@@ -1,0 +1,33 @@
+// Version resource, filled in by CMake from MOTHERVR_VERSION (see
+// CMakeLists.txt). Shown in the file's Properties > Details in Explorer, so
+// a player can tell which release they have installed.
+#include <winver.h>
+
+1 VERSIONINFO
+FILEVERSION     @MOTHERVR_VERSION_MAJOR@,@MOTHERVR_VERSION_MINOR@,@MOTHERVR_VERSION_PATCH@,0
+PRODUCTVERSION  @MOTHERVR_VERSION_MAJOR@,@MOTHERVR_VERSION_MINOR@,@MOTHERVR_VERSION_PATCH@,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEFLAGS       0
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_DLL
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "OpenMotherVR"
+            VALUE "FileDescription",  "OpenMotherVR: VR mod for Alien: Isolation"
+            VALUE "FileVersion",      "@MOTHERVR_VERSION@"
+            VALUE "InternalName",     "d3d11"
+            VALUE "LegalCopyright",   "GPL-3.0"
+            VALUE "OriginalFilename", "d3d11.dll"
+            VALUE "ProductName",      "OpenMotherVR"
+            VALUE "ProductVersion",   "@MOTHERVR_VERSION@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

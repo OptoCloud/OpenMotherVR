@@ -15,6 +15,17 @@ endif()
 # not stop a local build; CI turns it on.
 option(MOTHERVR_WERROR "Treat compiler warnings as errors" OFF)
 
+# Release version, stamped into the DLL's version resource. CI passes the
+# tag without its "v" (1.0.0, 1.0.0-rc.2); local builds are 0.0.0-dev.
+set(MOTHERVR_VERSION "0.0.0-dev" CACHE STRING "Version stamped into d3d11.dll")
+if(NOT MOTHERVR_VERSION MATCHES "^([0-9]+)[.]([0-9]+)[.]([0-9]+)([-+][0-9A-Za-z.+-]+)?$")
+    message(FATAL_ERROR "MOTHERVR_VERSION '${MOTHERVR_VERSION}' is not MAJOR.MINOR.PATCH[-pre]")
+endif()
+set(MOTHERVR_VERSION_MAJOR ${CMAKE_MATCH_1})
+set(MOTHERVR_VERSION_MINOR ${CMAKE_MATCH_2})
+set(MOTHERVR_VERSION_PATCH ${CMAKE_MATCH_3})
+configure_file(src/version.rc.in "${CMAKE_CURRENT_BINARY_DIR}/version.rc" @ONLY)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -106,6 +117,7 @@ add_library(mothervr SHARED
     src/runtime/openxr_hmd.cpp
     src/runtime/openxr_input.cpp
     src/mothervr.rc
+    "${CMAKE_CURRENT_BINARY_DIR}/version.rc"
 )
 
 if(MSVC)
