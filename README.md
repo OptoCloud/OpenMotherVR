@@ -56,14 +56,18 @@ Fixes to original issues
 - [x] Desktop mirror only filled a corner of the window
 - [x] Render-target-view leak every frame; out-of-range reads in the input
       hooks
-- [ ] Stale Oculus input on focus loss (with the Oculus backend)
+- [x] Stale Oculus input on focus loss: the Oculus backend is replaced by
+      OpenXR, and both backends zero the controller state while the game
+      lacks input focus (dashboard open)
 - [ ] Object pop-in: the game's per-object distance/LOD cull is wrong for
-      the wide per-eye field of view
+      the wide per-eye field of view; bypassed in stereo, not yet confirmed
+      in game
 - [ ] Anti-aliasing modes are switched off in the stereo path: FXAA and
       SMAA T1x re-enabled, SMAA T2x runs as T1x (no per-eye history);
       implemented, not yet seen in game
 - [ ] Short delay before the head-in-wall blackout, so walking through
-      doors does not flash black
+      doors does not flash black; implemented (600 ms), not yet confirmed in
+      game
 - [x] Controls only fit the Vive wand under OpenVR: SteamVR Input with
       default bindings for Index, Touch, WMR and Vive wands, rebindable in
       SteamVR (verified on Index)
