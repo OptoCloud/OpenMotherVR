@@ -64,9 +64,10 @@ extern std::uint8_t*  g_exit_request;
 extern bool g_vr_session_active;
 
 // AI.exe's "display changed" byte: when set, the game's frame loop rebuilds
-// its render targets (as after a window resize). Raised on every settings
-// push and when the mirror or pixel scale changes, so those take effect
-// without a restart.
+// its render targets (as after a window resize). Raised when a settings push
+// or console command changes the mirror or pixel scale, so those take effect
+// without a restart; an unchanged push leaves it alone (a rebuild is a
+// visible freeze).
 // From: DAT_10066d44 (AI.exe table slot 0x5F).
 extern std::uint8_t*  g_display_reset_flag;
 

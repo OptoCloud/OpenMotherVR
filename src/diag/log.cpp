@@ -5,9 +5,8 @@
 // because AI.exe spawns a launcher + game process and both end up running our
 // DllMain; without pid in the log it's hard to tell which is which.
 //
-// The file handle is opened per line (FILE_APPEND_DATA + FILE_SHARE_*). That
-// trades a few syscalls for atomicity across processes; both the launcher
-// and game write into the same log without coordination.
+// Both processes write into the same file without coordination; see g_file
+// below for how the writes stay whole.
 
 #include "log.h"
 
