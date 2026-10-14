@@ -14,6 +14,7 @@
 #include "../render/shader_patch.h"
 #include "../util/proc.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <mutex>
@@ -167,6 +168,45 @@ bool mirror_size(UINT& width, UINT& height) noexcept {
     return true;
 }
 
+// The game sizes its window for the display mode it picked: the monitor's
+// full resolution, or both eyes side by side under VR. Forced windowed, that
+// client area plus a title bar and borders runs past the screen. Shrink the
+// window to the monitor's work area (the whole monitor for a borderless
+// one), keeping its aspect ratio, and centre it. A window that already fits
+// is left alone, so a size the player picks stays.
+void fit_window(HWND hwnd) noexcept {
+    if (!hwnd || ::IsZoomed(hwnd) || ::IsIconic(hwnd)) return;
+    RECT window{}, client{};
+    if (!::GetWindowRect(hwnd, &window) || !::GetClientRect(hwnd, &client)) return;
+    MONITORINFO mi{sizeof(mi)};
+    if (!::GetMonitorInfoW(::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi)) return;
+
+    const bool framed = (::GetWindowLongW(hwnd, GWL_STYLE) & WS_CAPTION) == WS_CAPTION;
+    const RECT& area = framed ? mi.rcWork : mi.rcMonitor;
+    const LONG area_w = area.right - area.left, area_h = area.bottom - area.top;
+    const LONG win_w = window.right - window.left, win_h = window.bottom - window.top;
+    if (win_w <= area_w && win_h <= area_h) return;
+    if (client.right <= 0 || client.bottom <= 0) return;
+
+    const LONG frame_w = win_w - client.right, frame_h = win_h - client.bottom;
+    const double scale = std::min(double(area_w - frame_w) / client.right,
+                                  double(area_h - frame_h) / client.bottom);
+    if (scale <= 0.0) return;
+    const LONG w = LONG(client.right * scale) + frame_w;
+    const LONG h = LONG(client.bottom * scale) + frame_h;
+    // Asynchronous: the window belongs to the game thread, which may be
+    // waiting on this one.
+    ::SetWindowPos(hwnd, nullptr, area.left + (area_w - w) / 2, area.top + (area_h - h) / 2, w, h,
+                   SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+    diag::logf("proxy: mirror window {}x{} did not fit the monitor, now {}x{}", win_w, win_h, w, h);
+}
+
+void fit_game_window(IDXGISwapChain* sc) noexcept {
+    if (!mothervr::stereo::manager().device) return;
+    DXGI_SWAP_CHAIN_DESC desc{};
+    if (SUCCEEDED(sc->GetDesc(&desc)) && desc.Windowed) fit_window(desc.OutputWindow);
+}
+
 HRESULT __stdcall hook_ResizeBuffers(void* This, UINT BufferCount,
                                      UINT Width, UINT Height,
                                      DXGI_FORMAT NewFormat,
@@ -182,7 +222,9 @@ HRESULT __stdcall hook_ResizeBuffers(void* This, UINT BufferCount,
         if (mirror_size(Width, Height))
             mothervr::diag::logf("ResizeBuffers: mirror back buffer {}x{}", Width, Height);
     }
-    return g_real_resize(This, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+    const HRESULT hr = g_real_resize(This, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+    if (SUCCEEDED(hr) && is_game_swapchain(This)) fit_game_window(static_cast<IDXGISwapChain*>(This));
+    return hr;
 }
 
 // VirtualProtect-swap a single vtable slot. Returns the previous slot value
@@ -351,6 +393,7 @@ void install_swapchain_hooks(void* swapchain) noexcept {
 
     auto* sc = static_cast<IDXGISwapChain*>(swapchain);
     log_swapchain_desc(sc);
+    fit_game_window(sc);
 
     void** vtbl = *reinterpret_cast<void***>(sc);
 
