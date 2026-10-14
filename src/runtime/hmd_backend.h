@@ -84,7 +84,8 @@ public:
     virtual void submit_frame(ID3D11Texture2D* side_by_side) = 0;
     // Button glyphs and controls help for this controller family.       slot 9
     virtual void register_control_hints() = 0;
-    // Read the controllers into the input action tiers.                 slot 10
+    // Read the controllers into the input action tiers, unless the
+    // backend already did at the end of submit_frame.                   slot 10
     virtual void poll_input() = 0;
 
     // Someone is wearing the headset, upright: a pose taken now is a good

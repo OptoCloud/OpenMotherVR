@@ -31,6 +31,7 @@
 #include <cmath>
 #include <format>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace mothervr::runtime {
@@ -68,6 +69,7 @@ private:
     using Hands = std::array<openvr::HandPose, 2>;
     const Hands& hands_now();
     void read_hands();
+    void write_controls();
     openvr::Controls legacy_controls(const vr::TrackedDeviceIndex_t (&index)[2]);
 
     const vr::HmdMatrix34_t& hmd_matrix() const noexcept {
@@ -92,6 +94,9 @@ private:
 
     openvr::Actions actions_;
     bool glyphs_chosen_ = false;
+    // Render thread: submit_frame handed the game this frame's controls, so
+    // the next poll_input has nothing to do.
+    bool controls_written_ = false;
 
     // The hands' grip poses, read on the render thread right after each
     // WaitGetPoses (the poses head_pose's GetLastPoses returns) and handed
@@ -333,6 +338,9 @@ void OpenVrHmd::submit_frame(ID3D11Texture2D* side_by_side) {
     // Running start: block until the next frame's poses are due.
     compositor_->WaitGetPoses(nullptr, 0, nullptr, 0);
     read_hands();
+    // The controllers as of this WaitGetPoses go to the game now, before its
+    // next simulation step, not at the next BeginFrame (P10, as OpenXR).
+    write_controls();
 }
 
 // ---- extension -----------------------------------------------------------------
@@ -351,7 +359,19 @@ void OpenVrHmd::register_control_hints() {
     input::set_control_scheme(input::ControlScheme::Touchpad);   // until a controller shows up
 }
 
+// BeginFrame. Only when no submit has handed over the controls since the
+// last one (before the first frame, or a frame without an eye texture).
 void OpenVrHmd::poll_input() {
+    if (!std::exchange(controls_written_, false)) write_controls();
+}
+
+// Render thread. Reads its own copy of the device poses: poses_ belongs to
+// the game thread (head_pose).
+void OpenVrHmd::write_controls() {
+    controls_written_ = true;
+    vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};
+    compositor_->GetLastPoses(poses, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
+
     const vr::ETrackedControllerRole roles[2] = {vr::TrackedControllerRole_LeftHand,
                                                  vr::TrackedControllerRole_RightHand};
     vr::TrackedDeviceIndex_t index[2]{};
@@ -375,9 +395,9 @@ void OpenVrHmd::poll_input() {
     // The right hand near the head turns Interact into the flashlight.
     bool near_head = false;
     if (index[1] != vr::k_unTrackedDeviceIndexInvalid && index[1] < vr::k_unMaxTrackedDeviceCount) {
-        const auto& head = hmd_matrix().m;
-        const auto& hand = poses_[index[1]].mDeviceToAbsoluteTracking.m;
-        near_head = poses_[index[1]].bPoseIsValid &&
+        const auto& head = poses[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking.m;
+        const auto& hand = poses[index[1]].mDeviceToAbsoluteTracking.m;
+        near_head = poses[index[1]].bPoseIsValid &&
                     length(hand[0][3] - head[0][3], hand[1][3] - head[1][3], hand[2][3] - head[2][3]) < input::kNearHead;
     }
 
