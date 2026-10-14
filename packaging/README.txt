@@ -1,9 +1,9 @@
-OpenMotherVR (test build)
-=========================
+OpenMotherVR
+============
 
 A rebuild of the MotherVR VR mod for Alien: Isolation that works on
-Windows 10 and 11 with SteamVR. Private test build: please don't share it
-further.
+Windows 10 and 11 with SteamVR or an OpenXR runtime.
+Source, releases and issues: https://github.com/OptoCloud/OpenMotherVR
 
 Requirements
 - Alien: Isolation on Steam (the build Steam installs; GOG/Epic not tested)
@@ -54,4 +54,4 @@ If something goes wrong
 
 Known issues
 - No hand tracking yet (controllers act as a gamepad).
-- Please report anything odd, with mothervr.log.
+- Please report anything odd as an issue on GitHub, with mothervr.log.
