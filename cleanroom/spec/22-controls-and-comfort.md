@@ -1,0 +1,1186 @@
+<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build. Revision: r1 -->
+
+# 22. Controls and comfort (v2)
+
+The v2 controls and comfort features: smooth turning and the snap-turn
+options, a comfort vignette, seated and standing play with a height
+calibration, world scale as a setting, d-pad emulation, gestures, turning
+that respects interactions, leaning and holding breath while hiding,
+button glyphs per controller type, OpenXR as the default runtime, the v2
+part of the options page, a hotkey that turns VR off, and crash-safe
+logging.
+
+This document builds on 03, 04, 05, 06, 09, 11, 12 and 14 and follows
+`20-v2-overview.md` §1.1: every feature has its own `mothervr.json` key,
+its default gives exactly v1 behaviour, and with every key here at its v1
+value the mod behaves as v1 specifies.
+
+Addresses are RVAs (image base 0x400000) of the 2015 `AI.exe` (PE
+timestamp 0x54E3199D). The 2020 column is `?` throughout; every feature of
+this document that needs a game address stays off on the 2020 build (20
+§6). Labels for game functions and sites are spec labels (01); the
+implementation may rename them. Every site is verified before it is used
+(12 §4); a v2 feature is an optional fix, so a mismatch turns that feature
+off alone and is logged.
+
+Confidence: **[sure]** read from the game's code or data, or observed in
+game; **[likely]** strong inference; **[guess]** plausible, must be
+confirmed. Requirements that are design choices rather than facts are
+marked **[proposal]** with a one-line reason.
+
+## 1. Summary
+
+| Feature | Key (section 3) | v1 value | Section |
+|---|---|---|---|
+| all v2 features of this document at once | `EnhancedMode` | false | 3.1 |
+| smooth turning at a set speed, time-based | `Comfort.SmoothTurnSpeed` | 0 (the game's own look, as v1) | 4.2 |
+| snap-turn repeat interval | `Comfort.SnapTurnRepeatMs` | 300 | 4.3 |
+| a short fade at each snap step | `Comfort.SnapTurnFade` | false | 4.3 |
+| no turning during interactions | `Controls.InteractionAwareTurning` | false | 4.4 |
+| comfort vignette | `Comfort.Vignette` | 0 (off) | 5 |
+| seated or standing play | `Comfort.PlayMode` | `"Seated"` | 6.1 |
+| calibrated standing eye height | `Comfort.StandingEyeHeight` | 0 (not calibrated) | 6.2 |
+| world scale | `Comfort.WorldScale` | 1.0 | 6.3 |
+| d-pad emulation | `Controls.DpadEmulation` | false | 7 |
+| two-handed recenter gesture | `Controls.RecenterGesture` | false | 8.2 |
+| HUD toggle gesture | `Controls.HudToggleGesture` | false | 8.3 |
+| body-relative holster gestures | `Controls.HolsterGestures` | false | 8.4 |
+| lean while hiding by moving the head | `Controls.HidingLean` | false | 9.2 |
+| hold breath by covering the mouth | `Controls.HoldBreathGesture` | false | 9.3 |
+| glyphs per controller type, following changes | `Controls.ControllerGlyphs` | false | 10 |
+| OpenXR as the default runtime | (default of `VRRuntime`) | `"OpenVR"` | 11 |
+| v2 settings on the options page | (no key) | v1 page | 12 |
+| VR-off hotkey | `Controls.VrOffHotkey` | false | 13 |
+| crash-safe logging | `Controls.CrashSafeLog` | false | 14 |
+
+## 2. Game facts
+
+### 2.1 The input action names and their indices [sure for the table]
+
+The game names the actions of its three input maps (04 §2.4) in one static
+table in `.data` at RVA **0x124F120** (2020: ?). Each entry is 12 bytes:
+a pointer to the action's NUL-terminated name, the action's index in its
+map, and a kind (0 digital, 1 analog axis, 2 slider; sliders are analog
+actions of the map). The entries run map by map: player map (map 0)
+digital, then analog, then the menu map (map 1, from RVA 0x124F358), then
+the debug map (map 2, from RVA 0x124F490). These are the names
+`DATA\INPUT.XML` binds controls to (2.2).
+
+The entry counts match the counts observed in each map at the first remap
+(04 §2.4: 41/6, 19/6, 32/8), and every action function 04 §2.4 inferred from
+play matches the name at its index, so the table index is the map entry
+index [likely: the counts and all observed functions agree; confirmed by
+the logging of 19 item 1].
+
+Map 0 (player), digital:
+
+| Index | Name | Index | Name | Index | Name |
+|---|---|---|---|---|---|
+| 0x00 | `move_forward` | 0x0E | `melee` | 0x1C | `select_motion_tracker` |
+| 0x01 | `move_back` | 0x0F | `button_mash` | 0x1D | `select_torch` |
+| 0x02 | `move_left` | 0x10 | `reload_weapon` | 0x1E | `torch_beam` |
+| 0x03 | `move_right` | 0x11 | `activate_item` | 0x1F..0x24 | `select_item_1` .. `select_item_6` |
+| 0x04 | `turn_left` | 0x12 | `peek` | 0x25 | `change_dof_focus` |
+| 0x05 | `turn_right` | 0x13..0x17 | `select_weapon_1` .. `select_weapon_5` | 0x26 | `hud_menu` |
+| 0x06 | `look_up` | 0x18 | `prev_weapon` | 0x27 | `tab_left` |
+| 0x07 | `look_down` | 0x19 | `next_weapon` | 0x28 | `tab_right` |
+| 0x08 | `sprint` | 0x1A | `prev_main_weapon` | | |
+| 0x09 | `crouch` | 0x1B | `next_main_weapon` | | |
+| 0x0A | `aim` | | | | |
+| 0x0B | `fire_or_throw` | | | | |
+| 0x0C | `use` | | | | |
+| 0x0D | `back_close` | | | | |
+
+Map 0, analog: 0 `x_axis`, 1 `y_axis`, 2 `cam_vertical_rot`, 3
+`cam_horizontal_rot` (the turn action of 04 §6), 4 `analog_aim`, 5
+`analog_shoot` (sliders).
+
+Map 1 (menus), digital: 0 `ok`, 1 `cancel`, 2 `up`, 3 `down`, 4 `left`, 5
+`right`, 6 `start`, 7 `select`, 8 `open_menu`, 9 `craft_item`, 0x0A
+`alt_1`, 0x0B `alt_2`, 0x0C `scroll_up`, 0x0D `scroll_down`, 0x0E
+`minigame_top`, 0x0F `minigame_middle`, 0x10 `minigame_bottom`, 0x11
+`leaderboard`, 0x12 `player_info`. Analog: 0 `zoom_in`, 1 `zoom_out`
+(sliders), 2 `x_axis`, 3 `y_axis`, 4 `x_axis_right`, 5 `y_axis_right`; the
+table has a seventh, `scroll` (6), beyond the six the map uses.
+
+This resolves names 04 §2.4 left open: map 0 0x27 / 0x28 are `tab_left` /
+`tab_right`, map 1 index 1 is `cancel`, 9 `craft_item`, 0x0B and 0x0E
+`alt_2` and `minigame_top` (section 20).
+
+### 2.2 Default bindings that matter here (`DATA\INPUT.XML`) [sure]
+
+From the game's own `DATA\INPUT.XML` (20,802 bytes, Steam 2015; 14 §2.10):
+
+| Control | Player map, default gamepad device | Menu map, gamepad |
+|---|---|---|
+| `dpad_left` | `prev_main_weapon` (every preset) | `left` |
+| `dpad_right` | `next_main_weapon` (every preset) | `right` |
+| `dpad_up` | none (default and presets 1 to 3) | `up` |
+| `dpad_down` | none (default and presets 1 to 3); `crouch` in the remote-play presets 4 and 5 | `down` |
+| `lb` | `peek` and `tab_left` (default device) | `craft_item` |
+| `lcontrol` (keyboard) | `peek` | |
+
+So the game's d-pad functions are weapon cycling in play and item
+navigation in menus. The v1 thumbstick scheme already drives
+`prev_main_weapon` / `next_main_weapon` (04 §5.8.5: right stick down / up,
+indices 0x1A / 0x1B); v1 drives none of the menu map's `up`, `down`,
+`left`, `right`.
+
+The file's default player bindings (for example `aim` on `lt_button`,
+`select_motion_tracker` on `rb`, `crouch` on `rstick_button`) differ from
+the stock pad layout 04 §2.4 states from the prompts. Which bindings the
+2015 PC build actually loads for the pad is an open question (19 item 2).
+Nothing in this document depends on the answer: every feature here drives
+actions through their index or their original pad control as recorded at
+virtualisation (04 §3.2), never through an assumed preset.
+
+### 2.3 Peek, hiding and the breathing game [sure for the strings]
+
+- `peek` (map 0 digital 0x12) is the game's lean action. The game's
+  camera code has a `CameraPeek` behaviour (string at RVA 0xDC3948,
+  referenced from code at 0x01E5DD, 0x3462F1 and 0xD48791) and a peek
+  system with tuning names such as `max_vertical_peek`,
+  `max_horizontal_peek`, `max_peek_control_velocity` and
+  `peek_control_scaling` (strings around RVA 0x12531F8), which suggests
+  that while peeking a stick moves the lean [likely]. v1 drives no VR
+  input to `peek`.
+- A script entity that is the hiding place [likely, from its names] has methods named in a table at RVA
+  0xF12040: `disallow_interrupt`, `Get_In`, `Add_NPC`,
+  `Start_Breathing_Game`, `Breathing_Game_Started`, `End_Breathing_Game`,
+  `Breathing_Game_Ended`, `bind_all` and their `_finished` forms. Its
+  handler passes `Start_Breathing_Game` (string at RVA 0xF067B0) and
+  `End_Breathing_Game` (RVA 0xF06764) to the script event tap (11 §5.1,
+  RVA 0xA1BCC0): the `push imm32` of each string is at 0x51070C and
+  0x510765, and the `call rel32` to the tap at 0x510714 and 0x51076D. So
+  the tap that v1 already installs sees the start and the end of the
+  breathing game [sure for the calls; likely that the pair brackets the
+  game's hold-breath minigame while hiding].
+- The game also has a `CHR_HoldBreath` script entity (string at RVA
+  0xFD6838) and UI texts for the breathing game's prompt and tutorial
+  (`show_breathing_game_prompt`, `set_breathing_game_prompt_progress`,
+  `display_breathing_game_tutorial`, strings around RVA 0xF0073C).
+- `hiding_visibility_start` / `hiding_visibility_finish` reach the tap
+  as v1 already uses them (11 §5.3).
+
+Which control the breathing game reads to hold breath, and which inputs
+lean the view in a hiding place, are not verified (19 items 3 and 4).
+
+### 2.4 The HUD movies and how the game hides them [sure]
+
+| Label | RVA | What is there |
+|---|---|---|
+| `UiManagerPtr` | 0x134A78C | global pointer to the game's UI manager |
+| `UiFindObject` | 0x410420 | thiscall on the UI manager, one argument `const char* name`, `ret 4`; returns the UI object of that name or null. It takes the manager's critical section, so it is called on the game thread. Prologue `83 ec 08 53 55 56 8b f1`. 515 call sites |
+| `UiInvoke` | 0x4081E0 | thiscall on a UI object, one argument `const char* function`, `ret 4`: calls that public function of the object's movie. SEH prologue `6a ff 68 <imm32> 64 a1 00 00 00 00` |
+| `WeaponHudHide` | 0x40C220 | thiscall on the `weaponstuff` UI object, no arguments, plain `ret`: when the movie (+0x68) exists, invokes `force_hud_hidden`, else marks the request pending (+0x129); sets +0x40 to 1. Bytes `56 8b f1 83 7e 68 00` |
+| `WeaponHudShow` | 0x40C250 | the same object; invokes `force_hud_visible` (or marks it pending) and sets +0x40 to 0. Bytes `56 8b f1 83 7e 68 00` |
+| `PickupHudHide` | 0x40ADC0 | thiscall on the `pickupOverlay` UI object, no arguments, plain `ret`: invokes `force_hud_hidden`, sets +0x40 to 1. Bytes `56 68`, then the address of the string `force_hud_hidden` |
+| `PickupHudShow` | 0x40ADE0 | the same, `force_hud_visible`, +0x40 to 0. Bytes `56 68`, then the address of `force_hud_visible` |
+| names | 0xDC6CE8, 0xDC3934, 0xE0451C | the strings `weaponstuff`, `pickupOverlay`, `reaction_game` that the game passes to `UiFindObject` |
+| function names | 0xEFB2D8, 0xEFB2EC | `force_hud_hidden`, `force_hud_visible` |
+
+In the player's `UI.PAK`, three movies define `force_hud_hidden` and
+`force_hud_visible`: `WEAPONSTUFF.GFX` (the HUD: weapon, ammunition,
+prompts), `PICKUPOVERLAY.GFX` and `REACTION_GAME.GFX`. The game hides its
+HUD for its own reasons through these methods: the function at RVA
+0x1094A0 looks up `weaponstuff`, `pickupOverlay` and `radial_menu` and hides
+the first two through `WeaponHudHide` and `PickupHudHide`; the HUD's
+per-frame update (around RVA 0x44C0A1) re-applies hidden or visible from
+the object's +0x40 byte when its pending byte +0x408 is set. The +0x40 byte
+is the game's own "HUD forced hidden" state of that object [likely, from
+its writers].
+
+### 2.5 v1 game facts used here
+
+- First-person camera (FollowBehavior): yaw at +0x204 with its mirror at
+  +0x1FC, ±1.0 = ±180°, wrapped to [-1, 1]; look input byte +0x264; written
+  only while the camera is tracked and active (04 §2.7, 05 §6.1).
+- The per-frame stereo update on the game thread (05 §3.2), where snap
+  turn and the look gate run.
+- Cutscene and level-fade state from the UI entity messages (05 §6.2,
+  §3.2g).
+- Interaction and hiding state from the script event tap (11 §5.3).
+- Recentering (03 §2, 04 §8, 09 §6) and the near-the-head test (04 §5.10).
+- The stereo mode at stereo object +0x60: 1 while a menu is on the virtual
+  screen (05 §1).
+- Detaching the stereo device after a late failure (02 §7.4).
+- The keyboard key test (04 §2.2, 05 §1).
+
+## 3. Settings
+
+### 3.1 Keys
+
+New keys go in two new objects inside `Settings`: `Comfort` and
+`Controls`, plus one key in `Settings` itself. The key names are this
+project's own. Reading, writing and sanitising follow 06 §3: each key is
+read on its own, a missing key or one of the wrong type gives its default,
+unknown keys are kept on save, and `Comfort` or `Controls` that is not an
+object is replaced by an object on the next write. The file is still not
+rewritten at start-up (06 §3.1), so an upgrade from v1 leaves the file
+untouched until the player changes a setting; the first write adds the new
+keys with their values.
+
+| Key | JSON type | Default (v1 value) | Values / range, sanitise | Takes effect |
+|---|---|---|---|---|
+| `EnhancedMode` | bool | false | | at once (see below) |
+| `Comfort.SmoothTurnSpeed` | number | 0 | 0, or 30 to 360 (degrees per second); a value in (0, 30) becomes 30, above 360 becomes 360, NaN or negative becomes 0 | at once |
+| `Comfort.SnapTurnRepeatMs` | integer | 300 | 0 (no repeat), or 150 to 1000; a value in (0, 150) becomes 150, above 1000 becomes 1000, negative becomes 300 | at once |
+| `Comfort.SnapTurnFade` | bool | false | | at once |
+| `Comfort.Vignette` | number | 0 | 0 to 1 (0 off); outside or NaN becomes 0 | at once |
+| `Comfort.PlayMode` | string | `"Seated"` | `"Seated"`, `"Standing"` (case-sensitive); anything else is `"Seated"` | at the next recenter (6.1) |
+| `Comfort.StandingEyeHeight` | number | 0 | 0 (not calibrated) or 1.0 to 2.2 (metres); anything else becomes 0 | at once |
+| `Comfort.WorldScale` | number | 1.0 | 0.5 to 1.5; outside or NaN becomes 1.0 | at once (6.3) |
+| `Controls.InteractionAwareTurning` | bool | false | | at once |
+| `Controls.DpadEmulation` | bool | false | | at once |
+| `Controls.RecenterGesture` | bool | false | | at once |
+| `Controls.HudToggleGesture` | bool | false | | at once |
+| `Controls.HolsterGestures` | bool | false | | at once |
+| `Controls.HidingLean` | bool | false | | at once |
+| `Controls.HoldBreathGesture` | bool | false | | at once |
+| `Controls.ControllerGlyphs` | bool | false | | at the next controller identification (10) |
+| `Controls.VrOffHotkey` | bool | false | | at once |
+| `Controls.CrashSafeLog` | bool | false | | next launch (14) |
+
+**`EnhancedMode`** is the single v2 switch 20 §9 proposes [proposal: one
+switch tells a v2 problem from a v1 one, and keeps an upgrade at v1]. While
+it is false every key of this table except `EnhancedMode` is treated as its
+v1 value, whatever the file holds; the stored values are kept and written
+back unchanged, so turning it on again restores the player's choices.
+While it is true each key applies as stored. Whether `EnhancedMode` also
+gates the keys of 21, 23 and 24 is 20's decision; this document requires
+only that it gates the keys above. (`VRRuntime`'s default, section 11, is
+not a v2 key and is not gated.)
+
+Reasons for the ranges [proposal for each]:
+
+- `SmoothTurnSpeed` 30 to 360 °/s: below 30 °/s turning a full circle
+  takes over 12 s, too slow to react to the Alien; above 360 °/s the turn
+  is no smoother than a snap and much worse for comfort. 0 keeps v1's turn
+  through the game's own look.
+- `SnapTurnRepeatMs`: 300 ms is v1's value (04 §6, 05 §3.2c), confirmed as
+  the default. Below 150 ms a held stick spins faster than a player can
+  stop on the step wanted; above 1000 ms a held stick feels unresponsive.
+  0 means one step per deflection, for players who prefer to flick.
+- `StandingEyeHeight` 1.0 to 2.2 m: covers seated-height children to tall
+  adults standing; a value outside cannot be a calibrated eye height.
+- `WorldScale` 0.5 to 1.5: the range `-vrscale` accepts (06 §2, kept for
+  compatibility), so the setting and the switch agree.
+
+### 3.2 Content
+
+With the v2 defaults the two new objects parse to:
+
+```json
+"Comfort": {
+    "PlayMode": "Seated",
+    "SmoothTurnSpeed": 0,
+    "SnapTurnFade": false,
+    "SnapTurnRepeatMs": 300,
+    "StandingEyeHeight": 0,
+    "Vignette": 0,
+    "WorldScale": 1.0
+},
+"Controls": {
+    "ControllerGlyphs": false,
+    "CrashSafeLog": false,
+    "DpadEmulation": false,
+    "HidingLean": false,
+    "HoldBreathGesture": false,
+    "HolsterGestures": false,
+    "HudToggleGesture": false,
+    "InteractionAwareTurning": false,
+    "RecenterGesture": false,
+    "VrOffHotkey": false
+}
+```
+
+next to `"EnhancedMode": false` in `Settings`. Formatting and order are the
+implementation's choice (06 §3.2).
+
+### 3.3 Commands and pushes
+
+Each key gets a mod command (06 §4.1, §4.2) and a push to the options page
+(06 §4.3), following v1's rules: a command is one string beginning with
+`mvr_`, its value decimal with `.` as the decimal point; a bad or
+out-of-range value changes nothing (06 §4.2 "one rule for bad values"); a
+change is saved (06 §3.1) and logged (11 §2.5). The command names and the
+page's functions are the implementation's own, under one constraint: each
+begins with `mvr_` so that 06 §4.1 recognises it as a mod command, and none
+equals a v1 command name. Two commands carry no setting value:
+
+- **calibrate height**: takes the standing eye height now (6.2);
+- (no command turns VR off; that is the hotkey of 13 only.)
+
+A pushed value never makes the page send a command back (06 §4.3).
+
+## 4. Turning
+
+### 4.1 Which turning applies
+
+The turn value is v1's: the merged value of map 0's turn action (04 §6:
+the larger-magnitude of the real right stick and the VR turn value of 04
+§5.8.5). Exactly one of three turnings applies, chosen every update:
+
+| `Input.SnapRotation` | `Comfort.SmoothTurnSpeed` | Turning |
+|---|---|---|
+| on | any | **snap turn** (04 §6), with the v2 repeat and fade of 4.3 |
+| off | 0 | **game look**: the game's own stick look turns smoothly (v1, 04 §7), scaled by the game's Camera Speed (4.5) |
+| off | above 0 | **smooth turn** written by the mod (4.2) |
+
+The look byte (FollowBehavior +0x264, 04 §7, 05 §3.2d) becomes: 1 while
+the stereo device is not running; otherwise 1 when keyboard/mouse is in use
+(05 §3.2b) or the turning is game look; 0 otherwise. So with smooth turn
+the game's own stick look is off, as with snap turn: pitch comes from the
+head only, and the stick does not turn twice. With every v2 key at its v1
+value the table and this rule reduce to v1's.
+
+All turning (snap and smooth) applies only while the conditions of 04 §6
+hold (stereo running, the active pad device exists, a FollowBehavior is
+tracked and active, stereo mode not 1), and, with
+`Controls.InteractionAwareTurning` on, while 4.4 allows it.
+
+### 4.2 Smooth turn
+
+Required result: while the turn value is deflected past the centre zone,
+the player's heading changes continuously at a rate set in degrees per
+second, the same at any frame rate.
+
+- **Rate.** With `v` the turn value, `d = (|v| - 0.33) / (1 - 0.33)`
+  clamped to [0, 1], the yaw changes at `SmoothTurnSpeed * d` degrees per
+  second, to the right for `v > 0` (the sign of 04 §6's snap step). [proposal:
+  0.33 is the centre zone 04 §5.8.5 already applies to the VR turn value,
+  applied here to the merged value too so a real stick at rest never
+  drifts; the linear ramp gives fine control near the zone and full speed
+  at full deflection.]
+- **Time base.** Each update adds `rate * dt` to the yaw (+0x204, in
+  half-turn units: degrees / 180) and writes the same value to +0x1FC,
+  wrapped into [-1, 1] as 04 §6 does. `dt` is the time since the previous
+  update in which smooth turn applied, from a monotonic clock, at most 50
+  ms. The first update after smooth turn becomes applicable (after a menu,
+  a cutscene, an interaction, a camera change) uses `dt = 0`. [proposal: the
+  cap keeps a hitch or a long frame from turning the player by a large
+  jump; below 20 frames per second the turn slows down instead.]
+- Accumulated in floating point; no step quantisation.
+- The game's frame-time argument of the stereo update (05 §3.1) may be used
+  instead of the clock if it is the real time between updates; whether it
+  is is not verified, so the clock is the reference.
+
+Edge cases: the stick held while a menu opens does nothing until the menu
+closes, then turning resumes with `dt = 0`; focus loss zeroes the VR turn
+value (04 §5.1) so smooth turn stops at once; a real pad's right stick
+turns the same way as the VR stick.
+
+### 4.3 Snap turn: repeat and fade
+
+**Repeat.** v1's snap turn (04 §6, 05 §3.2c) with the repeat interval
+`Comfort.SnapTurnRepeatMs` instead of the fixed 300 ms. 0 means a held stick
+steps once and steps again only after returning inside 0.5. Default 300:
+v1's value is confirmed (its reason, 05 §3.2c, still holds).
+
+**Fade** (`Comfort.SnapTurnFade`). Required result: each snap step is
+hidden behind a brief darkening, so the player never sees the view jump.
+
+- The first head-tracked frame rendered with the new yaw is shown fully
+  black in both eyes; the following frames return from black to the
+  normal image over 100 ms. [proposal: a fade-in only adds no input delay
+  (the step is not held back), and 100 ms is short enough not to hide the
+  Alien moving while long enough that the cut is not seen.]
+- A further step during the fade-in restarts it from black.
+- The darkening is drawn into each eye's image exactly like the vignette
+  (section 5) with full strength over the whole eye.
+- Screen frames (menus) are never darkened; with the fade off nothing is
+  drawn.
+
+Thread note: the step is made on the game thread; the frame that carries
+it is identified by the render pose the game read for it (03 §6.3) or by a
+step counter published with an atomic store and read by the render thread
+at that frame's slot 6 (section 15).
+
+### 4.4 Interaction-aware turning
+
+With `Controls.InteractionAwareTurning` on, no turning (snap, smooth, or
+game look from the stick; mouse look stays) happens while any of these
+holds:
+
+- the interaction state is "in interaction" (11 §5.3), any kind;
+- the breathing game is in progress (9.1);
+- a cutscene or level fade is in progress (05 §3.2g);
+- the first-person camera is not tracked and active (already v1: the game
+  owns the camera, 05 §6.1).
+
+While turning is blocked, a held snap deflection does not step and does not
+repeat; after the block ends, the stick must return inside 0.5 before the
+next snap step (as v1 does when the camera becomes inactive, 04 §6), and
+smooth turn resumes with `dt = 0`. The look byte stays 0 during the block
+when the turning is game look and pad or VR input is in use, so the
+game's own stick look cannot turn either. [proposal: during keypads,
+terminals, levers and hacking the stick drives the interaction; turning
+the body at the same time moves the interaction prompt out of view.]
+
+Hiding (11 §5.3 "hiding") does not by itself block turning: the game limits
+the camera in a hiding place itself [likely; to confirm in game, 18 item 7].
+
+With the key off, turning is v1's: the interaction state is ignored.
+
+### 4.5 The game's Camera Speed
+
+The stock Game page's Camera Speed (`_cameraSensitivityItem`, sends
+`set_gamepad_speed`; 06 §5.3) scales the game's own stick look. It
+therefore scales game look (4.1) only. Snap turn ignores it (v1), and so
+does smooth turn: its speed is `SmoothTurnSpeed` alone [proposal: one
+setting with a unit the player can reason about; Camera Speed keeps its
+stock meaning for flat play]. Camera Speed stays enabled in VR (06 §5.3).
+The options page's description of `SmoothTurnSpeed` must say that Camera
+Speed does not affect it.
+
+## 5. Comfort vignette
+
+**What the player experiences.** While moving with the stick or turning
+smoothly, the edge of the view darkens, narrowing the visible field; it
+clears when the movement stops. The stronger the setting, the narrower the
+clear area.
+
+**When it applies.** The vignette's target strength is
+`Comfort.Vignette` while, in the current game frame:
+
+- the merged movement value (map 0 analog actions 0 and 1, VR and real
+  pad) has a magnitude above 0.1, or
+- smooth turn (4.2) changed the yaw, or the game look turned with the
+  stick (4.1, turn value past 0.33);
+
+and 0 otherwise. Snap steps do not trigger it (they use the fade, 4.3).
+Keyboard movement does not trigger it [proposal: keyboard players are not
+in the headset's comfort case the setting addresses; to revisit]. The
+shown strength moves towards the target at a rate that takes 0 to full in
+150 ms and full to 0 in 300 ms. [proposal: 0.1 ignores stick noise; a fast
+onset covers the start of motion, where discomfort begins, and a slower
+release avoids flicker when the stick is briefly released.] It is 0 in
+screen frames and while the stereo device is not running.
+
+**Shape** (required result). In each eye the vignette is a function of the
+angle from that eye's forward axis: pixels whose angle from the axis is
+below an inner radius are untouched; beyond an outer radius they are black;
+in between they darken smoothly. With strength `k` in (0, 1], the inner
+radius is `60° - 35° * k` and the outer radius is the inner radius plus
+15°. [proposal: at full strength a clear cone of 25° around the gaze
+centre, roughly the common "strong" comfort setting; at low strength the
+darkening stays outside most headsets' sweet spot.] The shape is the same
+in both eyes in angle, so the darkened ring fuses and does not appear
+doubled.
+
+**Rendering approach** (required result, both runtimes). The vignette is
+drawn into each eye's image itself, so it is part of what the runtime
+composites and reprojects:
+
+- It is drawn in slot 6 of a head-tracked frame, on the render thread,
+  into the stereo render target (device +0x158), after the game has
+  finished the frame and before the frame is handed to the runtime:
+  before `IVRCompositor::Submit` on OpenVR (03 §6.2), before the copy into
+  the eye swapchain images on OpenXR (09 §5.2).
+- Each eye half is darkened about its own forward axis. The game renders
+  each eye with the symmetric FOV of 03 §3.2 (tangents `maxH`, `maxV`), so
+  the eye's forward axis is at the centre of its half, and a pixel at
+  normalised position `(u, v)` in the half has direction tangents
+  `((2u - 1) * maxH, (1 - 2v) * maxV)`; its angle from the axis is
+  `atan(sqrt(tx^2 + ty^2))`.
+- The pass multiplies the colour by the darkening factor (blend to black);
+  it never brightens and never touches pixels with factor 1.
+- The pass leaves the game's D3D11 pipeline state as it found it (the same
+  requirement as the mirror draw, 03 §8), uses resources created when the
+  target size changes, and allocates nothing per frame (12 §6.1).
+- Nothing is drawn while the shown strength is 0 and no snap fade runs, so
+  the feature off costs one comparison per frame.
+- The desktop mirror shows the vignette too, since it samples the same
+  target [proposal: the mirror shows what the player sees].
+
+**Cost.** One full-target pass while active: one draw per eye half over at
+most 2 x the eye pixel count (for example about 14.5 megapixels at 2688 x
+2688 per eye), a single multiply per pixel. It must stay within the
+render-thread rule of 12 §6.1 (no wait, no readback) and is measured in
+game (18 item 4); the target is well under 0.2 ms of GPU time at that size
+on current hardware [proposal: the bound to check against].
+
+**Edge cases.** Menus and videos (screen frames): no vignette. Cutscenes:
+the FollowBehavior is inactive, so no movement or turn drives it. Death and
+reload: the strength falls to 0 with the movement. Focus loss: VR movement
+reads 0, so it fades out. Runtime None or no device: nothing is drawn.
+
+## 6. Seated and standing play, world scale
+
+### 6.1 Seated and standing modes
+
+How v1 places the head (03 §1, §2.1): the game receives the head pose
+relative to the reference pose, and the reference keeps the head's full
+position at the latest recenter, height included. So at every recenter the
+player's eye is put at the game character's eye height, whatever the
+player's real height or posture. That is the right behaviour seated, and
+it is v1.
+
+| `Comfort.PlayMode` | Vertical part of the reference | Result |
+|---|---|---|
+| `"Seated"` (v1) | the head's height at the latest recenter (03 §2.1) | the eye is at the character's eye height after every recenter |
+| `"Standing"`, calibrated | the calibrated standing eye height `h` (6.2), measured from the floor, never changed by a recenter | standing straight, the eye is at the character's eye height; ducking or kneeling lowers the view by the real amount, whenever the last recenter happened |
+| `"Standing"`, not calibrated | as seated, until a calibration is taken (6.2) | |
+
+Required result for standing: the vertical offset the game receives is
+`(current head height above the floor - h) * s` (s the world scale, 6.3),
+while the horizontal part and the yaw keep v1's recenter behaviour. The
+recenter that a loading screen or putting the headset on triggers (03 §2.2)
+then no longer resets the height when the player happens to be crouching.
+
+Floor height comes from the runtime:
+
+- OpenVR: the standing tracking universe the mod already uses (03 §1): its
+  Y is the height above the calibrated floor.
+- OpenXR: the `STAGE` reference space when the runtime supports it, else
+  `LOCAL_FLOOR` when the runtime offers it (core in OpenXR 1.1, or the
+  `XR_EXT_local_floor` extension); the head is located in that space at the
+  same time as the frame's views (09 §5.3). If neither is available,
+  standing mode is unavailable on this runtime: play is seated and this is
+  logged once [proposal: a height without a floor reference drifts with
+  each re-anchor of the base space, 09 §6.3].
+
+Who uses the mode: 21 (real crouch, room-scale) reads it; this document
+owns the setting and the calibration (20 §4).
+
+The mode takes effect at the next recenter, which a change from the menu
+requests (as a pending automatic request, 05 §3.2e) [proposal: switching
+the reference mid-play would jump the view].
+
+### 6.2 Height calibration
+
+Required result: `Comfort.StandingEyeHeight` holds the player's standing
+eye height in runtime metres (before world scale), measured from the
+floor.
+
+- **Taking it.** On the calibrate command (3.3) from the options page, the
+  mod waits 3 s (shown on the page as a countdown, so the player can take
+  off the controller and stand straight), then takes the head's height
+  above the floor from the first valid head pose while the headset is in
+  use (03 §2.3, 09 §6.2), stores it, saves the file and logs it.
+  [proposal: 3 s is time to stand up straight after pressing the button.]
+- **Automatic first calibration.** In standing mode with no calibration
+  (0), the first recenter taken while the headset is in use and upright
+  also takes the calibration. [proposal: a player who picks standing and
+  never calibrates still gets a sensible height; it is the head height at
+  the moment play starts, which is usually standing.]
+- A height outside 1.0 to 2.2 m is not taken (logged; the old value
+  stays).
+- An invalid pose never calibrates; the request stays pending until a
+  valid pose arrives, like a recenter (03 §2.1).
+
+### 6.3 World scale
+
+`Comfort.WorldScale` is the world scale `s` of 03 (metres scale of head and
+eye positions, hand positions, 04 §5.11), as a setting. The `-vrscale`
+switch (06 §2) still wins for its run: when it is present and accepted, `s`
+is its value and the setting is ignored (shown on the page, but the page
+says the command line overrides it). Without the switch `s` is the setting.
+
+Changes from v1 (03 parameter table, 06 §1): `s` is no longer read once
+when the device is created. A change from the menu applies from the next
+frame: the head pose (03 §1), the eye offsets (03 §5, refreshed every slot
+5), the reference pose (re-converted with the new `s`, so the view does not
+jump: the head stays where it is relative to the reference) and the hand
+poses all use the new value. Runtime layer poses (09 §5.2) never use `s`.
+
+Order with standing mode and real crouch (20 §10 item 4): positions are
+taken relative to the reference in runtime metres first, then multiplied by
+`s`. The standing height `h` and 21's crouch threshold are in runtime
+metres, before `s` [proposal: they describe the player's body, which does
+not change with the world's scale].
+
+## 7. D-pad emulation
+
+**What the player experiences.** On VR controllers, which have no d-pad,
+the game's d-pad functions (2.2) can still be used: weapon cycling in play
+and item navigation in menus and interaction screens.
+
+**Source** [proposal]: the left stick's direction becomes a d-pad press
+while any of these holds:
+
+- an interaction is in progress (11 §5.3), or the breathing game (9.1);
+- a menu is on the virtual screen (stereo mode 1);
+- the player holds the "d-pad modifier", a new semantic boolean input (04
+  §5.8.1) whose default binding is the left stick click held for 0.3 s
+  [proposal: the click alone is sprint; a hold distinguishes it]; on wands
+  the left touchpad's four edges while clicked.
+
+Reason: during interactions and in menus the left stick does not walk the
+player, so its direction is free; elsewhere a deliberate modifier keeps
+walking unaffected.
+
+**Direction.** With the left stick at `(x, y)`: a direction is pressed when
+the stick is beyond 0.6 along that axis and the larger of `|x|`, `|y|`
+(one direction at a time); it is released below 0.4. [proposal: hysteresis
+so a stick at the threshold does not chatter; one direction at a time as on
+a d-pad's common use.] While a d-pad direction is pressed from the stick,
+the movement value read from that stick is 0 (no double input).
+
+**What it drives** (required result): while a direction is pressed, every
+action of maps 0 and 1 whose **original pad control** (04 §3.2) is that
+d-pad direction (0x04 DPAD_UP, 0x05 DPAD_DOWN, 0x06 DPAD_LEFT, 0x07
+DPAD_RIGHT) has its VR digital state set, merged with v1's state for that
+action by OR. Under the default bindings this is `prev_main_weapon` /
+`next_main_weapon` (map 0, left / right) and `up`, `down`, `left`, `right`
+(map 1). Driving by original control follows whatever the player bound to
+the d-pad and needs no table of actions. Activity (04 §5.1) counts these
+values like any other.
+
+**Glyphs.** With d-pad emulation on, prompts for actions whose original
+control is a d-pad direction show a glyph of the emulated control (the
+left stick direction) instead of the stock d-pad glyph (10, 14).
+
+**With the key off** no d-pad state is written (v1).
+
+Whether some screens read the pad's d-pad without an action binding, and
+which interaction screens need the d-pad at all, is open (19 item 5).
+
+## 8. Gestures
+
+### 8.1 Common rules
+
+- Gestures use the hand and head poses of the render thread's controls
+  write (04 §5.9, §5.10), taken at the same time as the controls they
+  modify, in runtime metres before world scale. A hand without a valid
+  pose never takes part in a gesture.
+- Distances are measured from the head's position (the HMD pose, as 04
+  §5.10); "in head frame" means relative to the head, rotated by the
+  inverse of the head's yaw only, with x right, y up, z back.
+- A gesture fires once per performance: after firing it needs its trigger
+  released before it can fire again.
+- No gesture fires while the runtime has no input focus (04 §5.1: every
+  input reads released), or in the first 0.5 s after focus returns
+  [proposal: a hand held still while the dashboard closes must not fire
+  anything].
+- A gesture's result that touches the game (a recenter, the HUD, an action)
+  is carried out on the game thread (section 15).
+- Each gesture is logged when it fires (16), and, with `DebugOptions` on,
+  when it was suppressed and why.
+
+### 8.2 Two-handed recenter
+
+**Gesture.** Both grips pressed (the Aim and Tracker semantic inputs, 04
+§5.8.1) while both hands are within 0.30 m of the head, held together for
+0.75 s. [proposal: both hands at the face with both grips held for most of
+a second does not happen in play; the hold time and the second hand rule
+out aiming with the tracker raised.]
+
+**Result.** A manual recenter as the v1 chord gives (04 §8): taken at once
+(once per gesture), never from an invalid pose (03 §2.1), the virtual
+screen re-placed (05 §3.2e). It is logged with the trigger "gesture".
+
+**False triggers.** Not while Fire is pressed; the timer restarts whenever
+either condition breaks. The grips still drive Aim and the tracker while
+the gesture is held (v1 behaviour of the grips is not changed).
+
+### 8.3 HUD toggle
+
+**Gesture.** The left hand within 0.20 m of the head (the near-head
+distance of 04 §5.10, used for the left hand) and a press of the Map input
+(04 §5.8.1; the left lower face button by default). While the left hand is
+near the head and this gesture is on, the Map input drives the HUD toggle
+and not the map. [proposal: a deliberate "touch the side of the helmet"
+movement; the map is never opened by accident because Map does one thing at
+a time.]
+
+**Result.** Each gesture flips a "HUD hidden by the player" state, which
+starts visible each session:
+
+- hidden: the `weaponstuff` and `pickupOverlay` HUD movies are hidden
+  through the game's own methods (2.4: `WeaponHudHide`, `PickupHudHide`,
+  each on the object `UiFindObject` returns for its name, only when the
+  object exists), on the game thread;
+- visible: they are shown again through `WeaponHudShow` and
+  `PickupHudShow`, **unless the game itself hides the HUD at that moment**
+  (the game's own hide, for example the one at 0x1094A0, leaves the +0x40
+  byte set and the mod does not override it).
+
+Required: while the player's state is hidden, the HUD stays hidden even
+when the game shows it again for its own reasons (a cutscene ending): the
+mod re-applies the hide on the next update in which it finds the object's
++0x40 byte at 0. When the player shows the HUD, the mod does not show a HUD
+the game is hiding for its own purpose: it restores visibility only if it
+was the mod that hid it. Interaction prompts and objective messages are in
+these movies, so hiding the HUD hides them too; the options page says so.
+The virtual screen and menus are not affected.
+
+Before first use the six sites of 2.4 are verified (prologue bytes, the
+`push` operands pointing at the named strings). A mismatch turns the HUD
+toggle off and is logged.
+
+### 8.4 Holster gestures
+
+**Gesture** [proposal]. A grip press that begins while the hand is in one
+of these zones (head frame, metres):
+
+| Zone | Where | Drives (map 0 action) |
+|---|---|---|
+| right shoulder | right hand, above the head's height minus 0.25, behind the head (z above 0.05) | `next_main_weapon` (0x1B) |
+| left shoulder | left hand, same zone mirrored | `prev_main_weapon` (0x1A) |
+| left hip | left hand, below the head's height minus 0.55, left of centre (x below -0.10) | `select_torch` (0x1D) |
+| chest | either hand, between 0.30 and 0.55 below the head's height, within 0.15 of centre, in front (z below -0.10) | `select_motion_tracker` (0x1C) |
+
+[proposal: reaching over the shoulder for a weapon and to the hip for the
+torch are familiar VR conventions; the zones do not overlap each other or
+the near-head zone of 8.3; these are starting values to tune in play.]
+
+**Result.** The action is pressed for as long as the grip is held, as if
+its button were held; when the grip is released it is released. A grip
+press consumed by a holster does not also drive Aim or the tracker (and is
+not counted by `Input.ToggleGrips`) until it is released [proposal: one
+owner per input at a time, 20 §5]. Grip presses that begin outside every
+zone behave as v1.
+
+Holsters are off during interactions and in mode 1.
+
+## 9. Hiding: lean and hold breath
+
+### 9.1 State
+
+The interaction state of 11 §5.3 gains one value, **breathing game**
+(bool): set by `Start_Breathing_Game` and cleared by `End_Breathing_Game`
+(2.3), both received through the event tap; also cleared by
+`hiding_visibility_finish` and at every loading screen. This state is kept
+whenever the tap is installed, so its log (11 §4.3) can confirm the
+bracket in play before 9.3 relies on it.
+
+### 9.2 Lean while hiding
+
+**What the player experiences.** In a hiding place, physically leaning
+(back into a locker, sideways or up from behind cover) makes the game's
+character lean the same way, so the game's own rules about being seen
+follow the player's real posture.
+
+**Required result** (`Controls.HidingLean`). While hiding (11 §5.3) and
+not in a menu: the head's offset from where it was when hiding began
+(head frame of that moment, yaw only), when it exceeds 0.08 m along an
+axis, produces the game's lean input in that direction; below 0.05 m it
+produces none [proposal: a deliberate lean is well beyond 8 cm, a breath or
+a nod stays within 5 cm; hysteresis avoids chatter]. The amount is
+proportional up to 0.25 m, then full.
+
+**Which game input leans.** Not verified (19 item 3). Candidates in order:
+the `peek` action (map 0 digital 0x12) together with the movement axes
+(map 0 analog 0 and 1) [guess: the peek system's "peek control" tuning
+names, 2.3]; the movement axes alone [guess]. Until confirmed, the
+implementation keeps this feature off (the key is accepted and stored, the
+page shows it disabled, the log says why). The method to confirm it is in
+19 item 3.
+
+While the lean drives the movement axes, the left stick's own movement
+value is added and the sum clamped to [-1, 1] (04 §5.1).
+
+### 9.3 Hold breath
+
+**What the player experiences.** When the game asks the hiding player to
+hold their breath (the breathing game), covering the mouth with a hand
+holds the breath, as well as the game's own control.
+
+**Required result** (`Controls.HoldBreathGesture`). While the breathing
+game is in progress (9.1): the game's hold-breath input is pressed while
+either hand is within 0.12 m of the mouth point, defined as 0.09 m below
+and 0.07 m in front of the head position in the head frame [proposal: a
+point close to the mouth of an average adult wearing a headset; 12 cm is
+"hand over mouth", not "hand near the face"]. It is released when the hand
+moves beyond 0.18 m. The game's own control keeps working.
+
+**Which game input holds breath.** Not verified (19 item 4). Until it is,
+this feature stays off as 9.2 does.
+
+## 10. Per-controller button glyphs
+
+v1 chooses one glyph set per run, at the first right-hand identification,
+from two sets (touchpad, thumbstick; 04 §4.1, §5.5). With
+`Controls.ControllerGlyphs` on:
+
+**Sets.** One glyph set per controller family, each image showing that
+controller's own control (its shape and its label):
+
+| Family | Identified by (OpenVR SteamVR Input: `Prop_ControllerType_String`; OpenXR: interaction profile) | Notes |
+|---|---|---|
+| Index | `knuckles`; `/interaction_profiles/valve/index_controller` | A / B on both hands, trackpads, thumbsticks |
+| Touch (Quest, Rift) | `oculus_touch`; `/interaction_profiles/oculus/touch_controller` | A / B right, X / Y left, menu button |
+| WMR | `holographic_controller`; `/interaction_profiles/microsoft/motion_controller` | touchpad halves for the face-button roles (04 §5.4) |
+| Vive wand | `vive_controller`; `/interaction_profiles/htc/vive_controller` | the touchpad set of 04 §4.1 |
+| generic | anything else, or `khr/simple_controller` | the thumbstick set of 04 §4.1 (v1 images) |
+
+The glyph for a prompt is the one of the control that drives the
+prompted function under the **default binding of that family** (04 §5.8.2
+and §5.8.4 tables), per runtime. Under OpenXR the Index pause is the left
+trackpad force (04 §5.8.4); under SteamVR Input it is the left trackpad
+click; both show a trackpad glyph.
+
+**Per hand.** Controls of the left hand use the left controller's family,
+controls of the right hand the right one's [proposal: mixed controllers are
+rare, but the rule costs nothing and is never wrong].
+
+**Following changes.** The family is re-evaluated at every controller
+identification (OpenVR: each change of the device in a hand role, 04
+§5.5; OpenXR: each interaction profile change). When a family changes, the
+glyph names change on the render thread as v1 requires (04 §3.6: a complete
+name, never a mix) and the prompts on screen redraw by the mechanism of 04
+§4.2, without the player touching another device. The controls help page
+(04 §5.7) is pushed with that family's entries at the next push.
+
+**d-pad and v2 inputs.** With d-pad emulation on, d-pad codes get the
+emulated control's glyph (7). With holsters, gestures and hiding features,
+no prompt changes (the game has no prompt for them).
+
+**Resources.** 14 gains the images of every family's set in the stock
+glyph format (14 §2.9), drawn by this project, and registers their input
+ids in the 19 movies (14 §3.4). Ids and file names are the
+implementation's choice under 04 §4.1's constraints. When the patched
+archive is not in use, stock glyphs stay (04 §4.2).
+
+**With the key off**, v1's choice applies exactly.
+
+## 11. OpenXR as the default runtime
+
+This changes a v1 default (06 §1, ANSWERS r4) and is a **user decision**
+pending (20 §9). Required when it is made:
+
+- A **fresh** `mothervr.json` (first launch, 06 §3.1) is written with
+  `VRRuntime` `"OpenXR"`, and a file without a `VRRuntime` key (or with an
+  unknown value) means OpenXR.
+- **Existing files keep their value.** A file that says `"OpenVR"`,
+  `"OpenXR"`, `"Oculus"` or `"None"` is read as in v1 (06 §3.3); nothing
+  rewrites it at start-up (06 §3.1). Every file v1 wrote holds the key, so
+  an upgrade keeps the player's runtime. [proposal: changing a runtime the
+  player chose would break a working setup; new players get the new
+  default.]
+- **Fallback** when the preferred runtime is not available and not forced
+  (06 §1.1): the other runtime if available, OpenXR before OpenVR when
+  neither was named (a fresh config). The table of 06 §1.1 is otherwise
+  unchanged.
+- The **welcome message** (13 §5.3) conveys that the default is OpenXR,
+  that SteamVR, Meta and other runtimes work through it, and how to switch
+  to OpenVR (SteamVR's own API) on the options page.
+- What changes for SteamVR players on OpenXR: bindings are edited in
+  SteamVR's OpenXR binding UI instead of the SteamVR Input files, and the
+  `mothervr_input` folder is not written while OpenXR runs (04 §5.8.2
+  applies to OpenVR only).
+- Logging: the runtime decision event (11 §2.3) says when the default, not
+  the file, chose OpenXR.
+
+Before the decision: v1's default (OpenVR) stays.
+
+## 12. v2 settings in the headset
+
+The options page (06 §5, the `MotherVR` entry) gains a v2 section reachable
+from the same page in the front end and the pause menu. Meanings only;
+labels, layout and grouping are the implementation's own (06 §5).
+
+| Control | Meaning |
+|---|---|
+| `EnhancedMode` | on/off; while off the rest of the section is greyed (values kept) |
+| `Comfort.SmoothTurnSpeed` | off, or a speed from 30 to 360 °/s in steps of 15; the description says snap turn must be off for it to apply and that Camera Speed does not affect it |
+| `Comfort.SnapTurnRepeatMs` | off (no repeat) or 150 to 1000 ms in steps of 50 |
+| `Comfort.SnapTurnFade` | on/off |
+| `Comfort.Vignette` | off, or a strength from 0.1 to 1.0 in steps of 0.1 |
+| `Comfort.PlayMode` | seated or standing; changing it recenters at the next update |
+| calibrate height | a button that starts the calibration of 6.2, shows the countdown and then the height taken (or why none was taken) |
+| `Comfort.WorldScale` | 0.5 to 1.5 in steps of 0.05; shows when `-vrscale` overrides it |
+| `Controls.InteractionAwareTurning`, `Controls.DpadEmulation`, `Controls.RecenterGesture`, `Controls.HudToggleGesture`, `Controls.HolsterGestures`, `Controls.ControllerGlyphs`, `Controls.VrOffHotkey`, `Controls.CrashSafeLog` | on/off each; `CrashSafeLog` says it applies at the next launch |
+| `Controls.HidingLean`, `Controls.HoldBreathGesture` | on/off; shown disabled while the game input they need is unconfirmed (9.2, 9.3) |
+
+State rules as 06 §5.3: with VR not running the v2 controls are disabled;
+values pushed never send a command back; steps apply from first use (06
+§5.2). The calibration and the HUD state are not settings and are not
+pushed except the stored height. The page's v2 additions are part of the
+menu change set of 14 (14 §3.1); where they go in the page map follows 06
+§7.3 (new pages and items created after every stock one).
+
+Whether one page holds everything is 20 §10 item 6; this document requires
+only that every key of 3.1 except `EnhancedMode`'s gating is reachable in
+the headset.
+
+## 13. VR-off hotkey
+
+**What the player experiences.** A key combination turns VR off for the
+rest of the session without quitting: the headset stops showing the game
+and the game continues flat on the monitor.
+
+**Key** [proposal]: right Ctrl + right Shift + F10, held together for 1 s,
+read with the game's keyboard key test (04 §2.2: DirectInput scan codes
+0x9D right Ctrl, 0x36 right Shift, 0x44 F10) on the game thread while the
+keyboard and mouse devices exist. [proposal: right-hand modifiers avoid
+the Ctrl+Alt recenter chord (04 §8) and the game's own left-hand keys; F10
+has no game binding in `DATA\INPUT.XML`; the hold avoids accidents.]
+
+**Result** when it fires (only while the stereo device runs):
+
+- the device is detached as after a late runtime failure (02 §7.4): state 0,
+  manager +0x04 null, then the runtime released; the options page shows VR
+  not running; **no** failure message is shown (the player asked for it);
+- the game runs flat from the next frame (02 §7.5);
+- the render-target rebuild flag (06 §4.6) is raised once so the game's
+  targets return to the window's size [proposal: the stereo-sized targets
+  would otherwise stay until the next resize; one 0.2 s freeze at the
+  moment the player chose];
+- the swapchain stays windowed for the rest of the session (03 §9 is not
+  undone) [proposal: changing the window mode mid-session is a second
+  risk for no gain];
+- VR cannot be turned on again in this session (the runtime is started
+  once per process, 03 §6.5); the page says a restart turns it on;
+- logged once (16).
+
+With OpenXR the session is ended in the order the API requires
+(`xrRequestExitSession`, then on `XR_SESSION_STATE_STOPPING` `xrEndSession`)
+before the instance is destroyed; the device is detached at the request.
+v2 features stop with the device.
+
+## 14. Crash-safe logging
+
+v1 (11 §1.2) already writes each event with one `WriteFile` to a handle
+opened once, with no buffering in the process; such data is in the
+operating system's cache and survives a crash **of the process**. Two
+cases lose information today: a crash of the whole system (a driver fault
+under GPU load), which loses what the cache had not written to disk; and
+the crash itself, which is not in the log (11 §6: no crash handler). With
+`Controls.CrashSafeLog` on (read at attach, so it applies from the next
+launch):
+
+**Flush policy.**
+
+- The log file is flushed to disk (`FlushFileBuffers`) after every `WRN`,
+  `ERR` or `FTL` event written on the game thread or the loader thread, and
+  at most once per second after other events, by a thread of the mod's own
+  (thread name `mod`, 11 §1.4) that waits on a timer and an event.
+- The render thread and job threads never flush and never wait for a
+  flush: their events are written as in v1 and flushed by the mod's thread
+  within a second. (12 §6.1: no file I/O beyond v1's single write per
+  event, and only per state change.)
+- The flush thread is created after attach (never in `DllMain`, 12 §2.3),
+  holds no lock the render thread takes, and is not joined at exit (12 §7:
+  no work at process exit).
+
+**Crash event.** An unhandled-exception filter chained after any the game
+or another module installed records one `FTL` event before passing the
+exception on unchanged (the game's own crash behaviour and Windows'
+report stay as they are, 11 §6). It conveys: the exception code; the
+faulting address as module name and RVA (`AI.exe`, the proxy, or another
+module); the thread name (11 §1.4); for an access violation, the address
+read or written; the last v2 and v1 states that help to place the crash
+(device state, stereo mode, interaction kind, whether a menu was open).
+It is rendered into a buffer reserved at attach, without allocation or
+locks, written with one `WriteFile` and flushed. A second exception inside
+the filter is not handled again. A vectored handler is not used: it would
+see every first-chance exception the game handles itself [proposal: only
+unhandled exceptions are crashes].
+
+**With the key off**, logging is v1's exactly.
+
+## 15. Threads and data crossing
+
+| Data | Written by | Read by | Requirement (12 §3) |
+|---|---|---|---|
+| v2 settings | the command handler (game thread) | game, render threads | each a single word, atomic (06 §3.4) |
+| turn value, movement value | pad replacements and the stereo update (game thread) | game thread | as v1 |
+| smooth-turn, snap and turning-block decisions, yaw writes | game thread (stereo update) | game thread | as v1 (05 §13) |
+| vignette target strength, snap-fade trigger (a step counter) | game thread | render thread (slot 6) | atomic 32-bit values |
+| gesture results (recenter request, HUD toggle request, holster action state) | render thread (controls write) | game thread | atomic flags and per-action values, as the VR state of 04 §3.6 |
+| d-pad VR state | render thread (controls write) | game thread (pad replacements) | per-action values as 04 §3.6 |
+| breathing-game state | the tap's thread (11 §8) | any | atomic, as 11 §5.3 |
+| standing height, play mode, world scale | game thread | render thread (head and hand conversion, 03 §11) | atomic; a change applies from the next frame whole (a frame never mixes two scales) |
+| VR-off request | game thread | render thread | atomic; the device detach follows 02 §7.4's order |
+| HUD hide and show calls into the game | game thread only (`UiFindObject` takes the UI critical section) | | never from the render thread |
+
+No allocation, file I/O, locking or logging per frame on the render thread
+(12 §6.1). The vignette pass and the fade allocate their resources when the
+target size changes.
+
+## 16. Logging
+
+11 owns the wording and the format; a later revision of 11 adds these
+events. Each is logged once when it happens or changes (11 §3):
+
+| Level | Area | When | Must convey |
+|---|---|---|---|
+| INF | Config | session start (11 §1.7) | the v2 keys in effect, with `EnhancedMode`, in the settings event |
+| INF | Input | the turning in use changes (snap, game look, smooth) | which; the speed or repeat interval |
+| DBG | Input | turning blocked or unblocked by 4.4 (with `DebugOptions`) | why (interaction kind, breathing game, cutscene) |
+| INF | Stereo | play mode or calibration applied | the mode; the height taken, or why none was taken (invalid pose, out of range, no floor reference) |
+| WRN | Stereo | standing mode unavailable on this runtime | the runtime; that play is seated |
+| INF | Stereo | world scale changes | the new value; whether `-vrscale` overrides it |
+| INF | Input | a gesture fired | which (recenter, HUD hidden or shown, holster and its action) |
+| WRN | UI | the HUD toggle cannot be installed | the site that failed its check (12 §4) |
+| INF | Input | the controller family for a hand changes (with `Controls.ControllerGlyphs`) | the hand; the family; the glyph set chosen |
+| INF | Diagnostics | the breathing game starts and ends (tap) | the state, as 11 §4.3 gated by `DebugOptions` |
+| WRN | Input | a feature whose game input is unconfirmed is requested (9.2, 9.3) | which; that it stays off |
+| INF | Stereo | VR turned off by the hotkey | that it was the player's request; that a restart turns it on |
+| FTL | Load | crash event (14) | the content of 14 |
+
+## 17. Edge cases
+
+| Situation | Required behaviour |
+|---|---|
+| Menus, videos, loading (mode 1) | no turning, no vignette, no fade; d-pad emulation from the left stick is on (7); holsters off; HUD toggle still allowed (it changes no menu) |
+| Cutscenes and level fades | FollowBehavior inactive: no turning (v1); vignette strength 0; the HUD state is kept and re-applied after (8.3) |
+| Interactions | turning blocked only with 4.4 on; d-pad from the left stick; holsters off |
+| Hiding | lean and hold breath per 9 (when confirmed); turning as 4.4 |
+| Death and reload | smooth-turn `dt` restarts at 0; vignette falls to 0; the HUD state is kept for the session [proposal: the player chose it]; the breathing-game state is cleared at the loading screen |
+| Headset taken off | nothing changes; calibration waits for a pose while the headset is in use (6.2) |
+| Controllers lost | gestures need valid hand poses (8.1); VR turn and movement read 0 (04 §5.1), so smooth turn and the vignette stop |
+| Runtime focus lost (dashboard) | all VR input zero (04 §5.1); gestures blocked until 0.5 s after focus returns (8.1) |
+| Runtime None, or VR failed | no v2 feature runs (20 §1.2); the page shows the v2 section greyed |
+| OpenVR and OpenXR | every feature on both, except standing mode without a floor space on an OpenXR runtime (6.1) |
+| Keyboard and mouse in use | mouse look as v1; smooth turn and snap still apply to the stick; the vignette ignores keyboard movement (5) |
+| Display reset | vignette and fade resources are recreated with the target; settings unchanged |
+| VR turned off by the hotkey | every v2 feature stops with the device; the game is flat |
+| 2020 build | every feature of this document that needs a game address is off; settings are still read and kept |
+
+## 18. Acceptance
+
+On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
+"Log" is `mothervr.log`.
+
+1. All keys of 3.1 at their defaults (or `EnhancedMode` off with other
+   values stored): every acceptance check of 04 and 05 passes unchanged,
+   and the file keeps the stored v2 values after a menu change.
+2. `SmoothTurnSpeed` 90 with snap off: holding the right stick fully turns
+   a full circle in 4 s (±10 %), at 90 Hz and with the frame rate capped
+   at 45 Hz alike; the stick at rest never drifts; Camera Speed at its
+   minimum and maximum changes nothing. With speed 0 and snap off the turn
+   is the game's own (v1).
+3. `SnapTurnRepeatMs` 500: a held stick steps about twice a second; 0: one
+   step per flick. With the fade on, no view jump is visible; the first
+   frame after a step is black.
+4. `Vignette` 1.0: walking with the stick narrows the view to a clear
+   circle of about 25° around the centre of each eye; it clears within
+   about 0.3 s of stopping; both eyes show the same ring (no doubled edge);
+   menus never show it. With a performance overlay, the GPU time added
+   while it is active is measured and stays under 0.2 ms at 2688 x 2688 per
+   eye.
+5. Standing mode, calibrated standing: ducking 30 cm lowers the view 30 cm
+   in game; load a level while kneeling: after the loading screen the view
+   is still low (not reset to standing). Seated: as v1. The log shows the
+   height taken. On an OpenXR runtime without `STAGE` or `LOCAL_FLOOR` the
+   log says standing is unavailable.
+6. `WorldScale` 0.8 set in the menu during play: head motion is scaled at
+   once without a jump; with `-vrscale 1.2` on the command line the page
+   shows the override and 1.2 applies.
+7. `InteractionAwareTurning` on: at a keypad and a terminal the right
+   stick does not turn the player; after the interaction the next flick
+   turns. Off: v1. With `DebugOptions` on, the log shows the block reasons.
+8. `DpadEmulation` on: in a menu, the left stick moves the selection as the
+   d-pad does on a pad; in play, holding the left stick click 0.3 s and
+   pushing left / right cycles weapons; the movement stops while a d-pad
+   direction is pressed.
+9. Recenter gesture: both grips at the face for under 0.75 s does nothing;
+   for 0.75 s recenters once (logged "gesture"); aiming with the tracker
+   raised never recenters during 10 minutes of play.
+10. HUD toggle: left hand at the helmet and the map button hides the HUD
+    and does not open the map; again shows it; a cutscene ending does not
+    bring a hidden HUD back.
+11. Holsters: reaching over the right shoulder and squeezing selects the
+    next weapon; the same squeeze in front of the body aims as v1.
+12. `ControllerGlyphs` on: with Index, prompts show Index glyphs; switch to
+    Touch controllers during play: the prompts redraw with Touch glyphs
+    without pressing anything else, and the log shows the family change.
+13. OpenXR default (once decided): delete `mothervr.json`; the new file
+    says `"OpenXR"` and OpenXR starts; a v1 file with `"OpenVR"` still
+    starts OpenVR.
+14. Every key of 3.1 can be changed on the options page in the headset,
+    in the front end and the pause menu, and the change is saved.
+15. VR-off hotkey: holding the keys 1 s in gameplay leaves the game running
+    flat on the monitor at window resolution after one short freeze; the
+    headset shows the runtime's own environment; no message box; the log
+    records it; pressing it again does nothing.
+16. `CrashSafeLog` on, crash test build (11 §7 item 13): the log ends with
+    the crash event naming `AI.exe` (or the proxy) and the RVA, matching
+    Event Viewer; with a performance overlay no render-thread spike comes
+    from flushing during 10 minutes of play.
+17. With `DebugOptions` on, hide in a locker until the Alien searches it:
+    the log shows `Start_Breathing_Game` and `End_Breathing_Game` around
+    the breathing prompt (confirms 9.1).
+
+## 19. Open questions
+
+1. **Action table index.** Confirm that the table at 0x124F120 gives each
+   map's entry index (2.1). To resolve: at the first virtualisation, with
+   `DebugOptions` on, log each action's index, name from the table and
+   original pad code; the names must match the controls `DATA\INPUT.XML`
+   binds (for example `use` on A).
+2. **Which pad bindings the PC build loads.** `DATA\INPUT.XML`'s default
+   gamepad device (2.2) and the stock layout of 04 §2.4 disagree (aim,
+   tracker, crouch, peek). To resolve: the same log as item 1 shows each
+   action's original pad code.
+3. **The lean input while hiding** (9.2). To resolve: with `DebugOptions`
+   on, a real pad and the script event tap installed, hide in a locker and
+   lean with the pad as the game's prompt says; log, between
+   `hiding_visibility_start` and `_finish`, every virtual code the game
+   queries with a non-zero answer (IsDown, GetValue, GetAxis), once per
+   code. The codes map to actions through item 1.
+4. **The hold-breath input** (9.3): the same method between
+   `Start_Breathing_Game` and `End_Breathing_Game`, pressing the control
+   the breathing prompt shows.
+5. **Screens that need the d-pad** (7): which interaction screens (keypads,
+   terminals, rewiring, the hacking device) read map 1's `up` / `down` /
+   `left` / `right` or any raw d-pad code. To resolve: the same query log
+   during each interaction kind of 11 §5.3; and whether any game code calls
+   the pad's IsDown with raw codes 0x04 to 0x07 (they answer false after
+   virtualisation, 04 §3.3).
+6. **Smooth-turn time base.** Whether the stereo update's float argument
+   (05 §3.1) is the real time since the previous update (then it may
+   replace the clock, 4.2), including during slow motion. To resolve: log
+   it against the clock for 900 frames.
+7. **Hiding and turning.** Whether the game itself limits the camera yaw in
+   every hiding place (4.4), or snap and smooth turn can turn the player
+   inside a locker. To resolve: turn in a locker, under a desk and in a
+   cabinet with 4.4 off.
+8. **The `reaction_game` HUD movie** defines `force_hud_hidden` too
+   (2.4); which screen it is and whether the HUD toggle must include it.
+9. **HUD state ownership.** Whether any game path other than the +0x40
+   byte shows the HUD (for example the deferred show through +0x129 when
+   the movie is reloaded after a level load); to resolve, toggle the HUD
+   off, load a level, and check it stays hidden.
+10. **2020 build.** Every RVA here; to resolve, find the action name table
+    by its strings, `UiFindObject` by its call count, and the HUD methods by
+    their string operands.
+
+## 20. Changes to v1 documents
+
+Not made here; to be applied in a later revision:
+
+- `04-input.md` §2.4: name the map actions from the table of 2.1 (map 0
+  0x27 / 0x28 `tab_left` / `tab_right`; map 1 1 `cancel`, 9 `craft_item`,
+  0x0B `alt_2`, 0x0E `minigame_top`) and drop them from "kept for parity,
+  function unconfirmed" in §2.4, §5.2, §5.3, §5.8.5 and §11; note the
+  disagreement of the stock layout with `DATA\INPUT.XML` (19 item 2).
+- `04-input.md` §5.5: the glyph set is re-chosen per hand and per change
+  when `Controls.ControllerGlyphs` is on (10); §6: the repeat interval is
+  `Comfort.SnapTurnRepeatMs`, the fade of 4.3, and the turning block of
+  4.4; §7: the look byte rule of 4.1; §5.8.1: the d-pad modifier input (7);
+  §5.8.5: d-pad and holster VR state (7, 8.4) and the Map input consumed by
+  the HUD toggle near the head (8.3); §5.10: the near-head test extended to
+  the left hand for 8.3.
+- `05-game-patches.md` §3.2c and §3.2d: turning selection and look gate of
+  4.1; §3.2e: the gesture recenter trigger (8.2) and the recenter's
+  vertical part in standing mode (6.1).
+- `03-hmd-and-frames.md` parameter table and §1, §2.1, §5: world scale from
+  `Comfort.WorldScale` applied live (6.3); the reference's vertical part in
+  standing mode (6.1); §6.2: the vignette and fade pass in slot 6 before
+  submission (5).
+- `09-openxr.md` §5.2, §6: the vignette before the copy; `STAGE` or
+  `LOCAL_FLOOR` located with the views for standing mode (6.1); the VR-off
+  session end (13).
+- `02-game-stereo-path.md` §7.4: a detach requested by the player, without
+  a failure message (13).
+- `06-options-and-config.md` §1, §3.2, §3.3, §4.2, §4.3, §5: the
+  `EnhancedMode`, `Comfort` and `Controls` keys, their commands and pushes,
+  the v2 section of the page (12); §1 and §1.1: `VRRuntime`'s default and
+  fallback order once OpenXR is the default (11); §5.3: Camera Speed does
+  not scale smooth turn (4.5).
+- `11-diagnostics.md` §5.3: the breathing-game state (9.1) and its strings;
+  §6: the crash event and the flush policy with `Controls.CrashSafeLog`
+  (14); §2: the events of 16.
+- `12-threads-and-robustness.md` §2.2 and §3.2: the mod's flush thread
+  (14), the crossings of 15; §7: the VR-off hotkey.
+- `13-distribution.md` §5.3: the welcome message with OpenXR as default
+  (11); the player guide: the new settings, gestures and the hotkey.
+- `14-ui-resources.md` §2.9, §3.1, §3.4: glyph images per controller family
+  and for the emulated d-pad (10, 7); the v2 controls on the options page
+  (12).
+- `ANSWERS.md`: record the user decisions this document leaves open
+  (OpenXR default, `EnhancedMode`, the proposals marked here).
