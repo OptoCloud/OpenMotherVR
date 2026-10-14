@@ -24,12 +24,13 @@ namespace mothervr::integration {
 bool deploy_mother_pak(HMODULE self, const std::filesystem::path& game_dir,
                        std::int64_t build_stamp) noexcept;
 
-// Same scheme for the embedded openvr_api.dll 1.0.10, written to
-// <game_dir>\openvr_api.dll. The original only does this when the configured
-// runtime is OpenVR.
+// Same scheme for the embedded openvr_api.dll 1.0.10, written next to this
+// DLL. The original does this in DllMain when the configured runtime is
+// OpenVR; here the OpenVR backend calls it just before it loads the DLL, so
+// the write is outside the loader lock, and it also happens when OpenVR is
+// reached by fallback or chosen in the menu after startup.
 //
 // From: FUN_1001e940 @ 0x1001e940.
-bool deploy_openvr_api(HMODULE self, const std::filesystem::path& game_dir,
-                       std::int64_t build_stamp) noexcept;
+bool deploy_openvr_api() noexcept;
 
 } // namespace mothervr::integration

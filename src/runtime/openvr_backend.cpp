@@ -17,6 +17,7 @@
 #include "openvr_backend.h"
 #include "vr_detect.h"
 #include "diag/log.h"
+#include "integration/payloads.h"
 #include "util/proc.h"
 
 #include <openvr.h>
@@ -100,9 +101,10 @@ private:
 
 bool init(const std::filesystem::path& runtime_root) noexcept {
     const auto bin_dir = runtime_root / "bin" / "win32";
-    // Prefer the openvr_api.dll 1.0.10 that the hook installer deploys next to
-    // the game, like the original (which delay-loads it from the app dir).
-    // Fall back to the loader that ships with SteamVR.
+    // Prefer the openvr_api.dll 1.0.10 embedded in this DLL, written next to
+    // the game now, like the original (which delay-loads it from the app
+    // dir). Fall back to the loader that ships with SteamVR.
+    integration::deploy_openvr_api();
     std::error_code ec;
     const auto bundled  = diag::module_directory() / "openvr_api.dll";
     const auto dll_path = std::filesystem::exists(bundled, ec) ? bundled : bin_dir / "openvr_api.dll";

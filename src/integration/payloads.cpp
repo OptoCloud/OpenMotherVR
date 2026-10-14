@@ -9,6 +9,7 @@
 
 #include "diag/log.h"
 #include "dialogs.h"
+#include "exe_check.h"
 #include "resource.h"
 #include "ui_patch.h"
 
@@ -151,9 +152,12 @@ bool deploy_mother_pak(HMODULE self, const std::filesystem::path& game_dir,
     return true;
 }
 
-bool deploy_openvr_api(HMODULE self, const std::filesystem::path& game_dir,
-                       std::int64_t build_stamp) noexcept {
-    const auto target = game_dir / "openvr_api.dll";
+bool deploy_openvr_api() noexcept {
+    HMODULE self = nullptr;
+    ::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                         reinterpret_cast<LPCWSTR>(&deploy_openvr_api), &self);
+    const std::int64_t build_stamp = this_module_build_filetime();
+    const auto target = diag::module_directory() / "openvr_api.dll";
     if (up_to_date(target, to_filetime(build_stamp))) {
         diag::logf("payload: {} is current", diag::utf8(target));
         return true;

@@ -14,7 +14,8 @@ namespace mothervr::hook {
 //   1. Select and rebase the AI.exe address table for the detected build.
 //      Then a preflight checks the code and data at every core site.
 //   2. Deploy DATA\MOTHER.PAK and redirect the game's UI.PAK path to it.
-//   3. Deploy the bundled openvr_api.dll when the runtime is OpenVR.
+//   3. (Moved) The original deploys openvr_api.dll here; the OpenVR backend
+//      now does it when it starts, outside the loader lock.
 //   4. Skip-intro patch ("ShowBootup" -> "SkipBootup") when configured.
 //   5. Script-variable callback pointers + console-command dispatch hook.
 //   6. "Stereo Mode == Rift" tests forced true.

@@ -578,13 +578,10 @@ bool install(HMODULE self, const std::filesystem::path& game_dir) noexcept {
         return false;
     }
 
-    // 2, 3
+    // 2 (3, openvr_api.dll, is in openvr::init)
     const auto stamp = integration::this_module_build_filetime();
     redirect_ui_archive(self, game_dir, stamp);
     const auto& cfg = config::current();
-    if (cfg.vr_runtime == config::VRRuntime::OpenVR) {
-        integration::deploy_openvr_api(self, game_dir, stamp);
-    }
 
     // 4
     if (cfg.debug.skip_startup_intro) skip_intro();
