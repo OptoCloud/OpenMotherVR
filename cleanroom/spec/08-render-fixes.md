@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build, verified against the binary) and of the game's pixel shaders (DXBC from the level and global shader packs); analyses of other VR mods used only to learn which problems exist; in-game testing of an earlier rebuild in a headset (section 1 and section 5 confirmed working); user requirements. Revision: r1 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build; every site and byte below re-read from the binary for r2) and of the game's pixel shaders (DXBC from the level and global shader packs); the public DXBC container layout and checksum; analyses of other VR mods, used to learn which problems exist: the approach of sections 1 and 2 agrees with a design seen in another mod's analysis, and is justified here from the game's own shaders (1.1 to 1.4) and cull code (2.1 to 2.3); in-game observation by the spec side in a headset (section 1 and section 5 confirmed working); measurements in game by the spec side (culling cost, AA cost, shader-creation cost); user requirements (anti-aliasing choice with an automatic mode, no MD5 of every shader, shaders changed by other tools pass through); project decisions (head-in-wall delay of 600 ms and its clear tolerance, with reasons inline). Revision: r3 -->
 
 # 08: Rendering fixes
 
@@ -8,20 +8,42 @@ anti-aliasing switched off, an abrupt head-in-wall blackout, and the size of
 the desktop mirror. For each: what the game does, why it fails in VR, and
 what the mod must do.
 
-Addresses are RVAs of the 2015 build (image base 0x400000). The 2020
-addresses are not known; fixes that need a game address stay off on that
-build. Section 1 needs no game address and applies to both builds.
+Addresses are RVAs of the 2015 build (image base 0x400000), read from the
+2015 `AI.exe`. The 2020 addresses of sections 2 to 4 are not known (2020: ?);
+those fixes stay off on that build and the log says so once. Section 1 needs
+no game address and applies to both builds.
 
-Confidence: **[sure]** the game code or shader shows it directly;
-**[likely]** strong inference; **[guess]** must be confirmed in game.
+Confidence: **[sure]** the game code or shader shows it directly, or it was
+observed in game; **[likely]** strong inference; **[guess]** must be
+confirmed in game.
 
 | § | Problem | Status |
 |---|---|---|
-| 1 | Lighting differs between the eyes | required; implemented; **confirmed in game** |
-| 2 | Object pop-in | required; not implemented |
-| 3 | Anti-aliasing off in stereo | required; not implemented |
-| 4 | Head-in-wall blackout too abrupt | required; not implemented |
-| 5 | Desktop mirror smaller than the window | required; implemented; **confirmed in game** |
+| 1 | Lighting differs between the eyes | required; **confirmed in game** |
+| 2 | Object pop-in | required; specified; **not yet confirmed in game** |
+| 3 | Anti-aliasing off in stereo | required; specified; **not yet confirmed in game** |
+| 4 | Head-in-wall blackout too abrupt | required; specified; **not yet confirmed in game** |
+| 5 | Desktop mirror smaller than the window | required; **confirmed in game** |
+| (07) | Planar reflections per eye | required; specified in 07; **not yet confirmed in game** (no planar reflection surface in the tested scene) |
+
+## 0. Applying the fixes
+
+- None of these fixes is applied with runtime None (01 §2.3).
+- Sections 2 to 4 are independent of each other and of the patch set of 01,
+  02 and 05: each checks its own sites (the bytes given in its section)
+  before writing. If one of its checks fails, that fix alone stays off, the
+  log names the fix and says it was not applied, and everything else works.
+  None of them is half-installed: all of a fix's sites are checked before the
+  first of them is written.
+- Sections 2 to 4 act only while stereo runs (stereo device present and in
+  state 2, 05 §1); otherwise the game's own code runs unchanged.
+- "Stereo running" is read on the game's job threads (section 2) and on the
+  render thread (section 3). The device pointer and state must be read with
+  single aligned (atomic) loads; a value one frame stale is acceptable.
+- No allocation, file I/O or logging per frame or per call; log once per
+  change (for example the first stereo frame with each AA mode). This
+  document says which events are logged; the wording and format are those of
+  `11-diagnostics.md`.
 
 ## 1. Position-based dither in the game's pixel shaders
 
@@ -29,11 +51,12 @@ Confidence: **[sure]** the game code or shader shows it directly;
 
 Several hundred of the game's pixel shaders (716 of the 2178 distinct pixel
 shaders in one level's `LEVEL_SHADERS_DX11_BIN.PAK`, plus some global
-shaders) add a small anti-banding dither to a lighting or reflectance
-factor. The dither is a hash of the pixel's **absolute** position. In the
-compiled shaders (shader model 5.0) it is always this sequence, where `vP`
-is the `SV_Position` input, `vT` another input (a texture coordinate) and
-`rA`, `rB`, `rC`, `rD` temporaries:
+shaders; about 676 sites in the first 3500 shaders created in one session)
+add a small anti-banding dither to a lighting or reflectance factor. The
+dither is a hash of the pixel's **absolute** position. In the compiled
+shaders (shader model 5.0) it is always this sequence, where `vP` is the
+`SV_Position` input, `vT` another input (a texture coordinate) and `rA`, `rB`,
+`rC`, `rD` temporaries:
 
 | # | Instruction (as the game's shaders contain it) | Value |
 |---|---|---|
@@ -45,10 +68,12 @@ is the `SV_Position` input, `vT` another input (a texture coordinate) and
 | 6 | `mad rD.w, rC.w, l(0.0025), rD.w` | factor += `0.0025·h` |
 | 7 | `min rD.w, rD.w, l(1.0)` | factor clamped to 1 |
 
-Register numbers and the input numbers vary between shaders; instructions
-1 and 2 are always adjacent and in this order, with the immediates exactly
-`0.001` (bit pattern 0x3A83126F). The factor then scales an output colour
-(emissive or environment light).
+Register numbers, write masks and input numbers vary between shaders;
+instructions 1 and 2 are always adjacent and in this order. Instruction 1's
+immediate is exactly `(0.001, 0.001, 0, 0)` and instruction 2's exactly
+`(0, 0, 0.001, 0.001)`, with 0.001 having the bit pattern 0x3A83126F; the
+second source of instruction 2 is an input with a negate modifier. The
+factor then scales an output colour (emissive or environment light).
 
 ### 1.2 Why it fails on a side-by-side target [likely]
 
@@ -65,9 +90,9 @@ roughly as `(0.001·|p|)²`:
   fully lit or fully reflective.
 
 The result is surfaces lit differently in the two eyes, first in the right
-eye and worse at higher resolution (MotherVR issue #253). Players described
-it as reflections moving against the head; it is lighting, not the planar
-reflection of 07.
+eye and worse at higher resolution (a known issue of the earlier mod).
+Players described it as reflections moving against the head; it is
+lighting, not the planar reflection of 07.
 
 ### 1.3 What the game provides [sure]
 
@@ -78,50 +103,95 @@ constant upload 0x621C90 with buffer 2, register 0x27, count 1). The
 shaders' reflection data names it `SourceResolution`. It differs from
 register 60 (`ScreenResolution`, 07 §2.7).
 
-### 1.4 Required change
+### 1.4 Required arithmetic
 
-Every pixel shader the game creates is checked, at
-`ID3D11Device::CreatePixelShader`, for the instruction pair 1-2 of §1.1.
-At each occurrence the dither must use the position **relative to the
-render target** `n = p · (1/W, 1/H)` (each component in `[0, 1]`) instead of
-the absolute position:
+At each occurrence of the pair 1-2 the dither must use the position
+**relative to the render target**, `n = p · (1/W, 1/H)` (register 39's `zw`
+components, each component of `n` in `[0, 1]`), **keeping the 0.001
+factor**:
 
-- instruction 1 computes `n`: `vP.xy` times register 39's `zw` components,
-  in place of the immediate `0.001`;
-- instruction 2 computes `0.001·n - t`, taking `n` from instruction 1's
-  result instead of from `vP`.
+- the value instruction 2 produces becomes `b = 0.001·n - t` (same
+  destination, mask and `vT` operand as in the game's shader);
+- the value instruction 3 reads from `rA` becomes `a = 0.001·n` (same
+  register and components as in the game's shader);
+- everything else is unchanged, so `d = (0.001·n - t)·(0.001·n)`.
 
-Numeric effect: the exponent becomes `d = n·(0.001·n - t)`, that is about
-`-t·(n.x + n.y)` plus at most 0.002. It no longer depends on the target size
-or on which half of the target the eye occupies, stays far from overflow for
-the texture coordinates the game uses, and `a = n` is what instruction 1
-produced on a flat screen about 1000 pixels wide. The dither keeps its
-amplitude (at most 0.0025) in both eyes.
+Numeric effect: `d` is about `-0.001·t·(n.x + n.y)` plus at most 2e-6. It no
+longer depends on the target size or on which half of the target the eye
+occupies, and stays far from overflow for any texture coordinate the game
+uses. The dither keeps its amplitude (at most 0.0025) in both eyes.
 
-Constraints on the patched shader:
+The 0.001 factor must stay. Using `a = n` instead (dropping it from one
+operand) gives `d` about `-t·(n.x + n.y)`, a thousand times larger: with
+tiled or negative texture coordinates beyond about |t| = 5, `2^d·10000`
+passes 2^24 again and the original failure returns, in both eyes.
 
-- **Same length.** The patched instruction stream must keep every other
-  instruction at its offset and the shader's total size: replacing the
-  4-component immediate operand by a constant-buffer operand shortens
-  instruction 1, and the freed space is filled with `nop` instructions.
-- **Constant buffer declaration.** Register 39 must be inside the shader's
-  declared size of constant buffer 2: if the declaration is smaller than 40
-  registers it is raised to 40. A shader that has no declaration of
-  constant buffer 2 is left unchanged.
-- **Checksum.** The DXBC container's 16-byte checksum (bytes 4..19) must be
-  recomputed over the patched container (the standard DXBC checksum, an MD5
-  variant over bytes 20 to the end). The stored checksum of the original is
-  checked first; a shader whose checksum does not verify is left alone.
-- **Conservative.** Any shader whose structure is not as expected is left
+Computing `0.001·n` from `vP` needs one more operation than the game's pair
+(the scale by `1/W, 1/H` and the scale by 0.001 cannot be folded into one
+immediate), so the patched program is longer than the original. Any
+instruction sequence with the result above is acceptable, subject to these
+required results:
+
+- **Exact match only.** A site is patched only if instructions 1 and 2 have
+  exactly the form of §1.1: the operand kinds, the `vP` components read, the
+  two immediates, and a negated input as the second source of instruction
+  2. Any other form is left unchanged. How the match is decided is the
+  implementation's choice.
+- **No live value overwritten.** The patched program must not change any
+  value the rest of the shader reads, other than the two results above.
+  Whether to reuse registers or declare an extra temporary is the
+  implementation's choice. A site that cannot be patched under this rule is
+  left unchanged.
+- **Register 39 declared.** Register 39 must be inside the shader's declared
+  size of constant buffer 2 (at least 40 registers); a smaller declaration
+  is raised to 40. A shader that does not declare constant buffer 2 at all
+  is left unchanged: the game is only known to bind buffer 2 for shaders
+  that declare it [likely].
+- **Containers understood or untouched.** A DXBC container the
+  implementation does not fully understand, by the public DXBC layout, is
+  left unchanged; so is one whose stored checksum (bytes 4..19, the standard
+  DXBC checksum, an MD5 variant over bytes 20 to the end) does not verify,
+  since it is not a container the patcher understands. A patched container
+  must be valid: when the program grows, the program's length token, the
+  chunk's size, the container's total size (bytes 24..27) and the offsets of
+  every chunk after the program chunk are updated, and the checksum is
+  recomputed over the result.
+- **Fallback.** Any structure not as expected leaves the whole shader
   unchanged. If `CreatePixelShader` rejects a patched shader, the original
-  bytecode is used.
-- Shaders without the pair are passed through untouched.
+  bytecode is created instead.
+- **Cheap pre-filter.** Before any hashing or parsing, a shader that does not
+  contain two consecutive dwords 0x3A83126F anywhere in its bytes (the
+  immediate of instruction 1) is passed through untouched. Most shaders are
+  skipped this way. Without the pre-filter, checksumming every shader costs
+  about 20 µs each on the thread that creates shaders (the game's main
+  thread), about 56 % on top of shader creation with a warm driver cache, or
+  about 1.3 s per session; with it, almost none.
 
-This runs in flat play too; it changes nothing visible there beyond the
-dither pattern.
+**Shaders not as expected.** Every shader that does not match the exact
+pattern of §1.1 passes through unchanged. This includes shader packs that
+other tools changed: the game still runs, and the log reports how many
+shaders were patched. Coexisting with other graphics mods is not required
+beyond that.
 
-**Observed:** in the headset, surfaces that lit up in the right eye only are
-lit the same in both eyes after the change.
+**Where.** The check runs at `ID3D11Device::CreatePixelShader` of the game's
+device (the device the game creates through the proxied D3D11 creation
+export, 01). Shaders of other devices in the process (a VR runtime's or an
+overlay's) and the mod's own shaders must reach the driver unchanged. If the
+hook is installed on the device class (a shared vtable), the pattern test is
+what keeps other devices' shaders unchanged; the mod's own shaders must not
+contain the pattern.
+
+**Logging** (wording and format in `11-diagnostics.md`). Log when the hook
+is installed. Log the running counts of shaders created, patched and
+rejected occasionally, never per shader. Log a rejected patched shader with
+its HRESULT, for a few rejections only, so a driver that rejects every one
+cannot flood the log.
+
+This runs in flat play with runtime OpenVR or OpenXR too (it changes nothing
+visible there beyond the dither pattern), but not with runtime None.
+
+**Observed [sure]:** in the headset, surfaces that lit up in the right eye
+only are lit the same in both eyes after the change.
 
 ## 2. Object pop-in
 
@@ -129,135 +199,264 @@ lit the same in both eyes after the change.
 
 The scene's object lists are culled by one function (0x61FD20, cdecl:
 `(cull context*, per-object flags*, bounds[] with stride 0x40, items[],
-count, out[])`), whose only call is at 0x5E984B. For each object it:
+count, out[])`, the caller pops 0x18), whose only call is at 0x5E984B. It
+runs on the game's job threads. For each object it:
 
 1. tests masks: the object's mask byte against context `+0x54`, its layer
    word against context `+0x58`; flags `& 0x19` skip it; flags `& 2` keep it
    unconditionally;
 2. unless flags `& 4`: a **distance/LOD test** (0x619A50, cdecl
-   `(bounds*, const vec3* camera position = context + 0x40, float s)`)
-   with `s` = the object's 16-bit LOD value times context `+0x50`; it culls
-   when `|centre - camera|² · s² > radius²` (centre at bounds `+0x0C`,
-   `+0x1C`, `+0x2C`; radius at `+0x3C`);
+   `(const bounds*, const vec3* camera position = context + 0x40, float s)`,
+   result in AL, true = keep) with `s` = the object's 16-bit LOD value times
+   context `+0x50`; it culls when `|centre - camera|² · s² > radius²`
+   (centre at bounds `+0x0C`, `+0x1C`, `+0x2C`; radius at `+0x3C`);
 3. a **frustum test** (0x619030, `(bounds*, context*)`);
-4. if context `+0x5C` is set, an extra plane test (0x619860); if context
-   `+0x60` is set, another (0x619920, with context `+0x70`). These are
-   occluder/portal tests [likely];
-5. appends the item to `out[]`.
+4. if context `+0x5C` is non-null, an **occlusion test** (0x619860, cdecl
+   `(const bounds*, context*, occlusion buffer* = context +0x5C)`, result in
+   AL); if context `+0x60` is non-null, a **view-volume test** (0x619920,
+   cdecl, 3 arguments: bounds, context `+0x70`, context `+0x60`; result in
+   AL);
+5. appends the item to `out[]` (at most 128 entries, null-terminated).
 
-The same function serves the main view and the shadow-caster lists.
+Which tests exist depends on the view being culled [likely: from which views
+fill the context fields; POV `+0x314` is the view's render-list group, the
+second argument of the game's POV creation, and POV `+0x310` its occlusion
+buffer]:
+
+| Group | Name in the game | Views | `+0x5C` occlusion | `+0x60` view volume |
+|---|---|---|---|---|
+| 2 | `BUILD_MAIN_RENDER_LIST` | the main view | the software occlusion buffer, drawn from the single centre view | no |
+| 1 | `BUILD_SHADOWS_RENDER_LISTS` | shadow-casting lights | no | yes |
+| 0 | `BUILD_PRE_MAIN_RENDER_LISTS` | the reflection view | no | no |
+
+So the occlusion test only ever runs for the main view.
+
+Sites (2015; check every byte before writing):
+
+| Site | 2015 | 2020 | 2015 bytes |
+|---|---|---|---|
+| distance test call | 0x61FD95 | ? | `e8 b6 9c ff ff` (call 0x619A50), preceded by `f3 0f 11 04 24 8d 46 40 50 53` (scale to `[esp]`, push camera position, push bounds) and followed by `83 c4 0c 84 c0` |
+| occlusion test call | 0x61FDB9 | ? | `e8 a2 9a ff ff` (call 0x619860), preceded by `8b 46 5c 85 c0 74 0f 50 56 53` (load context `+0x5C`, skip when null, push it, the context and the bounds) and followed by `83 c4 0c 84 c0` |
 
 ### 2.2 Why it fails in VR [likely]
 
-The distance scale `+0x50` is derived from the field of view and
-resolution of the single centre view, and the extra tests of step 4 are
-built from that centre view. In a headset each eye has a much wider field of
-view and its own position. Small props and decals vanish or appear at
-distances that do not match what the player sees, and objects near the
-edges of each eye are dropped by tests made for the centre view (worse on
-wide-FOV headsets). Shadows of such objects pop as well (MotherVR issue
-#194).
+The distance scale `+0x50` is derived from the field of view and resolution
+of the single centre view, and the occlusion buffer is drawn from that centre
+view. In a headset each eye has a much wider field of view and its own
+position. Small props and decals vanish or appear at distances that do not
+match what the player sees, and objects near the edges of each eye are
+dropped by an occlusion test made for the centre view (worse on wide-FOV
+headsets). Shadows of such objects pop as well, since shadow-caster lists go
+through the same distance test (a known issue of the earlier mod).
 
 ### 2.3 Required behaviour
 
 While stereo runs:
 
-- the distance/LOD test (step 2) must not remove objects: treat it as
-  passed, for the main view and for shadow casters;
-- for the main view, the extra plane tests of step 4 must not remove an
-  object that is visible in either eye; skipping them for the main view is
-  acceptable;
-- the frustum test stays, but the frustum it uses for the main view must
-  contain both eyes' frusta (to verify: which frustum the main view's cull
-  uses while stereo runs);
-- in flat play the game's behaviour is unchanged.
+- the distance/LOD test (step 2) must report "keep" for every object, in
+  every group (main view, shadows, reflection);
+- the occlusion test (step 4, main view only) must report "keep";
+- the frustum test (step 3) and the shadow lights' view-volume test stay the
+  game's;
+- otherwise (flat, or stereo not running) both tests are the game's.
 
-The cost is more objects drawn; this is accepted. Confirm in game: decals
-and small props no longer appear or vanish while walking, including at the
-edges of the view.
+The two calls above are redirected to functions with the same ABI (cdecl,
+three arguments, result in AL) that report "keep" while stereo runs and
+otherwise call the game's test with the same arguments and return its
+result. They run on job threads (0.1 to 4 thousand calls per frame) and must
+do nothing but the atomic "stereo running" read and the forward.
+
+**Cost [sure, measured on an earlier version that also bypassed the
+view-volume test].** About 1 ms of render-thread CPU per frame in the main
+menu scene (draw submission 2.7 to 3.2 ms with the game's tests, 3.5 to 4.4
+ms without), and 0 to 0.4 ms GPU; more is expected in levels with many
+occluded rooms. Accepted.
+
+**Log** once at install that the fix is in (and the two sites).
+
+**Acceptance (in game, not yet done).** Walk through a level with many small
+props, decals and shadows (for example the Medical wing): nothing appears or
+vanishes while walking or turning the head, including at the outer edges of
+each eye's view, compared with the same walk with the fix off. Frame time
+stays within the headset's budget at pixel scale 1.0.
 
 ## 3. Anti-aliasing in the stereo output path
 
 ### 3.1 Where the game skips it [sure]
 
-Graphics setting 0x09 is anti-aliasing. Its handler (0x5F6AC0, thiscall,
-one argument, `ret 4`) stores the mode at post-processing object `+0x1B3C`
-(the object is returned by 0x5F19C0): 1 FXAA, 2 SMAA T1x, 3 SMAA T2x,
-otherwise 0.
+Graphics setting 0x09 is anti-aliasing. Its handler (0x5F6AC0, thiscall, one
+argument, `ret 4`) stores the mode at post-processing object `+0x1B3C`: 1
+FXAA, 2 SMAA T1x, 3 SMAA T2x, otherwise 0. The post-processing object is a
+static object returned by 0x5F19C0 (cdecl, no arguments; bytes `b8` +
+4-byte address + `c3`, `mov eax, imm32; ret`).
 
 The final post chain (0x610040..0x6101FA) runs the post-processing pass
 (0x600490) and then, after debug-view checks, tests whether stereo is
-running (0x610144: 0x01E150 on the object at 0x13583A0, true when the
-stereo device state is 2):
+running (0x610144: a call to 0x01E150 on the object at 0x13583A0, true when
+the stereo device state is 2):
 
-- **flat:** AA pass (0x600210), then the post-processing pass (0x600490)
-  again;
-- **stereo:** the stereo output (0x5FC560), which sets pixel constant
-  buffer 2 register 36 to two post-processing values multiplied by the
-  stereo object's scene visibility (`+0x64`, the head-in-wall blackout), and
-  0x5A0980. **The AA pass is never called.**
+- **flat:** the AA pass (0x600210, thiscall on the post-processing object, no
+  arguments; prologue `55 8b ec 83 e4 f0`), which draws the bound final
+  effect into an intermediate target and then runs FXAA or SMAA from it into
+  the output; then the post-processing pass again;
+- **stereo:** the stereo output (0x5FC560), which binds the stereo final
+  effect, sets pixel constant buffer 2 register 36 to two post-processing
+  values multiplied by the stereo object's scene visibility (`+0x64`, the
+  head-in-wall blackout), and draws it straight into the output with the
+  full-screen draw (0x5A0980, cdecl, no arguments) called at 0x6101DC (`e8 9f
+  07 f9 ff`). **The AA pass is never called.**
+
+Inside the AA pass, SMAA runs through a call at 0x600479 (`e8 42 a0 01 00`)
+to the SMAA runner 0x61A4C0 (cdecl, three arguments: colour input, second
+input, `const bool*` temporal; `83 c4 0c` follows). With the temporal flag
+false it runs spatial SMAA and also zeroes the projection jitter that the
+temporal mode applies to the next frame [likely]. The AA pass draws with its
+own mesh instead of the full-screen triangle when the byte at
+post-processing object `+0x1B2F` is set [likely].
 
 For SMAA T2x the velocity pass (0x5B1720) runs on the eye-0/centre path
-only; the main view's eye-1 preparation (0x5B5B70) skips it.
+only; the main view's eye-1 preparation (0x5B5B70) skips it, and the game
+keeps one previous-frame view-projection, not one per eye.
 
 ### 3.2 Required behaviour
 
-The anti-aliasing chosen in the game's options must apply in stereo:
+A config setting `StereoAntiAliasing` (`06`) decides whether the game's AA
+runs in stereo: **On**, **Off**, or **Auto** (default): on when the pixel
+scale is at most 1.3, off above. Above 1.3 the eyes are already
+supersampled by at least 1.69 times and SMAA adds about 0.6 ms GPU (measured
+0.52 to 0.76 ms at 8064x4032) for little visible gain.
 
-- **FXAA and SMAA T1x** (spatial): the AA pass runs on the side-by-side
-  image in stereo, in the same order relative to post-processing as in
-  flat play. Bleeding of one or two pixels across the seam between the eyes
-  is acceptable; keeping each eye's filter inside its half is better.
-- **SMAA T2x** (temporal): each eye needs its own velocity (the velocity
-  pass must also run for eye 1, into eye 1's half) and its own
-  previous-frame view-projection history; reprojection must not fetch
-  history from the other eye's half. If this cannot be met, T2x in stereo
-  must behave as T1x (no temporal component) rather than ghost in one eye.
-- The scene visibility (blackout) the stereo output applies through
-  register 36 must keep working with AA on.
-- Flat play is unchanged.
+While stereo runs, the AA mode at `+0x1B3C` is 1, 2 or 3, and the setting
+says AA runs:
 
-Confirm in game for each mode: edges are smoothed in both eyes, no
-ghosting on head motion, and the head-in-wall blackout still darkens the
-view.
+- the stereo output's full-screen draw (the call at 0x6101DC) is replaced by
+  the AA pass, called with the post-processing object as `this`; the stereo
+  final effect, with the blackout already in register 36, then feeds FXAA or
+  SMAA exactly as the flat final effect does. During that call the byte
+  `+0x1B2F` must read 0 (so the pass uses the full-screen triangle, as the
+  stereo path does) and is restored afterwards;
+- **FXAA and SMAA T1x** run on the side-by-side image as they are. Only the
+  pixel column on each side of the seam between the eyes can mix, at the
+  outer edge of each eye's view; this is accepted;
+- **SMAA T2x** runs as SMAA T1x: the SMAA runner (call at 0x600479) is given
+  a temporal flag of false while stereo runs. Running it temporally would
+  reproject the right eye with the left eye's motion and history, because the
+  game keeps velocity and history for one eye only.
+
+Otherwise (AA mode 0, setting off, or stereo not running) the game's own code
+runs: the plain full-screen draw in stereo, the temporal flag as given.
+
+Both sites (0x6101DC and 0x600479) are patched together or not at all; check
+also the getter's bytes and the AA pass prologue.
+
+The blackout (register 36) keeps working because it is applied before the AA
+pass. Flat play is unchanged.
+
+**Log** (wording and format in `11-diagnostics.md`) once at install, and
+once per change of the AA mode in effect in stereo, naming the mode and
+saying when temporal SMAA is run spatially.
+
+**Acceptance (in game, not yet done).** For FXAA, SMAA T1x and SMAA T2x at
+pixel scale 1.0 with `StereoAntiAliasing` Auto: edges are smoothed in both
+eyes, the image does not ghost or shimmer on head motion, and the
+head-in-wall blackout still darkens the view. At pixel scale 1.5 with Auto,
+and with Off, no AA runs in stereo (log). With On at pixel scale 1.5, AA runs.
 
 ## 4. Head-in-wall blackout delay
 
 ### 4.1 Game facts [sure]
 
-The head-in-wall fade (HeadClipFade, 0x346DE0, stdcall
-`(const vec3* eye, const vec3* pivot)`, `ret 8`, result on the x87 stack)
-returns the scene visibility, 1 visible down to 0 black; its caller
-(the call at 0x34E2C1 in the VR camera behaviour update) stores it in
-stereo object `+0x64`. The fade itself and the clipping-blinders option are
-described in 05 §7.2.
+The head-in-wall fade (HeadClipFade, 0x346DE0, stdcall `(const vec3* eye,
+const vec3* pivot)`, `ret 8`, result on the x87 stack) returns the scene
+visibility, 1 visible down to 0 black. Its caller, the VR camera behaviour
+update (0x34DE50) on the game's main thread, calls it once per frame at
+0x34E2C1 (`e8 1a 8b ff ff`) and stores the result in stereo object `+0x64`.
+The fade itself and the `ClippingBlinders` threshold are described in 05
+§7.2.
 
 ### 4.2 Problem and required behaviour
 
 The view blacks out on the first frame the head touches geometry, so brief
-contacts (leaning to look around a corner, a quick head movement near a
-wall) flash the view to black.
+contacts (walking through a door, leaning to look around a corner, a quick
+head movement near a wall) flash the view to black.
 
-Required: a **grace period of 0.6 s**. When the visibility the game
-computes is below 1 (more precisely below 0.99999), the mod lets visibility
-1.0 through instead, until 0.6 s have passed since the last frame in which
-the game's value was 1; after that the game's value passes through
-unchanged, so the fade then proceeds as the game computes it. Leaving the
-wall resets the timer. The grace period is measured in real time, not in
-frames. It applies whether the clipping-blinders option is on or off, and it
-never shows the scene during cutscenes or loading where the mod itself
-forces black (05).
+Required, while stereo runs: redirect the call at 0x34E2C1 to a function
+with HeadClipFade's ABI (stdcall, two pointer arguments, pops 8, result in
+ST0) that calls the game's HeadClipFade with the same arguments, so that:
+
+- the scene visibility used is 1.0 until the game's fade has stayed below
+  "clear" for **600 ms** of real time without a break (project decision:
+  long enough to pass through a doorway or brush a wall, short enough that
+  holding the head in a wall still blacks out); from then on, and for as
+  long as it stays below "clear", it is the game's value;
+- "clear" means the game's value is 1 allowing for float rounding: the fade
+  is 1 only when nothing is touched, but a product of factors can then come
+  out a few units in the last place below 1.0, so a tolerance of about 1e-5
+  is used (project decision: far above rounding error, far below any
+  visible darkening);
+- any clear value restarts the 600 ms, so leaving the wall resets the
+  delay;
+- if stereo starts with the head already in geometry (no clear value seen
+  yet), the game's fade applies at once: the delay exists to hide brief
+  contact during movement, and a head that starts inside geometry is not
+  one;
+- time is measured with a monotonic clock, not in frames, so the delay is
+  the same at any frame rate.
+
+So contact shorter than 0.6 s never darkens the view, and longer contact
+fades exactly as the game computes, from the 0.6 s mark. It applies whether
+`ClippingBlinders` is on or off. When stereo is not running the game's
+value passes through unchanged.
+
+The mod's own scene-visibility rules (05 §3.2g: forced 1 during cutscenes,
+forced 0 behind a loading screen) are applied after this and win over it.
+
+**Log** once at install that the fix is in.
+
+**Acceptance (in game, not yet done).** With `ClippingBlinders` on: walking
+through doorways and brushing a wall with the head never flashes black; holding
+the head inside a wall turns the view black after about 0.6 s, with the
+game's fade; pulling the head out restores the view at once. In the mission
+4 android encounter the view never goes black from head clipping (05 §15
+item 18, and its open question in 05 §16).
 
 ## 5. Desktop mirror scale
 
 The mirror (03 §8) must fill the window as specified in 03 §8.2, every
-frame. MotherVR drew the mirror image scaled by 1.0 on the first frame and
-by `0.5 / pixel scale` afterwards. That factor only matched its own
-behaviour of starting the eyes at half size (00 §4 item 1); with eyes at full
-size from the start it shrinks the image into a corner of the window. v1
-uses no such factor.
+frame: the mirror image is drawn at scale 1.0 every frame, and no factor
+depends on the pixel scale. (An earlier version shrank the image into a
+corner of the window.)
 
 The mirror draw must also set its viewport to the whole back buffer
+(`{0, 0, width, height, 0, 1}` from the back buffer's own description)
 itself: the game leaves whatever viewport it last used bound.
 
-**Observed:** after both changes the mirror fills the window.
+**Observed [sure]:** after both changes the mirror fills the window.
+
+## 6. Acceptance summary
+
+| § | Check | Status |
+|---|---|---|
+| 1 | Floors and walls lit the same in both eyes at pixel scale 2.0; the log reports several hundred patched shaders per level and no rejections | confirmed |
+| 2 | 2.3 acceptance | to do |
+| 3 | 3.2 acceptance | to do |
+| 4 | 4.2 acceptance | to do |
+| 5 | Mirror fills the window for each mirror type, symmetric on and off | confirmed |
+| (07) | 07 §5 | to do |
+
+## 7. Open questions
+
+- **Main-view frustum in stereo (§2).** Whether the frustum the main view is
+  culled with while stereo runs contains both eyes' frusta (it is the centre
+  view's; with symmetric per-eye frusta offset by half the eye distance, the
+  outer edges of each eye may fall just outside it). Look for: objects at the
+  far left of the left eye or far right of the right eye vanishing; the
+  frustum the main POV's culling context is built from (POV frustum update
+  0x5B2FB0).
+- **View groups (§2.1).** Confirm that only group 2 fills context `+0x5C`.
+  Look for: the writers of POV `+0x310` and of context `+0x5C`.
+- **`+0x1B2F` and the jitter (§3.1).** Confirm their meaning. Look for: the
+  AA pass's branch on `+0x1B2F` and the SMAA runner's write of the jitter.
+- **Per-eye T2x.** True temporal SMAA in stereo (a velocity pass for eye 1
+  and per-eye history) is not required in v1.
+- **2020 build.** Every address of sections 2 to 4.

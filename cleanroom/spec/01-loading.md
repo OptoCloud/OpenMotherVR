@@ -1,16 +1,24 @@
-<!-- Provenance: AI.exe 2015 analysis (PE headers, imports, code at each listed RVA); Windows 11 load tests in the game directory; SysWOW64\d3d11.dll export table; 2020 RVAs from earlier analysis, not verified against a 2020 AI.exe; AI.exe 2015 code at the 07 and 08 sites (bytes checked against the binary); user decision on flat play with runtime None (answer to Q6, ANSWERS.md). Revision: r2 -->
+<!-- Provenance: AI.exe 2015 analysis (PE headers, imports, code at each listed RVA; every patch-site and preflight byte in this revision re-read from the installed Steam 2015 AI.exe, timestamp 0x54E3199D); Windows 11 load tests in the game directory; SysWOW64\d3d11.dll export table; the built proxy's import and export tables; Windows' built-in application compatibility database (its entry for AI.EXE); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; this project's own design decisions for v1 (preflight, runtime probing and fallback, deferred message boxes, display-reset re-entry); orderings are stated only where §2.6 gives a game, Windows or runtime reason; in-game runs on the 2015 build with SteamVR and Index; user decision on flat play with runtime None (answer to Q6, ANSWERS.md); user decision that the UI archive is built as defined in 14-ui-resources.md. Revision: r4 -->
 
-# 01. Loading, build identification and AI.exe addresses
+# 01. Loading, build identification, runtime selection and AI.exe addresses
 
 This document covers how the mod gets into `AI.exe` on Windows 11, what it
-may do at load time, how it tells game builds apart, and the full list of
-game addresses that the other documents use.
+may do at load time and in which order, how it tells game builds apart, the
+preflight that checks every patch site before anything is written, how the
+VR runtime for a run is chosen, and the full list of game addresses that
+the other documents use. Files the mod writes and the player-facing
+message boxes are in `13-distribution.md`; how the UI archive is built is
+in `14-ui-resources.md`.
 
 Conventions: AI.exe is a 32-bit (x86) executable with preferred image base
 0x400000. Addresses here are **RVAs** unless they say VA (VA = image base +
 RVA, so VAs quoted from the 2015 build assume base 0x400000). `thiscall`
 means `this` in ECX, arguments on the stack, callee pops them; `ret N` is
-the number of argument bytes the callee pops.
+the number of argument bytes the callee pops. `cdecl` means the caller pops.
+In the 2020 columns, `?` means unknown: the feature that needs the address
+stays off on that build. 2020 values were taken from the earlier mod's
+per-build address table (and, for inline sites, its installer) and have not
+been verified against a 2020 `AI.exe`.
 
 ## 1. Entry: a `d3d11.dll` proxy
 
@@ -18,7 +26,7 @@ the number of argument bytes the callee pops.
 
 The mod ships as a single 32-bit `d3d11.dll` placed in the game directory,
 next to `AI.exe`. The Windows loader finds it there before the system copy,
-because `AI.exe` imports `d3d11.dll` statically:
+because `AI.exe` imports `d3d11.dll` statically [sure]:
 
 | DLL | Functions AI.exe imports (by name) |
 |---|---|
@@ -27,20 +35,36 @@ because `AI.exe` imports `d3d11.dll` statically:
 | `XINPUT1_3.dll` | ordinals 2, 3, 4 |
 
 No installer, launcher or injector is used. Removing the file restores the
-unmodified game.
+unmodified game (`13-distribution.md` §6 lists the other files to delete).
+
+The proxy itself must not import `d3d11.dll` (it would import itself) and
+must not import any C runtime DLL (`13-distribution.md` §7). It imports
+only system DLLs that every supported Windows ships (such as `KERNEL32`,
+`USER32`, `ADVAPI32`, `SHELL32` and `ole32`); DXGI and D3D11 are used only
+through interfaces the game's device hands out.
 
 ### 1.2 Why not `dxgi.dll`
 
-A `dxgi.dll` proxy in the game directory, which is how earlier mods for this
-game were loaded, does not work on Windows 11. Tests on Windows 11 build
-26200 with the 2015 Steam build: any local `dxgi.dll`, even a minimal one
-with no C runtime and only five kernel32 imports, made `AI.exe` crash with
-an access violation at address 0 during process start, before the DLL's
-entry point ran. KnownDLLs (dxgi is not listed), Smart App Control (off), C
-runtime start-up, missing exports and PE structure were ruled out. A
-`d3d11.dll` built the same way loads and its entry point runs. The cause is
-inside the Windows loader or graphics stack and is not documented; the mod
-must not depend on a local `dxgi.dll` at all.
+A `dxgi.dll` proxy in the game directory does not work on Windows 11.
+Tests on Windows 11 build 26200 with the 2015 Steam build: any local
+`dxgi.dll`, even a minimal one with no C runtime and only five kernel32
+imports, made `AI.exe` crash with an access violation at address 0 during
+process start, before the DLL's entry point ran. KnownDLLs (dxgi is not
+listed), Smart App Control (off), C runtime start-up, missing exports and
+PE structure were ruled out. A `d3d11.dll` built the same way loads and its
+entry point runs. The mod must not depend on a local `dxgi.dll` at all
+[sure].
+
+The probable cause [likely]: Windows' built-in application compatibility
+database has an entry for `AI.EXE` (application "Alien: Isolation", vendor
+SEGA) that matches only when the folder holding the executable is named
+`Alien Isolation`, as a Steam install is. The entry applies a DXGI
+compatibility shim (a 10-bit back-buffer upgrade). A shim on DXGI is
+installed while the process starts, which fits a fault in a local
+`dxgi.dll` before its entry point runs; the reasoning is not confirmed by a
+test with the shim disabled. The `d3d11.dll` proxy is not affected, since
+it replaces no DLL the shim targets. The mod never needs a registry change
+or a renamed game folder to load.
 
 ### 1.3 Exports
 
@@ -48,12 +72,12 @@ Once the proxy is loaded as `d3d11.dll`, every later import of `d3d11.dll`
 in the process binds to it by name, not only AI.exe's. The VR runtime's
 32-bit client library imports `D3D11CreateDevice`; with that export missing
 its load fails and OpenVR initialisation reports
-`VRInitError_Init_VRClientDLLNotFound` (102). The proxy must therefore
-export every name the system `d3d11.dll` exports and forward each one
-unchanged to the system copy.
+`VRInitError_Init_VRClientDLLNotFound` (102) [sure, observed]. The proxy
+must therefore export every name the system `d3d11.dll` exports and forward
+each one unchanged to the system copy.
 
 The 32-bit `C:\Windows\SysWOW64\d3d11.dll` on current Windows 11 exports
-these 51 names:
+these 51 names (the proxy exports exactly these 51):
 
 ```
 CreateDirect3D11DeviceFromDXGIDevice   D3DKMTGetDeviceState
@@ -86,31 +110,64 @@ OpenAdapter10_2
 
 Requirements:
 
-- Forward to the system DLL loaded by full path (the system directory as
-  the 32-bit process sees it, i.e. `SysWOW64` on 64-bit Windows). Loading
-  `d3d11.dll` by bare name would return the proxy itself.
-- A forwarder must not change arguments, return values or the stack; the
-  callee's own calling convention (`__stdcall` for all of these) applies.
-- `D3D11CreateDeviceAndSwapChain` is the only one the game calls. The mod
-  may wrap it (03 uses the device and swap chain it returns); all others
-  are pure forwards.
-- If the system DLL cannot be loaded or a name cannot be resolved, the
-  forwarder returns a failure (`E_FAIL` for HRESULT functions) instead of
-  crashing, and the problem is logged.
-- If a future Windows adds exports, the list must be extended; a startup
-  check that compares the system DLL's export names with the proxy's and
-  logs any missing one is required.
+- **Lazy load.** The system DLL is loaded on the first call of any export,
+  once, thread-safely, not in `DllMain`. Later calls find it loaded at the
+  cost of one compare.
+- **Full path.** Load it as `<GetSystemDirectory()>\d3d11.dll`
+  (`SysWOW64` for a 32-bit process on 64-bit Windows) with
+  `LoadLibraryExW(..., LOAD_WITH_ALTERED_SEARCH_PATH)`. Loading `d3d11.dll`
+  by bare name would return the proxy itself. If the returned module is the
+  proxy, or the resolved `D3D11CreateDeviceAndSwapChain` is the proxy's own
+  export, treat the load as failed.
+- **Transparent forwarding.** A forwarder must not change arguments,
+  registers, return values or the stack. The one-time load that the first
+  call triggers must preserve every general register, so that an export
+  with a register calling convention still reaches the system function
+  intact. The callee's own convention (`__stdcall` for all of these)
+  applies.
+- **Missing names.** When the system DLL is loaded, resolve all 50
+  pass-through names; log each name the system DLL lacks, and a summary
+  line (resolved count, missing count). A call to a name that could not be
+  resolved must not return a made-up success; it may fault or return
+  `E_FAIL` with the correct stack cleanup. On every Windows 10 and 11 build
+  tested all 51 names exist [likely], so this path is not reached in
+  practice.
+- **`D3D11CreateDeviceAndSwapChain`** is the only export the game calls. If
+  the system DLL or this name cannot be resolved it logs the problem and
+  returns `E_FAIL`. Otherwise, in this order:
+  1. wait until every attach-time message box of this run has been closed
+     (`13-distribution.md` §5.2), so the game does not start rendering
+     under a box;
+  2. when a stereo device is attached (02), adjust the swap-chain
+     description as `03-hmd-and-frames.md` §4.5 requires (windowed, mirror
+     size);
+  3. call the system function;
+  4. on success, install the device and swapchain wrappers that 03 and 08
+     require (pixel shader creation for 08 §1; `Present`,
+     `SetFullscreenState`, `ResizeBuffers` for 03). These act only on the
+     game's own swapchain, the last one created through this export.
+
+  With runtime None (§2.3) only step 1 and step 3 apply.
+
+### 1.4 Detach
+
+On `DLL_PROCESS_DETACH` at process exit (`lpReserved` non-null) the mod
+does nothing: other threads are gone and the game's D3D objects are still
+alive. On a dynamic unload (`lpReserved` null; not expected in practice) it
+frees the system `d3d11.dll`. In both cases a session-end line is logged.
+`DLL_THREAD_ATTACH` and `DLL_THREAD_DETACH` notifications are disabled
+(`DisableThreadLibraryCalls`).
 
 ## 2. Initialisation order
 
 ### 2.1 What happens when
 
-Facts about the 2015 build, in process order:
+Facts about the 2015 build, in process order [sure]:
 
 1. The loader maps `AI.exe` and its static imports and runs their entry
    points, including the proxy's `DLL_PROCESS_ATTACH`, under the loader
-   lock. `AI.exe`'s own C runtime has **not** started: none of its static
-   constructors has run.
+   lock, on the process's main thread. `AI.exe`'s own C runtime has **not**
+   started: none of its static constructors has run.
 2. `AI.exe`'s C runtime runs its static constructors. One of them (at RVA
    0xD74F30) constructs the renderer (RVA 0x5AFA70), and that constructor
    allocates the game's stereo object at site `StereoObjectAlloc`
@@ -124,27 +181,44 @@ Facts about the 2015 build, in process order:
    parameters (`RiftTest7`, RVA 0x613C80) and only then creates the D3D11
    device and swap chain (call at RVA 0x613CB8 into RVA 0x626FA0, which
    calls `D3D11CreateDeviceAndSwapChain`).
-4. The front end loads its Scaleform UI from the UI archive and starts the
-   intro sequence (`ShowBootup`, §4.6). The front-end menu object first
-   exists when its open method (`FrontEndMenuVtable` slot 0) runs.
+4. The front end loads its Scaleform UI from the UI archive named by
+   `UiPakPathPtr` and starts the intro sequence (`ShowBootup`, §4.6). The
+   front-end menu object first exists when its open method
+   (`FrontEndMenuVtable` slot 0) runs.
+
+When the game is started outside Steam, Steam can restart it, so the proxy
+attaches in two processes one after the other [sure, observed in the log:
+two attach headers with different process ids]. Everything below must be
+safe when the first process exits at any point (for example before a
+pending attach-time message box was shown).
 
 ### 2.2 Requirements at `DLL_PROCESS_ATTACH`
 
 Allowed, and required to happen here:
 
+- Open the log (`13-distribution.md` §4) and write a session header.
+- Read the config file (06 §3) and the command line (§5.1).
 - Identify the AI.exe build (§3) from the main module's PE header, which is
   already mapped.
-- Read the config file and open the log (both in the game directory, the
-  directory of the proxy DLL).
-- Decide the patch set from the configured runtime (the config file,
-  then the command-line overrides of 06 §2), and apply it (§2.3). The
-  patches must be in place before step 2 above: the stereo object
-  allocation runs from a static constructor, before `WinMain`. Patching
-  here also means no game thread is running yet, so no patch can race with
-  game code. `.text` and `.rdata` are read-only; the mod changes page
-  protection for the write, restores it, and flushes the instruction cache
-  for code.
+- Decide the patch set (§2.3), run the preflight (§2.5) and apply the
+  patches. The patches must be in place before step 2 above: the stereo
+  object allocation runs from a static constructor, before `WinMain`.
+  Patching here also means no game thread is running yet, so no patch can
+  race with game code. `.text` and `.rdata` are read-only; for each write
+  the mod makes the pages writable (`PAGE_EXECUTE_READWRITE`), writes,
+  restores the previous protection and flushes the instruction cache for
+  code (`WriteProcessMemory` on the current process does both the write
+  and the flush).
+- Produce `DATA\MOTHER.PAK` and redirect `UiPakPathPtr` to it (§2.6). This is the only file work at attach; it stays here because the game
+  opens its UI archive during step 4 of §2.1 through the pointer patched
+  here. How the archive is built, validated and when it is rebuilt is in
+  `14-ui-resources.md`.
 - Compute absolute addresses from the actual image base (§3.3).
+- Decide which attach-time message boxes this run shows
+  (`13-distribution.md` §5.2) and arrange for them to be shown: never under
+  the loader lock, in front of the game window, and before the game's
+  device creation completes (§1.3 step 1). How (threads, queues) is the
+  implementation's choice.
 
 Not allowed at attach:
 
@@ -154,32 +228,36 @@ Not allowed at attach:
   that needs them is done from the game hooks the other documents define
   (for example, settings are pushed to the UI from the front-end menu's open
   method, 06).
-- Starting the VR runtime. Its client library imports `d3d11.dll` (which
-  is now the proxy) and creates threads; doing that under the loader lock
-  can deadlock, and the game has not decided yet whether stereo is wanted.
-  The runtime starts from the game's `StereoInit(1)` call (step 3), which
-  is early enough: the back-buffer size query and device creation follow it.
-- Loading the system `d3d11.dll`. It is loaded on the first call to any
-  forwarded export (thread-safe, once), not in `DllMain`.
-- Message boxes, except a single fatal one when the mod refuses to run; a
-  problem found at attach is otherwise logged and reported once the game
-  window exists.
+- Probing for or starting the VR runtime. Its client library imports
+  `d3d11.dll` (which is now the proxy) and creates threads; doing that under
+  the loader lock can deadlock, and the game has not decided yet whether
+  stereo is wanted. The runtime is probed and started from the game's
+  `StereoInit(1)` call (§5), which is early enough: the back-buffer size
+  query and device creation follow it.
+- Loading the system `d3d11.dll` (§1.3), writing `openvr_api.dll` or the
+  controller bindings (`13-distribution.md` §3), or writing the config file.
+- Showing a message box while the loader lock is held (above).
+- Letting an exception or a fault leave `DllMain`. Any error is logged and
+  attach returns `TRUE`: the proxy must never stop the game from starting.
 
 ### 2.3 Patch sets: runtime None means the unmodded game
 
-Flat play must be the unmodded game. The patch set therefore depends on the
-runtime chosen for this run (06 §1, §2), which is known at attach:
+Flat play must be the unmodded game (user decision, ANSWERS Q6). The patch
+set therefore depends on the runtime chosen for this run, which is known at
+attach: the config file's `VRRuntime` (06 §1), overridden by a
+`-vrforce...` switch (§5.1). The patch set does not depend on which runtimes
+are installed; that is only probed later (§5.2).
 
 | Runtime for this run | Applied at attach |
 |---|---|
-| OpenVR or OpenXR | **every** code and data patch that 02 to 08 require |
-| None (the default, or `-vrforcenone`) | only the **UI set** below; no other patch |
+| OpenVR or OpenXR (also `"Oculus"`, which means OpenXR) | **every** code and data patch that 02 to 08 require |
+| None (`-vrforcenone`, or `VRRuntime` `"None"`) | only the **UI set** below; no other patch |
 
 The UI set is what the player needs to turn VR on from the menu and nothing
 that changes how the game plays or renders:
 
-- the UI archive redirect (`UiPakPathPtr`, 06 §7.3), when the patched
-  archive is available;
+- the UI archive redirect (`UiPakPathPtr`, `14-ui-resources.md`),
+  when the archive is available;
 - the UI callback slot (`UiExternalCallSlot`, 06 §4.1), so the options page's
   commands reach the mod;
 - the front-end and pause menu Open wrappers (`FrontEndMenuVtable`,
@@ -189,59 +267,195 @@ that changes how the game plays or renders:
 
 With runtime None the mod creates no stereo device (`StereoInitCall` is not
 redirected, so the game's own `StereoInit(1)` runs and finds no LibOVR
-runtime, as in the unmodded game), does not patch the Rift tests, the pad,
-the camera, SSAO, the mode stack, the UI quads or the render paths of 07
-and 08, does not wrap the D3D11 device or swapchain beyond the pure
-forwarders of §1.3, and does not touch the game's pixel shaders (08 §1).
+runtime, as in the unmodded game), does not probe for VR runtimes, does not
+patch the Rift tests, the pad, the camera, SSAO, the mode stack, the UI
+quads or the render paths of 07 and 08, does not wrap the D3D11 device or
+swapchain beyond §1.3, and does not touch the game's pixel shaders (08 §1).
 The game plays exactly as without the mod; only the Options menu has the
-VR page.
+VR page. The preflight (§2.5) for runtime None covers only the UI set's
+sites.
 
-When the runtime is OpenVR or OpenXR but fails to start (no headset, runtime
-not installed), every patch is already in place; the game then runs flat on
-the stereo path's no-device behaviour defined in 02, and the reason is
-shown once (00 §2.7). The player can set the runtime to None to get the
-unmodded game.
+When the runtime is OpenVR or OpenXR but is not installed or fails to start
+(no headset, runtime error), every patch is already in place; the game then
+runs flat on the stereo path's no-device behaviour defined in 02 (§5.3).
+The player can set the runtime to None to get the unmodded game.
 
 ### 2.4 Failure behaviour
 
-If the build is not recognised (§3), or a patch site does not contain the
-bytes this document lists for it, the mod applies **no** patch at all, logs
-the PE timestamp and the first mismatching site, and lets the game run
-unmodified (forwarders keep working). It tells the user once, in a message
-that names the found timestamp. A partly patched game is never acceptable.
+| Condition | What the mod does |
+|---|---|
+| Build not recognised (§3) | No patch at all, no `MOTHER.PAK`. Logs the PE timestamp. Shows the unsupported-build message (`13-distribution.md` §5.3), which names the timestamp. The game runs unmodified; the forwarders keep working |
+| Recognised build, but an address for it lies outside the image, or any preflight check (§2.5) fails | No patch at all, no `MOTHER.PAK`. Logs each failing check naming the site, and that nothing was patched. No message box (project decision: a recognised build that fails the preflight has been changed by something other than the mod; the game still plays unmodified, and the log names the site for anyone diagnosing it). The game runs unmodified |
+| A page cannot be made writable or a write fails after the preflight passed | Logs the address, the Windows error, and that the game is left partly patched, and applies no further patch. Earlier patches are not undone. This is not expected to happen on any supported system; it is the only path that leaves a partly patched game |
+| The game folder cannot be written | The game still starts. Each missing artefact degrades on its own: no `MOTHER.PAK` means no options page (row below), no local `openvr_api.dll` means the runtime's own loader (§5.3), and a log that cannot be opened goes to the debugger output (`11-diagnostics.md`). The mod never needs elevation, a registry change or a folder rename (12, 13) |
+| An optional fix's own check fails (§2.5.2) | That fix stays off, with one log line; everything else is applied |
+| The UI archive cannot be produced (`14-ui-resources.md`) | `UiPakPathPtr` is left alone; the options page is missing; VR works. One log line, and the message box of `13-distribution.md` §5.3 when `DATA\UI.PAK` itself is missing |
+| The config file cannot be read or parsed | Defaults (06 §3.1); not a failure of loading |
+
+The rule: the **core set** (the stereo path and stereo object hand-off,
+the stereo device redirects, input, menus, camera and UI byte patches; every
+site of §2.5.1) is all-or-nothing. Each fix of 07 and 08 (and the
+diagnostic tap) is checked, enabled or skipped on its own, and logged
+(§2.5.2); a mismatch there never blocks the core set or another fix.
+
+A partly patched core set from a preflight failure is never acceptable: the
+preflight exists so that the only partly patched case is a failing write
+API, which is outside the mod's control.
+
+### 2.5 Preflight
+
+Before the first write, the mod checks every core site it will write, at
+the addresses of the detected build (§3). Every failing check is logged
+(so one run names all mismatches), and any failure means nothing is
+written. The expected game bytes for each site are in §4; which checks to
+run and in what order is the implementation's choice, as long as the rule
+below holds.
+
+#### 2.5.1 Core checks (all must pass, else nothing is patched)
+
+The core set is every site of §4 that 02 to 06 write: the UI set of §2.3
+(`UiPakPathPtr`, `ShowBootupPush`, `UiExternalCallSlot`,
+`FrontEndMenuVtable` slot 0), the eight Rift tests, the stereo object and
+stereo device sites, the mode stack calls and inline sites, the UI quad
+calls, the camera, HUD and menu sites, the input sites and the pad vtable
+slots. Each must satisfy:
+
+- **Bounds.** Every address the mod reads or writes for the build lies
+  inside `SizeOfImage` of the loaded main module; an address outside it is
+  itself a failed check, and the other checks never read outside the image.
+- **Instructions.** Each written code site holds its §4 instruction: the
+  opcode and the operand bytes the patch depends on. Where a patch reuses
+  an operand of the original instruction (for example the branch
+  displacement at `CameraCorrectionBranch`), that operand must match
+  exactly. Displacements and register choices that differ between builds
+  and that the patch does not depend on may be masked.
+- **Data.** `UiPakPathPtr` holds a VA inside the image that points at the
+  NUL-terminated string `data\ui.pak` (compared case-insensitively);
+  `ShowBootupPush`'s operand points at the NUL-terminated `ShowBootup`.
+- **Calls.** Each call site the mod redirects or relies on resolves to its
+  listed callee. Where the callee has no entry of its own in §4 (the
+  left-stick test behind `LeftStickPromptCall` and `LeftStickPromptCall2`),
+  the sibling sites must resolve to the same callee.
+- **Vtable slots.** Each vtable slot the mod replaces holds a VA inside the
+  image; slot 0 of `FrontEndMenuVtable` and of `FollowVtable`, and
+  `UiExternalCallSlot`, hold exactly their listed methods.
+
+"Resolving to X" means the byte is 0xE8 and VA(site) + 5 + rel32 equals the
+VA of X in the running image.
+
+For runtime None only the UI set's sites are checked.
+
+#### 2.5.2 Optional fixes (each checked on its own, right before it is written)
+
+These are the fixes of 07 and 08, plus a diagnostic tap. Each is enabled only when its addresses are known for the
+build (all are `?` for 2020, so all stay off there) and its own check
+passes; a failure logs one line and leaves that fix off.
+
+| Fix | Check |
+|---|---|
+| Planar reflections per eye (07) | `ReflectionRenderCall` resolves to `ReflectionRender`; then `RendererClear` starts with `55 8b ec 83 ec 10`. If only the first holds, the call is redirected but reflections stay mono (logged) |
+| Anti-aliasing in stereo (08 §3) | `StereoOutputDrawCall` resolves to `FullscreenDraw`, `SmaaCall` resolves to `SmaaRun`, `PostFxInstance` is `b8 <imm32> c3` (`mov eax, imm32; ret`), and `AaPass` starts with `55 8b ec 83 e4 f0`. Both call sites or neither |
+| Object culling (08 §2) | `CullDistanceCall` resolves to `CullDistance`, `CullPlaneTestACall` resolves to `CullPlaneTestA`, and the 10 bytes before `CullPlaneTestACall` are `8b 46 5c 85 c0 74 0f 50 56 53`. `CullPlaneTestBCall` is not patched |
+| Head-in-wall delay (08 §4) | `HeadClipFadeCall` resolves to `HeadClipFade` |
+| Script event tap (diagnostic, §2.7) | the first 5 bytes of `ScriptEventTap` are `8b c1 c2 04 00` (`mov eax, ecx; ret 4`); the entry is detoured |
+
+### 2.6 Ordering constraints at attach
+
+Only these orderings are required; everything else at attach may run in
+any order the implementation likes.
+
+| Constraint | Why |
+|---|---|
+| The log is open before anything that can fail | so every later step can report |
+| The config file and the command line are read before the patch set is decided | the patch set depends on the runtime for this run (§2.3) |
+| The build is identified and the preflight (§2.5) has passed before the first write to AI.exe | a partly patched game is not acceptable (§2.4) |
+| The original value of every vtable slot the mod replaces is read before the slot is written | the replacements call or restore the game's own method |
+| `DATA\MOTHER.PAK` exists and `UiPakPathPtr` points at a NUL-terminated `data\mother.pak` before attach returns | the game opens its UI archive through that pointer during start-up (§2.1 step 4). The string must live in the mod's static storage for the whole process |
+| The skip-intro operand (`ShowBootupPush`, pointed at a NUL-terminated name, in static storage, of the skip-intro function that the mod's UI movie implements; the name is the implementation's choice, 06 §6, 14) is written before attach returns | the front end runs the intro during start-up |
+| The stereo object hand-off (`StereoObjectAlloc`) is written before attach returns | the game allocates its stereo object from a static constructor, before `WinMain` (§2.1 step 2) |
+| All other patches are written before attach returns | no game thread exists yet, so no patch can race with game code |
+| No message box is shown while the loader lock is held | showing UI under the loader lock can deadlock (§2.2) |
+| The first-launch config file is written only after the welcome message has been dismissed | a process that exits first (a Steam restart, §2.1) leaves the first-launch state for the next process, so the player still sees the message once |
+
+The optional fixes of §2.5.2 are each checked and written independently,
+after the core preflight has passed. A failure at any point follows §2.4.
+
+The log records, at attach: the game directory, the effective settings
+that decide this run's behaviour (at least the runtime), the build found,
+the image base and which build's addresses are used, whether the UI archive
+was redirected, whether the intro is skipped, and which patches were
+applied, enough to tell for each feature area of 02 to 08 whether it is
+active, or the reason it is not. Wording and format are defined in
+`11-diagnostics.md`.
+
+### 2.7 Threads and later events
+
+Threads, as requirements [sure for 2015]:
+
+| Thread | What runs there |
+|---|---|
+| Loader thread (the main thread, before `WinMain`) | attach (§2.6) |
+| Wherever the implementation shows the attach-time boxes (never the loader thread while it holds the lock, §2.2) | the attach-time boxes, one after another, then the first-launch config write |
+| Game thread (the main thread after `WinMain`) | `StereoInit(1)`, so runtime probing and start (§5); `D3D11CreateDeviceAndSwapChain`; UI callbacks and menu wrappers (config writes after a menu command); head pose reads |
+| Render thread | the device's begin and end frame and the runtime's frame calls (03, 09) |
+| Job threads | the culling hooks of 08 §2 |
+
+Data crossing threads must use atomics or a sequence lock; the details are
+in the documents that own each piece of data.
+
+Later events:
+
+- **Display reset.** The game can call `StereoInit(1)` again [likely; seen
+  on display resets]. The runtime is probed and started once per process:
+  the second call only re-attaches the device that the first call created
+  (or none, if the first failed), shows no message box, and logs that it
+  was called again.
+- **Runtime changed in the menu** (06 §4.2 `mvr_vrruntime`): the new value
+  is saved and `QuitRequested` is set to 1 so the game exits; the new
+  runtime and its patch set apply from the next launch. Nothing is
+  unpatched or repatched in the running process.
+- **Headset taken off, focus loss, runtime exit:** 03 and 09.
+- **Script event tap.** The game's scripts pass debug strings to a retail
+  no-op method (`ScriptEventTap`, §4.6). The mod detours its entry
+  (§2.5.2) for diagnostics only; what it derives and logs is defined in
+  `11-diagnostics.md`. v1 behaviour does not depend on it.
 
 ## 3. Build identification
 
 ### 3.1 Known builds
 
 The build is identified by `IMAGE_FILE_HEADER.TimeDateStamp` of the main
-module (`AI.exe`).
+module, read from the already-mapped headers (no file I/O). The main module
+is the module named `AI.exe` if present, otherwise the process's main
+module.
 
 | Build | PE timestamp | Date (UTC) | Status |
 |---|---|---|---|
-| 2015 launch build (Steam) | 0x54E3199D | 2015-02-17 10:36:13 | Primary target; every address below verified |
-| 2020 update (Steam, GOG, Epic) | 0x5FD25676 | 2020-12-10 17:10:14 | Most addresses known (RVA 2020 column), none verified; see §3.2 |
+| 2015 launch build (Steam) | 0x54E3199D | 2015-02-17 10:36:13 | Primary target; every 2015 address below verified against the binary |
+| 2020 update (Steam, GOG, Epic) | 0x5FD25676 | 2020-12-10 17:10:14 | Recognised; core addresses known (2020 columns), none verified against a 2020 binary; see §3.2 |
 
-The 2015 build: image base 0x400000, `SizeOfImage` 0x1F81000, sections
-`.text` 0x1000, `.rdata` 0xD9F000, `.data` 0x1236000, `.rsrc` 0x1D54000,
-`.reloc` 0x1D66000.
+Any other timestamp (or a main module without valid DOS and NT headers,
+read as timestamp 0) is unknown (§2.4).
+
+The 2015 build: image base 0x400000, `SizeOfImage` 0x1F81000,
+`DllCharacteristics` 0x8140, sections `.text` 0x1000, `.rdata` 0xD9F000,
+`.data` 0x1236000, `.rsrc` 0x1D54000, `.reloc` 0x1D66000.
 
 ### 3.2 2020 build
 
-The RVA 2020 column comes from earlier analysis and has not been checked
-against a 2020 `AI.exe`. Before the mod enables itself on that build, each
-2020 site must be checked against the bytes given for 2015 (instruction
-encodings are expected to match even where displacements differ). An
-address with a blank 2020 column is unknown; the feature that needs it
-stays off on that build and the log says so.
+The 2020 columns (including the eight Rift tests, `LeftStickPromptCall2`
+and the displacement bytes below) were taken from the earlier mod's
+per-build address table (and, for inline sites, its installer) and have not
+been verified against a 2020 `AI.exe`; treat them as unverified until §7 Q1
+is resolved. On that build the mod uses the 2020 addresses and the same
+preflight rule (§2.5). If the preflight passes, the core patches are
+applied; every optional fix of §2.5.2 stays off (its addresses are `?`).
 
-Two 2020 values are known to differ in content, not only in address:
+Values that differ in content, not only in address:
 
 - `UiMouseWidthLoad` / `UiMouseHeightLoad`: the displacement low byte that
   selects the 1280x720 reference fields is 0x9C / 0xA0 in 2020 (0xEC / 0xF0
-  in 2015), assuming the same +0x10 field distance.
-- Address 0x00D1F020 was recorded for the 2020 `StereoIsSettingAllowed`;
-  it is probably a typo for 0x0051F020. It is listed for reference only.
+  in 2015), from the earlier mod's table, unverified.
 
 ### 3.3 Image base
 
@@ -255,12 +469,18 @@ in the file.
 ## 4. Address table
 
 Columns: **Name** is the stable name the spec uses. **2015** and **2020**
-are RVAs. **What is there** describes the game code or data at that
-address, with the original 2015 bytes for patch sites. **Spec** names the
-documents that use it.
+are RVAs (`?` = unknown). **What is there** describes the game code or data
+at that address, with the original 2015 bytes for patch sites (re-read from
+the 2015 binary for this revision). **Spec** names the documents that use
+it.
 
 For call sites, "call → X" means a 5-byte `call rel32` (opcode E8) whose
 target is RVA X in the 2015 build.
+
+The names are spec-side labels for game functions, data and sites; the
+implementation may rename them. Other addresses in the earlier mod's table
+that are not listed here are deliberately omitted: no v1 behaviour needs
+them.
 
 ### 4.1 Rift-mode tests
 
@@ -287,16 +507,16 @@ compares the two with a 2-byte `cmp reg, eax`. The listed address is that
 | Name | 2015 | 2020 | Kind | What is there | Spec |
 |---|---|---|---|---|---|
 | `StereoObjectPtr` | 0x1366A2C | 0x1376BDC | data | Global pointer to the game's stereo object (0xB0 bytes). Also stored at renderer +0xE68C. Read directly by game code throughout | 02, 05 |
-| `StereoObjectAlloc` | 0x5AFBA1 | 0x501CC1 | site | In the renderer constructor: `68 b0 00 00 00` (`push 0xB0`), then `89 be 98 f6 0c 00` and `89 be 9c f6 0c 00` (zero renderer +0xCF698 and +0xCF69C), `call` → 0x044330 (operator new), `add esp,4`, a null test, a call to the stereo constructor (RVA 0x5D9A60) and at 0x5AFBC5 `89 86 8c e6 00 00` (store into renderer +0xE68C). From 0x5AFBA1 to the store is 0x24 bytes; the `push` + two stores span 0x11 | 02 |
-| `StereoObjectVtable` | 0xFE57BC | | rdata | Game stereo object vtable, 3 slots: destructor (RVA 0x5E3F40), OnSettingChanged(SettingEvent*) (RVA 0x5CCDB0, thiscall, ret 4), IsSettingAllowed (RVA 0x5CCEB0) | 02 |
-| `StereoDeviceVtable` | 0xFE5418 | | rdata | Game stereo device (HMD) vtable, 21 slots; slot 11 (+0x2C) = RVA 0x5E0DA0 head pose into a 3x4 matrix; slots 12 to 15 below; slot 16 (+0x40) render-target size; slot 17 (+0x44) display size; slot 18 (+0x48) display device name | 02 |
-| `StereoInitCall` | 0x613941 | 0x565E11 | site | In renderer initialisation: `mov ecx,[StereoObjectPtr]; push 1; call` → 0x5E0D40, `StereoInit(int type)`: thiscall, ret 4; type 1 creates the LibOVR device | 02 |
+| `StereoObjectAlloc` | 0x5AFBA1 | 0x501CC1 | site | In the renderer constructor: `68 b0 00 00 00` (`push 0xB0`), then `89 be 98 f6 0c 00` and `89 be 9c f6 0c 00` (zero renderer +0xCF698 and +0xCF69C), `call` → 0x044330 (operator new), `add esp,4`, a null test, a call to the stereo constructor (RVA 0x5D9A60) and at 0x5AFBC5 `89 86 8c e6 00 00` (store into renderer +0xE68C). From 0x5AFBA1 to the store is 0x24 bytes; the `push` + two stores span 0x11. A 5-byte `mov eax, imm32` followed by a 2-byte `jmp short` with displacement 0x1D lands exactly on the store | 02 |
+| `StereoObjectVtable` | 0xFE57BC | ? | rdata | Game stereo object vtable, 3 slots: destructor (RVA 0x5E3F40), OnSettingChanged(SettingEvent*) (RVA 0x5CCDB0, thiscall, ret 4), IsSettingAllowed (RVA 0x5CCEB0) | 02 |
+| `StereoDeviceVtable` | 0xFE5418 | ? | rdata | Game stereo device (HMD) vtable, 21 slots; slot 11 (+0x2C) = RVA 0x5E0DA0 head pose into a 3x4 matrix; slots 12 to 15 below; slot 16 (+0x40) render-target size; slot 17 (+0x44) display size; slot 18 (+0x48) display device name | 02 |
+| `StereoInitCall` | 0x613941 | 0x565E11 | site | In renderer initialisation: `mov ecx,[StereoObjectPtr]; push 1; call` → 0x5E0D40 (`e8 fa d3 fc ff`), `StereoInit(int type)`: thiscall, ret 4; type 1 creates the LibOVR device | 02 |
 | `DeviceEyeTransform` | 0x5CD4C0 | 0x51F630 | function | Device slot 12: (int eye, float4x4* view, float4x4* proj), thiscall, ret 0xC. Builds the eye projection and offsets the view; eye -1 = centre | 02 |
 | `DeviceFovAspect` | 0x5B8E70 | 0x50B010 | function | Device slot 13: (int eye, float* vfov, float* aspect), thiscall, ret 0xC | 02 |
 | `DeviceEyeScaleOffset` | 0x5B8F10 | 0x50B0C0 | function | Device slot 14: (int eye, float out[4]), thiscall, ret 8 | 02 |
 | `DeviceEyeViewport` | 0x5B9000 | 0x50B1B0 | function | Device slot 15: (int eye, int, int, int* left, int* top, int* right, int* bottom), thiscall, ret 0x1C; reads the device's eye rectangles, ignoring the target size it is given (07) | 02, 07 |
-| `RecenterCallUpdate` | 0x5BE2E8 | 0x5104A8 | site | In `StereoUpdate`, when pad LB and RB are both held: `8b 40 2c` (`mov eax,[eax+0x2C]`, device slot 11), `8d 56 78` (`lea edx,[esi+0x78]`), `push edx`, `call eax`; the slot offset byte is at +2 | 04 |
-| `RecenterCallMenu` | 0x5B8691 | 0x50A831 | site | In the stereo object's reset-orientation method (RVA 0x5B8680, called at RVA 0x091BD7, from the menu's reset-view item (likely)): `8b 42 2c` (`mov eax,[edx+0x2C]`), `call eax`, `ret`; offset byte at +2 | 04 |
+| `RecenterCallUpdate` | 0x5BE2E8 | 0x5104A8 | site | In `StereoUpdate`, when pad LB and RB are both held: `8b 40 2c` (`mov eax,[eax+0x2C]`, device slot 11), `8d 56 78` (`lea edx,[esi+0x78]`), `52` (`push edx`), `ff d0` (`call eax`); the slot offset byte is at +2 | 04 |
+| `RecenterCallMenu` | 0x5B8691 | 0x50A831 | site | In the stereo object's reset-orientation method (RVA 0x5B8680, called at RVA 0x091BD7, from the menu's reset-view item (likely)): `8b 42 2c` (`mov eax,[edx+0x2C]`), `ff d0` (`call eax`), `c3`; offset byte at +2 | 04 |
 
 ### 4.3 Frames and render targets
 
@@ -308,9 +528,18 @@ compares the two with a 2-byte `cmp reg, eax`. The listed address is that
 | `RendererContext` | 0x621E40 | 0x574330 | function | cdecl (renderer) → immediate `ID3D11DeviceContext*` (renderer +0x1EF3E8) | 03 |
 | `RendererRtTexture` | 0x6232D0 | 0x575800 | function | cdecl (renderer, uint16 index) → `ID3D11Texture2D*` of render target `index` (renderer +0x1CD240 + 16·index) | 03 |
 | `RendererRtSrv` | 0x6232F0 | 0x5757C0 | function | cdecl (renderer, uint16 index) → `ID3D11ShaderResourceView*` of render target `index` (renderer +0x1CD248 + 16·index) | 03 |
-| `StereoRenderTargetSizeCall` | 0x60FD64 | 0x562244 | site | In the back-buffer size query, after `RiftTest1`: `mov ecx,[StereoObjectPtr]; push edi; push esi; call` → 0x5B8750, the stereo object's render-target size (int* w, int* h), thiscall, ret 8: sets 1280x800 then asks device slot 16 | 03 |
-| `StereoDisplaySizeCall` | 0x60FE5D | 0x56233D | site | In the display size query, after `RiftTest2`: `call` → 0x5B8780, the stereo object's display size (int* w, int* h), thiscall, ret 8: sets 1280x800 then asks device slot 17 | 03 |
-| `RenderTargetResizePending` | 0x1358470 | 0x1368620 | data | Byte. Set to 1 by the resolution setter (RVA 0x611250) when the size changes; the frame loop tests it at RVA 0x3903B2 and rebuilds the back buffer and render targets | 03, 06 |
+| `StereoRenderTargetSizeCall` | 0x60FD64 | 0x562244 | site | In the back-buffer size query, after `RiftTest1`: `mov ecx,[StereoObjectPtr]; push edi; push esi; call` → 0x5B8750 (`e8 e7 89 fa ff`), the stereo object's render-target size (int* w, int* h), thiscall, ret 8: sets 1280x800 then asks device slot 16 | 03 |
+| `StereoDisplaySizeCall` | 0x60FE5D | 0x56233D | site | In the display size query, after `RiftTest2`: `call` → 0x5B8780 (`e8 1e 89 fa ff`), the stereo object's display size (int* w, int* h), thiscall, ret 8: sets 1280x800 then asks device slot 17 | 03 |
+| `DisplayObject` | 0x13583E8 | ? | data | The game's display object: back-buffer and display state; its byte +0x88 is `RenderTargetResizePending` (02 §9.3) | 02, 03 |
+| `RenderTargetResizePending` | 0x1358470 | 0x1368620 | data | Byte at `DisplayObject` +0x88: "rebuild render targets". Set by the resolution setter (RVA 0x611250) when the window size changes, by the restore path after a minimised window is restored (RVA 0x611CB0), by the display object's setting handler (RVA 0x6104C0) for display settings 2 to 6, and by the mod when a setting the stereo targets depend on changes (06 §4). After the end frame the main loop tests it (at RVA 0x3903B2) and, when the dword at RVA 0x125127C is 0, runs `DisplayReset` | 02, 03, 06 |
+| `DisplayReset` | 0x613F90 | ? | function | The game's display reset (render thread): shut-down-rendering wrapper, back-buffer size query, pixel format and output selection, swapchain rebuild, configure-rendering wrapper, then clears `RenderTargetResizePending` (order in 02 §9.3) | 02, 03 |
+| `StereoConfigureRendering` | 0x5D9B30 | ? | function | Stereo object wrapper of device slot 3 (configure rendering): thiscall (stereo object), ret 0; requires a device and state != 0. Called from RVA 0x613EF4 (start-up) and 0x614129 (display reset) | 02 |
+| `StereoShutdownRendering` | 0x5D9B60 | ? | function | Wrapper of device slot 4 (shut down rendering): thiscall (stereo object), ret 0; requires a device and state != 0; called from RVA 0x613FBA (display reset) | 02 |
+| `StereoBeginFrame` | 0x5B8870 | ? | function | Wrapper of device slot 5 then slot 7 for eyes 0 and 1; called at RVA 0x3902A9 | 02 |
+| `StereoEndFrame` | 0x5B88B0 | ? | function | Wrapper of device slot 8 for eyes 0 and 1, then tail-jumps to slot 6 (end frame); called at RVA 0x3903AD | 02 |
+| `StereoDevicePresents` | 0x5B8DD0 | ? | function | Wrapper of device slot 10 ("device presents"): false without a running device; called in `PresentStep` | 02 |
+| `PresentStep` | 0x610240 | ? | function | The per-frame present step: thiscall (display object), between begin and end frame (called at RVA 0x39038E): overlay draw, then the game's own present unless the device presents (02 §6.8) | 02 |
+| `GamePresent` | 0x623F30 | ? | function | The game's own present: `IDXGISwapChain::Present(renderer +0x0C sync interval, 0)` | 02 |
 
 ### 4.4 Input
 
@@ -330,7 +559,8 @@ compares the two with a 2-byte `cmp reg, eax`. The listed address is that
 | `KeyboardKeyDown` | 0x60EB20 | 0x560FE0 | function | Keyboard: bool KeyDown(int scancode), thiscall, ret 4 (DirectInput scan codes: 0x1D Ctrl, 0x38 Alt) | 04 |
 | `KeyboardAnyKey` | 0x60EE00 | 0x5612D0 | function | Keyboard: bool AnyKey() (byte +0x224), thiscall, ret 0 | 04 |
 | `MouseActive` | 0x9BBE70 | 0x4C87E0 | function | Mouse: bool Active() (+0x54 != 0), thiscall, ret 0 | 04 |
-| `LeftStickPromptCall` | 0x42D0A0 | 0x43E1F0 | site | In the control-prompt name lookup (RVA 0x42CFF0): `call` → 0x57DCE0, "is movement on the left stick" (thiscall on an action map, ret 0, returns AL), then `test al,al` choosing `"lstick"` / `"rstick"`. A second identical call is at +0xEC (RVA 0x42D18C) | 04 |
+| `LeftStickPromptCall` | 0x42D0A0 | 0x43E1F0 | site | In the control-prompt name lookup (RVA 0x42CFF0): `e8 3b 0c 15 00`, `call` → 0x57DCE0, "is movement on the left stick" (thiscall on an action map, ret 0, returns AL), then `test al,al` choosing `"lstick"` / `"rstick"` | 04 |
+| `LeftStickPromptCall2` | 0x42D18C | 0x43E2DC | site | The second identical call, at `LeftStickPromptCall` + 0xEC: `e8 4f 0b 15 00`, `call` → 0x57DCE0 | 04 |
 | `UiMouseWidthLoad` | 0x443564 | 0x454704 | site | In the UI mouse update (RVA 0x443520): `f3 0f 10 15 dc 88 75 01` (`movss xmm2,[VA 0x17588DC]`), back-buffer width (display info +0x2C, struct at VA 0x17588B0). Display info +0x3C holds the UI reference width 1280.0. disp32 starts at +4 | 04 |
 | `UiMouseHeightLoad` | 0x4435C2 | 0x454762 | site | Same for height: `f3 0f 10 15 e0 88 75 01` (display info +0x30); +0x40 holds 720.0 | 04 |
 | `UiInputModeBranch` | 0x43EB3A | 0x44FCFA | site | Menu input-mode event handler (RVA 0x43EB00, thiscall, ret 8), event 0x12: `74 0c` (`je`) skipping the switch to focus/pad navigation (RVA 0x434E90) when keyboard and mouse are present | 04 |
@@ -341,29 +571,29 @@ compares the two with a 2-byte `cmp reg, eax`. The listed address is that
 |---|---|---|---|---|---|
 | `StereoPushMode` | 0x5D9C00 | 0x52BE00 | function | Stereo object: push(int stereo mode), thiscall, ret 4. Pushes on the stack at +0x68/+0x6C and applies via RVA 0x5CD0A0 | 05 |
 | `StereoPopMode` | 0x5D9C80 | 0x52BE80 | function | Stereo object: pop(), thiscall, ret 0 | 05 |
-| `StereoModeStackAppend` | 0x294540 | | function | The game's int-array append used by `StereoPushMode` (its call at 0x5D9C53): thiscall (ECX = stereo +0x68, the array `{data, count, capacity}`), one argument `const int*`, ret 4, returns the new element's address or null; grows the array (8, then doubling) through the game allocator | 05 |
-| `PushCallA` | 0x40EB8E | 0x41FD4E | site | `call` → 0x5D9C00 (stereo push) | 05 |
-| `PushCallB` | 0x43EECA | 0x45008A | site | `call` → 0x5D9C00, in a hub-type screen | 05 |
-| `PushCallC` | 0x44197A | 0x452B2A | site | `call` → 0x5D9C00, in the front-end menu's open method | 05 |
-| `PopCallA` | 0x413DDA | 0x42508A | site | `call` → 0x5D9C80 (stereo pop), in the front-end menu's close method | 05 |
-| `PopCallB` | 0x416382 | 0x4275D2 | site | `call` → 0x5D9C80 | 05 |
-| `PopCallC` | 0x424C2A | 0x435DCA | site | `call` → 0x5D9C80 | 05 |
-| `ResumeGamePop` | 0x453682 | 0x4649B2 | site | Front-end "Resume_game" handler (RVA 0x4535D0): 11 bytes, `8b 0d` + VA of `StereoObjectPtr` (`mov ecx,[...]`) and a `call` → 0x5D9C80 | 05 |
-| `PauseMenuPush` | 0x43E545 | 0x44F705 | site | Pause menu "Pause" handler (RVA 0x43E520): 13 bytes, `8b 0d` + VA of `StereoObjectPtr`, `6a 01` (`push 1`) and a `call` → 0x5D9C00 | 05 |
-| `StereoUpdateCall` | 0x3B4100 | 0x3C4FB0 | site | Once per frame: `call` → 0x5BE2A0, `StereoUpdate(float dt)`, thiscall, ret 4 (LB+RB recenter, fade animation) | 04, 05 |
+| `StereoModeStackAppend` | 0x294540 | ? | function | The game's int-array append used by `StereoPushMode` (its call at 0x5D9C53): thiscall (ECX = stereo +0x68, the array `{data, count, capacity}`), one argument `const int*`, ret 4, returns the new element's address or null; grows the array (8, then doubling) through the game allocator | 05 |
+| `PushCallA` | 0x40EB8E | 0x41FD4E | site | `e8 6d b0 1c 00`, `call` → 0x5D9C00 (stereo push) | 05 |
+| `PushCallB` | 0x43EECA | 0x45008A | site | `e8 31 ad 19 00`, `call` → 0x5D9C00, in a hub-type screen | 05 |
+| `PushCallC` | 0x44197A | 0x452B2A | site | `e8 81 82 19 00`, `call` → 0x5D9C00, in the front-end menu's open method | 05 |
+| `PopCallA` | 0x413DDA | 0x42508A | site | `e8 a1 5e 1c 00`, `call` → 0x5D9C80 (stereo pop), in the front-end menu's close method | 05 |
+| `PopCallB` | 0x416382 | 0x4275D2 | site | `e8 f9 38 1c 00`, `call` → 0x5D9C80 | 05 |
+| `PopCallC` | 0x424C2A | 0x435DCA | site | `e8 51 50 1b 00`, `call` → 0x5D9C80 | 05 |
+| `ResumeGamePop` | 0x453682 | 0x4649B2 | site | Front-end "Resume_game" handler (RVA 0x4535D0): 11 bytes, `8b 0d 2c 6a 76 01` (`mov ecx,[StereoObjectPtr]`) and `e8 f3 65 18 00` (`call` → 0x5D9C80) | 05 |
+| `PauseMenuPush` | 0x43E545 | 0x44F705 | site | Pause menu "Pause" handler (RVA 0x43E520): 13 bytes, `8b 0d 2c 6a 76 01`, `6a 01` (`push 1`) and `e8 ae b6 19 00` (`call` → 0x5D9C00) | 05 |
+| `StereoUpdateCall` | 0x3B4100 | 0x3C4FB0 | site | Once per frame: `e8 9b a1 20 00`, `call` → 0x5BE2A0, `StereoUpdate(float dt)`, thiscall, ret 4 (LB+RB recenter, fade animation) | 04, 05 |
 | `BuildUiQuad` | 0x5BE550 | 0x510710 | function | cdecl `float4x4* (float4x4* out, float size, float inv_aspect, float dist)`, returns `out` in EAX; the caller copies from the returned pointer. Builds a quad facing the camera at `dist` | 05 |
-| `VirtualScreenCall` | 0x5CD132 | 0x51F2A2 | site | In the stereo object's set-mode method (RVA 0x5CD0A0), mode 1: `call` → 0x5BE550 with (3.5, UI height/width, 3.0); result copied to stereo +0x20 | 03, 05 |
-| `HudPanelCall` | 0x5CD2EE | 0x51F45E | site | In the stereo overlay draw (RVA 0x5CD170), mode 0: `call` → 0x5BE550 with (0.8, inv aspect, 1.0); used for this frame's HUD quad | 05 |
+| `VirtualScreenCall` | 0x5CD132 | 0x51F2A2 | site | In the stereo object's set-mode method (RVA 0x5CD0A0), mode 1: `e8 19 14 ff ff`, `call` → 0x5BE550 with (3.5, UI height/width, 3.0); result copied to stereo +0x20 | 03, 05 |
+| `HudPanelCall` | 0x5CD2EE | 0x51F45E | site | In the stereo overlay draw (RVA 0x5CD170), mode 0: `e8 5d 12 ff ff`, `call` → 0x5BE550 with (0.8, inv aspect, 1.0) (caller pops 0x10); used for this frame's HUD quad | 05 |
 | `PovManagerPtr` | 0x1366A00 | 0x1376BB0 | data | Global pointer to the POV manager: +0x8 = POV 0 (main view), whose first 64 bytes are the world-to-view matrix; +0x88 POV count | 03, 05, 07 |
 | `FollowVtable` | 0xDC6600 | 0xDDD6E8 | rdata | First-person camera behaviour vtable ("FollowBehavior"): slot 0 OnActivate(arg) (RVA 0x02C930), slot 1 OnDeactivate(arg) (RVA 0x02BBF0), both thiscall, ret 4. Yaw at +0x204 (mirror +0x1FC), ±1.0 = ±180°; pitch +0x208; look input enabled byte +0x264 | 04, 05 |
-| `FollowOnActivate` | 0x02C930 | 0x03C1A0 | site | Function start; at +8 (RVA 0x02C938) `88 86 64 02 00 00` (`mov [esi+0x264],al`, al = 1) enables game look input | 05 |
+| `FollowOnActivate` | 0x02C930 | 0x03C1A0 | site | Function start (`53 56 8b f1 33 db b0 01`); at +8 (RVA 0x02C938) `88 86 64 02 00 00` (`mov [esi+0x264],al`, al = 1) enables game look input | 05 |
 | `FollowOnDeactivate` | 0x02BBF0 | 0x03B340 | function | Clears +0x264 | 04 |
-| `FollowLookState` | 0x02D83C | 0x03D0BC | site | In the behaviour's state update (RVA 0x02D600): `8a 4c 24 0f` (`mov cl,[esp+0xF]`, previous +0x25E) then store to +0x261, a byte that enables the second look-integration branch | 05 |
-| `CameraNoiseCall` | 0x2603B1 | 0x270C61 | site | In the camera update (RVA 0x260320): `8b ce` (`mov ecx,esi`) and a `call` → 0x24BF50, procedural sway and breathing offsets; 7 bytes in total | 05 |
-| `HeadClipCompare` | 0x346E94 | 0x35794E | site | In the head-in-wall fade (RVA 0x346DE0, stdcall, ret 8): `0f 2f 05` + VA of a float 1e-5 (RVA 0xDC68A8) (`comiss xmm0,[...]`); disp32 at +3. The result goes to stereo object +0x64 | 05 |
+| `FollowLookState` | 0x02D83C | 0x03D0BC | site | In the behaviour's state update (RVA 0x02D600): `8a 4c 24 0f` (`mov cl,[esp+0xF]`, previous +0x25E) then `88 8e 61 02 00 00` (store to +0x261), a byte that enables the second look-integration branch | 05 |
+| `CameraNoiseCall` | 0x2603B1 | 0x270C61 | site | In the camera update (RVA 0x260320): `8b ce` (`mov ecx,esi`) and `e8 98 bb fe ff` (`call` → 0x24BF50), procedural sway and breathing offsets; 7 bytes in total | 05 |
+| `HeadClipCompare` | 0x346E94 | 0x35794E | site | In the head-in-wall fade (RVA 0x346DE0, stdcall, ret 8): `0f 2f 05 a8 68 1c 01` (`comiss xmm0,[VA 0x11C68A8]`, a float 1e-5 at RVA 0xDC68A8); disp32 at +3. The result goes to stereo object +0x64 | 05 |
 | `CameraCorrectionBranch` | 0x34A0CE | 0x35ACCE | site | In the VR camera correction (RVA 0x34A050, thiscall, ret 0x10): `0f 86 2b 03 00 00` (`jbe` to the epilogue at RVA 0x34A3FF). The output vector is zeroed first; the correction is computed only when this branch is not taken | 05 |
 | `SsaoSettingBranch` | 0x575421 | 0x4C71D1 | site | In the SSAO setting handler (RVA 0x575400, setting 0x15): `75 10` (`jne`), choosing what to store in +0xD80 and the enable byte +0xD84 | 05 |
-| `UiEntityOnMessage` | 0xDFCE18 | 0xE13F38 | rdata | Vtable entry (vtable at RVA 0xDFCE10, slot 2) holding RVA 0x51BD70, the UI entity's message handler: thiscall (const ShortGuid* msg, int, int, int), ret 0x10 | 05 |
+| `UiEntityOnMessage` | 0xDFCE18 | 0xE13F38 | rdata | Vtable entry (vtable at RVA 0xDFCE10, slot 2) holding RVA 0x51BD70 (2020 0x6241A0), the UI entity's message handler: thiscall (const ShortGuid* msg, int, int, int), ret 0x10 | 05 |
 | `MsgCutsceneVisibilityStart` | 0x134DC0C | 0x17F6B84 | data | Runtime hash of `cutscene_visibility_start` (set by a static constructor) | 05 |
 | `MsgCutsceneVisibilityFinish` | 0x134DC18 | 0x17F6B90 | data | Hash of `cutscene_visibility_finish` | 05 |
 | `MsgLevelFadeStart` | 0x134DD1C | 0x17F6C94 | data | Hash of `level_fade_start` | 05 |
@@ -376,7 +606,7 @@ compares the two with a 2-byte `cmp reg, eax`. The listed address is that
 | `GraphicsSettings` | 0x1358A50 | 0x1368C00 | data | The graphics settings object (`this` for the two functions below; settings indexed 0x00 to 0x19, names at RVA 0x124FC20) | 02, 05 |
 | `SettingsSetOption` | 0x5A8910 | 0x4FAA50 | function | thiscall (int setting index, const char* value name), ret 8: set a graphics setting by value name | 02, 05 |
 
-### 4.6 Options, UI and configuration
+### 4.6 Options, UI, configuration and process
 
 | Name | 2015 | 2020 | Kind | What is there | Spec |
 |---|---|---|---|---|---|
@@ -385,9 +615,11 @@ compares the two with a 2-byte `cmp reg, eax`. The listed address is that
 | `UiInvokeInt` | 0x1341A0 | 0x144470 | function | Same with one int; thiscall (name, int), ret 8 | 06 |
 | `UiInvokeFloat` | 0x134240 | 0x144510 | function | Same with one float; thiscall (name, float), ret 8 | 06 |
 | `UiExternalCallSlot` | 0xF00078 | 0xF177D8 | rdata | Vtable entry (slot 1 of the vtable at RVA 0xF00074) holding RVA 0x43A0A0 (2020 0x44B250): the front end's Scaleform external-interface dispatch. thiscall (context, const char* name, args, arg count), ret 0x10; hashes `name` and calls the callback registered for it | 06 |
-| `UiPakPathPtr` | 0x124F748 | 0x125F978 | data | Pointer to the string `data\ui.pak`, the UI archive the game opens | 06 |
-| `ShowBootupPush` | 0x441AED | 0x452C9D | site | In a front-end method: `68 78 e2 2f 01` (`push` VA of the string `ShowBootup`), then `mov ecx,esi` and a `call` → 0x42AAD0, which invokes that ActionScript function (with 1 and one more argument; thiscall, ret 0xC) and starts the intro sequence | 06 |
-| `QuitRequested` | 0x17DA920 | 0x17EAAD0 | data | Byte: the game's exit request flag (getter RVA 0x614760, setter RVA 0x614770; set for example right after a fatal start-up `MessageBoxA` at RVA 0x613F38). Setting it to 1 asks the game to exit (likely) | 06 |
+| `UiPakPathPtr` | 0x124F748 | 0x125F978 | data | Pointer (VA 0x13E3C34 in 2015) to the string `data\ui.pak`, the UI archive the game opens | 06, 14 |
+| `ShowBootupPush` | 0x441AED | 0x452C9D | site | In a front-end method: `68 78 e2 2f 01` (`push` VA of the string `ShowBootup`), then `8b ce` (`mov ecx,esi`) and a `call` → 0x42AAD0, which invokes that ActionScript function (with 1 and one more argument; thiscall, ret 0xC) and starts the intro sequence | 06 |
+| `QuitRequested` | 0x17DA920 | 0x17EAAD0 | data | Byte: the game's exit request flag (getter RVA 0x614760, setter RVA 0x614770; set for example right after a fatal start-up `MessageBoxA` at RVA 0x613F38). Setting it to 1 makes the game exit; the mod relies on this after a runtime change (§2.7) [likely] | 06 |
+| `ScriptEventTap` | 0xA1BCC0 | ? | function | The game's script event dispatch: a retail no-op that the game's scripts pass debug strings to: `8b c1 c2 04 00` (`mov eax, ecx; ret 4`), thiscall (const char*), ret 4; 683 call sites [sure]. Debug-only diagnostic site, detoured at its entry (§2.5.2) | 01, 11 |
+| `AudioReopenOutput` | 0x831B00 | 0x8473D0 | function | Re-initialises the game's audio output device: cdecl, no arguments; starts `c6 05 61 97 bf 01 01` (sets a byte flag) then calls the device open. Called once, after the mod redirects audio to the headset's endpoint (10) | 10 |
 
 ### 4.7 Planar reflections and render fixes
 
@@ -395,67 +627,204 @@ compares the two with a 2-byte `cmp reg, eax`. The listed address is that
 §2 to §4 stay off on that build (08 §1 needs no game address). Bytes are
 the 2015 originals, checked against the binary. "call → X" sites are 5-byte
 `call rel32` (E8) whose target is RVA X; a redirect must check the opcode
-and that the displacement resolves to X.
+and that the displacement resolves to X (§2.5.2).
 
 Reflections (07):
 
 | Name | 2015 | 2020 | Kind | What is there | Spec |
 |---|---|---|---|---|---|
-| `ReflectionManagerPtr` | 0x135835C | | data | Global pointer to the reflection manager: +0x04 target, +0x56 usable, +0x58/+0x5C target size, +0x60 quality, +0x6C/+0x70 candidate planes and count, +0x78 flag | 07 |
-| `ReflectionPovUpdate` | 0x5B41E0 | | function | Reflection POV per-frame update (thiscall, POV in ECX); called at 0x5B4640 (`e8 9b fb ff ff`) from the POV manager update 0x5B45A0 for every type-1 POV | 07 |
-| `ReflectionRenderCall` | 0x5B5D91 | | site | `e8 aa fe ff ff`: call → 0x5B5C40, in the POV manager's render loop (RVA 0x5B5D40), POV type 1; the only call of it | 07 |
-| `ReflectionRender` | 0x5B5C40 | | function | Renders the reflection POV, mono; thiscall, no arguments, ret 0; prologue `55 8b ec 83 e4 f0 83 ec 2c` | 07 |
-| `PovSetEye` | 0x5B38D0 | | function | POV set eye (int eye), thiscall, ret 4. Eye -1 saves the centre view and projection to `PovEyeSave`. Must not be called on the reflection POV | 07 |
-| `PovEyeSave` | 0x142F5E0 | | data | Shared save area of `PovSetEye`: view float[16] at 0x142F5E0, projection float[16] at 0x142F620 | 07 |
-| `PovBeginRender` | 0x5B11D0 | | function | POV begin render: uploads view, projection and camera constants, sets target and viewport | 07 |
-| `PovUpdateFrustum` | 0x5B2FB0 | | function | Recomputes a POV's culling frustum from its view and projection; thiscall, no stack arguments | 07 |
-| `PovViewport` | 0x5B0820 | | function | POV viewport: thiscall, one pointer to `{left, top, right, bottom}`, ret 4; whole target for eye -1, else via `StereoEyeViewport` | 07 |
-| `StereoEyeViewport` | 0x5B8730 | | function | Stereo object wrapper that calls device slot 15 with `(eye, width / 2, height, &l, &t, &r, &b)` when the device state is 2 | 07 |
-| `StereoApplyEyeTransform` | 0x5B86A0 | | function | Stereo object: (int eye, float view[16], float proj[16]), thiscall, ret 0xC; forwards to device slot 12 when the device state is 2 | 07 |
-| `RendererEyeOwner` | 0x13583E4 | | data | Global pointer; the int at +0x2C is the renderer's current eye | 07 |
-| `RendererClear` | 0x621770 | | function | Renderer clear, cdecl (renderer, flags, ARGB colour, float depth, stencil); flags 1 colour, 2 depth, 4 stencil. First six bytes `55 8b ec 83 ec 10`, position independent | 07 |
-| `PassSetup` | 0x595170 | | function | Render pass setup; for some pass types rebuilds the viewport through 0x574EE0 as `{0, 0, right - left, bottom - top}` (07 §5 item 3) | 07 |
-| `RendererSetViewport` | 0x621350 | | function | cdecl (context, int vp[6] = {x, y, w, h, minZ, maxZ}) | 07 |
-| `ScreenConstantsUpload` | 0x574F50 | | function | Uploads pixel constant buffer 2 register 60 (`ScreenResolution`) and vertex constant buffer 1 register 21 (viewport fraction of the target) | 07 |
+| `ReflectionManagerPtr` | 0x135835C | ? | data | Global pointer to the reflection manager: +0x04 target, +0x56 usable, +0x58/+0x5C target size, +0x60 quality, +0x6C/+0x70 candidate planes and count, +0x78 flag | 07 |
+| `ReflectionPovUpdate` | 0x5B41E0 | ? | function | Reflection POV per-frame update (thiscall, POV in ECX); called at 0x5B4640 (`e8 9b fb ff ff`) from the POV manager update 0x5B45A0 for every type-1 POV | 07 |
+| `ReflectionRenderCall` | 0x5B5D91 | ? | site | `e8 aa fe ff ff`: call → 0x5B5C40, in the POV manager's render loop (RVA 0x5B5D40), POV type 1; the only call of it | 07 |
+| `ReflectionRender` | 0x5B5C40 | ? | function | Renders the reflection POV, mono; thiscall, no arguments, ret 0; prologue `55 8b ec 83 e4 f0 83 ec 2c` | 07 |
+| `PovSetEye` | 0x5B38D0 | ? | function | POV set eye (int eye), thiscall, ret 4. Eye -1 saves the centre view and projection to `PovEyeSave`. Must not be called on the reflection POV | 07 |
+| `PovEyeSave` | 0x142F5E0 | ? | data | Shared save area of `PovSetEye`: view float[16] at 0x142F5E0, projection float[16] at 0x142F620 | 07 |
+| `PovBeginRender` | 0x5B11D0 | ? | function | POV begin render: uploads view, projection and camera constants, sets target and viewport | 07 |
+| `PovUpdateFrustum` | 0x5B2FB0 | ? | function | Recomputes a POV's culling frustum from its view and projection; thiscall, no stack arguments | 07 |
+| `PovViewport` | 0x5B0820 | ? | function | POV viewport: thiscall, one pointer to `{left, top, right, bottom}`, ret 4; whole target for eye -1, else via `StereoEyeViewport` | 07 |
+| `StereoEyeViewport` | 0x5B8730 | ? | function | Stereo object wrapper that calls device slot 15 with `(eye, width / 2, height, &l, &t, &r, &b)` when the device state is 2 | 07 |
+| `StereoApplyEyeTransform` | 0x5B86A0 | ? | function | Stereo object: (int eye, float view[16], float proj[16]), thiscall, ret 0xC; forwards to device slot 12 when the device state is 2 | 07 |
+| `RendererEyeOwner` | 0x13583E4 | ? | data | Global pointer; the int at +0x2C is the renderer's current eye | 07 |
+| `RendererClear` | 0x621770 | ? | function | Renderer clear, cdecl (renderer, flags, ARGB colour, float depth, stencil); flags 1 colour, 2 depth, 4 stencil. First six bytes `55 8b ec 83 ec 10`, position independent | 07 |
+| `PassSetup` | 0x595170 | ? | function | Render pass setup; for some pass types rebuilds the viewport through 0x574EE0 as `{0, 0, right - left, bottom - top}` (07 §5 item 3) | 07 |
+| `RendererSetViewport` | 0x621350 | ? | function | cdecl (context, int vp[6] = {x, y, w, h, minZ, maxZ}) | 07 |
+| `ScreenConstantsUpload` | 0x574F50 | ? | function | Uploads pixel constant buffer 2 register 60 (`ScreenResolution`) and vertex constant buffer 1 register 21 (viewport fraction of the target) | 07 |
 
 Culling, anti-aliasing and head-in-wall fade (08):
 
 | Name | 2015 | 2020 | Kind | What is there | Spec |
 |---|---|---|---|---|---|
-| `CullObjectsCall` | 0x5E984B | | site | `e8 d0 64 03 00`: call → 0x61FD20, the only call of the per-object visibility loop; cdecl, the caller pops 0x18 | 08 |
-| `CullObjects` | 0x61FD20 | | function | Per-object visibility loop: cdecl (cull context*, flags*, bounds[] stride 0x40, items[], count, out[]); serves the main view and shadow casters | 08 |
-| `CullDistanceCall` | 0x61FD95 | | site | `e8 b6 9c ff ff`: call → 0x619A50, followed by `83 c4 0c` | 08 |
-| `CullDistance` | 0x619A50 | | function | Distance/LOD test: cdecl (bounds*, const vec3* camera position, float scale), result in AL (true = keep) | 08 |
-| `CullFrustum` | 0x619030 | | function | Frustum test: (bounds*, context*) | 08 |
-| `CullPlaneTestACall` | 0x61FDB9 | | site | `e8 a2 9a ff ff`: call → 0x619860 (taken when context +0x5C is set), followed by `83 c4 0c` | 08 |
-| `CullPlaneTestA` | 0x619860 | | function | Extra plane/occluder test for the main view; cdecl, 3 arguments, result in AL | 08 |
-| `CullPlaneTestBCall` | 0x61FDD2 | | site | `e8 49 9b ff ff`: call → 0x619920 (taken when context +0x60 is set, with context +0x70), followed by `83 c4 0c` | 08 |
-| `CullPlaneTestB` | 0x619920 | | function | Second extra plane test; cdecl, 3 arguments, result in AL | 08 |
-| `AaSettingHandler` | 0x5F6AC0 | | function | Graphics setting 0x09 handler: thiscall, one argument, ret 4; stores the AA mode at post-processing object +0x1B3C (1 FXAA, 2 SMAA T1x, 3 SMAA T2x, else 0) | 08 |
-| `PostFxInstance` | 0x5F19C0 | | function | Returns the post-processing object; cdecl, no arguments | 08 |
-| `FinalPostChain` | 0x610040 | | function | Final post chain (to 0x6101FA): post pass, then flat AA + post pass, or the stereo output | 08 |
-| `StereoRunningTest` | 0x610144 | | site | `b9` + VA of 0x13583A0 (`mov ecx, ...`) then a call → 0x01E150: true when the stereo device state is 2; selects the stereo branch | 08 |
-| `AaPass` | 0x600210 | | function | Post-processing AA pass, thiscall on the post-processing object, no arguments | 08 |
-| `SmaaCall` | 0x600479 | | site | In the AA pass: `e8 42 a0 01 00`: call → 0x61A4C0, the SMAA runner (cdecl, 3 arguments; `83 c4 0c` follows) | 08 |
-| `PostFxPass` | 0x600490 | | function | Post-processing pass | 08 |
-| `StereoOutput` | 0x5FC560 | | function | Stereo output: sets pixel constant buffer 2 register 36 from post values times stereo +0x64, then draws through 0x5A0980; first bytes `83 ec 1c 53` | 08 |
-| `StereoOutputDrawCall` | 0x6101DC | | site | `e8 9f 07 f9 ff`: call → 0x5A0980, the full-screen draw (cdecl, no arguments) in the stereo branch of the final post chain; the place where the AA pass is missing | 08 |
-| `VelocityPass` | 0x5B1720 | | function | SMAA T2x velocity pass; runs on the eye-0/centre path only | 08 |
-| `MainViewEye1` | 0x5B5B70 | | function | Prepares and renders the main view's eye 1 (`PovSetEye(1)`, render, restore the centre); skips the velocity pass | 08 |
-| `PostSourceResolution` | 0x6007B0 | | site | Post-processing setup (to 0x600811): size query 0x627B90, then the constant upload 0x621C90 of pixel constant buffer 2 register 39 = (W, H, 1/W, 1/H) | 08 |
-| `HeadClipFadeCall` | 0x34E2C1 | | site | `e8 1a 8b ff ff`: call → 0x346DE0 in the VR camera behaviour update; its result is stored to stereo +0x64 | 08 |
-| `HeadClipFade` | 0x346DE0 | | function | Head-in-wall fade: stdcall (const vec3* eye, const vec3* pivot), ret 8, visibility in ST0 (1 visible to 0 black) | 05, 08 |
+| `CullObjectsCall` | 0x5E984B | ? | site | `e8 d0 64 03 00`: call → 0x61FD20, the only call of the per-object visibility loop; cdecl, the caller pops 0x18 | 08 |
+| `CullObjects` | 0x61FD20 | ? | function | Per-object visibility loop: cdecl (cull context*, flags*, bounds[] stride 0x40, items[], count, out[]); serves the main view and shadow casters | 08 |
+| `CullDistanceCall` | 0x61FD95 | ? | site | `e8 b6 9c ff ff`: call → 0x619A50, followed by `83 c4 0c` | 08 |
+| `CullDistance` | 0x619A50 | ? | function | Distance/LOD test: cdecl (bounds*, const vec3* camera position, float scale), result in AL (true = keep) | 08 |
+| `CullFrustum` | 0x619030 | ? | function | Frustum test: (bounds*, context*) | 08 |
+| `CullPlaneTestACall` | 0x61FDB9 | ? | site | `e8 a2 9a ff ff`: call → 0x619860, the occlusion test (taken when context +0x5C is set), followed by `83 c4 0c`. Preceded by the 10 bytes `8b 46 5c 85 c0 74 0f 50 56 53` (`mov eax,[esi+0x5C]; test eax,eax; je +0xF; push eax; push esi; push ebx`) | 08 |
+| `CullPlaneTestA` | 0x619860 | ? | function | The occlusion test: tests the object against the context's occlusion buffer, which only the main view has (08 §2); cdecl, 3 arguments, result in AL | 08 |
+| `CullPlaneTestBCall` | 0x61FDD2 | ? | site | `e8 49 9b ff ff`: call → 0x619920, the shadow-light view-volume test (taken when context +0x60 is set, with context +0x70), followed by `83 c4 0c`. Not patched | 08 |
+| `CullPlaneTestB` | 0x619920 | ? | function | The shadow lights' view-volume test (shadow casters against the main view's volume, 08 §2); cdecl, 3 arguments, result in AL | 08 |
+| `AaSettingHandler` | 0x5F6AC0 | ? | function | Graphics setting 0x09 handler: thiscall, one argument, ret 4; stores the AA mode at post-processing object +0x1B3C (1 FXAA, 2 SMAA T1x, 3 SMAA T2x, else 0) | 08 |
+| `PostFxInstance` | 0x5F19C0 | ? | function | Returns the post-processing object; cdecl, no arguments; `b8 70 09 9d 01 c3` (`mov eax, VA 0x19D0970; ret`) | 08 |
+| `FinalPostChain` | 0x610040 | ? | function | Final post chain (to 0x6101FA): post pass, then flat AA + post pass, or the stereo output | 08 |
+| `StereoRunningTest` | 0x610144 | ? | site | `b9` + VA of 0x13583A0 (`mov ecx, ...`) then a call → 0x01E150: true when the stereo device state is 2; selects the stereo branch | 08 |
+| `AaPass` | 0x600210 | ? | function | Post-processing AA pass, thiscall on the post-processing object, no arguments; starts `55 8b ec 83 e4 f0 83 ec 44` | 08 |
+| `SmaaCall` | 0x600479 | ? | site | In the AA pass: `e8 42 a0 01 00`: call → 0x61A4C0 (`SmaaRun`), followed by `83 c4 0c` | 08 |
+| `SmaaRun` | 0x61A4C0 | ? | function | The SMAA runner: cdecl, 3 arguments | 08 |
+| `PostFxPass` | 0x600490 | ? | function | Post-processing pass | 08 |
+| `StereoOutput` | 0x5FC560 | ? | function | Stereo output: sets pixel constant buffer 2 register 36 from post values times stereo +0x64, then draws through 0x5A0980; first bytes `83 ec 1c 53` | 08 |
+| `StereoOutputDrawCall` | 0x6101DC | ? | site | `e8 9f 07 f9 ff`: call → 0x5A0980 (`FullscreenDraw`) in the stereo branch of the final post chain; the place where the AA pass is missing | 08 |
+| `FullscreenDraw` | 0x5A0980 | ? | function | The full-screen triangle draw: cdecl, no arguments | 08 |
+| `VelocityPass` | 0x5B1720 | ? | function | SMAA T2x velocity pass; runs on the eye-0/centre path only | 08 |
+| `MainViewEye1` | 0x5B5B70 | ? | function | Prepares and renders the main view's eye 1 (`PovSetEye(1)`, render, restore the centre); skips the velocity pass | 08 |
+| `PostSourceResolution` | 0x6007B0 | ? | site | Post-processing setup (to 0x600811): size query 0x627B90, then the constant upload 0x621C90 of pixel constant buffer 2 register 39 = (W, H, 1/W, 1/H) | 08 |
+| `HeadClipFadeCall` | 0x34E2C1 | ? | site | `e8 1a 8b ff ff`: call → 0x346DE0 in the VR camera behaviour update; its result is stored to stereo +0x64 | 08 |
+| `HeadClipFade` | 0x346DE0 | ? | function | Head-in-wall fade: stdcall (const vec3* eye, const vec3* pivot), ret 8, visibility in ST0 (1 visible to 0 black) | 05, 08 |
 
 ### 4.8 Known but not needed
 
-These are in the game and were touched by earlier mods, but v1 needs no
-change to them:
+These are in the game, but v1 does not change them:
 
 - RVA 0x43AB40 (2020 0x44BCF0): a call to the control-prompt name lookup
-  (RVA 0x42CFF0, cdecl, 2 arguments). Earlier mods hooked it with a pure
-  pass-through.
-- RVA 0x831B00 (2020 0x8473D0): re-initialises the audio output device.
-  Only needed to move game audio to a headset's own audio endpoint, which
-  OpenVR runtimes handle themselves.
-- RVA 0x5CCDB0 / 0x5CCEB0 (2020 0x51EF20 / see §3.2): the game's own stereo
+  (RVA 0x42CFF0, cdecl, 2 arguments).
+- RVA 0x5CCDB0 / 0x5CCEB0 (2020 0x51EF20 / unknown): the game's own stereo
   OnSettingChanged and IsSettingAllowed, listed in `StereoObjectVtable`.
+
+## 5. Runtime selection
+
+### 5.1 The runtime for this run
+
+At attach the mod takes the configured runtime (06 §1, `Settings.VRRuntime`;
+`"Oculus"` and value 1 mean OpenXR) and applies the command-line switches:
+
+| Argument | Runtime for this run |
+|---|---|
+| `-vrforcenone` | None |
+| `-vrforceopenvr` | OpenVR |
+| `-vrforceopenxr` | OpenXR |
+| `-vrforceoculus` | OpenXR |
+
+A switch matches only as a whole argument (the command line split as
+`CommandLineToArgvW` does), compared case-insensitively. If several are
+given, the last one wins. A forced runtime is not saved. The switches
+decide the patch set (§2.3) at attach and the runtime choice (§5.2) later;
+both use the same value.
+
+### 5.2 Probing and choice
+
+With runtime OpenVR or OpenXR, the first `StereoInit(1)` call (game thread)
+probes for installed runtimes, without loading any of their DLLs, and logs
+each result:
+
+- **OpenVR is available** when `%LOCALAPPDATA%\openvr\openvrpaths.vrpath`
+  exists and parses as JSON, its `"runtime"` member is a non-empty array
+  whose first element is a string (a UTF-8 path, the SteamVR install
+  directory), and `<that path>\bin\win32\openvr_api.dll` exists. Any other
+  outcome means not available (logged: file missing or unparseable, or the
+  path without the DLL).
+- **OpenXR is available** when a runtime usable from a 32-bit process is
+  found as `09-openxr.md` §1 defines (in short: a non-empty
+  `XR_RUNTIME_JSON` wins; else the 32-bit registry view's `ActiveRuntime`
+  under `HKLM\SOFTWARE\Khronos\OpenXR\1` whose library is x86; else a
+  32-bit sibling manifest of the 64-bit view's active runtime, which the mod
+  then sets as `XR_RUNTIME_JSON` for the process).
+- LibOVR (the Oculus PC SDK) is never probed or used.
+
+The choice, in order:
+
+1. Preferred runtime available: use it.
+2. Preferred runtime not available and it was **forced** by a switch: no
+   runtime (no fallback).
+3. Otherwise fall back: OpenVR if available, else OpenXR if available.
+4. Otherwise no runtime.
+
+The log records the availability of each, the preferred runtime, whether
+it was forced, and the choice. The probe runs once per process; the result
+is reused (display resets, the OpenXR frame pacing of 09).
+
+### 5.3 Start and failure
+
+The chosen runtime is started from the same `StereoInit(1)` call (03 for
+OpenVR, 09 for OpenXR). OpenVR's start first writes `openvr_api.dll` next to
+the proxy when it is not current (`13-distribution.md` §3.2), then loads
+that copy (or, if it does not exist, the runtime's own
+`bin\win32\openvr_api.dll`) with the runtime's `bin\win32` directory on the
+DLL search path while `openvr_api.dll` loads and `VR_InitInternal2` runs.
+
+| Outcome | Behaviour |
+|---|---|
+| No runtime chosen (§5.2 step 2 or 4) | No stereo device; logged; **no message box**. The game runs flat on the patched stereo path (02's no-device behaviour) |
+| The chosen runtime fails to start (DLL cannot load, init error, missing interface, no OpenXR session possible with the game's device) | No stereo device; the runtime is shut down and unloaded; the runtime-failure message of `13-distribution.md` §5.3 is shown once, modal, on the thread that hit the failure (the game thread), and the game waits until it is closed; then the game runs flat |
+| Started | Device attached to the stereo object; an initial recenter, and a second one when the headset is first worn (03 §2.2) |
+
+A failure detected later, when the game configures rendering (OpenXR
+session creation needs the game's device, 09 §2), follows the same row and
+detaches the device there.
+
+## 6. Acceptance
+
+Each check names what to look at. "Log" is `mothervr.log` in the game
+directory (`13-distribution.md` §4).
+
+1. **Loads on Windows 11.** With only the proxy added to a clean 2015 Steam
+   install, the game starts; the log has an attach header, the game
+   directory, the config summary and the recognised build with its timestamp 0x54E3199D.
+2. **Forwarders.** With OpenVR chosen and SteamVR installed, OpenVR init
+   succeeds (no error 102). The log shows the system `d3d11.dll` loaded from
+   the system directory, `D3D11CreateDeviceAndSwapChain` resolved, and a
+   summary of 50 pass-through exports resolved and none missing.
+   `dumpbin /exports` on the proxy lists exactly the 51 names of §1.3.
+3. **No loader-lock work.** The log shows the system `d3d11.dll` load and
+   the runtime probe only after the attach lines, and the attach-time boxes
+   appear after the attach lines. With a box open, the game window does not
+   start rendering until it is closed.
+4. **Unknown build.** Changing one byte of the PE timestamp in a copy of
+   `AI.exe` (test only): the unsupported-build message shows the new value
+   in hex, the log says the build is unknown and that nothing is patched, the
+   game plays unmodified, and `DATA\MOTHER.PAK` is not created.
+5. **Preflight.** Changing the byte at `SsaoSettingBranch` in a test copy
+   from 0x75 to 0x74: the log names the SSAO branch, says nothing was
+   patched, and the game plays unmodified, with no box. No other site is
+   modified (compare process memory of a few sites with the file).
+6. **Runtime None.** With `-vrforcenone`: the log shows only the UI set
+   (§2.3) applied and no runtime probe; the Options menu
+   has the VR page; graphics options behave as unmodded (SSAO can be
+   enabled and shows), no swapchain or shader wrapping lines appear.
+7. **Forced missing runtime.** With SteamVR not installed (or
+   `openvrpaths.vrpath` renamed) and `-vrforceopenvr`: the log shows OpenVR
+   unavailable, chosen None, no box, and the game runs flat.
+8. **Fallback.** With `VRRuntime` `"OpenXR"`, no OpenXR runtime usable from
+   32-bit, and SteamVR installed, no switch: the log shows the fallback to
+   OpenVR and VR starts.
+9. **Runtime failure box.** With SteamVR installed but its server unable to
+   start (for example the headset unplugged, or another VR app launching):
+   one runtime-failure message naming SteamVR, the runtime's error text and
+   its code;
+   the game continues flat after it is closed.
+10. **Display reset.** Changing the resolution in the game's video options
+    in VR: the log shows a second stereo device creation call with no second
+    runtime start and no box; VR continues.
+11. **Runtime change.** Choosing another runtime in the VR page: the game
+    exits; `mothervr.json` holds the new value; the next launch uses it.
+12. **Two processes.** Starting `AI.exe` directly (outside Steam) produces
+    two attach headers with different process ids in one log, and neither
+    process crashes.
+13. **Optional fixes.** On the 2015 build the log shows reflections,
+    anti-aliasing, culling, the head-in-wall delay and the event tap each
+    reported active; on the 2020 build none of them, and the core
+    patches still applied if the preflight passed.
+
+## 7. Open questions
+
+1. **2020 build addresses.** No 2020 `AI.exe` has been checked. To resolve:
+   load a 2020 binary (timestamp 0x5FD25676), run the §2.5 checks over its
+   column, and confirm the bytes match the 2015 encodings; then locate the
+   §4.7 and `ScriptEventTap` addresses by the same byte patterns (call
+   targets and prologues listed there) and confirm the
+   `UiMouseWidthLoad` displacement bytes.
+2. **Does the game call `StereoInit(1)` again on every display reset?** The
+   re-entry is handled either way (§2.7). To resolve: break on
+   `StereoInitCall` while changing resolution, display mode and adapter.
+3. **Is setting `QuitRequested` the game's normal exit path?** Setting it
+   after a runtime change was observed in game to exit the game. To resolve: confirm that the
+   game's own quit menu item writes the same byte through the setter at RVA
+   0x614770 and that save data is flushed on that path.

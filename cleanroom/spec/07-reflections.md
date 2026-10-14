@@ -1,65 +1,77 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build, verified against the binary) and of the game's level pixel shaders; geometric derivation of the per-eye mapping by the spec side; in-game testing of an earlier rebuild (the per-eye render has not yet been seen running: the tested scene had no planar reflection surface); MotherVR 0.8.1 behaviour observed in game. Revision: r1 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build, re-checked against the binary for r2: reflection render and its single call, POV::SetEye including its FOV formula, renderer clear prologue, screen-constants upload); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; analysis of the game's level pixel shaders (LEVEL_SHADERS_DX11_BIN.PAK of the Torrens level); geometric derivation of the per-eye mapping by the spec side; observation in game by the spec side (an earlier mod showed reflections sliding against head motion; the per-eye render required here has not yet been seen running, because in every scene tested the reflection view never had both its active and render flags set). Revision: r3 -->
 
 # 07: Planar reflections in stereo
 
-Reflective floors (and other flat mirrors) are drawn by the game's
-**planar reflection** system: a second camera view renders the scene
-mirrored about the floor plane into a texture, and the floor's pixel shader
-reads that texture in screen space. On a flat screen this is correct. On
-the side-by-side stereo target it is not, and MotherVR 0.8.1 left it
-broken: reflections slid against head motion and twisted on roll. This
-document gives the game facts and what the mod must do so that each eye
-sees its own correct reflection.
+Reflective floors (and other flat mirrors) are drawn by the game's **planar
+reflection** system: a second camera view renders the scene mirrored about
+the floor plane into a texture, and the floor's pixel shader reads that
+texture in screen space. On a flat screen this is correct. On the
+side-by-side stereo target it is not: an earlier mod showed reflections
+that slid against head motion and twisted on roll. This document gives
+the game facts and what the mod must do so that each eye sees its own correct
+reflection.
 
-Addresses are RVAs of the 2015 build (image base 0x400000). The 2020
-addresses are not known; on that build the fix stays off (01 §4.7) and
-reflections render as the game does.
+Addresses are RVAs of the 2015 build (image base 0x400000). 2020 values
+were taken from the earlier mod's per-build address table (and, for inline
+sites, its installer) and have not been verified against a 2020 `AI.exe`.
+Most 2020 addresses this fix needs are not known ("?" below); on that build
+the fix stays off (01 §4.7), the log says so once, and reflections render as
+the game does.
 
 Confidence: **[sure]** the game code shows it directly; **[likely]** strong
 inference; **[guess]** must be confirmed in game.
 
-**Status:** the required behaviour of §4 is implemented in the rebuild but
-**not yet observed in game**: in the scene tested so far the reflection
-render never ran (no reflection plane was active), so neither the result nor
-the viewport question of §5 has been checked. Treat §4 as required, and §5
-as the list of things to confirm in the first scene that has a reflective
-floor.
+**Status:** the behaviour of §4 has **not yet been observed in game**: in
+the scenes the spec side tested, the reflection view never had both flag
+bits 0 and 4 set, so a per-eye render could not run, and neither its result
+nor the viewport question (§8 item 1) has been checked. §4 is required
+behaviour; §7 says exactly how to check it.
 
 ## 1. Game objects
 
-| Object | Where | Facts |
-|---|---|---|
-| Reflection manager | global pointer at 0x135835C | `+0x04` reflection render target; `+0x56` byte, reflections usable; `+0x58`/`+0x5C` target width/height = half the main render resolution; `+0x60` quality = graphics setting 0x10 "Planar Reflections" (0 off; the menu offers 0 and 3); `+0x6C`/`+0x70` candidate reflection planes and their count; `+0x78` byte flag. [sure] |
-| POV manager | global pointer at 0x1366A00 | Owns the POVs (camera views): count byte `+0x88`, POV pointers from `+0x08`. [sure] |
-| POV | allocated by the POV manager | `+0x000` view matrix (4x4 float, row vectors), `+0x040` projection, `+0x080` copy of the projection used for shader constants, `+0x0E0` vertical FOV (radians), `+0x0E4` aspect, `+0x0E8` type (0 main/other, 1 reflection), `+0x33C`/`+0x340` width/height of its render target, `+0x36B` flags (bit 0 active, bit 2 cleared by SetEye, bit 4 renders, bit 7 main view), `+0x378` eye (-1 none; selects the viewport half). [sure] |
-| Stereo object | global pointer at 0x1366A2C | `+0x04` stereo device; device `+0x04` state, 2 = tracking running (02). [sure] |
-| Renderer eye | global pointer at 0x13583E4 | The int at `+0x2C` is the renderer's current eye. [sure] |
-| POV eye save area | 0x142F5E0 (view) and 0x142F620 (projection) | Shared by every POV's `SetEye` (§2.4). [sure] |
+| Object | 2015 | 2020 | Facts |
+|---|---|---|---|
+| Reflection manager | global pointer at 0x135835C | ? | `+0x04` reflection render target; `+0x56` byte, reflections usable; `+0x58`/`+0x5C` target width/height; `+0x60` quality = graphics setting 0x10 "Planar Reflections" (0 off; the menu offers 0 and 3); `+0x6C`/`+0x70` candidate reflection planes and their count; `+0x78` byte flag. [sure] |
+| POV manager | global pointer at 0x1366A00 | 0x1376BB0 | Owns the POVs (camera views): count byte `+0x88`, POV pointers from `+0x08`. [sure] |
+| POV | allocated by the POV manager | | `+0x000` view matrix (4x4 float, row vectors), `+0x040` projection, `+0x080` copy of the projection used for shader constants, `+0x0E0` vertical FOV (radians), `+0x0E4` aspect, `+0x0E8` type (0 main/other, 1 reflection), `+0x33C`/`+0x340` width/height of its render target, `+0x36B` flags (bit 0 active, bit 2 cleared by SetEye, bit 4 renders, bit 7 main view), `+0x378` eye (-1 none; selects the viewport half). [sure] |
+| Stereo object | global pointer at 0x1366A2C | 0x1376BDC | `+0x04` stereo device; device `+0x04` state, 2 = stereo running (02). [sure] |
+| Renderer eye owner | global pointer at 0x13583E4 | ? | The int at `+0x2C` is the renderer's current eye. [sure] |
+| POV eye save area | 0x142F5E0 (view) and 0x142F620 (projection) | ? | Shared by every POV's `SetEye` (§2.4). [sure] |
 
-The reflection POV is created at start-up with the name "Reflection Map"
-and type 1. Its target is created only when setting 0x10 is not 0.
+The reflection POV is created at start-up (RVA 0x599540) with the name
+"Reflection Map" and type 1. Its target is created only when setting 0x10 is
+not 0, and is recreated when the setting changes (RVA 0x59AB30) and at every
+display reset (02 §9.3).
+
+**Target size.** `+0x58`/`+0x5C` are half of the game's back-buffer size
+answer (display information at RVA 0x13588B0, `+0x14`/`+0x18`), which in
+stereo is the side-by-side size `W x H` of the render-target size query
+(02 §6.2). So the reflection target is `W/2 x H/2` and each eye half of it is
+`W/4 x H/2`, the same per-eye density as on a flat screen. [sure for the
+halving; likely that the display information holds the side-by-side size in
+stereo]
 
 ## 2. How the game renders a planar reflection
 
 ### 2.1 Update: the reflection camera [sure]
 
-`ReflectionPOV update` (0x5B41E0, thiscall, ecx = the reflection POV) runs
-once per frame in the game update, from the POV manager update
-(0x5B45A0; the call is at 0x5B4640, made for every POV of type 1). It runs
-after the camera update has written the main view, and before any render.
+`ReflectionPOV update` (0x5B41E0, thiscall, ECX = the reflection POV) runs
+once per frame in the game update, from the POV manager update (0x5B45A0;
+the call is at 0x5B4640, `e8 9b fb ff ff`, made for every POV of type 1). It
+runs after the camera update has written the main view, and before any
+render.
 
 - It sets POV flag bit 0 ("active") to whether the reflection manager has
   any candidate plane (`+0x70` > 0), and does nothing more if not.
 - It takes the main view (the first POV with flag bit 7): its view `V` and
-  projection `P` at that time. These are the **centre** (mono) matrices:
-  `P` is the game's flat camera projection, not a per-eye headset
-  projection.
-- It picks the best plane for `V·P` and the camera position
-  (0x59B990), builds the 4x4 mirror matrix `R` about that plane, and sets
-  the reflection view to `R·V` with the X column negated (the image is
-  mirrored left-right so that triangle winding is kept).
-- It sets the reflection projection to `P`, updates the frustum (§2.5),
-  and sets aspect and FOV from `P`.
+  projection `P` at that time. These are the **centre** (mono) matrices: `P`
+  is the game's flat camera projection, not a per-eye headset projection.
+- It picks the best plane for `V·P` and the camera position (0x59B990),
+  builds the 4x4 mirror matrix `R` about that plane, and sets the reflection
+  view to `R·V` with the X column negated (the image is mirrored left-right
+  so that triangle winding is kept).
+- It sets the reflection projection to `P`, updates the frustum (§2.5), and
+  sets aspect and FOV from `P`.
 
 So the reflection camera already contains the head rotation (it is part of
 the main view `V`), correctly mirrored. What it lacks is the eye: it is one
@@ -67,11 +79,11 @@ mono camera with the flat projection.
 
 ### 2.2 Render: once, mono [sure]
 
-`ReflectionPOV render` (0x5B5C40, thiscall, ecx = POV, no stack arguments,
+`ReflectionPOV render` (0x5B5C40, thiscall, ECX = POV, no stack arguments,
 plain `ret`; prologue `55 8b ec 83 e4 f0 83 ec 2c`) is called from exactly
 one place: 0x5B5D91 (`e8 aa fe ff ff`) in the POV manager's render loop
-(0x5B5D40), for POVs of type 1. The loop runs in the render job before the
-main view.
+(0x5B5D40), for POVs of type 1. The loop runs in the render job, on the
+render thread, before the main view.
 
 It does nothing unless the POV has flag bits 0 and 4 set and the reflection
 manager has `+0x56` and `+0x60` non-zero. Otherwise it:
@@ -93,26 +105,26 @@ reflection target.
 ### 2.3 The clear in every render [sure]
 
 Step 3 calls the pass setup (0x595170) and then 0x57B210 with (0, 0, 0),
-which ends in the renderer clear 0x621770 with flags 7. The renderer clear
-is `cdecl (renderer, flags, ARGB colour, float depth, stencil)`, flags
-1 colour, 2 depth, 4 stencil; the caller pops the arguments. Its first six
+which ends in the renderer clear 0x621770 with flags 7. The renderer clear is
+`cdecl (renderer, flags, ARGB colour, float depth, stencil)`, flags 1
+colour, 2 depth, 4 stencil; the caller pops the arguments. Its first six
 bytes are `55 8b ec 83 ec 10` (`push ebp; mov ebp,esp; sub esp,0x10`),
 position independent. A Direct3D 11 clear ignores the viewport, so this
 erases the whole reflection target, both halves, on every render.
 
 ### 2.4 POV::SetEye and its side effects [sure]
 
-`POV set eye` (0x5B38D0, thiscall, one int argument, `ret 4`) is the
-game's per-eye setup for the main view. It does much more than set
-matrices:
+`POV set eye` (0x5B38D0, thiscall, one int argument, `ret 4`) is the game's
+per-eye setup for the main view. It does much more than set matrices:
 
 - clears flag bit 2; does nothing more unless flag bits 0 and 4 are set;
 - stores the eye in `+0x378`;
-- if stereo tracking is running: for eye -1 it **saves** the POV's view and
-  projection to the shared save area (§1) and sets `+0x378 = 0`; for any
-  other eye it **restores** view and projection from that save area. Then
-  it calls ApplyEyeTransform (§2.5) for `+0x378`, updates the frustum, sets
-  aspect `+0x0E4 = P[1][1] / P[0][0]` and FOV `+0x0E0` from `P[1][1]`, and
+- if stereo is running (device state 2): for eye -1 it **saves** the POV's
+  view and projection to the shared save area (§1) and sets `+0x378 = 0`;
+  for any other eye it **restores** view and projection from that save
+  area. Then it calls ApplyEyeTransform (§2.5) for `+0x378`, updates the
+  frustum, sets aspect `+0x0E4 = P[1][1] / P[0][0]` and vertical FOV
+  `+0x0E0 = 2·atan(1 / P[1][1])` (constants 1.0 and 2.0 in the code), and
   copies the projection to `+0x080`;
 - always writes `+0x378` to the renderer's current eye;
 - for the main view (bit 7) it also updates the post-processing camera
@@ -134,21 +146,20 @@ reflection plane list. It must not be used for the reflection.
 
 ### 2.5 ApplyEyeTransform and the frustum [sure]
 
-- **ApplyEyeTransform** (0x5B86A0, thiscall on the stereo object,
-  arguments `int eye, float view[16], float proj[16]`, `ret 0xC`): if the
-  stereo device exists and its state is 2, it forwards to device slot 12
-  (02), which replaces `proj` with the eye's projection built from the
-  device's EyeFov and post-multiplies `view` by the translation by the
-  eye's ViewAdjust. It adds no rotation. Otherwise it returns without
-  change.
+- **ApplyEyeTransform** (0x5B86A0, thiscall on the stereo object, arguments
+  `int eye, float view[16], float proj[16]`, `ret 0xC`): if the stereo
+  device exists and its state is 2, it forwards to device slot 12 (02 §5.1),
+  which replaces `proj` with the eye's projection built from the device's
+  EyeFov and post-multiplies `view` by the translation by the eye's
+  ViewAdjust. It adds no rotation. Otherwise it returns without change.
 - **POV frustum update** (0x5B2FB0, thiscall on the POV, no stack
   arguments): recomputes the POV's culling frustum from its view and
   projection.
 
 ### 2.6 The viewport and device slot 15 [sure]
 
-The POV viewport (0x5B0820, thiscall, one pointer to a
-`{left, top, right, bottom}` int rectangle, `ret 4`):
+The POV viewport (0x5B0820, thiscall, one pointer to a `{left, top, right,
+bottom}` int rectangle, `ret 4`):
 
 - `+0x378 == -1`: the whole target, `{0, 0, width, height}` from
   `+0x33C`/`+0x340`;
@@ -159,16 +170,16 @@ The POV viewport (0x5B0820, thiscall, one pointer to a
 The game's own slot 15 (0x5B9000) ignores the width and height it is given
 and returns the device's eye rectangle for the **main** stereo target
 (device `+0x8C`). For the reflection target, which is half the main size,
-eye 1's rectangle then starts beyond the reflection target's right edge.
-The rectangle is copied into the renderer (`+0xA88..+0xA94`) and consumers
-use `right - left`.
+eye 1's rectangle then starts beyond the reflection target's right edge. The
+rectangle is copied into the renderer (`+0xA88..+0xA94`) and consumers use
+`right - left`.
 
 ### 2.7 How the floor samples the reflection [sure]
 
 The reflection target is bound to pixel-shader slot **t7** (0x59B8F0; when
 reflections are off a default texture is bound instead) for materials with
-the reflective flag. In the level shader packs
-(`LEVEL_SHADERS_DX11_BIN.PAK`), floor pixel shaders declare
+the reflective flag. In the level shader packs (`LEVEL_SHADERS_DX11_BIN.PAK`,
+for example the Torrens level's), floor pixel shaders declare
 `reflectionSamplerReg` at t7 and compute the lookup purely from the pixel
 position:
 
@@ -179,8 +190,8 @@ position:
 - the sample is a `sample_l` with the level of detail taken from the
   surface roughness.
 
-No reflection matrix is involved. `1 - x` undoes the left-right mirroring
-of the reflection view.
+No reflection matrix is involved. `1 - x` undoes the left-right mirroring of
+the reflection view.
 
 ## 3. Why it breaks in stereo [likely]
 
@@ -199,80 +210,93 @@ is correct there.
 
 ## 4. Required behaviour
 
-When stereo tracking is running and the reflection POV would render (flag
-bits 0 and 4 set), the reflection must be rendered **once per eye, into the
-two halves of the reflection target**, instead of once for the whole
-target. Elsewhere (flat play, no planar reflection, setting off) the game's
-render runs unchanged.
+When stereo is running (device present, state 2) and the reflection POV
+would render (flag bits 0 and 4 both set), the reflection must be rendered
+**once per eye, into the two halves of the reflection target**, instead of
+once for the whole target. In every other case (flat play, no device,
+planar reflections off, no plane, either flag bit clear, the fix not
+installed) the game's render is called once, unchanged.
 
 ### 4.1 Which eye goes in which half
 
-The floor shader reads `u = 1 - x / W`. The left eye's pixels
-(`x` in `[0, W/2]`) therefore read `u` in `[0.5, 1]`, the **right half**
-(half 1); the right eye reads the **left half** (half 0).
+The floor shader reads `u = 1 - x / W`. The left eye's pixels (`x` in
+`[0, W/2]`) therefore read `u` in `[0.5, 1]`, the **right half** (half 1);
+the right eye reads the **left half** (half 0).
 
 Because the reflection view is mirrored in X, applying eye `k`'s transform
 to the reflection camera gives the reflection seen by the **other** eye:
 mirroring swaps the sign of the eye's sideways offset. For a headset whose
 two eye frusta and eye offsets are mirror images of each other (true for
-current symmetric headsets), this is exact. (Derivation by the spec side:
-the true reflection view for eye `e` is `R·(V·T(a_e))·Fx`, which equals
+current symmetric headsets, and the rendered frusta are symmetric and shared
+by construction, 03 §3.2), this is exact. (Derivation by the spec side: the
+true reflection view for eye `e` is `R·(V·T(a_e))·Fx`, which equals
 `(R·V·Fx)·T(Fx·a_e)`, and `Fx·a_e = a_(1-e)` when the eye offsets `a_e` are
 ±IPD/2 in X; the same mirror argument holds for the projections.)
 
 So: **half k is rendered with eye k's transform and eye k's viewport, and is
 sampled by eye 1-k.** Within its half, each eye then sees a reflection with
-the correct scale, centre, rotation and parallax. Each half is
-`(W/4) x (H/2)`, the same per-eye density as on a flat screen. Headsets with
-canted displays break the mirror identity only by the cant angle; this is
-accepted for v1.
+the correct scale, centre, rotation and parallax. Headsets with canted
+displays break the mirror identity only by the cant angle; this is accepted
+for v1.
 
-### 4.2 One pass, for k = 0 then 1
+### 4.2 State at each pass
 
-1. Start from the reflection POV's centre view and projection as the
-   update (§2.1) left them.
-2. Apply eye `k`'s transform with ApplyEyeTransform (§2.5) to the POV's
-   view and projection.
-3. Update the frustum (§2.5), set aspect `P[1][1] / P[0][0]` and the
-   vertical FOV `2·atan(1 / P[1][1])` [likely for the FOV formula], copy the
-   projection to `+0x080`.
-4. Set `+0x378 = k`, so that the viewport (§2.6) selects half k, and set the
-   renderer's current eye to `k`.
-5. Call the game's reflection render (§2.2).
+The reflection is rendered in two passes, one per half `k` (0 and 1). Each
+pass is one call of the game's reflection render (§2.2). At the moment of
+the call for half `k`, this must hold:
 
-This is the matrix part of `SetEye` without any of its side effects
-(§2.4); `SetEye` itself must not be called on the reflection POV.
+| Item | Required value |
+|---|---|
+| POV view `+0x000` and projection `+0x040` | the centre view and projection the update left this frame (§2.1), transformed for eye `k` exactly as ApplyEyeTransform (§2.5) transforms them; always derived from the centre matrices, never from the other pass's result |
+| POV culling frustum | consistent with that view and projection (the frustum update of §2.5) |
+| aspect `+0x0E4`, vertical FOV `+0x0E0` | `P[1][1] / P[0][0]` and `2·atan(1 / P[1][1])` of that projection (the game's own formulas, §2.4) |
+| projection copy `+0x080` | equal to that projection |
+| POV eye `+0x378` | `k`, so the viewport is half `k` (§2.6, §4.4) |
+| renderer current eye (eye owner `+0x2C`) | `k`, when the eye owner pointer is not null |
+| renderer clear (0x621770) | runs normally in the first pass; returns without clearing in the second (§4.3) |
 
-The natural place to do this is the single call at 0x5B5D91, which can be
-redirected to a function with the same ABI (thiscall, POV in ecx, no stack
-arguments, plain `ret`, callee-saved registers preserved).
+Orders forced by the game: the frustum, aspect, FOV and projection copy are
+computed from the eye's transformed matrices, so they follow the transform;
+and the pass whose clears run must come before the pass whose clears are
+skipped, because each render clears the whole target (§2.3). Which half is
+rendered first is free.
+
+`SetEye` (§2.4) must not be called on the reflection POV: its side effects
+belong to the main view.
+
+The place to do this is the single call at 0x5B5D91, redirected to a
+function with the same ABI (thiscall, POV in ECX, no stack arguments, plain
+`ret`, callee-saved registers preserved).
 
 ### 4.3 Clears skipped on the second pass
 
-The clear in every render (§2.3) would erase half 0 during the second pass.
-During the **second** pass (k = 1) every renderer clear (0x621770) must be
-skipped; the first pass's clear has already cleared the whole target. Any
-mechanism is acceptable (for example a gate at the clear's entry that
-returns at once while a flag is set; the clear is cdecl, so returning
-without popping is correct). The flag must be off outside that pass. If the
-clear's first six bytes are not the expected ones, the whole per-eye
-reflection fix stays off and the game's mono render is used.
+The clear in every render (§2.3) would erase the first pass's half during
+the second pass. During the **second** pass every call of the renderer clear
+(0x621770) must return without clearing; the first pass's clear has already
+cleared the whole target. Outside the second pass every clear runs normally,
+on every thread.
+
+The mechanism is the implementation's choice. Game facts it can rely on: the
+clear is `cdecl`, so a return without popping its arguments is correct; its
+first six bytes (`55 8b ec 83 ec 10`) are whole instructions and position
+independent; during the passes it is called on the render thread. Any
+executable memory the mechanism uses must not stay writable and executable.
 
 ### 4.4 Slot 15 honours the target size
 
 Device slot 15 must return the rectangle for the size it is given, not for
-the main target: eye 0 `{0, 0, halfWidth, height}`, eye 1
-`{halfWidth, 0, 2·halfWidth, height}`. For the main stereo target this
-gives the same rectangles as the device's eye viewports (03 §4), so the
-main view is unaffected.
+the main target: eye 1 `{halfWidth, 0, 2·halfWidth, height}`, any other eye
+`{0, 0, halfWidth, height}` (02 §5). For the main stereo target this gives
+the same rectangles as the device's eye viewports (03 §4), so the main view
+is unaffected.
 
 ### 4.5 State restored
 
-After both passes, restore what was changed: the POV's view, projection,
+After both passes, these hold their values from before the first pass:
+the POV's view, projection,
 projection copy `+0x080`, FOV `+0x0E0`, aspect `+0x0E4` and eye `+0x378`,
-and the renderer's current eye; recompute the frustum from the restored
-matrices. The shared save area (§1) must not be touched. The main view's
-eye-1 pass relies on it.
+and the renderer's current eye. The shared save area (§1) must not be
+touched: the main view's eye-1 pass relies on it.
 
 ### 4.6 Not required
 
@@ -280,37 +304,128 @@ eye-1 pass relies on it.
   it runs twice and the blur crosses the seam between the halves by a few
   texels. This is acceptable. Building it only once, after the second pass,
   is allowed.
-- Rendering the reflection once and making both eyes read the same half
-  (a shader change) is not acceptable: it removes the reflection's stereo
+- Rendering the reflection once and making both eyes read the same half (a
+  shader change) is not acceptable: it removes the reflection's stereo
   parallax, so the reflection reads as being at infinity.
+- Switching planar reflections off in VR is not acceptable as the fix (the
+  game's own Rift preset did; the mod must not, 02 §6.5).
 
-## 5. To confirm in game
+## 5. Installation, checks and fallback
 
-The first scene with an active reflective floor must show:
+At load (with the rest of the patch set, 01 §2.3), on the 2015 build only,
+both sites are verified before anything is written:
 
-1. The log shows the per-eye path running (the reflection POV has flag bits
-   0 and 4 set while stereo runs).
-2. A capture of the reflection target after the first pass holds content in
-   the left half only, and after the second pass both halves hold content
-   (half 0 is not erased).
-3. **Viewport origin [guess].** The pass setup (0x595170) for some pass
-   types rebuilds the viewport from the renderer rectangle as
-   `{0, 0, right - left, bottom - top}` (0x574EE0), which would drop the
-   left offset of half 1. If the second pass lands in the left half, the
-   viewport offset must be enforced for the reflection passes (for example
-   at the renderer's viewport setter, 0x621350, `cdecl (context,
+- the call site 0x5B5D91 holds `e8` whose target resolves to 0x5B5C40;
+- the renderer clear 0x621770 starts with `55 8b ec 83 ec 10`.
+
+| Call site | Clear prologue | Result |
+|---|---|---|
+| as expected | as expected | the fix is installed; the installation is logged once (§6) |
+| differs | any | nothing is written for reflections; the game's mono render runs; the log says the fix is off and that the call-site check failed |
+| as expected | differs | nothing is written for reflections (a per-eye render without the clear skip would erase half of the target); the game's mono render runs; the log says the fix is off and that the clear check failed |
+
+The order of the writes is the implementation's, with one constraint: the
+clear skip of §4.3 is in place before the redirected call can be reached,
+because a per-eye render without it would erase the first pass's half.
+
+On the 2020 build, or any build whose addresses are unknown, the fix is not
+installed; the game's mono render runs, and the player can switch "Planar
+Reflections" off in the game's options to avoid the wrong reflection (floors
+then keep their environment-map reflection).
+
+## 6. Diagnostics, threads and cost
+
+**Logged events** (11-diagnostics owns the wording and format; each event
+must convey what is listed):
+
+- the installation result (§5): installed, or not installed and which check
+  failed, or that the build's addresses are unknown;
+- each new reflection POV and each change of its flag byte `+0x36B`: which
+  POV, its new flags and the device state. This is the event that shows
+  whether a scene has an active reflection (§7 step 3). Bounded so a run
+  cannot flood the log; the bounds are the implementation's choice;
+- the first per-eye render, once per run.
+
+Nothing else is logged per frame.
+
+**Reflection capture** (optional diagnostic, only while `DebugOptions` is
+on, 06): on a key press (the key is the implementation's choice), after each
+of the two passes of that frame, save the render target bound at that moment
+to a DDS file in the game directory, one file per pass, named so that it is
+clear which pass it holds (names are the implementation's choice; 13 lists
+the files the mod writes). Log each file's size and format, or that no
+target was bound. This is how §7 step 5 is checked.
+
+**Threads.** The reflection render, the per-eye function and the clear all
+run on the render thread. The device state is read there with an atomic
+load (02 §9.1). The skip flag is only touched on that thread.
+
+**Cost** (not yet measured, [likely]): pixel work about the same as the mono
+render (two half viewports of the same target instead of one full one);
+draw submission (CPU) for the reflection doubles, because the scene is culled
+and drawn once per eye; the mip chain is built twice. Measure in a scene
+with a reflective floor before optimising.
+
+## 7. Acceptance: checking on the Torrens at the start of a new game
+
+The Torrens level's shader pack contains floor shaders that sample the
+reflection at t7 [sure], so its reflective floors are the first place to
+check; whether its planes register at run time (reflection POV flag bit 0)
+is [likely] and is exactly what step 3 shows.
+
+1. Set "Planar Reflections" to on (any value other than Off) in the game's
+   graphics options, and the VR runtime to OpenVR or OpenXR. Restart if the
+   runtime changed.
+2. Start a **New Game**. After the opening sequence the player has control
+   aboard the Torrens. Walk into a lit corridor or room with a glossy floor
+   and look down at the floor where lights, doorframes or Ripley's
+   surroundings should be mirrored. Stand still for a few seconds.
+3. Read the log: there must be a reflection-POV flags event whose new flags
+   have bits 0 and 4 set (`flags & 0x11 == 0x11`) with device state 2, and
+   the one-time event of the first per-eye render (§6). If no event ever shows both
+   bits while on the Torrens floors, the scene has no active plane: record
+   where this was tried and repeat on other glossy floors later in the game
+   (the fix is still unverified).
+4. In the headset, with both eyes: turn the head left and right, look up and
+   down, and roll the head. The reflection must stay fixed to the floor (no
+   sliding against head motion, no shear on roll) and fuse at the depth of
+   the mirrored scene, below the floor. Closing each eye in turn, each eye's
+   reflection must line up with the objects it mirrors.
+5. With `DebugOptions` on, trigger the reflection capture (§6) while
+   looking at the floor. The first pass's file must hold content in **its
+   own half only** (the other half cleared); the second pass's file must
+   hold content in **both** halves (the first half not erased). If the
+   half-1 pass shows up drawn into the left half (overwriting it) or not at
+   all, the viewport-origin issue of §8 item 1 is real.
+6. Switch Planar Reflections off in the options: floors fall back to their
+   environment reflection, and no further flags events with bit 4 appear.
+7. With the runtime None, the game's render runs once per frame as in the
+   unmodded game (no per-eye event in the log).
+
+## 8. Open questions
+
+1. **Viewport origin [guess].** The pass setup (0x595170) for some pass
+   types rebuilds the viewport from the renderer rectangle as `{0, 0,
+   right - left, bottom - top}` (0x574EE0), which would drop the left offset
+   of half 1. Resolve with §7 step 5. If the second pass lands in the left
+   half, the viewport offset must be enforced for the reflection passes (for
+   example at the renderer's viewport setter, 0x621350, `cdecl (context,
    int vp[6] = {x, y, w, h, minZ, maxZ})`), and the vertex-shader screen-UV
-   constant (constant buffer 1, register 21, `{vpW/rtW, vpH/rtH,
-   vpLeft/rtW, vpTop/rtH}`, uploaded by 0x574F50) must describe the same
-   half, so that full-screen passes inside the reflection render, such as
-   the mip blur, stay within it.
-4. In the headset, with the head turning, pitching and rolling, the
-   reflection stays fixed to the floor, and the two eyes fuse it at the
-   depth of the mirrored scene.
-
-## 6. Fallback
-
-If any site does not match, or on a build whose addresses are not known,
-the game's own mono render runs. The player can switch "Planar Reflections"
-off in the game's options to avoid the wrong reflection; floors then keep
-their environment-map reflection.
+   constant (constant buffer 1, register 21, `{vpW/rtW, vpH/rtH, vpLeft/rtW,
+   vpTop/rtH}`, uploaded by 0x574F50) must describe the same half, so that
+   full-screen passes inside the reflection render, such as the mip blur,
+   stay within it.
+2. **Clears of intermediate targets in the second pass [guess].** Skipping
+   every renderer clear during the second pass (§4.3) includes any clear of the mip
+   blur's intermediate targets ("Reflection Mip Blur Target",
+   "Intermediate Reflection Mip Blur Target", 0x59C8B0). If the blur fully
+   overwrites them this is harmless. Resolve by comparing the mip levels of
+   the second pass's capture with the first pass's at quality 3; if stale content
+   shows, restrict the skip to clears of the reflection target itself.
+3. **Which scenes have planes.** Where in the game the reflection POV first
+   becomes active is unknown; resolve with §7 step 3 and record the
+   location here.
+4. **2020 addresses.** Every address of §1 to §5 except the stereo object
+   and POV manager pointers is unknown for 2020. Resolve by locating the
+   "Reflection Map" string reference and the type-1 render call in a 2020
+   `AI.exe`, then checking the bytes given here.
