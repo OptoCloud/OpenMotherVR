@@ -1,4 +1,4 @@
-# MotherVR revived
+# OpenMotherVR
 
 Reverse engineering of MotherVR 0.8.1, the unofficial VR mod for
 Alien: Isolation, and a C++ reconstruction of it that runs on Windows 11.

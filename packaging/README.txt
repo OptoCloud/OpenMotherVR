@@ -1,5 +1,5 @@
-MotherVR revived (test build)
-=============================
+OpenMotherVR (test build)
+=========================
 
 A rebuild of the MotherVR VR mod for Alien: Isolation that works on
 Windows 10 and 11 with SteamVR. Private test build: please don't share it
