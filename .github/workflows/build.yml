@@ -1,27 +1,37 @@
+# Reusable build: d3d11.dll as a 32-bit release build with warnings as
+# errors, checked and packaged. Called by ci.yml and release.yml.
 name: build
 
 on:
-  push:
-    branches: [master]
-    tags: ["v*"]
-  pull_request:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: Version stamped into the DLL and the package name (1.0.0, 1.0.0-rc.2)
+        type: string
+        required: true
+    outputs:
+      package:
+        description: Name of the uploaded package artifact
+        value: ${{ jobs.build.outputs.package }}
 
 permissions:
-  contents: write   # releases on tags
+  contents: read
 
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      package: ${{ steps.package.outputs.name }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg-cache
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          submodules: false
           lfs: false
+          persist-credentials: false
 
       # The one binary the DLL embeds is Valve's OpenVR loader 1.0.10; take
       # it from Valve's repository rather than this repo's LFS store.
@@ -37,7 +47,7 @@ jobs:
           "commit=$b" >> $env:GITHUB_OUTPUT
 
       - name: Cache vcpkg packages
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: vcpkg-cache
           key: vcpkg-${{ steps.baseline.outputs.commit }}-${{ hashFiles('vcpkg.json', 'triplets/**') }}
@@ -64,34 +74,30 @@ jobs:
 
       - name: Configure
         shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
         run: >
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DMOTHERVR_WERROR=ON
+          -DMOTHERVR_WERROR=ON "-DMOTHERVR_VERSION=$env:VERSION"
 
       - name: Build
         run: cmake --build build
 
+      - name: Check the DLL
+        shell: pwsh
+        run: ./scripts/check_dll.ps1 build/d3d11.dll
+
       - name: Package
         id: package
         shell: pwsh
-        run: |
-          $name = if ($env:GITHUB_REF_TYPE -eq 'tag') { "MotherVR-revived-$env:GITHUB_REF_NAME" } else { "MotherVR-revived-$($env:GITHUB_SHA.Substring(0,7))" }
-          New-Item -ItemType Directory -Force out/$name | Out-Null
-          Copy-Item build/d3d11.dll, packaging/README.txt out/$name/
-          Compress-Archive -Path out/$name/* -DestinationPath out/$name.zip
-          "name=$name" >> $env:GITHUB_OUTPUT
+        env:
+          VERSION: ${{ inputs.version }}
+        run: ./scripts/package.ps1 -Dll build/d3d11.dll -Version $env:VERSION -OutDir out
 
-      - uses: actions/upload-artifact@v4
+      # The folder, not the zip: the artifact download is zipped already.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.package.outputs.name }}
-          path: out/${{ steps.package.outputs.name }}/*
-
-      - name: Release
-        if: github.ref_type == 'tag'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $pre = if ($env:GITHUB_REF_NAME -like '*-*') { '--prerelease' } else { $null }
-          gh release create $env:GITHUB_REF_NAME "out/${{ steps.package.outputs.name }}.zip" --generate-notes $pre
+          path: out/${{ steps.package.outputs.name }}/
+          if-no-files-found: error

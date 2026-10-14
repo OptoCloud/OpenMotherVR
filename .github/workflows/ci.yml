@@ -1,0 +1,63 @@
+# Every push to master and every pull request: repository policy checks and
+# a test build. Releases are release.yml.
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          lfs: false
+          persist-credentials: false
+
+      - name: Tracked files
+        run: bash scripts/check_repo.sh files
+
+      - name: Commit messages
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT" == pull_request ]]; then
+            bash scripts/check_repo.sh commits "$PR_BASE" "$PR_HEAD"
+          elif [[ "$EVENT" == push && -n "$BEFORE" && ! "$BEFORE" =~ ^0+$ ]]; then
+            bash scripts/check_repo.sh commits "$BEFORE" "$AFTER"
+          else
+            echo "no commit range to check"
+          fi
+
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        env:
+          SHA: ${{ github.sha }}
+        run: echo "version=0.0.0-dev.${SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}

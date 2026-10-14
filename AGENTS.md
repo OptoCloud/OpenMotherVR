@@ -19,6 +19,10 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
 
 - CI builds with Ninja in a `vcvars32.bat` environment and `MOTHERVR_WERROR=ON`;
   a warning fails it.
+- CI also fails on a commit subject that is not Conventional Commits and on a
+  tracked game file (`scripts/check_repo.sh`).
+- Releases: push a `v*` tag on `master` with `release-notes/<tag>.md`
+  committed; see "Making a release" in `BUILDING.md`.
 - Configure stops if `res/openvr_api.dll` is a Git LFS pointer: run
   `pwsh scripts/fetch_openvr_api.ps1`.
 - In-game check (needs the game installed through Steam):

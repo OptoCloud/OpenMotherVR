@@ -1,0 +1,14 @@
+# Keep the pinned action SHAs current. vcpkg dependencies are pinned by
+# vcpkg.json's builtin-baseline and updated by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]

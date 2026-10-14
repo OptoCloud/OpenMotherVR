@@ -109,9 +109,17 @@ cmake --build build-ninja
 
 which gives `build-ninja/d3d11.dll`.
 
-CI (`.github/workflows/build.yml`) builds every push and pull request with
-`-DMOTHERVR_WERROR=ON` (warnings are errors; off by default locally) and
-publishes a release for each `v*` tag (tags with a hyphen are prereleases).
+CI (`.github/workflows/ci.yml`) runs on every push to `master` and every pull
+request: it checks that no game files are tracked and that commit subjects
+follow Conventional Commits (`scripts/check_repo.sh`), then builds with
+`-DMOTHERVR_WERROR=ON` (warnings are errors; off by default locally), checks
+the DLL (`scripts/check_dll.ps1`: x86, no import of `d3d11.dll` or the MSVC
+runtime, the D3D11 exports present) and uploads the packaged folder as a
+workflow artifact. The build itself is `.github/workflows/build.yml`, shared
+with the release workflow.
+
+`-DMOTHERVR_VERSION=1.2.3` stamps a version into the DLL's version resource
+(Properties > Details in Explorer); local builds are `0.0.0-dev`.
 
 `src/d3d11.def` and `src/proxy/d3d11_exports.inc` both list the pass-through
 exports; configure fails if they differ.
@@ -139,3 +147,43 @@ for the scripts in `scripts/`):
 python -I scripts/ui_patch.py make  "<game>\DATA\UI.PAK" <MotherVR 0.8.1 MOTHER.PAK> res/ui_patch.bin
 python -I scripts/ui_patch.py check "<game>\DATA\UI.PAK" <MotherVR 0.8.1 MOTHER.PAK> res/ui_patch.bin
 ```
+
+## Making a release
+
+Releases are built and published by `.github/workflows/release.yml` when a
+tag `vMAJOR.MINOR.PATCH` or `vMAJOR.MINOR.PATCH-pre` is pushed. A tag with a
+hyphen (`v1.0.0-rc.1`) becomes a prerelease.
+
+1. Write `release-notes/<tag>.md` (for example `release-notes/v1.0.0.md`).
+   It becomes the release description on GitHub, so write it for players.
+   Commit it to `master` and push.
+2. Wait for the `ci` run on that commit to pass.
+3. Tag that commit and push the tag:
+
+   ```powershell
+   git tag -s v1.0.0 -m "OpenMotherVR 1.0.0"
+   git push origin v1.0.0
+   ```
+
+The release workflow then:
+
+- refuses a tag that is not on `master`, does not match the version format,
+  or has no release notes file;
+- builds the DLL with the tag's version stamped in and runs the DLL checks;
+- packages `OpenMotherVR-<version>.zip` (`d3d11.dll`, `README.txt`,
+  `LICENSE.txt`, `THIRD_PARTY_LICENSES.txt`) and `SHA256SUMS.txt`;
+- signs a build provenance attestation for the zip and the DLL;
+- creates the GitHub release with the notes file as its description.
+
+If the workflow fails after the tag is pushed, fix the problem on `master`,
+then move the tag:
+
+```powershell
+git tag -d v1.0.0
+git push origin :refs/tags/v1.0.0
+git tag -s v1.0.0 -m "OpenMotherVR 1.0.0"
+git push origin v1.0.0
+```
+
+Re-running the workflow for an existing release replaces its notes and
+assets. `scripts/package.ps1` builds the same package locally.
