@@ -1,0 +1,31 @@
+# Build output
+build/
+
+# Ghidra databases (rebuild with analyzeHeadless + scripts/FillGaps.java)
+ghidra_project*/
+
+# Reproducible from dxgi.dll and the game's DATA/UI.PAK via scripts/pak2.py
+dumps/rsrc/UI_stock/
+dumps/rsrc/UI_mod/
+dumps/rsrc/*.PAK
+dumps/rsrc/*.dll
+
+# Tool run logs
+logs/
+
+# Per-machine local settings
+.claude/settings.local.json
+
+# Third-party test build (GRAND), studied locally only; not ours to redistribute
+GRAND-Releasev0.6.2/
+.vscode/
+dumps/grand/
+dist/
+
+# Python bytecode
+__pycache__/
+build-ninja/
+
+# Material the project no longer needs (original binary, raw decompiles,
+# Ghidra projects); kept locally, not tracked
+archive/

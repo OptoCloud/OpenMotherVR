@@ -1,0 +1,97 @@
+name: build
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # releases on tags
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg-cache
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          lfs: false
+
+      # The one binary the DLL embeds is Valve's OpenVR loader 1.0.10; take
+      # it from Valve's repository rather than this repo's LFS store.
+      - name: Fetch the OpenVR loader
+        shell: pwsh
+        run: ./scripts/fetch_openvr_api.ps1
+
+      - name: Read the vcpkg baseline
+        id: baseline
+        shell: pwsh
+        run: |
+          $b = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          "commit=$b" >> $env:GITHUB_OUTPUT
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: vcpkg-cache
+          key: vcpkg-${{ steps.baseline.outputs.commit }}-${{ hashFiles('vcpkg.json', 'triplets/**') }}
+          restore-keys: vcpkg-${{ steps.baseline.outputs.commit }}-
+
+      - name: Set up vcpkg
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          git clone --quiet https://github.com/microsoft/vcpkg $env:VCPKG_ROOT
+          git -C $env:VCPKG_ROOT checkout --quiet ${{ steps.baseline.outputs.commit }}
+          & "$env:VCPKG_ROOT/bootstrap-vcpkg.bat" -disableMetrics
+
+      # Whatever Visual Studio the runner image has, as a 32-bit toolset;
+      # Ninja keeps the build independent of the VS generator version.
+      - name: Set up the MSVC x86 environment
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * `
+                  -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars32.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($Matches[1])=$($Matches[2])" >> $env:GITHUB_ENV }
+          }
+
+      - name: Configure
+        shell: pwsh
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DMOTHERVR_WERROR=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Package
+        id: package
+        shell: pwsh
+        run: |
+          $name = if ($env:GITHUB_REF_TYPE -eq 'tag') { "MotherVR-revived-$env:GITHUB_REF_NAME" } else { "MotherVR-revived-$($env:GITHUB_SHA.Substring(0,7))" }
+          New-Item -ItemType Directory -Force out/$name | Out-Null
+          Copy-Item build/d3d11.dll, packaging/README.txt out/$name/
+          Compress-Archive -Path out/$name/* -DestinationPath out/$name.zip
+          "name=$name" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: out/${{ steps.package.outputs.name }}/*
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $pre = if ($env:GITHUB_REF_NAME -like '*-*') { '--prerelease' } else { $null }
+          gh release create $env:GITHUB_REF_NAME "out/${{ steps.package.outputs.name }}.zip" --generate-notes $pre

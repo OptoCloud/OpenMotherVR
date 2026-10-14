@@ -1,0 +1,745 @@
+#include "openxr_backend.h"
+
+#include "openxr_input.h"
+#include "vr_detect.h"
+#include "config/config.h"
+#include "diag/log.h"
+
+#include <nlohmann/json.hpp>
+
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <string>
+#include <vector>
+
+namespace mothervr::runtime::openxr {
+
+namespace {
+
+// ---- Runtime discovery --------------------------------------------------------
+
+std::filesystem::path active_runtime(REGSAM view) {
+    HKEY key = nullptr;
+    if (::RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Khronos\\OpenXR\\1", 0,
+                        KEY_READ | view, &key) != ERROR_SUCCESS) {
+        return {};
+    }
+    wchar_t buf[MAX_PATH] = {};
+    DWORD size = sizeof(buf) - sizeof(wchar_t);
+    DWORD type = 0;
+    const LSTATUS st = ::RegQueryValueExW(key, L"ActiveRuntime", nullptr, &type,
+                                          reinterpret_cast<BYTE*>(buf), &size);
+    ::RegCloseKey(key);
+    if (st != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ)) return {};
+    return buf;
+}
+
+// IMAGE_FILE_HEADER.Machine of a PE file, 0 if unreadable.
+WORD pe_machine(const std::filesystem::path& file) {
+    std::ifstream f(file, std::ios::binary);
+    IMAGE_DOS_HEADER dos{};
+    if (!f.read(reinterpret_cast<char*>(&dos), sizeof(dos)) || dos.e_magic != IMAGE_DOS_SIGNATURE) return 0;
+    f.seekg(dos.e_lfanew);
+    DWORD sig = 0;
+    IMAGE_FILE_HEADER fh{};
+    if (!f.read(reinterpret_cast<char*>(&sig), sizeof(sig)) || sig != IMAGE_NT_SIGNATURE) return 0;
+    if (!f.read(reinterpret_cast<char*>(&fh), sizeof(fh))) return 0;
+    return fh.Machine;
+}
+
+// A manifest is usable from this process if its runtime library is x86.
+bool usable_from_x86(const std::filesystem::path& manifest) {
+    std::error_code ec;
+    if (manifest.empty() || !std::filesystem::exists(manifest, ec)) return false;
+    try {
+        std::ifstream f(manifest);
+        const auto j = nlohmann::json::parse(f);
+        const auto lib_utf8 = j.at("runtime").at("library_path").get<std::string>();
+        std::filesystem::path lib{std::u8string(lib_utf8.begin(), lib_utf8.end())};
+        if (lib.is_relative()) lib = manifest.parent_path() / lib;
+        const WORD m = pe_machine(lib);
+        diag::logf("openxr: manifest {} -> {} (machine 0x{:04X})", diag::utf8(manifest), diag::utf8(lib), m);
+        return m == IMAGE_FILE_MACHINE_I386;
+    } catch (const std::exception& e) {
+        diag::logf("openxr: cannot read manifest {}: {}", diag::utf8(manifest), e.what());
+        return false;
+    }
+}
+
+// 32-bit manifests usually sit next to the 64-bit one with "32" in place of
+// "64" in the name (steamxr_win64.json -> steamxr_win32.json,
+// oculus_openxr_64.json -> oculus_openxr_32.json).
+std::vector<std::filesystem::path> x86_siblings(const std::filesystem::path& manifest64) {
+    std::vector<std::filesystem::path> out;
+    std::wstring name = manifest64.filename().wstring();
+    for (const auto& [from, to] : {std::pair{L"win64", L"win32"}, std::pair{L"x64", L"x86"},
+                                   std::pair{L"64", L"32"}}) {
+        if (const auto pos = name.rfind(from); pos != std::wstring::npos) {
+            std::wstring n = name;
+            n.replace(pos, std::wcslen(from), to);
+            out.push_back(manifest64.parent_path() / n);
+        }
+    }
+    return out;
+}
+
+// ---- Session state ------------------------------------------------------------
+
+struct Swapchain {
+    XrSwapchain handle = XR_NULL_HANDLE;
+    std::uint32_t width = 0, height = 0;
+    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+    std::vector<XrSwapchainImageD3D11KHR> images;
+};
+
+// Where the virtual screen goes when no pose is set (set_screen_pose): this
+// far ahead of the seated origin and this wide, in metres.
+constexpr float kDefaultScreenDistance = 2.0f;
+constexpr float kDefaultScreenWidth    = 2.6f;
+
+struct State {
+    XrInstance   instance = XR_NULL_HANDLE;
+    XrSystemId   system   = XR_NULL_SYSTEM_ID;
+    XrSession    session  = XR_NULL_HANDLE;
+    XrSpace      local    = XR_NULL_HANDLE; // runtime's LOCAL origin
+    XrSpace      seated   = XR_NULL_HANDLE; // LOCAL re-anchored by recenter()
+    XrSpace      view     = XR_NULL_HANDLE;
+    XrSessionState state  = XR_SESSION_STATE_UNKNOWN;
+    bool         running  = false;
+    bool         lost     = false;
+    XrEnvironmentBlendMode blend = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+    std::vector<std::int64_t> formats;
+    std::array<XrViewConfigurationView, 2> config_views{};
+    // The frame begun by the last frame() and not yet ended.
+    bool         frame_begun   = false;
+    bool         should_render = false;
+    XrTime       frame_time    = 0; // its predictedDisplayTime
+    XrDuration   frame_period  = 0; // its predictedDisplayPeriod
+    bool         recenter_pending = true; // anchor once tracking is up
+    bool         exit_requested = false;
+
+    ID3D11Device*        device  = nullptr;
+    ID3D11DeviceContext* context = nullptr;
+
+    std::array<Swapchain, 2> eye_chain{};
+    Swapchain                screen_chain{};
+
+    EyeImages    eye_images{};
+    bool         eye_images_set = false;
+    FrameViews   views{};    // the begun frame's views (render thread's copy)
+    ID3D11Texture2D* screen_image = nullptr;
+    D3D11_BOX        screen_region{};
+    bool             screen_pose_set = false;
+    Pose             screen_pose{};
+    float            screen_width = 0.0f;
+    SystemInfo       info{};
+    bool         ipd_logged = false;
+
+    // Pose-age probe: how many display periods before the frame's own
+    // display time the declared (and rendered) views were predicted for.
+    // 0 is right; the old loop measured 1. Logged with Dev. Debug Options.
+    std::uint32_t age_frames = 0, age_same = 0, age_one = 0, age_other = 0;
+    double        age_sum    = 0.0;
+} g;
+
+// g.views as published to other threads. Outside State: atomics do not
+// reset by assignment.
+SeqLock<FrameViews> g_views;
+
+constexpr std::uint32_t kPoseAgeLogFrames = 900;
+
+void count_pose_age(XrTime rendered_for) {
+    const double periods = g.frame_period > 0 && rendered_for != 0
+                               ? static_cast<double>(g.frame_time - rendered_for) / static_cast<double>(g.frame_period)
+                               : -1.0;
+    const long long whole = std::llround(periods);
+    if (rendered_for != 0 && whole == 0) ++g.age_same;
+    else if (rendered_for != 0 && whole == 1) ++g.age_one;
+    else ++g.age_other;
+    if (periods >= 0.0) g.age_sum += periods;
+    if (++g.age_frames < kPoseAgeLogFrames) return;
+    if (config::current().debug.debug) {
+        diag::logf("openxr: pose age over {} frames: {} same frame, {} one period early, {} other, mean {:.2f} periods",
+                   g.age_frames, g.age_same, g.age_one, g.age_other, g.age_sum / g.age_frames);
+    }
+    g.age_frames = g.age_same = g.age_one = g.age_other = 0;
+    g.age_sum = 0.0;
+}
+
+bool check(XrResult r, const char* what) {
+    if (XR_SUCCEEDED(r)) return true;
+    char text[XR_MAX_RESULT_STRING_SIZE] = {};
+    if (g.instance != XR_NULL_HANDLE) xrResultToString(g.instance, r, text);
+    diag::logf("openxr: {} failed: {} ({})", what, static_cast<int>(r), text);
+    set_init_failure(std::string{what} + ": " + text, static_cast<int>(r));
+    return false;
+}
+
+// Swapchain format whose images the source can be copied into
+// (CopySubresourceRegion needs the same typeless family). sRGB variants are
+// preferred: the game's back buffer holds gamma-encoded values, and an sRGB
+// swapchain tells the compositor exactly that.
+DXGI_FORMAT pick_format(DXGI_FORMAT src) {
+    std::vector<DXGI_FORMAT> want;
+    switch (src) {
+        case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+        case DXGI_FORMAT_R8G8B8A8_UNORM:
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+            want = {DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, DXGI_FORMAT_R8G8B8A8_UNORM};
+            break;
+        case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+        case DXGI_FORMAT_B8G8R8A8_UNORM:
+        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+            want = {DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, DXGI_FORMAT_B8G8R8A8_UNORM};
+            break;
+        default:
+            want = {src};
+    }
+    for (DXGI_FORMAT f : want) {
+        for (std::int64_t have : g.formats) {
+            if (have == static_cast<std::int64_t>(f)) return f;
+        }
+    }
+    return DXGI_FORMAT_UNKNOWN;
+}
+
+void destroy_chain(Swapchain& sc) {
+    if (sc.handle != XR_NULL_HANDLE) xrDestroySwapchain(sc.handle);
+    sc = {};
+}
+
+bool ensure_chain(Swapchain& sc, DXGI_FORMAT src_format, std::uint32_t w, std::uint32_t h) {
+    const DXGI_FORMAT fmt = pick_format(src_format);
+    if (fmt == DXGI_FORMAT_UNKNOWN) {
+        diag::logf("openxr: runtime has no swapchain format compatible with {}", static_cast<int>(src_format));
+        return false;
+    }
+    if (sc.handle != XR_NULL_HANDLE && sc.format == fmt && sc.width == w && sc.height == h) return true;
+    destroy_chain(sc);
+
+    XrSwapchainCreateInfo ci{XR_TYPE_SWAPCHAIN_CREATE_INFO};
+    ci.usageFlags  = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT;
+    ci.format      = fmt;
+    ci.sampleCount = 1;
+    ci.width       = w;
+    ci.height      = h;
+    ci.faceCount   = 1;
+    ci.arraySize   = 1;
+    ci.mipCount    = 1;
+    if (!check(xrCreateSwapchain(g.session, &ci, &sc.handle), "xrCreateSwapchain")) return false;
+
+    std::uint32_t n = 0;
+    xrEnumerateSwapchainImages(sc.handle, 0, &n, nullptr);
+    sc.images.assign(n, {XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR});
+    if (!check(xrEnumerateSwapchainImages(sc.handle, n, &n,
+                   reinterpret_cast<XrSwapchainImageBaseHeader*>(sc.images.data())),
+               "xrEnumerateSwapchainImages")) {
+        destroy_chain(sc);
+        return false;
+    }
+    sc.width = w;
+    sc.height = h;
+    sc.format = fmt;
+    diag::logf("openxr: swapchain {}x{} fmt={} images={}", w, h, static_cast<int>(fmt), n);
+    return true;
+}
+
+// Copy `src` (region `box`) into the next image of `sc`.
+bool copy_into(Swapchain& sc, ID3D11Texture2D* src, D3D11_BOX box) {
+    box.right  = (std::min)(box.right,  box.left + sc.width);
+    box.bottom = (std::min)(box.bottom, box.top + sc.height);
+    box.front = 0;
+    box.back  = 1;
+
+    std::uint32_t index = 0;
+    XrSwapchainImageAcquireInfo ai{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+    if (!check(xrAcquireSwapchainImage(sc.handle, &ai, &index), "xrAcquireSwapchainImage")) return false;
+    XrSwapchainImageWaitInfo wi{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+    wi.timeout = XR_INFINITE_DURATION;
+    if (check(xrWaitSwapchainImage(sc.handle, &wi), "xrWaitSwapchainImage")) {
+        g.context->CopySubresourceRegion(sc.images[index].texture, 0, 0, 0, 0, src, 0, &box);
+    }
+    XrSwapchainImageReleaseInfo ri{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+    return check(xrReleaseSwapchainImage(sc.handle, &ri), "xrReleaseSwapchainImage");
+}
+
+bool locate(XrSpace space, XrSpace base, XrTime t, Pose& out) {
+    XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
+    if (XR_FAILED(xrLocateSpace(space, base, t, &loc))) return false;
+    constexpr XrSpaceLocationFlags kValid =
+        XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_POSITION_VALID_BIT;
+    if ((loc.locationFlags & kValid) != kValid) return false;
+    out = from_xr(loc.pose);
+    return true;
+}
+
+XrSpace make_reference_space(XrReferenceSpaceType type, const XrPosef& pose) {
+    XrReferenceSpaceCreateInfo ci{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
+    ci.referenceSpaceType   = type;
+    ci.poseInReferenceSpace = pose;
+    XrSpace s = XR_NULL_HANDLE;
+    check(xrCreateReferenceSpace(g.session, &ci, &s), "xrCreateReferenceSpace");
+    return s;
+}
+
+constexpr XrPosef kIdentity{{0, 0, 0, 1}, {0, 0, 0}};
+
+// Seated origin at the head's current position, facing its yaw (pitch and
+// roll ignored so the world stays level).
+bool do_recenter(XrTime t) {
+    Pose head{};
+    if (!locate(g.view, g.local, t, head)) return false;
+    const Quat& q = head.orientation;
+    const float yaw = std::atan2(2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.x * q.x + q.y * q.y));
+    const XrPosef origin{{0, std::sin(yaw * 0.5f), 0, std::cos(yaw * 0.5f)},
+                         {head.position.x, head.position.y, head.position.z}};
+    XrSpace s = make_reference_space(XR_REFERENCE_SPACE_TYPE_LOCAL, origin);
+    if (s == XR_NULL_HANDLE) return false;
+    if (g.seated != XR_NULL_HANDLE) xrDestroySpace(g.seated);
+    g.seated = s;
+    diag::logf("openxr: recentered (yaw {:.1f} deg)", yaw * 57.29578f);
+    return true;
+}
+
+void handle_state(XrSessionState s) {
+    g.state = s;
+    switch (s) {
+        case XR_SESSION_STATE_READY: {
+            XrSessionBeginInfo bi{XR_TYPE_SESSION_BEGIN_INFO};
+            bi.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+            g.running = check(xrBeginSession(g.session, &bi), "xrBeginSession");
+            if (g.running) diag::log_line("openxr: session running");
+            break;
+        }
+        case XR_SESSION_STATE_STOPPING:
+            g.running = false;
+            check(xrEndSession(g.session), "xrEndSession");
+            diag::log_line("openxr: session stopped");
+            break;
+        case XR_SESSION_STATE_EXITING:
+            g.exit_requested = true; // the player quit from the runtime's menu
+            [[fallthrough]];
+        case XR_SESSION_STATE_LOSS_PENDING:
+            g.running = false;
+            g.lost = true;
+            diag::log_line("openxr: session exiting, VR disabled until restart");
+            break;
+        default:
+            break;
+    }
+}
+
+void poll_events() {
+    for (;;) {
+        XrEventDataBuffer ev{XR_TYPE_EVENT_DATA_BUFFER};
+        if (xrPollEvent(g.instance, &ev) != XR_SUCCESS) break;
+        switch (ev.type) {
+            case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
+                handle_state(reinterpret_cast<const XrEventDataSessionStateChanged&>(ev).state);
+                break;
+            case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
+                g.running = false;
+                g.lost = true;
+                diag::log_line("openxr: instance loss pending");
+                break;
+            case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED:
+                input::on_interaction_profile_changed();
+                break;
+            case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING:
+                g.recenter_pending = true;
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+void teardown() {
+    for (auto& sc : g.eye_chain) destroy_chain(sc);
+    destroy_chain(g.screen_chain);
+    input::destroy();
+    for (XrSpace* s : {&g.seated, &g.local, &g.view}) {
+        if (*s != XR_NULL_HANDLE) xrDestroySpace(*s);
+        *s = XR_NULL_HANDLE;
+    }
+    if (g.session != XR_NULL_HANDLE) xrDestroySession(g.session);
+    if (g.instance != XR_NULL_HANDLE) xrDestroyInstance(g.instance);
+    if (g.context) g.context->Release();
+    if (g.device) g.device->Release();
+    g = State{};
+    g_views.store({});
+}
+
+} // namespace
+
+std::filesystem::path probe() noexcept {
+    try {
+        // An explicit override wins, as with the loader itself.
+        wchar_t* env = nullptr;
+        if (_wdupenv_s(&env, nullptr, L"XR_RUNTIME_JSON") == 0 && env) {
+            const std::filesystem::path set{env};
+            std::free(env);
+            if (!set.empty()) {
+                diag::logf("openxr: XR_RUNTIME_JSON already set");
+                return set;
+            }
+        }
+        // Registered for 32-bit processes: the loader finds it unaided.
+        if (auto m = active_runtime(KEY_WOW64_32KEY); usable_from_x86(m)) return m;
+
+        // Only a 64-bit registration: look for its 32-bit sibling and point
+        // the loader at it. _wputenv_s updates both this module's CRT
+        // environment (the statically linked loader reads it) and the process.
+        if (auto m64 = active_runtime(KEY_WOW64_64KEY); !m64.empty()) {
+            for (const auto& m : x86_siblings(m64)) {
+                if (usable_from_x86(m)) {
+                    _wputenv_s(L"XR_RUNTIME_JSON", m.c_str());
+                    diag::logf("openxr: using 32-bit sibling {} of active runtime", diag::utf8(m));
+                    return m;
+                }
+            }
+            diag::logf("openxr: active runtime {} has no 32-bit build", diag::utf8(m64));
+        } else {
+            diag::log_line("openxr: no active runtime registered");
+        }
+    } catch (const std::exception& e) {
+        diag::logf("openxr: probe failed: {}", e.what());
+    }
+    return {};
+}
+
+bool init_system() noexcept {
+    if (g.instance != XR_NULL_HANDLE) return true;
+
+    // Instance with the D3D11 binding, and the per-eye FOV query where the
+    // runtime offers it (the FOV is needed before a session can exist).
+    std::uint32_t n_ext = 0;
+    xrEnumerateInstanceExtensionProperties(nullptr, 0, &n_ext, nullptr);
+    std::vector<XrExtensionProperties> props(n_ext, {XR_TYPE_EXTENSION_PROPERTIES});
+    xrEnumerateInstanceExtensionProperties(nullptr, n_ext, &n_ext, props.data());
+    const auto offered = [&](const char* name) {
+        for (const auto& p : props)
+            if (std::strcmp(p.extensionName, name) == 0) return true;
+        return false;
+    };
+    const bool fov_ext   = offered(XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
+    const bool audio_ext = offered(XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
+    std::vector<const char*> extensions{XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
+    if (fov_ext) extensions.push_back(XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
+    if (audio_ext) extensions.push_back(XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
+    XrInstanceCreateInfo ci{XR_TYPE_INSTANCE_CREATE_INFO};
+    strncpy_s(ci.applicationInfo.applicationName, "Alien: Isolation (MotherVR)", _TRUNCATE);
+    strncpy_s(ci.applicationInfo.engineName, "MotherVR", _TRUNCATE);
+    ci.applicationInfo.applicationVersion = 1;
+    ci.applicationInfo.engineVersion      = 1;
+    ci.applicationInfo.apiVersion         = XR_API_VERSION_1_0;
+    ci.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
+    ci.enabledExtensionNames = extensions.data();
+    if (!check(xrCreateInstance(&ci, &g.instance), "xrCreateInstance")) {
+        teardown();
+        return false;
+    }
+    XrInstanceProperties ip{XR_TYPE_INSTANCE_PROPERTIES};
+    if (XR_SUCCEEDED(xrGetInstanceProperties(g.instance, &ip))) {
+        diag::logf("openxr: runtime {} {}.{}.{}", ip.runtimeName,
+                   XR_VERSION_MAJOR(ip.runtimeVersion), XR_VERSION_MINOR(ip.runtimeVersion),
+                   XR_VERSION_PATCH(ip.runtimeVersion));
+        strncpy_s(g.info.runtime_name, ip.runtimeName, _TRUNCATE);
+    }
+    PFN_xrGetAudioOutputDeviceGuidOculus get_audio_output = nullptr;
+    if (audio_ext &&
+        XR_SUCCEEDED(xrGetInstanceProcAddr(g.instance, "xrGetAudioOutputDeviceGuidOculus",
+                                           reinterpret_cast<PFN_xrVoidFunction*>(&get_audio_output)))) {
+        wchar_t id[XR_MAX_AUDIO_DEVICE_STR_SIZE_OCULUS] = {};
+        if (XR_SUCCEEDED(get_audio_output(g.instance, id))) g.info.audio_output = id;
+    }
+
+    XrSystemGetInfo si{XR_TYPE_SYSTEM_GET_INFO};
+    si.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+    if (!check(xrGetSystem(g.instance, &si, &g.system), "xrGetSystem (is the headset on?)")) {
+        teardown();
+        return false;
+    }
+    XrSystemProperties sp{XR_TYPE_SYSTEM_PROPERTIES};
+    if (XR_SUCCEEDED(xrGetSystemProperties(g.instance, g.system, &sp))) {
+        strncpy_s(g.info.system_name, sp.systemName, _TRUNCATE);
+    }
+
+    std::array<XrViewConfigurationViewFovEPIC, 2> fov{{{XR_TYPE_VIEW_CONFIGURATION_VIEW_FOV_EPIC},
+                                                       {XR_TYPE_VIEW_CONFIGURATION_VIEW_FOV_EPIC}}};
+    g.config_views.fill({XR_TYPE_VIEW_CONFIGURATION_VIEW});
+    if (fov_ext) {
+        g.config_views[0].next = &fov[0];
+        g.config_views[1].next = &fov[1];
+    }
+    std::uint32_t n = 0;
+    if (!check(xrEnumerateViewConfigurationViews(g.instance, g.system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+                                                 2, &n, g.config_views.data()),
+               "xrEnumerateViewConfigurationViews")) {
+        teardown();
+        return false;
+    }
+    g.config_views[0].next = g.config_views[1].next = nullptr;
+    g.info.recommended_w = g.config_views[0].recommendedImageRectWidth;
+    g.info.recommended_h = g.config_views[0].recommendedImageRectHeight;
+    g.info.has_fov = fov_ext;
+    if (fov_ext) g.info.fov = {fov[0].recommendedFov, fov[1].recommendedFov};
+    diag::logf("openxr: {} per eye {}x{}, FOV {}", g.info.system_name, g.info.recommended_w,
+               g.info.recommended_h, fov_ext ? "reported" : "not reported (from the first frame)");
+    return true;
+}
+
+const SystemInfo& system_info() noexcept { return g.info; }
+
+session_info init(ID3D11Device* device) noexcept {
+    session_info r{};
+    if (!device || !init_system()) return r;
+
+    // Required before xrCreateSession. The runtime must composite on the
+    // adapter the game renders with; warn if they differ (hybrid laptops).
+    PFN_xrGetD3D11GraphicsRequirementsKHR get_reqs = nullptr;
+    xrGetInstanceProcAddr(g.instance, "xrGetD3D11GraphicsRequirementsKHR",
+                          reinterpret_cast<PFN_xrVoidFunction*>(&get_reqs));
+    XrGraphicsRequirementsD3D11KHR reqs{XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR};
+    if (!get_reqs || !check(get_reqs(g.instance, g.system, &reqs), "xrGetD3D11GraphicsRequirementsKHR")) {
+        teardown();
+        return r;
+    }
+    IDXGIDevice* dxgi = nullptr;
+    if (SUCCEEDED(device->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgi)))) {
+        IDXGIAdapter* adapter = nullptr;
+        DXGI_ADAPTER_DESC desc{};
+        if (SUCCEEDED(dxgi->GetAdapter(&adapter)) && SUCCEEDED(adapter->GetDesc(&desc)) &&
+            (desc.AdapterLuid.LowPart != reqs.adapterLuid.LowPart ||
+             desc.AdapterLuid.HighPart != reqs.adapterLuid.HighPart)) {
+            diag::log_line("openxr: WARNING game renders on a different GPU than the headset runtime");
+        }
+        if (adapter) adapter->Release();
+        dxgi->Release();
+    }
+
+    g.device = device;
+    g.device->AddRef();
+    g.device->GetImmediateContext(&g.context);
+
+    XrGraphicsBindingD3D11KHR binding{XR_TYPE_GRAPHICS_BINDING_D3D11_KHR};
+    binding.device = device;
+    XrSessionCreateInfo sci{XR_TYPE_SESSION_CREATE_INFO};
+    sci.next     = &binding;
+    sci.systemId = g.system;
+    if (!check(xrCreateSession(g.instance, &sci, &g.session), "xrCreateSession")) {
+        teardown();
+        return r;
+    }
+
+    g.local  = make_reference_space(XR_REFERENCE_SPACE_TYPE_LOCAL, kIdentity);
+    g.seated = make_reference_space(XR_REFERENCE_SPACE_TYPE_LOCAL, kIdentity);
+    g.view   = make_reference_space(XR_REFERENCE_SPACE_TYPE_VIEW, kIdentity);
+    if (g.local == XR_NULL_HANDLE || g.seated == XR_NULL_HANDLE || g.view == XR_NULL_HANDLE) {
+        // Nothing could be located or submitted without them.
+        teardown();
+        return r;
+    }
+
+    std::uint32_t n = 0;
+    xrEnumerateEnvironmentBlendModes(g.instance, g.system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 1, &n, &g.blend);
+
+    xrEnumerateSwapchainFormats(g.session, 0, &n, nullptr);
+    g.formats.resize(n);
+    xrEnumerateSwapchainFormats(g.session, n, &n, g.formats.data());
+
+    if (!input::create(g.instance, g.session)) {
+        diag::log_line("openxr: controller input unavailable");
+    }
+
+    r.ok            = true;
+    r.recommended_w = g.config_views[0].recommendedImageRectWidth;
+    r.recommended_h = g.config_views[0].recommendedImageRectHeight;
+    diag::logf("openxr: session created, per-eye {}x{}", r.recommended_w, r.recommended_h);
+    return r;
+}
+
+void shutdown() noexcept {
+    if (g.session != XR_NULL_HANDLE && g.running) xrEndSession(g.session);
+    teardown();
+}
+
+bool running() noexcept { return g.running && !g.lost; }
+
+bool exit_requested() noexcept { return g.exit_requested; }
+
+FrameViews views() noexcept { return g_views.load(); }
+
+void set_eye_images(const EyeImages& images) noexcept {
+    g.eye_images = images;
+    g.eye_images_set = true;
+}
+
+void clear_eye_images() noexcept { g.eye_images_set = false; }
+
+void set_screen_image(ID3D11Texture2D* texture, const D3D11_BOX& region) noexcept {
+    g.screen_image  = texture;
+    g.screen_region = region;
+}
+
+void set_screen_pose(const Pose& pose, float width_m) noexcept {
+    g.screen_pose     = pose;
+    g.screen_width    = width_m;
+    g.screen_pose_set = true;
+}
+
+void recenter() noexcept { g.recenter_pending = true; }
+
+namespace {
+
+// Second half of a frame: submit what the game rendered for the frame begun
+// by the previous frame() and end it, at that frame's own display time:
+// copies, Flush, then xrEndFrame (dumps/12_perf_review.md, P7).
+void end_frame(IDXGISwapChain* swapchain) {
+    g.frame_begun = false;
+    const XrTime t = g.frame_time;
+
+    // Layers.
+    XrCompositionLayerProjection proj{XR_TYPE_COMPOSITION_LAYER_PROJECTION};
+    std::array<XrCompositionLayerProjectionView, 2> pv{{{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW},
+                                                        {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW}}};
+    XrCompositionLayerQuad quad{XR_TYPE_COMPOSITION_LAYER_QUAD};
+    const XrCompositionLayerBaseHeader* layer = nullptr;
+
+    if (g.should_render && g.views.valid) {
+        if (g.eye_images_set) {
+            bool ok = true;
+            for (int i = 0; i < 2 && ok; ++i) {
+                ID3D11Texture2D* tex = g.eye_images.texture[i];
+                if (!tex) { ok = false; break; }
+                D3D11_TEXTURE2D_DESC d{};
+                tex->GetDesc(&d);
+                const D3D11_BOX& box = g.eye_images.region[i];
+                ok = ensure_chain(g.eye_chain[i], d.Format, box.right - box.left, box.bottom - box.top) &&
+                     copy_into(g.eye_chain[i], tex, box);
+                pv[i].pose = to_xr(g.eye_images.view[i].pose);
+                pv[i].fov  = {g.eye_images.view[i].angle_left, g.eye_images.view[i].angle_right,
+                              g.eye_images.view[i].angle_up, g.eye_images.view[i].angle_down};
+                pv[i].subImage.swapchain = g.eye_chain[i].handle;
+                pv[i].subImage.imageRect = {{0, 0}, {static_cast<std::int32_t>(g.eye_chain[i].width),
+                                                     static_cast<std::int32_t>(g.eye_chain[i].height)}};
+            }
+            if (ok) {
+                proj.space     = g.seated;
+                proj.viewCount = 2;
+                proj.views     = pv.data();
+                layer = reinterpret_cast<const XrCompositionLayerBaseHeader*>(&proj);
+                count_pose_age(g.eye_images.rendered_for);
+            }
+        } else {
+            // Virtual screen: a region of the given image, or else the
+            // finished back buffer, on a world-locked quad.
+            ID3D11Texture2D* src = g.screen_image;
+            D3D11_BOX box = g.screen_region;
+            ID3D11Texture2D* back = nullptr;
+            if (!src && swapchain &&
+                SUCCEEDED(swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&back)))) {
+                D3D11_TEXTURE2D_DESC d{};
+                back->GetDesc(&d);
+                src = back;
+                box = {0, 0, 0, d.Width, d.Height, 1};
+            }
+            if (src) {
+                D3D11_TEXTURE2D_DESC d{};
+                src->GetDesc(&d);
+                const std::uint32_t w = box.right - box.left, h = box.bottom - box.top;
+                if (d.SampleDesc.Count == 1 && w && h && ensure_chain(g.screen_chain, d.Format, w, h) &&
+                    copy_into(g.screen_chain, src, box)) {
+                    const float width = g.screen_pose_set ? g.screen_width : kDefaultScreenWidth;
+                    quad.space         = g.seated;
+                    quad.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+                    quad.subImage.swapchain = g.screen_chain.handle;
+                    quad.subImage.imageRect = {{0, 0}, {static_cast<std::int32_t>(w), static_cast<std::int32_t>(h)}};
+                    quad.pose = g.screen_pose_set ? to_xr(g.screen_pose)
+                                                  : XrPosef{{0, 0, 0, 1}, {0, 0, -kDefaultScreenDistance}};
+                    quad.size = {width, width * static_cast<float>(h) / static_cast<float>(w)};
+                    layer = reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad);
+                }
+            }
+            if (back) back->Release();
+        }
+    }
+
+    // Start the GPU on the copies now: the runtime's xrEndFrame waits for
+    // them, and the immediate context would otherwise hold them until the
+    // next flush.
+    if (layer) g.context->Flush();
+
+    XrFrameEndInfo ei{XR_TYPE_FRAME_END_INFO};
+    ei.displayTime          = t;
+    ei.environmentBlendMode = g.blend;
+    ei.layerCount           = layer ? 1 : 0;
+    ei.layers               = layer ? &layer : nullptr;
+    check(xrEndFrame(g.session, &ei), "xrEndFrame");
+}
+
+// First half of a frame: wait for the runtime to want it, begin it, and
+// locate the views and the controllers at its predicted display time.
+bool begin_frame() {
+    XrFrameWaitInfo wi{XR_TYPE_FRAME_WAIT_INFO};
+    XrFrameState fs{XR_TYPE_FRAME_STATE};
+    if (!check(xrWaitFrame(g.session, &wi, &fs), "xrWaitFrame")) return false;
+    XrFrameBeginInfo bi{XR_TYPE_FRAME_BEGIN_INFO};
+    if (!check(xrBeginFrame(g.session, &bi), "xrBeginFrame")) return false;
+    const XrTime t = fs.predictedDisplayTime;
+    g.frame_begun   = true;
+    g.should_render = fs.shouldRender != XR_FALSE;
+    g.frame_time    = t;
+    g.frame_period  = fs.predictedDisplayPeriod;
+
+    if (g.recenter_pending && do_recenter(t)) g.recenter_pending = false;
+
+    // Controllers at the start of the frame, so the game's next simulation
+    // step reads them (P10). Their grip poses are located at the same time
+    // in the same space as the views, and published with them.
+    input::sync(t, g.seated);
+    for (int h = 0; h < 2; ++h) {
+        const auto& s = input::state().hands[h];
+        g.views.hands[h] = {s.grip, s.grip_velocity, s.grip_valid, s.grip_valid && s.grip_velocity_valid};
+    }
+
+    // Views for this frame, in the seated space.
+    XrViewLocateInfo li{XR_TYPE_VIEW_LOCATE_INFO};
+    li.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    li.displayTime = t;
+    li.space       = g.seated;
+    XrViewState vs{XR_TYPE_VIEW_STATE};
+    std::array<XrView, 2> xv{{{XR_TYPE_VIEW}, {XR_TYPE_VIEW}}};
+    std::uint32_t nv = 0;
+    g.views.valid = XR_SUCCEEDED(xrLocateViews(g.session, &li, &vs, 2, &nv, xv.data())) &&
+                    (vs.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT);
+    for (int i = 0; i < 2; ++i) {
+        g.views.eyes[i] = {from_xr(xv[i].pose), xv[i].fov.angleLeft, xv[i].fov.angleRight,
+                           xv[i].fov.angleUp, xv[i].fov.angleDown};
+    }
+    locate(g.view, g.seated, t, g.views.head);
+    g.views.display_time = t;
+    g_views.store(g.views);
+    if (g.views.valid && !g.ipd_logged) {
+        const Vec3 a = g.views.eyes[0].pose.position, b = g.views.eyes[1].pose.position;
+        diag::logf("openxr: IPD {:.4f} m", std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y) +
+                                                     (b.z - a.z) * (b.z - a.z)));
+        g.ipd_logged = true;
+    }
+    return true;
+}
+
+} // namespace
+
+bool frame(IDXGISwapChain* swapchain) noexcept {
+    if (g.session == XR_NULL_HANDLE) return false;
+    if (g.frame_begun) end_frame(swapchain);
+    if (g.lost) return false;
+    poll_events();
+    if (!g.running) return false;
+    return begin_frame();
+}
+
+} // namespace mothervr::runtime::openxr

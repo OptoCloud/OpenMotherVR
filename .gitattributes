@@ -1,0 +1,24 @@
+# Normalize text to LF in the repo; checkout uses the platform's line endings.
+* text=auto
+
+# Windows-only scripts keep CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Large binaries in LFS: the original mod, embedded payloads.
+*.dll filter=lfs diff=lfs merge=lfs -text
+*.exe filter=lfs diff=lfs merge=lfs -text
+*.pak filter=lfs diff=lfs merge=lfs -text
+*.PAK filter=lfs diff=lfs merge=lfs -text
+
+# Other binary formats that may show up (game assets, images, Ghidra exports).
+*.dds binary
+*.DDS binary
+*.gfx binary
+*.GFX binary
+*.png binary
+*.gzf binary
+
+# Machine-generated: hide from GitHub language stats and collapse in diffs.
+dumps/** linguist-generated=true
+recon/src/hook/ai_address_tables.inc linguist-generated=true
