@@ -7,6 +7,12 @@
 # <OutDir>/SHA256SUMS.txt. The third-party notices come from the vcpkg ports
 # linked into the DLL; the OpenVR notice also covers the embedded
 # openvr_api.dll.
+#
+# The DLL's symbol file (d3d11.pdb, written next to it by a Release build)
+# goes to <OutDir>/OpenMotherVR-<Version>-symbols/ and
+# <OutDir>/OpenMotherVR-<Version>-symbols.zip, never into the player zip: it
+# is kept with the release so a crash offset inside the proxy (mothervr.log)
+# can be mapped to source. -RequireSymbols makes a missing PDB an error.
 
 param(
     [Parameter(Mandatory)] [string]$Dll,
@@ -14,7 +20,10 @@ param(
     [string]$OutDir = 'out',
     # vcpkg manifest-mode install tree. Default: next to the DLL (Ninja) or
     # one level up (Visual Studio generator, build/Release/d3d11.dll).
-    [string]$VcpkgInstalled
+    [string]$VcpkgInstalled,
+    # Default: d3d11.pdb next to the DLL.
+    [string]$Pdb,
+    [switch]$RequireSymbols
 )
 
 $ErrorActionPreference = 'Stop'
@@ -62,8 +71,29 @@ $sums = @(
     "$((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant())  $name.zip"
     "$((Get-FileHash (Join-Path $dir 'd3d11.dll') -Algorithm SHA256).Hash.ToLowerInvariant())  d3d11.dll"
 )
+
+if (-not $Pdb) { $Pdb = Join-Path $dllDir 'd3d11.pdb' }
+$symbols = "$name-symbols"
+if (Test-Path $Pdb) {
+    $symDir = Join-Path $OutDir $symbols
+    if (Test-Path $symDir) { Remove-Item -Recurse -Force $symDir }
+    New-Item -ItemType Directory -Force $symDir | Out-Null
+    Copy-Item $Pdb (Join-Path $symDir 'd3d11.pdb')
+    $symZip = Join-Path $OutDir "$symbols.zip"
+    if (Test-Path $symZip) { Remove-Item -Force $symZip }
+    Compress-Archive -Path (Join-Path $symDir '*') -DestinationPath $symZip
+    $sums += "$((Get-FileHash $symZip -Algorithm SHA256).Hash.ToLowerInvariant())  $symbols.zip"
+} elseif ($RequireSymbols) {
+    throw "symbol file not found: $Pdb (a Release build writes d3d11.pdb next to d3d11.dll)"
+} else {
+    Write-Warning "no symbol file at $Pdb; packaged without symbols"
+    $symbols = ''
+}
 [IO.File]::WriteAllText((Join-Path $OutDir 'SHA256SUMS.txt'), ($sums -join "`n") + "`n")
 
 Write-Host "packaged $zip"
 $sums | ForEach-Object { Write-Host $_ }
-if ($env:GITHUB_OUTPUT) { "name=$name" >> $env:GITHUB_OUTPUT }
+if ($env:GITHUB_OUTPUT) {
+    "name=$name" >> $env:GITHUB_OUTPUT
+    "symbols=$symbols" >> $env:GITHUB_OUTPUT
+}

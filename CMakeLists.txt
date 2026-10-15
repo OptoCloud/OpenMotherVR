@@ -154,6 +154,15 @@ if(MSVC)
         $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<BOOL:${MOTHERVR_WERROR}>>:/WX>)
     target_compile_definitions(mothervr PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 
+    # Release builds also write d3d11.pdb, kept with each release (not in
+    # the player zip) so a crash offset inside the proxy from the log can be
+    # mapped to source. /Z7 keeps the debug info in the objects, so parallel
+    # compiles share no PDB. /DEBUG turns off the linker's REF and ICF
+    # defaults; turning them back on keeps the shipped code what it would be
+    # without symbols. /PDBALTPATH names only the file in the DLL's debug
+    # directory, not the build machine's path.
+    target_compile_options(mothervr PRIVATE "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Z7>")
+    target_link_options(mothervr PRIVATE "$<$<CONFIG:Release>:/DEBUG;/OPT:REF;/OPT:ICF;/PDBALTPATH:%_PDB%>")
 endif()
 
 target_include_directories(mothervr PRIVATE src ${OPENVR_INCLUDE_DIR})

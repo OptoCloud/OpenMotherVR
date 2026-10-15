@@ -1,6 +1,7 @@
 # Pushing a tag vMAJOR.MINOR.PATCH[-pre] publishes a GitHub release:
 # the tag must be on master and have release-notes/<tag>.md, the DLL is
-# built and stamped with the version, and the zip, its SHA-256 sums and a
+# built and stamped with the version, and the zip, the symbols zip
+# (d3d11.pdb, not part of the player package), their SHA-256 sums and a
 # build provenance attestation are attached. Tags with a hyphen
 # (v1.0.0-rc.2) become prereleases. See BUILDING.md, "Making a release".
 name: release
@@ -73,14 +74,22 @@ jobs:
           name: ${{ needs.build.outputs.package }}
           path: out/${{ needs.build.outputs.package }}
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.symbols }}
+          path: out/${{ needs.build.outputs.symbols }}
+
       - name: Zip and hash
         env:
           NAME: ${{ needs.build.outputs.package }}
+          SYMBOLS: ${{ needs.build.outputs.symbols }}
         run: |
           cd out
           (cd "$NAME" && zip -q -X -r "../$NAME.zip" .)
+          (cd "$SYMBOLS" && zip -q -X -r "../$SYMBOLS.zip" .)
           sha256sum "$NAME.zip" > SHA256SUMS.txt
           (cd "$NAME" && sha256sum d3d11.dll) >> SHA256SUMS.txt
+          sha256sum "$SYMBOLS.zip" >> SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -88,15 +97,17 @@ jobs:
           subject-path: |
             out/${{ needs.build.outputs.package }}.zip
             out/${{ needs.build.outputs.package }}/d3d11.dll
+            out/${{ needs.build.outputs.symbols }}.zip
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
           NAME: ${{ needs.build.outputs.package }}
+          SYMBOLS: ${{ needs.build.outputs.symbols }}
           PRERELEASE: ${{ needs.preflight.outputs.prerelease }}
         run: |
-          assets=("out/$NAME.zip" out/SHA256SUMS.txt)
+          assets=("out/$NAME.zip" "out/$SYMBOLS.zip" out/SHA256SUMS.txt)
           if gh release view "$TAG" >/dev/null 2>&1; then
             # A re-run: refresh the notes and assets of the existing release.
             gh release edit "$TAG" --notes-file "release-notes/$TAG.md" --prerelease="$PRERELEASE"
