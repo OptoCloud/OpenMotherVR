@@ -439,11 +439,15 @@ void handle_state(XrSessionState s) {
             break;
         case XR_SESSION_STATE_EXITING:
             g.exit_requested = true; // the player quit from the runtime's menu
-            [[fallthrough]];
-        case XR_SESSION_STATE_LOSS_PENDING:
             g.running = false;
             g.lost = true;
-            diag::log_line("openxr: session exiting, VR disabled until restart");
+            diag::log_line("openxr: runtime requested exit; game asked to quit, VR off until restart");
+            break;
+        case XR_SESSION_STATE_LOSS_PENDING:
+            // Not a request to quit: the game keeps running on the mirror (09 §3, §7).
+            g.running = false;
+            g.lost = true;
+            diag::log_line("openxr: session loss pending; VR off until restart, the game continues");
             break;
         default:
             break;

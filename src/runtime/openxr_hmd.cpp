@@ -234,11 +234,15 @@ public:
         // Ends this frame (copies, flush, xrEndFrame), then blocks until the
         // runtime wants the next one and begins it: a running start, as
         // OpenVR's WaitGetPoses. The game thread then reads the new views.
-        xr::frame(nullptr);
+        const bool begun = xr::frame(nullptr);
         log_hands();
         // The controllers were synced as the next frame began; hand them to
-        // the game now, before its next simulation step (P10).
-        write_controls();
+        // the game now, before its next simulation step (P10). With no frame
+        // begun (session not running, lost) nothing was synced: the game
+        // sees every VR control released, never the last synced state
+        // (04 §5.12, 09 §3).
+        if (begun) write_controls();
+        else input::write_controls(input::Controls{}, false);
     }
 
     void register_control_hints() override { input::set_control_scheme(input::ControlScheme::Thumbstick); }
@@ -298,7 +302,12 @@ private:
     // Map the controllers synced at the start of this frame to the game's
     // input action tiers.
     void write_controls() {
-        if (xr::exit_requested()) return;
+        // Once exit is requested every control reads released (09 §3), not
+        // the last values latched.
+        if (xr::exit_requested()) {
+            input::write_controls(input::Controls{}, false);
+            return;
+        }
         namespace xi = xr::input;
         const auto& s = xi::state();
         const auto& L = s[xi::Hand::Left];
