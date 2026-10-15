@@ -7,6 +7,7 @@
 // whose CreatePixelShader and Present we hook.
 
 #include "d3d11_proxy.h"
+#include "../diag/crash_log.h"
 #include "../diag/log.h"
 #include "../hook/hook_installer.h"
 #include "../hook/memory_patch.h"
@@ -150,8 +151,13 @@ HRESULT __stdcall hook_Present(void* This, UINT SyncInterval, UINT Flags) {
     const bool vr_paced = mothervr::stereo::on_present(static_cast<IDXGISwapChain*>(This));
 
     // The first call confirms the hook fired. No periodic line: this is the
-    // render thread, and a log write can stall it.
-    if (n == 1) mothervr::diag::log_line("present #1");
+    // render thread, and a log write can stall it. The first frame is also
+    // a point to put the crash filter back on top, if the game installed
+    // its own after attach (spec 11, the crash record).
+    if (n == 1) {
+        mothervr::diag::log_line("present #1");
+        mothervr::diag::reassert_crash_log();
+    }
     return g_real_present(This, vr_paced ? 0 : SyncInterval, Flags);
 }
 
@@ -510,6 +516,12 @@ extern "C" __declspec(dllexport) HRESULT WINAPI D3D11CreateDeviceAndSwapChain(
     // The attach-time message boxes (dialogs.h) are up until the player
     // closes them; as with the original, the game does not render before.
     mothervr::integration::wait_for_message_boxes();
+    // The game's C runtime replaces the unhandled-exception filter during
+    // its start-up, after attach and before WinMain; device creation is the
+    // first call into us after that, and comes on every run (runtime None
+    // has no Present hook). Once is enough here.
+    static std::once_flag s_crash_filter;
+    std::call_once(s_crash_filter, [] { mothervr::diag::reassert_crash_log(); });
 
     auto fn = mothervr::proxy::d3d11::real_create_device_and_swapchain;
     if (!fn) {
