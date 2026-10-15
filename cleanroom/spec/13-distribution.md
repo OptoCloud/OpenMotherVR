@@ -1,4 +1,4 @@
-<!-- Provenance: in-game observation on the 2015 Steam build with SteamVR and a Valve Index (files that appear next to the game and when, the log shared by the two processes of a Steam relaunch, message boxes and what the game does while they are open); Windows documentation (DllMain and the loader lock, file sharing modes, version resources, PE headers and imports); OpenVR public documentation (`VR_InitInternal2` error codes including 117, the x86 `openvr_api.dll` redistributable of the public SDK, SteamVR Input action manifests); the requirements of 03 §6.4, 06 §3, 10, 11, 12 and 14 that this document gathers from the player's side; the project's own release packaging and player guide; the GPL-3.0 licence's terms for conveying object code; OpenXR loader documentation (`XR_KHR_loader_init`, `XR_EXT_loader_init_properties`); Semantic Versioning (pre-release and build-metadata suffixes); user decisions (default runtime OpenVR in a fresh `mothervr.json`, no game files shipped, UI archive built as in 14-ui-resources.md, message wording is the implementation's own, the mod never needs elevation); a tester's report on SteamVR with a Steam Frame headset (an OpenXR failure message with an empty result text and no way back to SteamVR; the game not shown in the headset with Desktop Game Theatre on); project decisions of spec r6, each with its reason inline (the OpenXR failure message's added facts; the non-blocking headset-not-showing-the-game warning); project decisions of spec r7, each with its reason inline (required and optional OpenVR interfaces; the settings file never left partly written; the welcome only on a run where the mod is active; an attach-time message that cannot be shown; no message in a process that is not the game; the message caption; failure messages when the runtime returned no error; the build's checks of the DLL, the embedded loader, the version string and the shaders; symbol files; the statically linked OpenXR loader's capabilities; the release process, its integrity and the corresponding source; the player guide's report instructions and file list). Revision: r4 -->
+<!-- Provenance: in-game observation on the 2015 Steam build with SteamVR and a Valve Index (files that appear next to the game and when, the log shared by the two processes of a Steam relaunch, message boxes and what the game does while they are open); Windows documentation (DllMain and the loader lock, file sharing modes, version resources, PE headers and imports); OpenVR public documentation (`VR_InitInternal2` error codes including 117, the x86 `openvr_api.dll` redistributable of the public SDK, SteamVR Input action manifests); the requirements of 03 §6.4, 06 §3, 10, 11, 12 and 14 that this document gathers from the player's side; the project's own release packaging and player guide; the GPL-3.0 licence's terms for conveying object code; OpenXR loader documentation (`XR_KHR_loader_init`, `XR_EXT_loader_init_properties`); Semantic Versioning (pre-release and build-metadata suffixes); user decisions (default runtime OpenVR in a fresh `mothervr.json`, no game files shipped, UI archive built as in 14-ui-resources.md, message wording is the implementation's own, the mod never needs elevation); a tester's report on SteamVR with a Steam Frame headset (an OpenXR failure message with an empty result text and no way back to SteamVR; the game not shown in the headset with Desktop Game Theatre on); project decisions of spec r6, each with its reason inline (the OpenXR failure message's added facts; the non-blocking headset-not-showing-the-game warning); project decisions of spec r7, each with its reason inline (required and optional OpenVR interfaces; the settings file never left partly written; the welcome only on a run where the mod is active; an attach-time message that cannot be shown; no message in a process that is not the game; the message caption; failure messages when the runtime returned no error; the build's checks of the DLL, the embedded loader, the version string and the shaders; symbol files; the statically linked OpenXR loader's capabilities; the release process, its integrity and the corresponding source; the player guide's report instructions and file list); r5 aligns this document with 01 r6, 03 r6, 07 r4, 09 r5 and 14 r3 (the test for a process that is not the game, the bounded wait being for the compositor, the two reflection passes, the content of the -51 message, the UI archive's key file and temporary files, the mod's shaders left alone by the dither fix, the OpenXR environment set only for a start). Revision: r5 -->
 
 # 13. Distribution: what the player installs, files, messages, uninstall
 
@@ -41,7 +41,7 @@ mod needs is created on first use (§3).
     DATA\
         UI.PAK                  the game's own archive (never modified)
         MOTHER.PAK              the UI archive with the VR page (14)
-        <companion files of MOTHER.PAK that 14 §5 defines>
+        <key file of MOTHER.PAK, 14 §5.1; name of the implementation's choosing>
 ```
 
 The names `mothervr.json`, `mothervr.log`, `openvr_api.dll`,
@@ -49,11 +49,14 @@ The names `mothervr.json`, `mothervr.log`, `openvr_api.dll`,
 already have files and folders with these names in their game directory,
 and player guides and support requests refer to them [sure]. The names of
 the files inside `mothervr_input` are the implementation's choice (SteamVR
-keeps a player's own bindings per application, not per file name). The mod
+keeps a player's own bindings per application, not per file name), as are
+the names of the UI archive's key file and of any temporary file (14 §5.1,
+§5.8: nothing outside the mod depends on them). The mod
 never writes outside the game directory, never writes to `AI.exe` or any
 stock game file, and never writes to the registry. The only process-wide
 change outside files is the `XR_RUNTIME_JSON` environment variable of the
-game's own process, which 09 §1 may set.
+game's own process, which 09 §1 sets only when OpenXR is the runtime that
+will start (probing for a runtime changes nothing, 01 §5.2).
 
 ## 3. Files the mod writes
 
@@ -63,7 +66,7 @@ game's own process, which 09 §1 may set.
 |---|---|---|---|---|
 | `mothervr.log` | from attach to exit, appended (§4) | any | always (if the file can be opened) | log events go to the debugger output instead (§3.6); the game is unaffected |
 | `mothervr.json` | first launch: after the welcome message is closed. Afterwards: after every settings command from the VR page (06 §4) | any thread, after the welcome message is closed (first launch); the thread that ran the command (afterwards) | §3.4 | the game is unaffected; the setting holds for this session only; the file on disk stays the complete previous one (06 §3.1) |
-| `DATA\MOTHER.PAK` and its companion files | at attach, before the game opens its UI archive, when absent or stale (14 §5) | the thread running attach (the game opens its UI archive during start-up, so no later point is early enough, 14 §5.1) | build recognised and preflight passed (01 §2.4, §2.5); also for runtime None | the options page is missing this session; VR works; the message of §5.3 as 14 §5.9 defines |
+| `DATA\MOTHER.PAK` and its key file | at attach, before the game opens its UI archive, when absent or stale (14 §5) | the thread running attach (the game opens its UI archive during start-up, so no later point is early enough, 14 §5.1) | build recognised and preflight passed (01 §2.4, §2.5); also for runtime None | the options page is missing this session; VR works; the message of §5.3 as 14 §5.9 defines |
 | `openvr_api.dll` | when OpenVR starts, before it is loaded (01 §5.3, 03 §6.4) | game thread | OpenVR chosen for this run (configured, forced, or reached by fallback), and the file is absent or not the copy this DLL ships | logged; an existing copy in the game directory is used, else the runtime's own `bin\win32\openvr_api.dll` |
 | files in `mothervr_input\` | every time OpenVR starts and `IVRInput` is available | game thread | OpenVR started | logged; SteamVR Input is not used and the legacy controller path of 04 §5.8 applies |
 | diagnostic texture dumps | only on the developer key while `DebugOptions` is on and reflections render per eye (§3.5) | implementation's choice | diagnostic, optional (§3.5) | logged; nothing else changes |
@@ -154,7 +157,8 @@ Format, defaults, compatibility and the settings commands are in 06 §3 and
 
 A developer aid of 07 and 11: while `DebugOptions` is on and reflections
 render per eye in stereo, a developer key writes the render target of each
-eye's reflection pass to a DDS file in the game directory (not the
+of the two reflection passes (07 §4.1: the pass for one eye's half is
+sampled by the other eye) to a DDS file in the game directory (not the
 process's current directory). The file names are the implementation's
 choice. An implementation may omit the feature; if it has it, the player
 guide's uninstall section lists the files.
@@ -169,7 +173,7 @@ renamed folder to work. Each artefact degrades on its own:
 | Cannot be written | Result |
 |---|---|
 | `mothervr.log` | log events go to the debugger output (`OutputDebugString`); nothing else changes |
-| `DATA\MOTHER.PAK` or its companion files | the game opens its stock `UI.PAK`: no VR options page, settings only through `mothervr.json` and the command line; VR works; the player is told as 14 §5.9 defines (§5.3) |
+| `DATA\MOTHER.PAK` or its key file | the game opens its stock `UI.PAK`: no VR options page, settings only through `mothervr.json` and the command line; VR works; the player is told as 14 §5.9 defines (§5.3) |
 | `openvr_api.dll` | an existing copy in the game directory is used, else the runtime's own loader (§3.2) |
 | `mothervr_input\` | the legacy controller path of 04 §5.8 |
 | `mothervr.json` | settings hold for this session only (06 §3.1). On a first launch the file can then never be written, so the welcome message appears at every launch; that is accepted |
@@ -266,12 +270,12 @@ keeps running. How it is shown is the implementation's choice.
 
 | Message | Trigger | Must convey (unordered) | Shown |
 |---|---|---|---|
-| Unsupported game build | the process is the game (a module named `AI.exe` is loaded, or the main module's file name is `AI.exe`; see below the table) and the PE timestamp of `AI.exe` is not a recognised build (01 §3) | the timestamp found; that this game version is not supported, so VR is off for this run and the game runs unmodified; that updating the game or the mod may fix it | every launch with that build |
-| Welcome | first launch (§3.4) on a run where the mod is active: the build is recognised and the core checks of 01 §2.5.1 passed (06 §3.1) | that the mod is active; that the default runtime is SteamVR (runtime OpenVR, the default of a fresh `mothervr.json`, 06 §1); how to change the runtime (OpenXR, or None for the unmodded game): on the `MotherVR` page of the game's Options menu, taking effect at the next start, or with a `-vrforce*` launch option (01 §5.1) | until a launch on which the mod is active writes `mothervr.json` (§3.4) |
+| Unsupported game build | the process is the game (the main module's file name is `AI.exe`, compared case-insensitively, 01 §3.1; see below the table) and the PE timestamp of `AI.exe` is not a recognised build (01 §3) | the timestamp found; that this game version is not supported, so VR is off for this run and the game runs unmodified; that updating the game or the mod may fix it | every launch with that build |
+| Welcome | first launch (§3.4) on a run where the mod is active: the build is recognised and the core checks of 01 §2.5.1 passed (01 §2.4, 06 §3.1) | that the mod is active; that the default runtime is SteamVR (runtime OpenVR, the default of a fresh `mothervr.json`, 06 §1); how to change the runtime (OpenXR, or None for the unmodded game): on the `MotherVR` page of the game's Options menu, taking effect at the next start, or with a `-vrforce*` launch option (01 §5.1) | until a launch on which the mod is active writes `mothervr.json` (§3.4) |
 | `UI.PAK` missing | the build is supported and `DATA\UI.PAK` does not exist when the UI archive is to be produced (14 §5.9) | the full path that was expected; that this is the game's own file and the installation needs repair; that the mod's options page is not available | every launch while the file is missing (14 §5.9) |
 | UI archive unusable | `DATA\UI.PAK` exists but the UI archive cannot be produced: it is not a valid archive or is damaged, it is a version the mod does not know, the mod's changes do not fit it, or the archive cannot be written (14 §5.9) | that VR works; that the mod's options page is not available; that settings can be changed in `mothervr.json`; the kind of cause (game archive not recognised, or the archive could not be written) | once per distinct `UI.PAK` (14 §5.9) |
-| Runtime failure, SteamVR | OpenVR was chosen and could not start (01 §5.3, 03 §6.4): SteamVR could not be started, no headset appeared within the bounded wait (about 10 s), a requested interface is not served (§3.2), or the runtime returned an error. SteamVR not running when the game starts is not a failure: initialisation may start it, and no process check is made | that SteamVR could not be started; the runtime's own error text when it gives one; the numeric error code. When the failure is not an error the runtime returned (a loader export or a required interface is missing, §3.2, or no headset appeared within the wait), what was missing or did not happen (the export name or the interface version) in place of the runtime's text, with the OpenVR error code the failing call returned, or the Windows error code when the loader itself could not be loaded; that VR is off and the game continues flat until it is restarted. When the code is 117 (`VRInitError_Init_AnotherAppLaunching`) also: that SteamVR's Desktop Game Theatre is the usual cause, and that Steam's game setting "Use Desktop Game Theatre while SteamVR is active" (Steam's own label) must be off | each launch on which it occurs |
-| Runtime failure, OpenXR | OpenXR was chosen and failed to start, including when no session can be created with the game's device (09 §7) | that OpenXR did not start and VR is off until the game is restarted, the game continuing flat; which OpenXR call failed and its result, by name and number (the name is never empty, 09 §7); that the next start tries OpenXR again; the two ways back to SteamVR (the runtime choice on the `MotherVR` options page, or `-vrforceopenvr`). For `XR_ERROR_RUNTIME_UNAVAILABLE` also: that no 32-bit OpenXR runtime on this machine could be used, and that the log names each runtime that was considered | each launch on which it occurs |
+| Runtime failure, SteamVR | OpenVR was chosen and could not start (01 §5.3, 03 §6.4): SteamVR could not be started, the compositor did not appear within the bounded wait (about 10 s), a required interface is not served (§3.2), or the runtime returned an error (no headset, for example, is an error the runtime returns). A headset whose pose is not yet valid when the wait ends is not a failure (03 §6.4). SteamVR not running when the game starts is not a failure: initialisation may start it, and no process check is made | that SteamVR could not be started; the runtime's own error text when it gives one; the numeric error code. When the failure is not an error the runtime returned (a loader export or a required interface is missing, §3.2, or the compositor did not appear within the wait), what was missing or did not happen (the export name, the interface version, or the compositor) in place of the runtime's text, with the OpenVR error code the failing call returned, or the Windows error code when the loader itself could not be loaded; that VR is off and the game continues flat until it is restarted. When the code is 117 (`VRInitError_Init_AnotherAppLaunching`) also: that SteamVR's Desktop Game Theatre is the usual cause, and that Steam's game setting "Use Desktop Game Theatre while SteamVR is active" (Steam's own label) must be off | each launch on which it occurs |
+| Runtime failure, OpenXR | OpenXR was chosen and failed to start, including when no session can be created with the game's device (09 §7) | that OpenXR did not start and VR is off until the game is restarted, the game continuing flat; which OpenXR call failed and its result, by name and number (the name is never empty, 09 §7); that the next start tries OpenXR again; the two ways back to SteamVR (the runtime choice on the `MotherVR` options page, or `-vrforceopenvr`). For `XR_ERROR_RUNTIME_UNAVAILABLE` (-51) also: the likely cause as 09 §7 gives it, and that the log is where the player can see which runtime manifests were examined (09 §1) | each launch on which it occurs |
 | Headset not showing the game | VR started, but the runtime does not show the game in the headset: with OpenVR, once the runtime has had the settling time of 03 §6.7 after the first submitted frame, it reports another process as the one it shows; with OpenXR, a running session has not become visible within the bound of 09 §3.1 | that the runtime (SteamVR, or OpenXR) is not showing the game; with OpenVR, which program it shows instead, if known; that Desktop Game Theatre is the usual cause, and the Steam setting to turn off for this game (Steam's own label, "Use Desktop Game Theatre while SteamVR is active"). A warning: VR stays on and the game continues | each launch on which it occurs; without blocking (§5.2) |
 | Audio redirect failed | the OpenXR runtime reports the headset's own audio output device and the mod cannot move the game's audio to it (10) | that game audio could not be moved to the headset; the error code; that audio stays on the Windows default device | each launch on which it occurs |
 
@@ -280,11 +284,11 @@ runtime is installed or the forced one is missing (01 §5.3), or when the
 config file cannot be read or written; those are logged.
 
 No message is shown either when the DLL is loaded into a process that is
-not the game: no module named `AI.exe` is loaded and the main module's file
-name is not `AI.exe` (a test harness, or another program started from the
-game directory). The proxy then only forwards the `d3d11.dll` exports (01
-§1.3), logs one event naming the host, reads no settings, applies no patch
-and writes no file but the log. A renamed game executable is therefore not
+not the game: the main module's file name is not `AI.exe` (a test harness,
+or another program started from the game directory; 01 §3.1). The proxy
+then only forwards the `d3d11.dll` exports (01 §1.3), logs one event naming
+the host, reads no settings, installs no crash filter, applies no patch and
+writes no file but the log. A renamed game executable is therefore not
 supported (project decision of spec r7: a modal box in a program that is
 not the game blocks it for nothing, and automated load tests must run
 unattended).
@@ -298,7 +302,9 @@ Delete from the game directory:
 - `openvr_api.dll`, `mothervr.json` and any temporary file an interrupted
   write of it left (§3.4), `mothervr.log` and its rotated copy (11 §1), the
   folder `mothervr_input`, and any diagnostic dumps (§3.5);
-- `DATA\MOTHER.PAK` and the companion files 14 §5 defines.
+- `DATA\MOTHER.PAK`, its key file, and any temporary file an interrupted
+  write of either left (14 §5.1, §5.8; their names are the
+  implementation's choice, so the player guide gives them).
 
 `openvr_api.dll` in the game directory is not used by the game itself, so
 leaving it is harmless; the player guide lists it anyway. Steam's "Verify
@@ -315,7 +321,7 @@ files) and does not need to be run.
 | Runtime dependencies | `openvr_api.dll` is never a static import; it is loaded at run time from a path decided then (§3.2). The OpenXR loader is linked statically, so no `openxr_loader.dll` is needed; it is a release that implements `XR_KHR_loader_init` and `XR_EXT_loader_init_properties` on Windows, so the elevated-process path of 09 §1 is always available in a release build and the fallback of 09 §1 exists for safety only. JSON parsing and any hooking library are linked statically |
 | Embedded resources | the `openvr_api.dll` redistributable (§3.2) and the project's own UI resources that 14 defines. Never a stock or modified game movie, archive or other game file, and nothing taken from another mod |
 | Embedded loader | the build names the public OpenVR SDK release whose x86 loader it embeds, with that file's SHA-256, and fails if the file is missing, is not an x86 PE DLL (machine 0x14C), or has another hash; it never embeds a placeholder (for example a large-file pointer left by a checkout). Updating the loader changes the release and the hash together. The licence notice of that release is the one in `THIRD_PARTY_LICENSES.txt` (§8). The interface versions requested (§3.2) are chosen independently of the loader release |
-| Shaders | the mod's own shaders (the mirror of 03 §8.3 and any other the mod draws with) are compiled from the project's HLSL at build time and embedded; the DLL never loads a shader compiler at run time (project decision of spec r7: a run-time compiler adds a DLL dependency and start-up cost for shaders that never change). The build fails if one does not compile |
+| Shaders | the mod's own shaders (the mirror of 03 §8.3 and any other the mod draws with) are compiled from the project's HLSL at build time and embedded; the DLL never loads a shader compiler at run time (project decision of spec r7: a run-time compiler adds a DLL dependency and start-up cost for shaders that never change). The build fails if one does not compile. They must not contain the dither pattern of 08 §1.1, so the shader fix of 08 §1 leaves them unchanged (03 §8.3) |
 | Symbols | every release build also produces the program database (PDB) of exactly the shipped `d3d11.dll`, without changing the shipped code; the DLL's debug directory names it so a debugger finds it. It is not in the player package (§8) and is kept as §8.3 says |
 | Version resource | see below |
 
@@ -379,8 +385,8 @@ The package never contains game files (`UI.PAK`, `MOTHER.PAK`, movies,
 The player guide:
 
 - lists every file and folder of §2 and §6, including the rotated log,
-  the companion files of `MOTHER.PAK` and the leftover temporary settings
-  file, and is updated whenever a setting, a control or a written file
+  the key file of `MOTHER.PAK` and the temporary files an interrupted
+  write can leave (settings file, UI archive), and is updated whenever a setting, a control or a written file
   changes;
 - names both runtime options of §1 among its requirements, and the
   `-vrforce*` launch options of 06 §2;
@@ -487,8 +493,8 @@ from the published source by the published process.
     display reset. With OpenXR forced and no usable 32-bit OpenXR runtime
     reachable: one message whose result text is not empty, which names the
     way back to SteamVR (the options page or `-vrforceopenvr`), and, for
-    -51, says that no usable 32-bit runtime could be loaded and that the
-    log lists what was tried.
+    -51, gives the likely cause and points to the log for the runtime
+    manifests examined (09 §7).
 12. **Unwritable directory.** With the game directory and `DATA` made
     read-only for the user, and no files of §2 present: the game starts and
     runs; no elevation is requested; log events appear in a debugger output
@@ -518,8 +524,8 @@ from the published source by the published process.
     resolves a proxy offset from a crash record of 11 §6.1 to a function
     of the source at the release tag.
 19. **Player guide.** The guide in the package lists every file and folder
-    of §2 and §6 (including the rotated log, the companion files of
-    `MOTHER.PAK` and the temporary settings file), names both runtime
+    of §2 and §6 (including the rotated log, the key file of `MOTHER.PAK`
+    and the temporary files an interrupted write can leave), names both runtime
     options of §1 and the `-vrforce*` launch options, says where to report
     a problem and what to attach, and where the source is.
 20. **Release.** Pushing a tag `v1.2.3-rc.1` on the main branch with its

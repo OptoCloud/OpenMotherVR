@@ -1,4 +1,4 @@
-<!-- Provenance: user requirements; in-game observation of the earlier mod's last release on the 2015 build; AI.exe 2015 analysis; 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; in-game observation by the spec side in a headset (per-eye lighting and mirror fixes confirmed; OpenXR stereo confirmed on SteamVR with Index; controls on Index confirmed); measurements by the spec side of render-thread and GPU cost in game (pixel scale, culling, mirror size, anti-aliasing, display resets, shader patching, logging, OpenXR frame loop); user decisions of spec r3 (runtimes None / OpenVR / OpenXR, flat play with runtime None is the unmodded game, "Oculus" means OpenXR), later (OpenVR is the default runtime; the options page is project-authored and built into the player's own UI archive; the project's log format; no other mod named in the spec) and r5 (SteamVR need not be running; invalid head poses; no elevation, registry change or folder rename; settings named by their key; known problems stated as observed effects); a tester's report on SteamVR with a Steam Frame headset and project decisions of spec r6 (borderless mirror window, focus loss does not pause, the options page shows the runtime this run drives, the headset-not-showing-the-game warning, the crash record); clean-room review round 2 and coverage review of spec r6, applied in r7 (v1 defined by what the player sees; console commands moved to the robustness requirements; process exit allows only the detach log line; settings keys given for every option on the page; a program other than the game that loads the DLL is left alone; the welcome only on a run where the mod is active). Revision: r7 -->
+<!-- Provenance: user requirements; in-game observation of the earlier mod's last release on the 2015 build; AI.exe 2015 analysis; 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; in-game observation by the spec side in a headset (per-eye lighting and mirror fixes confirmed; OpenXR stereo confirmed on SteamVR with Index; controls on Index confirmed); measurements by the spec side of render-thread and GPU cost in game (pixel scale, culling, mirror size, anti-aliasing, display resets, shader patching, logging, OpenXR frame loop); user decisions of spec r3 (runtimes None / OpenVR / OpenXR, flat play with runtime None is the unmodded game, "Oculus" means OpenXR), later (OpenVR is the default runtime; the options page is project-authored and built into the player's own UI archive; the project's log format; no other mod named in the spec) and r5 (SteamVR need not be running; invalid head poses; no elevation, registry change or folder rename; settings named by their key; known problems stated as observed effects); a tester's report on SteamVR with a Steam Frame headset and project decisions of spec r6 (borderless mirror window, focus loss does not pause, the options page shows the runtime this run drives, the headset-not-showing-the-game warning, the crash record); clean-room review round 2 and coverage review of spec r6, applied in r7 (v1 defined by what the player sees; console commands moved to the robustness requirements; process exit allows only the detach log line; settings keys given for every option on the page; a program other than the game that loads the DLL is left alone; the welcome only on a run where the mod is active); cross-document pass after that review, applied in r8 (the head-in-wall delay given as about half a second, as 08 §4.2 now decides; v2 pointed to its own documents). Revision: r8 -->
 
 # 00. Overview
 
@@ -24,7 +24,8 @@ running its own gameplay, AI, audio and scripting unchanged.
 - **v2** (later, separate spec revision) adds enhancements: tracked hands
   and hand aiming, smooth turning, comfort options, haptics, per-controller
   glyphs in more places, OpenXR as the default runtime. Nothing in v1 may
-  make these harder, but v1 does not specify them. (OpenXR itself is a v1
+  make these harder, but v1 does not specify them; v2 is specified in
+  `20-v2-overview.md` to `24-rendering-v2.md`. (OpenXR itself is a v1
   runtime, §3; only making it the default is v2.)
 
 ## 2. What the player sees in v1
@@ -49,8 +50,8 @@ running its own gameplay, AI, audio and scripting unchanged.
   and out at the edges of the view (08 §2); planar reflections are rendered
   per eye (07); the game's FXAA and SMAA run in stereo (08 §3).
 - Head-in-wall blackout ("clipping blinders"): when the head moves into
-  level geometry the view fades to black, after 0.6 s of contact so that
-  walking through a doorway does not flash black (08 §4). An option weakens
+  level geometry the view fades to black, after about half a second of
+  contact so that walking through a doorway does not flash black (08 §4.2). An option weakens
   the trigger so that leaning near walls does not set it off.
 - Cutscenes and level fades play in stereo and are never blacked out by
   the mod.
@@ -290,8 +291,8 @@ Each item states the effect observed in game and the requirement v1 meets.
     stereo; SMAA T2x runs as T1x, because the temporal mode has no per-eye
     history (08 §3).
 11. **Abrupt head-in-wall blackout.** The view goes black on the first
-    frame the head touches geometry. v1 allows 0.6 s of contact before the
-    blackout starts (08 §4).
+    frame the head touches geometry. v1 allows about half a second of
+    contact before the blackout starts (08 §4.2).
 12. **Desktop mirror in a corner.** With the eyes at full size the mirror
     image filled only a corner of the window. The mirror must scale from
     the actual eye size, so the image fills the window (03 §8, 08 §5).

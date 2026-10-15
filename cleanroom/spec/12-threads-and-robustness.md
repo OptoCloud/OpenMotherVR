@@ -1,4 +1,4 @@
-<!-- Provenance: AI.exe 2015 analysis (initialisation order, the per-object visibility loop, the calling conventions of the replaced methods); measurements in game of test builds (thread ids of every hook, call counts per frame, render-thread timings, 600-frame pose-fetch timing on OpenVR and OpenXR, a torn head-pose handover on OpenXR); user requirements (verify before writing, no per-frame logging on the render thread, no work at process exit, unknown build patches nothing, the mod never needs elevation); project decisions with their reasons inline (message boxes at attach, unwritable game folder); the earlier mod's player-facing behaviour (its message for OpenVR error 117 pointing at Steam's Desktop Game Theatre); public OpenVR headers (`EVRInitError` values); Microsoft documentation of DllMain, the loader lock, structured exceptions and the DLL search order, DXGI, OpenVR and OpenXR threading rules; the C++ memory model; a tester's report on SteamVR with a Steam Frame headset (focus taken by other applications, the game not shown in the headset, a crash with nothing in the log); project decisions of r3 with their reasons in 03, 09, 11 and 13 (the borderless mirror window, focus loss kept from the game, the non-blocking headset warning, the crash record, the event tap's image-range guard, the page showing the runtime this run drives); AI.exe 2015 analysis by the spec side for r4 (the C runtime's own unhandled-exception filter, installed after DLL attach, 11 §6.1); project decisions of r4, each with its reason inline (an OpenXR loss never quits the game; the proxy stays loaded once anything points into it; a caught exception's return value; a protection that cannot be restored; groups of sites applied whole; a late detach on the render thread and the runtime's release; the controls help set crossing threads; an attach-time message that cannot be shown). Revision: r4 -->
+<!-- Provenance: AI.exe 2015 analysis (initialisation order, the per-object visibility loop, the calling conventions of the replaced methods); measurements in game of test builds (thread ids of every hook, call counts per frame, render-thread timings, 600-frame pose-fetch timing on OpenVR and OpenXR, a torn head-pose handover on OpenXR); user requirements (verify before writing, no per-frame logging on the render thread, no work at process exit, unknown build patches nothing, the mod never needs elevation); project decisions with their reasons inline (message boxes at attach, unwritable game folder); the earlier mod's player-facing behaviour (its message for OpenVR error 117 pointing at Steam's Desktop Game Theatre); public OpenVR headers (`EVRInitError` values); Microsoft documentation of DllMain, the loader lock, structured exceptions and the DLL search order, DXGI, OpenVR and OpenXR threading rules; the C++ memory model; a tester's report on SteamVR with a Steam Frame headset (focus taken by other applications, the game not shown in the headset, a crash with nothing in the log); project decisions of r3 with their reasons in 03, 09, 11 and 13 (the borderless mirror window, focus loss kept from the game, the non-blocking headset warning, the crash record, the event tap's image-range guard, the page showing the runtime this run drives); AI.exe 2015 analysis by the spec side for r4 (the C runtime's own unhandled-exception filter, installed after DLL attach, 11 §6.1); project decisions of r4, each with its reason inline (an OpenXR loss never quits the game; the proxy stays loaded once anything points into it; a caught exception's return value; a protection that cannot be restored; groups of sites applied whole; a late detach on the render thread and the runtime's release; the controls help set crossing threads; an attach-time message that cannot be shown); r5 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (the stereo device creation has one call site, so a display reset does not call it again, 02 §6.1), the attach cost stated as 14 §5.10's limits instead of measurements, a process that is not the game, the welcome only on a run where the mod is active, a checked original byte behind a derived written value, the logging of game script events named as in 11 §5, the focus-loss fix described by its result. Revision: r5 -->
 
 # 12. Threads and robustness
 
@@ -58,7 +58,7 @@ fetched between a BeginFrame and its EndFrame [sure, measured].
 | per-eye reflections, anti-aliasing in stereo | render thread |
 | distance and occlusion test replacements | job threads |
 | showing the messages decided at attach (§2.4) | any thread except the loader thread under the lock; the implementation's choice |
-| script event tap (11 §5) | the scripts' thread; not established (11 §8) |
+| logging of game script events (11 §5) | the thread that calls `ScriptEventTap`; not established (11 §8) |
 | keeping focus loss from the game (03 §9.6) | game thread: the game window's messages are delivered on the thread that created the window |
 | the check that the headset shows the game (03 §6.7, 09 §3.1) | render thread; the warning it may raise must not block the render thread or the game thread (13 §5.2) |
 | the crash record (11 §6.1) | the thread that raised the unhandled exception |
@@ -84,12 +84,12 @@ reason given:
 
 Everything else may run in any order. Allowed at attach: what 01 §2.2
 lists. Heavy work there is limited to one item: **building `MOTHER.PAK`**
-from the player's `UI.PAK` (reading about 17.5 MB and writing the result,
-70 to 90 ms measured) when it is missing or stale (14). It must be complete
-before the game opens its UI archive, which it does through the redirected
-path during start-up, on the game thread, before the front end shows; there
-is no later hook early enough. When the archive is current, attach takes
-about 4 ms [sure, measured].
+from the player's `UI.PAK` when it is missing or stale (14), within the
+rebuild limit of 14 §5.10. It must be complete before the game opens its
+UI archive, which it does through the redirected path during start-up, on
+the game thread, before the front end shows; there is no later hook early
+enough. When the archive is current, the UI archive work at attach stays
+within the fast-path limit of 14 §5.10.
 
 Not at attach, because each can deadlock or misbehave under the loader
 lock: loading the system `d3d11.dll`, writing `openvr_api.dll`, starting a
@@ -105,8 +105,10 @@ succeeded.
 ### 2.4 Messages decided at attach
 
 Some messages to the player are decided during attach: unsupported build,
-first-launch welcome, the `UI.PAK` and UI-archive messages (13 §5.3). The
-requirements (project decision; the reasons are given with each):
+first-launch welcome (only on a run where the mod is active, 01 §2.4), the
+`UI.PAK` and UI-archive messages (13 §5.3). None is shown in a process that
+is not the game (01 §3.1). The requirements (project decision; the reasons
+are given with each):
 
 - never shown under the loader lock: a message box runs a message loop,
   and waiting on the player there blocks every other thread that loads a
@@ -202,7 +204,7 @@ organised is the implementation's choice.
 |---|---|
 | any site | its address lies inside the loaded image (below `SizeOfImage`) |
 | a `call rel32` to redirect | it is a `call rel32` (opcode `E8`); where 01 gives the callee for this build, the call resolves to it (so a callee 01 gives only for 2015 is checked on 2015, and on 2020 the rules after it apply); where 01 gives none, it resolves into `AI.exe`'s code, and sites that 01 marks as calling the same function resolve to the same target |
-| a byte patch | the original bytes 01 lists for the parts of the instruction that do not depend on the build (opcode, ModRM pattern, immediate) |
+| a byte patch | the original bytes 01 lists for the parts of the instruction that do not depend on the build (opcode, ModRM pattern, immediate); where the written value is derived from an original byte (the mouse displacement low bytes, 05 §7.7), that byte too, because the derived value is right only for that original (01 §2.5.1) |
 | a data pointer to replace | it points inside the image at a NUL-terminated string with the text 01 gives (`data\ui.pak` for the UI archive path, `ShowBootup` for the intro push). A case-insensitive compare is acceptable for the path, because Windows file names are case-insensitive and either spelling names the same file |
 | an immediate operand | it holds the value 01 gives (for example the stereo object size pushed before its allocation, the device field store at `+0x264`) |
 | a vtable slot | where 01 gives the function the slot holds, it holds that function; where 01 gives none, it points into `AI.exe`'s code |
@@ -216,8 +218,8 @@ organised is the implementation's choice.
   runs unmodified (the D3D11 forwarders keep working), the log names each
   differing site, and no message is shown (01 §2.4).
 - **Optional**: each fix beyond the original (per-eye reflections 07,
-  stereo AA 08 §3, culling 08 §2, head-in-wall delay 08 §4, the event tap
-  11 §5) checks its own sites just before it is installed and stays off on
+  stereo AA 08 §3, culling 08 §2, head-in-wall delay 08 §4, the logging
+  of game script events 11 §5) checks its own sites just before it is installed and stays off on
   its own when they differ or when its address for this build is unknown
   (0). The rest of the mod is unaffected.
 - A write that fails after its checks passed (Windows refusing the
@@ -355,7 +357,8 @@ since they were built: pixel scale, mirror view type, symmetric mirror (06,
 
 | Situation | Required behaviour |
 |---|---|
-| `AI.exe` is not a recognised build | patch nothing; the forwarders work; log the timestamp; the unsupported-build message of 13 §5.3 (01 §2.4) |
+| the process is not the game (its executable is not `AI.exe`, 01 §3.1) | forward the Direct3D 11 exports only; log one event naming the host (11 §2.1); no settings, message, filter, patch or other file |
+| `AI.exe` is not a recognised build | patch nothing; the forwarders work; log the timestamp; the unsupported-build message of 13 §5.3 (01 §2.4); no welcome and no first-launch `mothervr.json`, because the welcome would describe a mod that is not running (01 §2.4) |
 | a core site differs (preflight) | patch nothing; log every differing site; the game runs unmodified |
 | an optional fix's site differs or its address is unknown on this build | that fix stays off; log it; everything else works |
 | `UI.PAK` missing or not the expected version | no options page this session; VR works; the message 13 §5.3 gives for the cause (06, 14) |
@@ -375,12 +378,12 @@ since they were built: pixel scale, mirror view type, symmetric mirror (06,
 | the game window does not fit its monitor (its work area for a window with a title bar) | made borderless and placed over its whole monitor; a window that fits is left alone; asynchronously, because the call may come from a thread other than the window's owner while that thread waits (03 §9.3) |
 | another application takes the desktop focus while a headset is attached | the game is not paused: its window does not receive the focus loss (03 §9.6); activation still reaches it; logged with the application's executable. Keyboard and mouse stop until the game window has the focus again; VR controllers and the gamepad keep working |
 | the runtime started but does not show the game in the headset (SteamVR's Desktop Game Theatre: OpenVR's scene application is another process about 3 s of frames after the first submission, 03 §6.7; or an OpenXR session not `VISIBLE` or `FOCUSED` within about 10 s of running, 09 §3.1) | logged; the player is warned once without blocking (13 §5.3); VR stays on and frames keep being submitted |
-| the script event tap's code is reached with an argument that is not a string (folded functions, 11 §5.1) | the argument is read only when it points into the game's image; otherwise the call passes through untouched (11 §5.2) |
-| display reset (the game calls its stereo device creation again and rebuilds its targets) | the runtime is started once per process: a second creation call re-attaches the device that exists (or none after a failure) and never shows a failure message again; the eye layout follows the texture the game actually creates (03); the swapchain is resized to the mirror size |
+| `ScriptEventTap` is reached with an argument that is not a string (its address also sits in pointer tables, 11 §5.1) | the argument is read only when it points into the game's image; otherwise the call passes through untouched (11 §5.2) |
+| display reset (the game rebuilds its targets; it does not call its stereo device creation again, which has one call site, 02 §6.1) | the eye layout follows the texture the game actually creates (03); the swapchain is resized to the mirror size. A repeated creation call is not expected but still handled: the runtime is started once per process, so a second call re-attaches the device that exists (or none after a failure) and never shows a failure message again (03 §6.5) |
 | writing `openvr_api.dll` fails part way | delete the partial file; the file counts as current only after a complete write (13 §3.2) |
 | loading `openvr_api.dll` | the DLLs that `openvr_api.dll` loads resolve from its own directory, and the process's DLL search path is the same after the load as before, because the game and other modules load DLLs later and must not pick up files from the mod's choice of directory. `LoadLibraryExW` with `LOAD_WITH_ALTERED_SEARCH_PATH` or with `LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR`, or a `SetDllDirectoryW` change undone right after the load, all meet this |
 | process exit (`DLL_PROCESS_DETACH` with a non-null reserved argument) | log the detach marker and return: no runtime shutdown (`VR_Shutdown` and `xrDestroyInstance` wait on runtime threads and can deadlock under the loader lock), no release of D3D objects (the game's still exist), no `FreeLibrary` of the system `d3d11.dll`, and no static destructor that calls into a runtime. The OS and the runtime clean up after an ended process |
-| dynamic unload (reserved argument null) | free the system `d3d11.dll`. In the game process this cannot happen: from attach on the game holds pointers into the proxy (the crash record's filter, then the patches, vtable slots, detours and the window subclass), and game code would call into unmapped memory after an unload, so the proxy keeps itself loaded until the process ends (01 §1.4; pinning its own module, for example with `GetModuleHandleExW` and `GET_MODULE_HANDLE_EX_FLAG_PIN`, is one way). A dynamic unload happens only in a host that is not the game (01 §3.1) |
+| dynamic unload (reserved argument null) | free the system `d3d11.dll`. In the game process this cannot happen: from attach on the game holds pointers into the proxy (the crash record's filter, then the patches, vtable slots, detours and the replacement of the game window's focus-loss handling, 03 §9.6), and game code would call into unmapped memory after an unload, so the proxy keeps itself loaded until the process ends (01 §1.4; pinning its own module, for example with `GetModuleHandleExW` and `GET_MODULE_HANDLE_EX_FLAG_PIN`, is one way). A dynamic unload happens only in a host that is not the game (01 §3.1) |
 | an exception in any mod code the game calls | caught at the entry point and logged once per entry point; never propagated into game code. The call then returns what that slot returns without a device (02 §7.5), or passes the call to the game's original where the mod replaced one |
 | an unhandled exception (a crash, in the game or the mod; including a stack overflow) | the crash record of 11 §6.1 is logged once, without allocation and within the stack a stack overflow leaves, then the exception goes to the filter the mod's replaced, so Windows records the crash as it would without the mod. The mod's filter is installed again after the game's C runtime has replaced it with its own, which does not chain (11 §6.1) |
 

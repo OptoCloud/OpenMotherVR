@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). Revision: r2 -->
+<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). r3 (spec r7 cross-check): 07 §8 item 1 no longer names the viewport setter or a viewport constant, so the viewport setter 0x621350 (it builds one viewport and calls `ID3D11DeviceContext::RSSetViewports`), the constant writers 0x621C20 and 0x621C90 and the pass set-up's type argument are given as this document's own facts, verified by the spec side in the 2015 `AI.exe`, and the velocity shader question no longer assumes a viewport constant; the settings setter labelled `SettingsSetOption` as in 01 §4, and whether it reaches the saved settings left open as 02 §11 item 5 does; the 2D-only effects keep the player's saved settings as 02 §6.5 now requires of v1. Revision: r3 -->
 
 # 24. Rendering in v2
 
@@ -41,7 +41,7 @@ that the implementation may rename them.
 | `PostFxGet` | 0x5F19C0 | ? | cdecl, no arguments, returns the post-processing object (bytes `b8` + 4-byte address + `c3`) (08 §3.1) |
 | `RendererPtr` | global pointer at 0x13583E4 | ? | the renderer; the int at `+0x2C` is the current eye (07 §1) |
 | `StereoObjectPtr` | global pointer at 0x1366A2C (01) | ? | stereo object; `+0x04` device, device `+0x04` state (2 = stereo running); `+0x64` scene visibility (02, 05 §3.2g) |
-| `SettingsObject` | object at 0x1358A50 (01) | ? | the game's settings; `SettingSet` at 0x5A8910 (02 §6.5); `SettingFind` at 0x59DF70, thiscall `(settings, int id)`, returns the setting object or null |
+| `SettingsObject` | object at 0x1358A50 (01) | ? | the game's settings; `SettingsSetOption` at 0x5A8910 (01 §4, 02 §6.5); `SettingFind` at 0x59DF70, thiscall `(settings, int id)`, returns the setting object or null |
 | `SettingCurrent` | 0x5A4D00 | ? | thiscall `(setting)`, returns the selected quality record (records 0x70 bytes apart): `+0x4C` float value, `+0x50` int value, `+0x54` bool value |
 | `SettingNameTable` | 0x124FC20 | ? | array of string pointers indexed by setting id (table 1.2), followed by the paths of the engine settings files (1.9) |
 | `JitterMatrixGet` | 0x61A360 | ? | `b8` + address + `c3`: returns the jitter matrix at 0x17DF540 (1.4) |
@@ -648,8 +648,9 @@ GPU and driver that support it:
   stays off, the log says why once, and v1 rendering runs.
 
 Which game passes are "the opaque scene passes" must be identified (the
-pass types the main view gives the pass set-up 0x595170, 07 §8 item 1;
-the velocity pass gives it type 0xB) before this is implemented (§12 item
+pass types the main view gives the pass set-up 0x595170, a thiscall
+whose first stack argument is the pass type; the velocity pass gives it
+type 0xB) before this is implemented (§12 item
 9). Cost and gain to be measured; the feature is
 worth keeping only if it saves at least 10 % GPU time at pixel scale 1.5
 [proposal].
@@ -673,8 +674,8 @@ Effects designed for a flat screen that look wrong in stereo. For each: the
 game fact, the problem, and the required toggle. All toggles default to the
 game's behaviour (v1) and act only while stereo runs; flat play is never
 changed, and the player's saved game settings are never changed by them
-[proposal: the player who goes back to flat play keeps their own choices;
-v1's three forced settings, 02 §6.5, are the only exception].
+[proposal: the player who goes back to flat play keeps their own choices,
+as v1 requires for the three settings it forces in stereo, 02 §6.5].
 
 | Effect | Game fact | Problem in stereo | Key and required result |
 |---|---|---|---|
@@ -689,8 +690,9 @@ Means for the three toggles: the implementation's choice; the game facts
 are the fields and the readers above. Chromatic aberration and film grain
 must take effect from the next rendered frame after the key changes, by
 overriding the value the reader uses (for example the field at the time
-0x5F1E00 or the grain reader runs), never through `SettingSet` (which would
-change the saved settings). The lens flare draw site is a `call` that can
+0x5F1E00 or the grain reader runs), never through `SettingsSetOption`
+(whether a value set there reaches the player's saved settings is open,
+02 §11 item 5, and these keys must never change them). The lens flare draw site is a `call` that can
 be redirected to a function with the ABI of 1.8 that returns without
 drawing while stereo runs and the key is false, and otherwise calls the
 game's draw.
@@ -711,8 +713,12 @@ headset off is still stereo, so use None) shows the player's settings.
 ### 9.1 Measure first
 
 The game sets render state through thin cdecl wrappers on its renderer (the
-viewport setter 0x621350, 07 §8 item 1; the constant uploaders 0x621C20 and
-0x621C90; the clear 0x621770, 07 §2.3), many of them each draw. Whether
+viewport setter 0x621350, cdecl `(context, rectangle)`, which turns an
+integer rectangle and a depth range into one viewport and passes it to
+`ID3D11DeviceContext::RSSetViewports` through the D3D11 context held at
+the context's `+0x08`; the constant writers 0x621C20 and 0x621C90, cdecl,
+which copy float4 constants into the renderer's copy of one constant-buffer
+slot and mark the slot for upload; the clear 0x621770, 07 §2.3), many of them each draw. Whether
 redundant calls (setting the state that is already set) cost measurable
 render-thread time in stereo is **not known**. Required before any
 implementation: a profile of the render thread in a heavy scene (Medical or
@@ -828,11 +834,11 @@ Each event must convey:
    it from `{0, 0, w, h}` (the same question as 07 §8 item 1)? Look for: a
    capture of the velocity target after both eyes with §2 on.
 2. **Velocity shader units.** Does the game's velocity shader compute
-   screen positions over the whole target or the bound viewport (the
-   viewport-UV constant of 07 §8 item 1 suggests the viewport)? Look for:
+   screen positions over the whole target or the bound viewport? Look for:
    the velocity effect's pixel shader in the post-processing shader pack
    (`DATA\SHADERS\UBERSHADER\POSTPROCESSINGSHADERS_DX11*.PAK`) and its use
-   of the viewport-UV and resolution constants.
+   of any constant that carries the target's or the viewport's size or
+   offset.
 3. **Screen-like surfaces under TAA (§3).** Which materials draw terminal
    and tracker screens, and can they be recognised by shader, by render
    pass or by the interaction state (11 §5.3)?

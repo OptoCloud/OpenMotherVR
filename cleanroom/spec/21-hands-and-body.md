@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. Revision: r2 -->
+<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. Revision: r3 -->
 
 # 21. Hands and body
 
@@ -342,7 +342,7 @@ while no physical pad is connected, are open (§22 item 9).
 | the player's first-person camera behaviour is active or not | FollowBehavior slots 0 and 1 (05 §6.1) |
 | a cutscene or level fade is in progress | UI entity messages (05 §6.2), and the inference of 05 §3.2g |
 | a loading screen is up | menu objects (05 §5) |
-| an interaction is in progress and its kind; hiding | the script event tap (11 §5.3) |
+| an interaction is in progress and its kind; hiding | the logging of game script events (11 §5.3) |
 | eye and body pivot positions each frame | the arguments of HeadClipFade at 0x34E2C1 (08 §4.1) |
 | head pose, recenter reference | device slot 11, manager `+0x78` (03 §1, §2) |
 | grip poses and linear velocities of both hands, converted, handed to the game thread | 04 §5.11 |
@@ -352,7 +352,7 @@ while no physical pad is connected, are open (§22 item 9).
 ### 3.1 Mapping [required]
 
 Every hand feature uses the same mapping, derived here by the spec side
-from the game's conventions (03 §1, §2.4) and the runtimes' public pose
+from the game's conventions (03 §1; 05 §1) and the runtimes' public pose
 definitions; it is stated as a short algorithm because the result must
 match exactly.
 
@@ -1157,7 +1157,7 @@ game actions v1 writes, merged by OR.
 
 | Work | Thread |
 |---|---|
-| read controllers and hand poses, publish them with the head pose; all haptic runtime calls | render thread (04 §5.9, §14.3) |
+| read controllers and hand poses, publish them with the head pose; all haptic runtime calls | render thread (04 §5.9; §14.3 of this document) |
 | take the frame's hand set (with the head pose of that frame), the camera pose (§2.4), the player pointer; compute world targets (§3.1); aim ray (§5), tracker heading (§6), room-scale, height, crouch presses (§11), control hand-back (§12), health value, haptic event detection | game thread |
 | edit the player's pose (§4.2), body visibility (§10) | the job thread running the player's final-pose step (§2.3), reading only the game thread's copy for this frame |
 | game rumble levels (§2.9) | whichever thread calls `RumbleSetMotors` [likely the audio thread]; stored as two atomic floats |

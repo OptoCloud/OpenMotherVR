@@ -1,4 +1,4 @@
-<!-- Provenance: AI.exe 2015 analysis (order of StereoInit, the render-target size query, D3D11 device creation and device slot 3, 01 §2.1, 02 §6; the game's quit flag); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; OpenXR 1.0 specification and the XR_KHR_D3D11_enable, XR_EPIC_view_configuration_fov, XR_OCULUS_audio_device_guid, XR_KHR_loader_init and XR_EXT_loader_init_properties extensions, and the OpenXR registry (symbolic names of XrResult values); the OpenXR loader's Windows registry convention and its documented handling of elevated processes; observation by the spec side on the test machine (SteamVR registers only a 64-bit runtime manifest and installs a 32-bit sibling); in-game testing and test logs by the spec side on SteamVR's OpenXR runtime (SteamVR/OpenXR 2.17.10) with a Valve Index headset and controllers (session creation, FOV fallback, frame boundary with pose age 0, recentering); performance measurements by the spec side (frame boundary placement, controller latency, a frame loop that rendered with views one period old); user requirements; a tester's report on SteamVR with a Steam Frame headset (XR_ERROR_RUNTIME_UNAVAILABLE at instance creation, an empty failure text, no visible way back to SteamVR, the game not shown in the headset with Desktop Game Theatre on); project decisions, each with its reason inline (r4: runtime discovery prefers the 64-bit view's runtime, the not-shown check; r5: probing has no effect beyond the log and the loader is directed only when OpenXR starts, expandable registry values are expanded, a re-anchor looking straight up or down keeps the previous yaw, per-frame call failures are logged per change of result, a session or instance loss never quits the game, the failure message's content as an unordered list of facts). Revision: r5 -->
+<!-- Provenance: AI.exe 2015 analysis (order of CreateDevice, the render-target size query, D3D11 device creation and device slot 3, 01 §2.1, 02 §6; the game's quit flag); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; OpenXR 1.0 specification and the XR_KHR_D3D11_enable, XR_EPIC_view_configuration_fov, XR_OCULUS_audio_device_guid, XR_KHR_loader_init and XR_EXT_loader_init_properties extensions, and the OpenXR registry (symbolic names of XrResult values); the OpenXR loader's Windows registry convention and its documented handling of elevated processes; observation by the spec side on the test machine (SteamVR registers only a 64-bit runtime manifest and installs a 32-bit sibling); in-game testing and test logs by the spec side on SteamVR's OpenXR runtime (SteamVR/OpenXR 2.17.10) with a Valve Index headset and controllers (session creation, FOV fallback, frame boundary with pose age 0, recentering); performance measurements by the spec side (frame boundary placement, controller latency, a frame loop that rendered with views one period old); user requirements; a tester's report on SteamVR with a Steam Frame headset (XR_ERROR_RUNTIME_UNAVAILABLE at instance creation, an empty failure text, no visible way back to SteamVR, the game not shown in the headset with Desktop Game Theatre on); project decisions, each with its reason inline (r4: runtime discovery prefers the 64-bit view's runtime, the not-shown check; r5: probing has no effect beyond the log and the loader is directed only when OpenXR starts, expandable registry values are expanded, a re-anchor looking straight up or down keeps the previous yaw, per-frame call failures are logged per change of result, a session or instance loss never quits the game, the failure message's content as an unordered list of facts); r6 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (`CreateDevice` at RVA 0x5E0D40 has the single call site `StereoInitCall`), the label `CreateDevice` used as in 01, 02 and 03, the loader fallback of §1 kept for safety only because the shipped loader implements both loader extensions (13 §7), the virtual screen of §8 never in a process that is not the game (01 §3.1). Revision: r6 -->
 
 # 09: Running the stereo device on OpenXR
 
@@ -109,7 +109,10 @@ manifest's full path is given to the loader in two ways:
   `xrGetInstanceProcAddr` (which is how it is obtained), so it precedes
   `xrEnumerateInstanceExtensionProperties` and `xrCreateInstance`. A loader
   that does not offer it, or refuses the property, is logged and start-up
-  continues with the environment alone.
+  continues with the environment alone. This fallback exists for safety
+  only: the OpenXR loader a release links statically implements both
+  `XR_KHR_loader_init` and `XR_EXT_loader_init_properties` (13 §7), so in a
+  release build the property path is always available.
 
 Logged (11 §2.3): both views' `ActiveRuntime` values (or that a view has
 none); each manifest examined with the library it resolves to and that
@@ -126,7 +129,8 @@ check when "OpenXR does not start" is reported.
 
 From renderer initialisation (01 §2.1, 02 §6), all on the game thread:
 
-1. `StereoInit(1)` at `StereoInitCall` (RVA 0x613941, 2020: 0x565E11): the
+1. `CreateDevice(1)` (the stereo manager's device creation, RVA 0x5E0D40,
+   called only from `StereoInitCall`, RVA 0x613941, 2020: 0x565E11): the
    mod's CreateDevice runs and must fill the device descriptor, including the
    FOV (02 §6.1).
 2. The back-buffer size query (call at RVA 0x613AE8): the stereo
@@ -609,7 +613,9 @@ reports: that message is about start-up only.
 When OpenXR is the chosen runtime but the game's stereo device was never
 attached and never failed (the game patches are not installed, for example
 because the preflight failed, 01 §2.5, or CreateDevice was never called with
-type 1), the mod still shows the game in the headset as a flat screen:
+type 1), the mod still shows the game in the headset as a flat screen. This
+never happens in a process that is not the game, where the proxy only
+forwards (01 §3.1).
 
 | Property | Value |
 |---|---|

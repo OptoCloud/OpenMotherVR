@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (device methods 3 to 16, relative head pose, render-target size query, render-target rebuild flag, renderer accessors, order of renderer initialisation); OpenVR, DXGI, Win32 and LibOVR 0.4 public API semantics (fullscreen transitions, window placement, window subclassing, interface versions, the LibOVR descriptor fields); observation in game by the spec side on SteamVR with a Valve Index (full resolution from the start, eye layout tied to the created texture, windowed swapchain, mirror back buffer at window size, recenter when worn and when gameplay starts, running start with pose age 0 over 600 frames, render-target sizes up to 13440x6720 and the 16384 texture limit, pixel-scale changes applied in the same run through the rebuild flag, head motion moving the camera correctly, the game's threads per device slot); observation of the SteamVR install by the spec side (where the x86 `vrclient.dll` and its libraries are); performance measurements in game by the spec side (mirror and back-buffer cost, controller latency); answers to implementation questions Q1, Q3, Q4 (ANSWERS.md); user requirements and project decisions (SteamVR need not be running, invalid poses, bounded start-up waits). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. For spec r6: AI.exe 2015 analysis by the spec side (the game's window procedure, RVA 0x612850, and its focus, activation and size handling); OpenVR public API (IVRApplications, the scene application's process id); observation in game by the spec side (a mirror window shrunk to fit its monitor, as the spec r4 decision required, put the menus and the cursor off centre); project decisions of spec r6, prompted by a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus; the game not shown in the headset with Desktop Game Theatre on), each with its reason inline (a mirror window that does not fit becomes borderless over its monitor, replacing the spec r4 shrink-and-centre decision; focus loss is kept from the game while a headset is attached; the scene-application check after about 3 s). For this document's r6 (after spec r6): clean-room review round 2 applied (results instead of mechanisms in §6.7, §9.3 and §9.6; the window-size behaviour traced in the game; the screen-frame mirror question restated from the game; descriptor header values left free); coverage review (late detach on the render thread, one interception failing, mirror resources failing, mirror shaders built at build time, the `vrclient.dll` location, failure text without a runtime error, acceptance checks for invalid poses, cropped mirror modes and the pose handover). Section numbers are unchanged from r5. Revision: r6 -->
+<!-- Provenance: game analysis of AI.exe 2015 (device methods 3 to 16, relative head pose, render-target size query, render-target rebuild flag, renderer accessors, order of renderer initialisation); OpenVR, DXGI, Win32 and LibOVR 0.4 public API semantics (fullscreen transitions, window placement, window subclassing, interface versions, the LibOVR descriptor fields); observation in game by the spec side on SteamVR with a Valve Index (full resolution from the start, eye layout tied to the created texture, windowed swapchain, mirror back buffer at window size, recenter when worn and when gameplay starts, running start with pose age 0 over 600 frames, render-target sizes up to 13440x6720 and the 16384 texture limit, pixel-scale changes applied in the same run through the rebuild flag, head motion moving the camera correctly, the game's threads per device slot); observation of the SteamVR install by the spec side (where the x86 `vrclient.dll` and its libraries are); performance measurements in game by the spec side (mirror and back-buffer cost, controller latency); answers to implementation questions Q1, Q3, Q4 (ANSWERS.md); user requirements and project decisions (SteamVR need not be running, invalid poses, bounded start-up waits). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. For spec r6: AI.exe 2015 analysis by the spec side (the game's window procedure, RVA 0x612850, and its focus, activation and size handling); OpenVR public API (IVRApplications, the scene application's process id); observation in game by the spec side (a mirror window shrunk to fit its monitor, as the spec r4 decision required, put the menus and the cursor off centre); project decisions of spec r6, prompted by a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus; the game not shown in the headset with Desktop Game Theatre on), each with its reason inline (a mirror window that does not fit becomes borderless over its monitor, replacing the spec r4 shrink-and-centre decision; focus loss is kept from the game while a headset is attached; the scene-application check after about 3 s). For this document's r6 (after spec r6): clean-room review round 2 applied (results instead of mechanisms in §6.7, §9.3 and §9.6; the window-size behaviour traced in the game; the screen-frame mirror question restated from the game; descriptor header values left free); coverage review (late detach on the render thread, one interception failing, mirror resources failing, mirror shaders built at build time, the `vrclient.dll` location, failure text without a runtime error, acceptance checks for invalid poses, cropped mirror modes and the pose handover). Section numbers are unchanged from r5. For r7: cross-document alignment after the second fix pass (CreateDevice labelled with its RVA, and its single call site re-verified by the spec side in the 2015 `AI.exe`; required and optional OpenVR interfaces and the loader release as in 13 §3.2; the reason the mirror's shaders must not contain the dither pattern; the back-buffer view the mirror binds is not created per frame; references to 06 §4.6 and 05 §10 for the rebuild flag; the pose-handover check no longer points at an event 11 does not define). Section numbers are unchanged from r6. Revision: r7 -->
 
 # 03 - Head tracking, projection, render targets, frames, virtual screen, mirror
 
@@ -132,8 +132,8 @@ was taken from, the resulting heading, and whether the headset was in use
 | the game's reset-orientation path (02 §6.4, RVA 0x5B8680) | take it at once |
 
 A queued retake is a single flag: queuing it again before it runs changes
-nothing. A later CreateDevice (display reset, §6.5) does not take or queue
-a reference. Taking the headset off and putting it on again later does not
+nothing. A repeated CreateDevice (not expected, §6.5) does not take or
+queue a reference. Taking the headset off and putting it on again later does not
 by itself queue a retake; only the triggers above do.
 
 After any recenter the menu's virtual screen in the game world is placed
@@ -278,7 +278,7 @@ The game asks again, and recreates its stereo target and back buffer, at
 every display reset (02 §9.3): when the byte `RenderTargetResizePending`
 (RVA 0x1358470, 2020: 0x1368620) is 1 after an end frame (resolution
 change, window restore, some display settings), and when the mod raises it
-because the pixel scale or a mirror setting changed (06 §4). A changed pixel
+because the pixel scale or a mirror setting changed (06 §4.6, 05 §10). A changed pixel
 scale therefore takes effect in the same run, without a restart, at that
 reset (observed: a pixel-scale change in game produced the new target size
 and a new stereo texture in the same session). [sure for the 2015 build]
@@ -431,8 +431,9 @@ only on a change, or at a bounded periodic rate behind `DebugOptions`
 
 ### 6.4 Runtime start-up (CreateDevice, OpenVR)
 
-CreateDevice is the manager's `Init(int type)` (02 §6.1, `thiscall`,
-`ret 4`), called on the game thread during renderer initialisation, before
+CreateDevice is the manager's device creation (02 §6.1: RVA 0x5E0D40,
+`thiscall(manager, int type)`, `ret 4`, called once per run from
+`StereoInitCall`) on the game thread during renderer initialisation, before
 the render-target size query and before the D3D11 device exists. For
 `type == 1`, and only the first time it is called, the OpenVR start-up
 must meet these requirements (the runtime chosen per 06 §1, logged per
@@ -441,10 +442,10 @@ must meet these requirements (the runtime chosen per 06 §1, logged per
 | Topic | Requirement |
 |---|---|
 | finding the runtime | the OpenVR runtime root is the first string of the `"runtime"` array in `%LOCALAPPDATA%\openvr\openvrpaths.vrpath` (JSON, written by SteamVR), usable when `<root>\bin\win32\openvr_api.dll` exists |
-| the loader | `openvr_api.dll`, x86, from a public OpenVR SDK release that serves the interface versions below: the copy deployed next to the game (13), else `<root>\bin\win32\openvr_api.dll`. Exports used, all `cdecl`: `VR_InitInternal2`, `VR_ShutdownInternal`, `VR_GetGenericInterface`, `VR_GetVRInitErrorAsEnglishDescription`; any missing is a failure |
+| the loader | `openvr_api.dll`, x86, from a public OpenVR SDK release (13 §3.2: the loader passes each interface request on to the installed SteamVR, so its release need not match the interface versions below): the copy deployed next to the game (13), else `<root>\bin\win32\openvr_api.dll`. Exports used, all `cdecl`: `VR_InitInternal2`, `VR_ShutdownInternal`, `VR_GetGenericInterface`, `VR_GetVRInitErrorAsEnglishDescription`; any missing is a failure |
 | DLL search path | while the loader loads and while `VR_InitInternal2` runs, `<root>\bin\win32` is on the DLL search path, because the loader loads the x86 `<root>\bin\vrclient.dll`, and SteamVR's other x86 libraries that it needs are in `<root>\bin\win32` (observed in a SteamVR install by the spec side); without that folder on the search path the result is `VRInitError_Init_VRClientDLLNotFound` (102). The previous search path is restored afterwards. When `vrclient.dll` or one of its dependencies cannot be loaded, the log names the file the loader tried and the Windows error (for example 126 for a missing dependency) rather than only error 102; how the mod finds this out is its choice (loading `<root>\bin\vrclient.dll` itself with the same search path before `VR_InitInternal2` is one way; a reference the mod takes is released when the runtime is shut down) |
 | SteamVR need not be running | `VR_InitInternal2(&err, VRApplication_Scene, nullptr)` starts SteamVR if it is not running; the mod makes no check for a SteamVR process beforehand. An init error (including no headset, such as `VRInitError_Init_HmdNotFound`) is a failure, reported with the runtime's English description and the error number |
-| interface versions | `IVRSystem_017`, `IVRCompositor_021` and `IVROverlay_016` (OpenVR SDK 1.0.10), or later versions of the same interfaces when the implementation is built against a later SDK; every call used here exists in all of them. Obtained with `VR_GetGenericInterface`. A missing interface is a start-up failure with the OpenVR error code and says which interface was missing. The versions obtained are logged once. `IVRApplications` (any version that has `GetCurrentSceneProcessId`) is also requested, for the check of §6.7 only; its absence is logged and is not a failure |
+| interface versions | `IVRSystem_017`, `IVRCompositor_021` and `IVROverlay_016` (OpenVR SDK 1.0.10), or later versions of the same interfaces when the implementation is built against a later SDK; every call used here exists in all of them. Obtained with `VR_GetGenericInterface`. These three are the required interfaces (13 §3.2): a missing one is a start-up failure with the OpenVR error code and says which interface was missing. The versions obtained are logged once. Two more are optional, and the absence of either is logged and is not a failure: `IVRApplications` (any version that has `GetCurrentSceneProcessId`), for the check of §6.7 only, and `IVRInput`, without which the legacy controller path of 04 §5.8.3 applies |
 | bounded wait | on a cold start SteamVR may serve the compositor (and report the headset) only some seconds after `VR_InitInternal2` returns. Waiting for the compositor interface and then for a valid headset pose (`bPoseIsValid` of the headset's pose from `WaitGetPoses`) is bounded to about 10 s in total (project decision: long enough for a cold SteamVR start on current PCs, short enough that the game does not appear hung). No compositor within the bound is a failure; no valid pose within it is not (§1 covers invalid poses, and the reference is then queued, §2.1) |
 | logged once | the recommended per-eye size and the IPD (right eye X minus left eye X of `GetEyeToHeadTransform`) |
 | on success | the descriptor and EyeFov filled (§3.2), device state 1, the device attached at manager +0x04, the reference taken (§2.2) |
@@ -460,7 +461,7 @@ no-device behaviour (02), and tell the player once (13 §5). The message must
 convey that SteamVR could not be started, the runtime's error text and
 number, and what the player can do next (the game continues without VR in
 this run). When the failure is not an error the runtime returned (a loader
-export or an interface version is missing, or no compositor appeared
+export or a required interface is missing, or no compositor appeared
 within the bounded wait), the message and the log name what was missing
 (the export, the interface version, or the compositor) instead of a
 runtime error text, with the error code the failing call returned, or the
@@ -473,13 +474,16 @@ this run.
 
 ### 6.5 Display reset and later CreateDevice calls
 
-The game does not call CreateDevice again at a display reset (02 §9.3),
-and no second call was traced; should one happen anyway, it must not start
-the runtime again (a second `VR_Init` or overlay
-would fail): it attaches the existing device again if the first call
-produced one (state not 0), else leaves manager +0x04 null, and logs that
-it was a repeated call with the outcome (11 §2.4). It takes no reference
-pose.
+The game calls CreateDevice once per run (game fact, 02 §6.1, verified by
+the spec side in the 2015 `AI.exe`: its only call is `StereoInitCall`,
+inside the display initialisation at RVA 0x6138F0, which has a single
+caller at RVA 0x59C307, and no pointer to the method exists in the image);
+in particular a display reset does not call it (02 §9.3). Should a second
+call happen anyway, it must not start the runtime again (a second
+`VR_Init` or overlay would fail): it attaches the existing device again
+if the first call produced one (state not 0), else leaves manager +0x04 null, and logs that
+it was a repeated call, which is not expected, with the outcome (11 §2.4).
+It takes no reference pose.
 
 A display reset (§4.2, 02 §9.3) runs on the render thread after an end
 frame: slot 4 (the overlay is destroyed), the size query (§4.3), the
@@ -487,7 +491,8 @@ swapchain's `ResizeBuffers` (§9.2), then new stereo targets from slot 16's
 answer and slot 3, which recreates the overlay and re-derives the layout
 and the mirror constants. The device stays in state 2 throughout. A rebuild stalls the
 game for about 0.2 s (observed); the mod must raise the rebuild flag only
-when the pixel scale or a mirror setting actually changed (06 §4).
+when the pixel scale or a mirror setting actually changed (06 §4.6,
+05 §10).
 
 ### 6.6 Headset removed, runtime idle, focus
 
@@ -621,9 +626,11 @@ The mirror is drawn with the implementation's own shaders, written in HLSL
 from this section, compiled when the DLL is built and embedded in it; the
 DLL does not load a shader compiler at run time (project decision: a
 run-time compiler adds a dependency and start-up cost for shaders that
-never change). The build fails if they do not compile, and the compiled
-shaders must not contain the dither pattern of 08 §1.1 (08 §1 must leave
-them unchanged). How the geometry, constants and sampler are set up is the
+never change; 13 §7, Shaders row). The build fails if they do not
+compile. The compiled shaders must not contain the dither pattern of
+08 §1.1: the shader fix of 08 §1 recognises the shaders it changes by that
+pattern, and the mirror's own shaders must reach the driver unchanged
+(08 §1.4, Where). How the geometry, constants and sampler are set up is the
 implementation's choice; the result must be:
 
 - **Coverage**: every pixel of the back buffer is written, opaque
@@ -644,11 +651,15 @@ implementation's choice; the result must be:
 - **Target**: the game swapchain's back buffer, no depth buffer. The game
   normally has it bound for output at that point; when nothing is bound
   for output at the end of a frame, the mirror binds the back buffer
-  itself, so the window never shows a stale picture. Clearing it first is
+  itself, so the window never shows a stale picture. The view it binds
+  may be kept for the life of the back buffer and released before every
+  `ResizeBuffers` (DXGI requires every reference to the buffers released
+  then); it is not created per frame, because that would allocate on the
+  render thread (§6.3). Clearing it first is
   allowed. Restoring the game's bindings afterwards is not needed, because
   `Present` follows (§6.2). Every reference to a view or resource obtained
-  from the context or the swapchain must be released, because a reference
-  kept per frame leaks one object per frame.
+  from the context or the swapchain in a frame must be released in that
+  frame, because a reference kept per frame leaks one object per frame.
 - **Resources missing**: if the mirror's shaders, constant buffer or
   sampler cannot be created, this is logged once with the error (11 §2.4)
   and VR is unaffected; the back buffer is then cleared to opaque black
@@ -658,7 +669,7 @@ implementation's choice; the result must be:
 The mapping must be current for the layout and the recorded window size
 after every configuration (slot 3, so after every rebuild) and for the
 current mirror settings. A mirror setting changed in the menu reaches it
-through the rebuild the mod requests (§6.5, 06 §4); recomputing it per frame
+through the rebuild the mod requests (§6.5, 06 §4.6); recomputing it per frame
 or on any change is also fine.
 
 ## 9. The game's swapchain and window while a headset is attached
@@ -889,6 +900,7 @@ rename them. Bytes at the patched sites are in 01 §4 and 02 §6.
 |---|---|---|---|
 | `StereoObjectPtr` | 0x1366A2C | 0x1376BDC | global holding the manager (02 §3) |
 | `StereoInitCall` (CreateDevice site) | 0x613941 | 0x565E11 | §6.4, `thiscall(manager, int)`, `ret 4` |
+| `CreateDevice` (the game's method the site calls) | 0x5E0D40 | ? | §6.4, §6.5: the site's only target; no other call or pointer to it (02 §6.1) |
 | renderer initialisation | 0x6138F0 | ? | order of CreateDevice, size query, swapchain (01 §2.1) |
 | back-buffer size query call | 0x613AE8 (into 0x60FC40) | ? | §4.2 |
 | `StereoRenderTargetSizeCall` | 0x60FD64 | 0x562244 | §4.3, `thiscall(manager, int* w, int* h)`, `ret 8` |
@@ -1000,8 +1012,9 @@ Checks with OpenVR (SteamVR) unless noted; the log content is that of 11
 18. Pose handover: over a 900-frame window of gameplay with fast head
     motion, the pose submitted with each frame is exactly the pose slot 11
     returned for that frame (checked by any means that compares the two
-    per frame, for example a debug comparison behind `DebugOptions`, 11
-    §4.1); no frame is submitted with a torn or newer pose.
+    per frame, for example a comparison in a test build; 11 §4.1 leaves
+    this check to this item and defines no event for it); no frame is
+    submitted with a torn or newer pose.
 
 ## 14. Open questions
 

@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build, every original byte below re-read from the binary for r3), required behaviour restated from observing the earlier mod in game, in-game observation by the spec side in a headset (head tracking, stereo, menus, HUD, loading screens confirmed), measurements in game by the spec side (render-target rebuild stall), user requirements (automatic recenter on headset-on and gameplay start, no 0.2 s freeze on every menu open), project decisions (snap-turn threshold and repeat, each with its reason inline), AI.exe 2015 analysis of the mode-stack container (answer to Q5, ANSWERS.md), a head-in-wall blackout in the mission 4 android scene noted in another mod's analysis (acceptance item and open question only). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; a tester's report on SteamVR with a Steam Frame headset (a view sliding after snap-turn steps); project decisions of spec r6 (ANSWERS.md: the stereo-mode and snap-turn diagnostics of 11 §4.5 behind `DebugOptions`). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the FollowBehavior yaw setter (the two yaw fields); the stereo-mode diagnostic covers every mode change; the snap-turn trace window, the head-in-wall delay and the "headset in use" test are owned by 11, 08 and 03 and only referred to here; keyboard and mouse each read whenever their own device exists; vtable slots checked against the exact function of 01 §4; the mouse-displacement low byte checked before it is changed; skip intro only with the mod's UI archive in place; the script event tap deferred to 11 §5; the render-target rebuild flag stated as a result; acceptance items for raising the mode-stack count and for the mode-change log. Revision: r6 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build, every original byte below re-read from the binary for r3), required behaviour restated from observing the earlier mod in game, in-game observation by the spec side in a headset (head tracking, stereo, menus, HUD, loading screens confirmed), measurements in game by the spec side (render-target rebuild stall), user requirements (automatic recenter on headset-on and gameplay start, no 0.2 s freeze on every menu open), project decisions (snap-turn threshold and repeat, each with its reason inline), AI.exe 2015 analysis of the mode-stack container (answer to Q5, ANSWERS.md), a head-in-wall blackout in the mission 4 android scene noted in another mod's analysis (acceptance item and open question only). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; a tester's report on SteamVR with a Steam Frame headset (a view sliding after snap-turn steps); project decisions of spec r6 (ANSWERS.md: the stereo-mode and snap-turn diagnostics of 11 §4.5 behind `DebugOptions`). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the FollowBehavior yaw setter (the two yaw fields); the stereo-mode diagnostic covers every mode change; the snap-turn trace window, the head-in-wall delay and the "headset in use" test are owned by 11, 08 and 03 and only referred to here; keyboard and mouse each read whenever their own device exists; vtable slots checked against the exact function of 01 §4; the mouse-displacement low byte checked before it is changed; skip intro only with the mod's UI archive in place; the script event tap deferred to 11 §5; the render-target rebuild flag stated as a result; acceptance items for raising the mode-stack count and for the mode-change log. r7 (spec r7 cross-check): the device creation trigger of the automatic recenter happens once per process (02 §6.1); the event tap installed on every run with the full set, `DebugOptions` deciding only its logging (11 §5). Revision: r7 -->
 
 # 05: Changes to game behaviour
 
@@ -235,8 +235,9 @@ stereo device write the yaw-only reference transform to stereo `+0x78` (`02`
 player faces when the headset goes on and when gameplay starts; the
 triggers are `03` §2.2):
 
-- when the device is created (`02` §6.1, first creation only, device state
-  1): recenter at once; if the headset is not in use at that moment, also
+- when the device is created (`02` §6.1: the game creates it once per
+  process; a repeated call is not a new trigger; device state 1): recenter
+  at once; if the headset is not in use at that moment, also
   leave a request pending, so the reference is taken again when the player
   puts it on;
 - when a loading screen closes (section 5): leave a request pending, so
@@ -876,8 +877,11 @@ start and end there (`start_interaction`, `stop_interaction`,
 `terminal_interaction`, `ladder_interaction`, `rewire_interaction`), as does
 hiding (`hiding_visibility_start`, `hiding_visibility_finish`). Most traffic is
 per-frame engine chatter (strings starting with `C` or `on_`). No behaviour
-of this document depends on these. When the tap is installed, which
-arguments it may read (only one that points into the loaded `AI.exe` image,
+of this document depends on these. The tap is an optional area of its
+own, part of the full patch set (`11` §2.1, §5.2): it is installed on every
+run with the full set whose build has its address, whether `DebugOptions`
+is on or off; `DebugOptions` decides only what it logs. Which arguments
+it may read (only one that points into the loaded `AI.exe` image,
 because the same code is also reached with arguments that are not
 strings), the state it derives and what it logs with `DebugOptions` on are
 specified in `11` §5; this document does not repeat them.

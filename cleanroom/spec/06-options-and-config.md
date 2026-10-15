@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (UI external-call handler and its return size, script invoke methods and their return sizes, menu Open methods, bootup movie call, quit flag getter, display-reset flag, settings handlers named in 02); the stock game's ActionScript menu classes from the player's own UI.PAK (item constructors, option setters, item data replacement, automatic ids, page maps, input-mapper selection, slider snapping); the earlier mod's settings file keys and values, command-line switches and `mvr_*` console commands, kept exactly as compatibility names; compatibility facts about tools that read the same settings file; user requirements (no shipped game archive or mod-derived UI data, v1 fixes, runtime values None / OpenVR / OpenXR, -vrscale is the world scale); user decisions for r3 and r4 (default runtime OpenVR in a fresh file; Oculus means OpenXR; runtime None is the unmodded game with the patch set decided at attach; skip intro only with the archive redirect; settings push also on loading-screen Open; no other mod named; own labels and texts); spec-side decisions for r5 (VR page hidden in the game-over menu; the game's Stereo Mode item greyed in VR; Camera Speed stays active; one rule for command values; -vrscale as a whole argument; no rewrite of the settings file at start-up; reads of values only earlier builds of this project wrote are dropped); answers to Q1, Q2, Q6 (ANSWERS.md); a tester's report on SteamVR with a Steam Frame headset (after an OpenXR failure the page offered no visible way back to SteamVR); project decision of spec r6, with its reason inline (the runtime control shows the runtime running in this session; the stored preference is kept); project decisions of spec r7, each with its reason inline (the settings file is replaced in one step, never left partly written; a leading UTF-8 byte-order mark is accepted when reading; a null command name passes to the stock handler; the welcome needs a run on which the mod is active; added acceptance checks for command values, the display-reset flag under runtime None, settings changes crossing threads, `-vrscale` parsing and skip intro without the options archive). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. Revision: r6 -->
+<!-- Provenance: game analysis of AI.exe 2015 (UI external-call handler and its return size, script invoke methods and their return sizes, menu Open methods, bootup movie call, quit flag getter, display-reset flag, settings handlers named in 02); the stock game's ActionScript menu classes from the player's own UI.PAK (item constructors, option setters, item data replacement, automatic ids, page maps, input-mapper selection, slider snapping); the earlier mod's settings file keys and values, command-line switches and `mvr_*` console commands, kept exactly as compatibility names; compatibility facts about tools that read the same settings file; user requirements (no shipped game archive or mod-derived UI data, v1 fixes, runtime values None / OpenVR / OpenXR, -vrscale is the world scale); user decisions for r3 and r4 (default runtime OpenVR in a fresh file; Oculus means OpenXR; runtime None is the unmodded game with the patch set decided at attach; skip intro only with the archive redirect; settings push also on loading-screen Open; no other mod named; own labels and texts); spec-side decisions for r5 (VR page hidden in the game-over menu; the game's Stereo Mode item greyed in VR; Camera Speed stays active; one rule for command values; -vrscale as a whole argument; no rewrite of the settings file at start-up; reads of values only earlier builds of this project wrote are dropped); answers to Q1, Q2, Q6 (ANSWERS.md); a tester's report on SteamVR with a Steam Frame headset (after an OpenXR failure the page offered no visible way back to SteamVR); project decision of spec r6, with its reason inline (the runtime control shows the runtime running in this session; the stored preference is kept); project decisions of spec r7, each with its reason inline (the settings file is replaced in one step, never left partly written; a leading UTF-8 byte-order mark is accepted when reading; a null command name passes to the stock handler; the welcome needs a run on which the mod is active; added acceptance checks for command values, the display-reset flag under runtime None, settings changes crossing threads, `-vrscale` parsing and skip intro without the options archive); r7 aligns this document with 01 r6 (no settings read in a process that is not the game; the welcome rule's source) and points to the v2 keys of 20 to 24 and their master switch. 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. Revision: r7 -->
 
 # 06 Options and config
 
@@ -54,6 +54,13 @@ is a v2 item (00 §1.1).
 
 The world scale is not a setting: it exists only as the `-vrscale`
 command-line switch (section 2, 03).
+
+The v2 documents add keys of their own inside `Settings`: `EnhancedMode`
+and the `Comfort` and `Controls` objects (22 §3.1), `Hands` and `Body`
+(21 §15), `Interaction` and `Hud` (23 §8), and `Graphics` (24 §10). They
+are read, written and sanitised by the rules of section 3, and while
+`EnhancedMode` is off each of them reads as its v1 value (20 §1.3). A v1
+implementation treats them as unknown keys and keeps them on save (3.2).
 
 The pixel scale multiplies the per-eye size the runtime already recommends,
 and that size already includes SteamVR's own resolution setting (03 §10).
@@ -176,7 +183,9 @@ on the command line pauses or stops the mod while the DLL attaches.
   start the game with another one. The name is kept for compatibility, so
   that players' existing settings carry over.
 - Read **once**, at DLL attach (01 §2.2), before anything else that depends
-  on settings. The settings read are logged once (11 §2.1).
+  on settings, and only in the game's process: in any other host the file
+  is neither read nor written (01 §3.1). The settings read are logged
+  once (11 §2.1).
 - **Not rewritten at start-up.** Loading the file never writes it, so a
   file the player edited, or one that does not parse, is not replaced
   unless the player changes a setting; a missing key stays missing until
@@ -184,8 +193,8 @@ on the command line pauses or stops the mod while the DLL attaches.
 - **First launch** (the file does not exist; an error while checking for it
   does not count as "does not exist"): the defaults are used and, on a run
   where the mod is active (the build is recognised and the core checks of
-  01 §2.5.1 passed), the welcome message is queued. Its content (13 §5.3):
-  the mod is active, the default runtime is SteamVR, and how to change the
+  01 §2.5.1 passed; 01 §2.4), the welcome message is queued. Its content
+  (13 §5.3): the mod is active, the default runtime is SteamVR, and how to change the
   runtime. The message is never shown under the loader lock, appears in
   front of the game window, and the game's device creation does not
   complete until it is closed (01 §2.2, 13 §5.2). **The file is written with the defaults

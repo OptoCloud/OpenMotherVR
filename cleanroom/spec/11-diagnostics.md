@@ -1,10 +1,10 @@
-<!-- Provenance: user decision (the project's own log format of section 1, modelled on the Serilog file sink: output template, levels, source contexts, message templates, session start events, rotation; a project design, not taken from any mod); project decisions of this revision (every message template of sections 1 and 2 written fresh by the spec side from its "must convey" list; the outcome table of the event tap; the bounds of section 3), each with its reason inline; user requirements (the log is what players send with bug reports; no per-frame render-thread logging; the DebugOptions diagnostics; the mod never needs elevation); observation in game of test builds (which facts testers needed from a log across runs with OpenVR and OpenXR on SteamVR with Index; measured cost of opening the log per line on the render thread; a frame loop that rendered with views one display period old); AI.exe 2015 analysis (the script event tap: bytes and call-site count checked against the Steam 2015 binary, PE timestamp 0x54E3199D; the game's own event strings); public Win32, DXGI, OpenVR, OpenXR and Serilog documentation; AI.exe 2015 analysis by the spec side for r3 (ScriptEventTap's address also in five pointer-table slots of .rdata); the OpenXR registry (symbolic XrResult names); a tester's report on SteamVR with a Steam Frame headset (an OpenXR failure with an empty result text, the game not shown in the headset, focus taken by other applications, a view sliding after snap-turn steps, a crash in the pause menu with nothing in the log); project decisions of r3, each with its reason inline (the crash record; the image-range guard of the event tap; the stereo-mode, frame-kind and snap-turn diagnostics; the new required events and their templates, written fresh by the spec side); AI.exe 2015 analysis by the spec side for r4 (the C runtime's own unhandled-exception filter installed by its start-up after DLL attach and its two reporting paths; the padding after ScriptEventTap; the first-person camera's character position and Head1 bone position fields); project decisions of r4, each with its reason inline (the crash record's content as an unordered list, its filter installed again after the game's C runtime starts, a bounded stack use for a stack overflow; the snap trace written fresh from its must-convey list and ended when the view settles, at most 1 s; templates rechecked against their must-convey lists; the OpenXR loss and desktop mirror failure events; acceptance checks for required events). Revision: r4 -->
+<!-- Provenance: user decision (the project's own log format of section 1, modelled on the Serilog file sink: output template, levels, source contexts, message templates, session start events, rotation; a project design, not taken from any mod); project decisions of this revision (every message template of sections 1 and 2 written fresh by the spec side from its "must convey" list; the outcome table of the event tap; the bounds of section 3), each with its reason inline; user requirements (the log is what players send with bug reports; no per-frame render-thread logging; the DebugOptions diagnostics; the mod never needs elevation); observation in game of test builds (which facts testers needed from a log across runs with OpenVR and OpenXR on SteamVR with Index; measured cost of opening the log per line on the render thread; a frame loop that rendered with views one display period old); AI.exe 2015 analysis (the script event tap: bytes and call-site count checked against the Steam 2015 binary, PE timestamp 0x54E3199D; the game's own event strings); public Win32, DXGI, OpenVR, OpenXR and Serilog documentation; AI.exe 2015 analysis by the spec side for r3 (ScriptEventTap's address also in five pointer-table slots of .rdata); the OpenXR registry (symbolic XrResult names); a tester's report on SteamVR with a Steam Frame headset (an OpenXR failure with an empty result text, the game not shown in the headset, focus taken by other applications, a view sliding after snap-turn steps, a crash in the pause menu with nothing in the log); project decisions of r3, each with its reason inline (the crash record; the image-range guard of the event tap; the stereo-mode, frame-kind and snap-turn diagnostics; the new required events and their templates, written fresh by the spec side); AI.exe 2015 analysis by the spec side for r4 (the C runtime's own unhandled-exception filter installed by its start-up after DLL attach and its two reporting paths; the padding after ScriptEventTap; the first-person camera's character position and Head1 bone position fields); project decisions of r4, each with its reason inline (the crash record's content as an unordered list, its filter installed again after the game's C runtime starts, a bounded stack use for a stack overflow; the snap trace written fresh from its must-convey list and ended when the view settles, at most 1 s; templates rechecked against their must-convey lists; the OpenXR loss and desktop mirror failure events; acceptance checks for required events); project decisions of r5 (spec r7 cross-check), each with its reason inline (the event for a process that is not the game; the event for a message that could not be shown; the OpenVR interface versions and the OpenVR start-up failures that are not runtime errors; the stereo device creation called once by the game; the settings write leaving the previous file complete; the head-in-wall contact diagnostic; section 5 named the logging of game script events; corrected cross-references to 07 and 13). Revision: r5 -->
 
 # 11. Diagnostics
 
 The mod's log file and its format, what must be logged and when, the rate
 rules for the render thread, the extra diagnostics behind the `DebugOptions`
-setting, the game's script event tap, the crash record, and what a player
+setting, the logging of game script events, the crash record, and what a player
 or tester needs to report a crash.
 
 The log is the only channel through which a tester or the implementation
@@ -136,7 +136,9 @@ Example (written for this spec, using the window-fit event of §2.2):
 
 ### 1.7 Session start
 
-The first two events of each process, after any rotation (§1.3).
+The first two events of each process, after any rotation (§1.3). In a
+process that is not the game (01 §3.1) neither is written: the host event
+of §2.1 is that process's only event apart from the detach event.
 
 **Attach event** (`INF Load`).
 
@@ -206,6 +208,7 @@ means the event carries the `Exception` part of §1.4.
 | Level | Area | When | Must convey | Template |
 |---|---|---|---|---|
 | INF | Load, Config | first two events of each process | §1.7 | §1.7 |
+| INF | Load | at attach, in a process that is not the game (01 §3.1), instead of the events of §1.7 | the executable's file name of the host; that the proxy only forwards the Direct3D 11 exports there (no settings, messages, filter or patches), so a log from a test harness or another program is not mistaken for a failed game start | `Not the game ({HostExecutable}): forwarding Direct3D 11 only` |
 | WRN | Config | `mothervr.json` exists but cannot be read or parsed (06 §3.1, §3.3) | its path; why (the Windows error, or where parsing stopped); that defaults are used | `Config {Path} ignored, defaults apply: {Reason}` |
 | INF | Config | `mothervr.json` does not exist (first launch, 06 §3.1) | its path; that this is a first launch; whether the welcome message is queued and the file written once it is closed, or neither because the mod is not active on this run (06 §3.1) | `Config {Path} absent: first launch; {WelcomeOutcome}` |
 | FTL | Load | `AI.exe` is not a recognised build (01 §2.4) | the PE timestamp; that nothing is patched and the game runs as shipped | `Game executable not recognised (timestamp {AiTimestamp}): no patches, game runs as shipped` |
@@ -221,6 +224,7 @@ means the event carries the `Exception` part of §1.4.
 | ERR / WRN | UI | the options archive cannot be produced (14 §5.9) | the cause category 14 defines (missing, not a valid archive, unknown version with the entry, link or layout check with its detail, write failure with the Windows error; WRN for the busy case); that the options page is off for this session; that VR is unaffected; whether a message is shown | `Options page off this session: {Reason}; VR not affected` (error for a write failure) |
 | INF | Input | the gamepad's action maps were taken over (04) | the digital and analog action counts of each map, in map order | `Game action maps ready for VR controls: {Maps}` (`Maps` as `41/6, 19/6, 32/8`, digital/analog per map) |
 | INF | Load | every message shown to the player (13 §5) | which message (§2.6); the full text shown | `Shown to the player ({Kind}): {Text}` |
+| WRN | Load | a message to the player could not be shown at all (12 §2.4, 13 §5.2) | which message (§2.6); the full text it would have shown, so the log still tells the player's situation; error; for the welcome, that `mothervr.json` is not written and the welcome is tried again at the next launch | `Could not show the player ({Kind}): {Text}; {Consequence}` (error) |
 | INF | Load | `DLL_PROCESS_DETACH` (12 §7) | whether the process is ending or the DLL is being unloaded | `Detaching ({DetachKind})` (`process exit` or `unload`) |
 
 **Feature areas.** One outcome event per area, so a log shows at a glance
@@ -280,12 +284,14 @@ failed one.
 
 | Level | Area | When | Must convey | Template |
 |---|---|---|---|---|
-| INF | Stereo | each call of the game's stereo device creation (03 §6.5) | which call this is (first, or a repeat on a display reset); whether a device is attached afterwards | `Game asked for its stereo device (call {Call}); device attached {Attached}` |
+| INF | Stereo | each call of the game's stereo device creation (03 §6.5) | which call this is (first, or a repeat, which is not expected: the game calls it once, 02 §6.1); whether a device is attached afterwards | `Game asked for its stereo device (call {Call}); device attached {Attached}` |
 | INF / ERR | OpenVR | the bundled `openvr_api.dll` (13 §3.2) | its path; written, or already current; on failure the Windows error and which loader will be used instead | `Bundled loader {Path}: {Outcome}` (error on failure) |
 | INF | OpenVR | the OpenVR loader was loaded | which file was loaded (the bundled copy or the runtime's own) | `OpenVR loader in use: {Path}` |
 | ERR | OpenVR | the runtime's client library, or a library it depends on, cannot be loaded (03 §6.4) | the library's path; the Windows error, so a missing dependency names a file instead of leaving only the runtime's own error number | `Runtime client library {Path} cannot load` (error) |
 | INF / ERR | OpenVR | `VR_InitInternal2` returned | success, or failure with the `EVRInitError` (error) | `OpenVR session opened` / `OpenVR session could not be opened` (error) |
 | ERR | OpenVR | an interface version the mod needs is unavailable (13 §3.2, a start-up failure) | the interface version string | `Runtime lacks interface {Interface}` |
+| INF | OpenVR | once, after the interfaces were obtained (03 §6.4) | each interface version string obtained, so a log shows which SDK level the runtime served | `OpenVR interfaces: {Interfaces}` |
+| ERR | OpenVR | the OpenVR start-up failed without an error from the runtime (03 §6.4): the loader could not be loaded, a loader export is missing, or no compositor appeared within the bounded wait | what was missing (the loader file, the export's name, or the compositor); the code the failing call returned, or the Windows error when the loader itself could not be loaded, never an empty text or a bare 0 (error) | `OpenVR start-up failed: {Missing} unavailable` (error) |
 | WRN | OpenVR | `IVRApplications` is unavailable, so the scene check of 03 §6.7 is skipped | the interface; that VR is otherwise unaffected | `No {Interface}: cannot check which application the headset shows` |
 | INF / WRN | OpenVR | the scene check of 03 §6.7, once per process; the INF result is kept so a log tells a check that passed from one that never ran | INF that the game's frames are the ones shown; WRN otherwise, naming what is shown instead (the executable's file name of that application, that no application holds the scene, or that it is unknown) and that a warning follows | `Headset shows the game's frames` / `Headset shows {SceneOwner} instead of the game; warning the player` (WRN) |
 | INF | OpenVR | after a successful start | the headset's manufacturer and model; the recommended per-eye size; the IPD in metres to 4 decimals (0.1 mm) | `Headset {Model} by {Manufacturer}; recommended eye size {EyeSize}; eye separation {Ipd:0.0000} m` |
@@ -333,7 +339,7 @@ failed one.
 | INF | UI | the first settings push of the process (06 §4.4); later pushes are not logged | that the menu received the settings | `Menu received the settings (first push this process)` |
 | WRN | UI | the settings cannot be pushed; once (06 §4.4) | why (the menu's call addresses are not available) | `Menu settings push unavailable: {Reason}` |
 | INF | Config | each setting changed from the menu or a console command (06) | the key path; the new value; where the change came from (menu or console) | `{Key} changed to {Value} by {Source}` |
-| INF / ERR | Config | `mothervr.json` written (06, 13 §3.4) | its path; on failure the Windows error and that the change holds for this session only | `Settings saved to {Path}` / `Saving settings to {Path} failed; the change holds for this session` (error) |
+| INF / ERR | Config | `mothervr.json` written (06, 13 §3.4) | its path; on failure the Windows error, that the change holds for this session only, and that the file on disk is still the previous complete one (06 §3.1) | `Settings saved to {Path}` / `Saving settings to {Path} failed; previous file kept; the change holds for this session` (error) |
 | INF | Audio | the redirect of 10 §3.2 was installed | the headset's audio endpoint | `Headset audio endpoint {Endpoint} now receives the game's output` |
 | ERR | Audio | the redirect failed (10) | that the game's output stays on the default device; the `HRESULT` (error); that a message follows | `Game output stays on the default device: redirect failed` (error) |
 | WRN | Audio | the reopen function's address is unknown on this build or its bytes differ (10 §2.2) | why; that the switch happens at the game's next reopen of its output | `Output reopen not available ({Reason}); switch happens at the game's next reopen` |
@@ -341,7 +347,8 @@ failed one.
 ### 2.6 Messages to the player
 
 Every message the mod shows (13 §5) is also logged (`INF Load`, §2.1) with
-its full text and a `Kind` naming which message it is: unsupported build,
+its full text and a `Kind` naming which message it is (and one that could
+not be shown, `WRN Load`, §2.1, with the same `Kind`): unsupported build,
 welcome, `UI.PAK` missing, UI archive unusable, runtime failed, audio
 failed, headset not showing the game. What each message conveys and when
 it appears are in 13 §5; the rules for showing the messages decided at
@@ -462,7 +469,8 @@ Only while `DebugOptions` is on and planar reflections render per eye
 (07), a developer key captures, once per press, the render target bound
 after each of that frame's two reflection passes to a file in the game
 directory (13 §3.5), in a format that keeps the texture's own format (a
-DDS file with a DX10 header is one). It checks 07 §5. The key and the file
+DDS file with a DX10 header is one). It serves the check of 07 §7 step 5,
+gated as 07 §6 says. The key and the file
 names are the implementation's choice; each file's name must show which
 pass it holds.
 
@@ -522,7 +530,26 @@ a moment, so the whole movement is in the log). A further step restarts
 it. On a build where the two position fields are unknown (2020) the event
 leaves out the head offset.
 
-## 5. Script event tap
+### 4.6 Head-in-wall contacts
+
+Purpose: give the measurement 08 §4.2 asks for (the longest incidental
+contact of the head with geometry), from the log of a test session,
+instead of asking the tester how long the view darkened.
+
+A contact is the time the game's head-in-wall fade (`HeadClipFade`, 08 §4)
+stays below exactly 1.0, from its first value below 1.0 to the next value
+of exactly 1.0, measured with the same monotonic clock as the delay of
+08 §4.2.
+
+| Level | Area | Thread | When | Must convey | Template |
+|---|---|---|---|---|---|
+| DBG | Stereo | `main` | each contact that ends, while stereo is running and the head-in-wall delay is in place | its length in milliseconds; whether it lasted longer than the delay D of 08 §4.2, so the view darkened | `Head-in-wall contact {Duration} ms; darkened {Darkened}` |
+
+One event per contact, on the game thread only and only with the option
+on, so walking along a wall adds a few lines per second at most. A
+contact still running when stereo stops is not reported.
+
+## 5. Logging of game script events
 
 ### 5.1 Game fact
 
@@ -548,7 +575,8 @@ function starts at 0xA1BCD0 [sure, read in the 2015 binary].
 
 ### 5.2 Hook
 
-The tap is an optional feature area (§2.1, 12 §4.2): it is installed with
+The logging of game script events (the feature area "event tap" of §2.1)
+hooks `ScriptEventTap`. It is an optional feature area (§2.1, 12 §4.2): it is installed with
 the other optional fixes once the core set has passed its checks, so a
 failure of the core set leaves it off too. It is installed only if the five
 bytes at the site are exactly `8b c1 c2 04 00`. The replacement keeps the
@@ -724,8 +752,8 @@ What a tester does with it:
   site or a replaced function, or at the first return after a call into
   the mod, points at a patch or a calling-convention error (12 §5).
 - When the faulting module is the proxy, the offset is an RVA of the proxy
-  build; each release keeps its symbol file (13 §8.3) so the offset can be
-  mapped.
+  build; each release keeps its symbol file (13 §7, Symbols row, and
+  §8.3) so the offset can be mapped.
 - The last events of the faulting process (by process id) show how far it
   got: no `OpenMotherVR.Patch` events after the attach event points at
   attach; nothing after the first-`Present` event points at the first
@@ -833,6 +861,17 @@ What a tester does with it:
 21. Reflection capture off: with `DebugOptions` off, pressing the capture
     key while a per-eye reflection renders writes no file and logs
     nothing.
+22. Not the game: loading the proxy into another 32-bit program writes
+    one host event naming that program's executable and no attach,
+    settings, patch or message event (01 §6 item 14).
+23. OpenVR start-up without a runtime error: with a developer build that
+    hides one loader export, or with SteamVR unable to serve its
+    compositor within the bound, the start-up failure event names what
+    was missing and a non-zero code; a normal start logs the interface
+    versions obtained once.
+24. Head-in-wall contacts: with `DebugOptions` on, brush a wall with the
+    head and then hold the head inside it: one contact event each, the
+    first not darkened, the second darkened, with lengths that match.
 
 ## 8. Open questions
 

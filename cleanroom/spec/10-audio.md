@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (the audio output reopen request function, the audio thread's device-recreate check, the game's default-device-change listener; imports SetEvent, CoInitializeEx, WaitForSingleObject); the reopen function was located from the earlier mod's use of the game's audio reopen, and its behaviour (2.2) and the listener (2.3) were then verified in AI.exe; public Windows Core Audio (MMDevice) and OpenXR XR_OCULUS_audio_device_guid documentation; user requirement (game audio on the headset when the runtime names its device); spec-side decisions with their reasons (installed once per process, pass-through when the headset device is unavailable, the player told once on failure). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. r3 (spec r7, second clean-room review): the redirect is stated as a required result, with the interception point left to the implementation (no claim about how Windows lays out its MMDevice objects); the 2020 ABI of the reopen function marked as assumed; the reopen call after installation no longer ordered after its log entry; acceptance item for a reopen function whose entry bytes differ. Revision: r3 -->
+<!-- Provenance: game analysis of AI.exe 2015 (the audio output reopen request function, the audio thread's device-recreate check, the game's default-device-change listener; imports SetEvent, CoInitializeEx, WaitForSingleObject); the reopen function was located from the earlier mod's use of the game's audio reopen, and its behaviour (2.2) and the listener (2.3) were then verified in AI.exe; public Windows Core Audio (MMDevice) and OpenXR XR_OCULUS_audio_device_guid documentation; user requirement (game audio on the headset when the runtime names its device); spec-side decisions with their reasons (installed once per process, pass-through when the headset device is unavailable, the player told once on failure). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. r3 (spec r7, second clean-room review): the redirect is stated as a required result, with the interception point left to the implementation (no claim about how Windows lays out its MMDevice objects); the 2020 ABI of the reopen function marked as assumed; the reopen call after installation no longer ordered after its log entry; acceptance item for a reopen function whose entry bytes differ. r4 (spec r7 cross-check): the redirect also stays after an OpenXR session or instance loss, which no longer ends the game (09 §3). Revision: r4 -->
 
 # 10 Audio on the headset
 
@@ -174,8 +174,11 @@ chose. That is intended: the game plays all its sound through one output.
 - No change to Windows' default device or to any system setting.
 - No redirect of capture (microphone) devices beyond what 3.3 implies: the
   game does not use capture [likely].
-- The redirect is not removed when the stereo device shuts down; it lasts
-  for the process.
+- The redirect is not removed when the stereo device shuts down, nor when
+  an OpenXR session or instance is lost and VR stops for the rest of the
+  run while the game keeps running (09 §3); it lasts for the process. A
+  headset endpoint that has gone away is handled by 3.3 (the default
+  device is used).
 
 ## 4. Logging
 

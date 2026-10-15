@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its names, wording or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons. r5 (spec r6): a tester's report on SteamVR with a Steam Frame headset (input while another window has the desktop focus); project decision of spec r6, with its reason inline (the touchpad scheme's scaled move limited to length 1 as a vector). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the map's digital evaluation (binding flag bit 0x40 marks a composite reference; codes reach the pad methods zero-extended), of the stock ControlToName for codes above 0x17, and of the FollowBehavior fields (the yaw setter, the character's position and its head bone's position); the five pad slots as one patch, checked against their exact functions; the controls help as content, not a page, and its crossing between threads; prompts while the options archive is not in use; VR activity seen by every reader in a game frame; the remap's flag writes given their game reason; thresholds and the initial glyph mode given reasons; keyboard and mouse each read whenever their own device exists; the recenter chord re-armed by release alone; controller identification and the OpenXR actions stated as results; the structure offsets marked as 2015 facts. Revision: r6 -->
+<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its names, wording or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons. r5 (spec r6): a tester's report on SteamVR with a Steam Frame headset (input while another window has the desktop focus); project decision of spec r6, with its reason inline (the touchpad scheme's scaled move limited to length 1 as a vector). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the map's digital evaluation (binding flag bit 0x40 marks a composite reference; codes reach the pad methods zero-extended), of the stock ControlToName for codes above 0x17, and of the FollowBehavior fields (the yaw setter, the character's position and its head bone's position); the five pad slots as one patch, checked against their exact functions; the controls help as content, not a page, and its crossing between threads; prompts while the options archive is not in use; VR activity seen by every reader in a game frame; the remap's flag writes given their game reason; thresholds and the initial glyph mode given reasons; keyboard and mouse each read whenever their own device exists; the recenter chord re-armed by release alone; controller identification and the OpenXR actions stated as results; the structure offsets marked as 2015 facts. r7 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (FollowBehavior +0x1C0, +0x1CC and +0x248 are written by vtable slot 6 and the update, slot 8, not by OnActivate; the `Head1` transform is taken with a mode argument of 7); a repeated CreateDevice is not expected (02 §6.1); a set is chosen at stereo device creation for the controls help; the toggled grip states kept when an OpenXR session stops; only `EXITING` sets the game's exit flag (09 §3). Revision: r7 -->
 
 # 04 Input
 
@@ -339,12 +339,12 @@ running build.
 
 | Offset | Type | Meaning |
 |---|---|---|
-| +0x1C0 | float x 3 | the position of the character the camera follows: copied from that character's object (`[[this+0x34]+0x148]`, its +0x70..+0x78) at activation and in every update (slot 8, 0x02E970 / ?, which takes the frame time) [sure for the copy; likely the character's root position in world space, metres] |
-| +0x1CC | float x 3 | the position of the character's head: the translation of the transform of the bone named `Head1`, obtained in the same places through the bone index at +0x248 [sure]; in the same space as +0x1C0 [likely: the camera code subtracts it from a world-space point] |
+| +0x1C0 | float x 3 | the position of the character the camera follows: copied from that character's object (`[[this+0x34]+0x148]`, its +0x70..+0x78) by slot 6 (0x02C9F0 / ?, thiscall, `ret 4`) and in every update (slot 8, 0x02E970 / ?, which takes the frame time); OnActivate (slot 0) does not write it [sure for the copy; likely the character's root position in world space, metres] |
+| +0x1CC | float x 3 | the position of the character's head: the translation of the transform of the bone named `Head1`, written by the same two slots, through the bone index at +0x248 [sure]; in the same space as +0x1C0 [likely: the camera code subtracts it from a world-space point] |
 | +0x1FC | float | second yaw copy: the game's yaw setter (0x02DF30 / ?, thiscall, a float yaw and a bool, `ret 8`) wraps the yaw, writes it to +0x204 and, when the bool is non-zero, the same value to +0x1FC [sure] |
 | +0x204 | float | yaw. ±1.0 = ±180°; the game keeps it wrapped to [-1, 1] |
 | +0x208 | float | pitch (clamped by the game) |
-| +0x248 | int | index of the `Head1` bone, looked up by name at activation [sure] |
+| +0x248 | int | index of the `Head1` bone, looked up by name in slot 6 (the name string at RVA 0xDC6640) [sure] |
 | +0x264 | byte | **look input enabled**: the game applies stick and mouse look deltas (slot 11, 0x02D200 / ?) only while this is set |
 
 The mod only reads +0x1C0, +0x1CC and +0x248 (for the snap-turn
@@ -894,6 +894,8 @@ settings to a menu. Required content:
   by interact near the head; the page names both.
 - Index variant (5.5): the thumbstick entries, with pause on the left
   trackpad press.
+- From stereo device creation on, a set is always chosen (the first
+  column of the table in 5.5), also before any controller is identified.
 - Until a set is chosen in this run (5.5: runtime None, a runtime that
   failed to start, or before the stereo device is created), the page lists
   no controller entries; it may show one entry saying that the controls
@@ -1186,7 +1188,7 @@ reads them:
   `xrBeginFrame`. There is no read at slot 5: without a new OpenXR frame
   there is nothing new to read. Slot 5 instead checks whether the runtime
   has asked the game to exit (session `EXITING`) and, if so, sets the
-  game's exit flag (06). When slot 6 returns early (no session, no eye
+  game's exit flag (06); a session or instance loss does not (09 §3). When slot 6 returns early (no session, no eye
   texture), the previous VR state stays.
 
 Why: reading at slot 5 used a frame-old controller state for the frame's
@@ -1258,12 +1260,12 @@ checked from the log without asking the player.
 | Situation | Required input behaviour |
 |---|---|
 | Before the first frame | OpenVR: the slot 5 fallback writes the controls. OpenXR: VR state is zero until the first OpenXR frame begins |
-| Display reset (the game calls CreateDevice again, 02 §6.1, 03) | the runtime and its input set-up are not re-created: no second manifest write, no second OpenXR action set; the pad hooks and remap state are unaffected; the next pad query with a raw code remaps if the game rebuilt its maps |
+| A repeated CreateDevice call (not expected: the game calls it once per process, 02 §6.1; a display reset does not call it) | the runtime and its input set-up are not re-created: no second manifest write, no second OpenXR action set; the pad hooks and remap state are unaffected; the next pad query with a raw code remaps if the game rebuilt its maps |
 | Game window loses OS focus | VR controls and the gamepad: no change, the runtime, not the desktop window, decides input focus. While a headset is attached the focus loss does not pause the game (03 §9.6). Keyboard and mouse stop reaching the game until its window has the focus again, because Windows sends them only to the foreground window |
 | SteamVR dashboard or another overlay takes input focus | all VR state zero (5.1) while it lasts; the toggled grip states keep their value |
 | Headset taken off | input keeps being read as the runtime reports it (OpenVR keeps delivering controller input; OpenXR as long as the session stays focused). Automatic recenter requests wait until the headset is in use again (8) |
 | OpenXR session leaves `FOCUSED` (`VISIBLE`) | states read inactive: all zero |
-| OpenXR session not running (`STOPPING`, `IDLE`) or lost, or exit requested | all VR state zero; no further reads |
+| OpenXR session not running (`STOPPING`, `IDLE`) or lost, or exit requested | all VR state zero; no further reads. The two toggled grip states (5.6) keep their value: the grips read released, which is not a rising edge |
 | Controller turned off or lost | its inputs read inactive / zero; the other hand keeps working |
 | Controller type changes during a run | the game-action scheme follows on the next write (5.5); the glyph set does not change (5.5) |
 | VR runtime changed in the options menu | takes effect at the next launch (06 §4.5); nothing in input changes during the run |
@@ -1519,6 +1521,11 @@ Common:
   behave correctly in game with the VR value not negated, so any such
   binding is not one VR drives; to resolve, log the `negate` argument per
   code once.
+- Whether FollowBehavior +0x1CC is in world space like +0x1C0: slots 6
+  and 8 take the `Head1` transform with a mode argument of 7 that was not
+  decoded (2.7). To resolve: decode the transform getter's mode, or log
+  +0x1C0 and +0x1CC together while standing still in game (a difference of
+  about the eye height means both are world positions).
 - Whether SteamVR Input reports actions inactive (rather than holding
   their last state) while the dashboard has focus, and what legacy
   `GetControllerState` returns then. To resolve: acceptance check 9 under

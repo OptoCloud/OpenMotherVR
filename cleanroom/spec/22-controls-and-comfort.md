@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6); r3: second clean-room review: the crash event stated as the state that must hold, at the level of v1's crash record; the gestures and d-pad emulation stated as results with this project's reasons; the HUD game facts of 2.4 re-read by the spec side in the 2015 `AI.exe` and reconciled with 23 (the pending flag of each HUD object, the objects the game's own hide and show touch); this document is the one owner of seated and standing play and the calibration (21 reads them); `EnhancedMode` gates 21 to 24 (20 §1.3); lever interactions own the grips, the move action and turning (23 §3.2). Revision: r3 -->
+<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6); r3: second clean-room review: the crash event stated as the state that must hold, at the level of v1's crash record; the gestures and d-pad emulation stated as results with this project's reasons; the HUD game facts of 2.4 re-read by the spec side in the 2015 `AI.exe` and reconciled with 23 (the pending flag of each HUD object, the objects the game's own hide and show touch); this document is the one owner of seated and standing play and the calibration (21 reads them); `EnhancedMode` gates 21 to 24 (20 §1.3); lever interactions own the grips, the move action and turning (23 §3.2). r4 (spec r7 cross-check): the game's event tap function named `ScriptEventTap` and the tracked state the logging of game script events, as 11 §5 now does; the flush thread's exit rule follows 12 §7 (at process exit only the detach line is logged); the change listed for 11 states the crash event's level and timing as §14 does. Revision: r4 -->
 
 # 22. Controls and comfort (v2)
 
@@ -149,7 +149,7 @@ virtualisation (04 §3.2), never through an assumed preset.
   `Start_Breathing_Game`, `Breathing_Game_Started`, `End_Breathing_Game`,
   `Breathing_Game_Ended`, `bind_all` and their `_finished` forms. Its
   handler passes `Start_Breathing_Game` (string at RVA 0xF067B0) and
-  `End_Breathing_Game` (RVA 0xF06764) to the script event tap (11 §5.1,
+  `End_Breathing_Game` (RVA 0xF06764) to `ScriptEventTap` (11 §5.1,
   RVA 0xA1BCC0): the `push imm32` of each string is at 0x51070C and
   0x510765, and the `call rel32` to the tap at 0x510714 and 0x51076D. So
   the tap that v1 already installs sees the start and the end of the
@@ -218,7 +218,8 @@ found. 23 §2.7 cites this section for these facts.
   turn and the look gate run.
 - Cutscene and level-fade state from the UI entity messages (05 §6.2,
   §3.2g).
-- Interaction and hiding state from the script event tap (11 §5.3).
+- Interaction and hiding state from the logging of game script events
+  (11 §5.3).
 - Recentering (03 §2, 04 §8, 09 §6) and the near-the-head test (04 §5.10).
 - The stereo mode at stereo object +0x60: 1 while a menu is on the virtual
   screen (05 §1).
@@ -1007,7 +1008,7 @@ launch):
   event, and only per state change.)
 - The flush thread is created after attach (never in `DllMain`, 12 §2.3),
   holds no lock the render thread takes, and is not joined at exit (12 §7:
-  no work at process exit).
+  at process exit the mod only logs the detach line).
 
 **Crash event.** v1's crash record (11 §6.1) is unchanged. With the key
 on, the same crash also produces one further event that conveys the last
@@ -1159,7 +1160,7 @@ On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
    tracker, crouch, peek). To resolve: the same log as item 1 shows each
    action's original pad code.
 3. **The lean input while hiding** (9.2). To resolve: with `DebugOptions`
-   on, a real pad and the script event tap installed, hide in a locker and
+   on, a real pad and the event tap (11 §5) installed, hide in a locker and
    lean with the pad as the game's prompt says; log, between
    `hiding_visibility_start` and `_finish`, every virtual code the game
    queries with a non-zero answer (IsDown, GetValue, GetAxis), once per
@@ -1227,8 +1228,9 @@ Not made here; to be applied in a later revision:
   fallback order once OpenXR is the default (11); §5.3: Camera Speed does
   not scale smooth turn (4.5).
 - `11-diagnostics.md` §5.3: the breathing-game state (9.1) and its strings;
-  §6: the v2 crash event after v1's crash record and the flush policy with
-  `Controls.CrashSafeLog` (14); §2: the events of 16.
+  §6.1: the v2 crash event, at `ERR` like v1's crash record and on disk
+  with it (14), and the flush policy with `Controls.CrashSafeLog` (14); §2:
+  the events of 16.
 - `12-threads-and-robustness.md` §2.2 and §3.2: the mod's flush thread
   (14), the crossings of 15; §7: the VR-off hotkey.
 - `13-distribution.md` §5.3: the welcome message with OpenXR as default
