@@ -184,3 +184,11 @@ set_target_properties(mothervr PROPERTIES
     PREFIX ""
     SUFFIX ".dll"
 )
+
+# Unit tests of util and core (tests/): a separate executable that never
+# links into d3d11.dll, run with ctest.
+option(MOTHERVR_BUILD_TESTS "Build the unit tests (tests/)" ON)
+if(MOTHERVR_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
