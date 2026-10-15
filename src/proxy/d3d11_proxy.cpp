@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <filesystem>
 #include <mutex>
 #include <utility>
 #include <dxgi.h>
@@ -168,37 +169,78 @@ bool mirror_size(UINT& width, UINT& height) noexcept {
     return true;
 }
 
-// The game sizes its window for the display mode it picked: the monitor's
-// full resolution, or both eyes side by side under VR. Forced windowed, that
-// client area plus a title bar and borders runs past the screen. Shrink the
-// window to the monitor's work area (the whole monitor for a borderless
-// one), keeping its aspect ratio, and centre it. A window that already fits
-// is left alone, so a size the player picks stays.
+// The game sizes its window for the display mode it picked (the monitor's
+// full resolution in its fullscreen mode) and gives it a title bar and
+// borders in every mode. Forced windowed under VR, that runs past the screen.
+// A window that does not fit becomes a borderless one covering its monitor:
+// what fullscreen looked like, with the client area at the monitor's size,
+// so the game's idea of its window size and the mouse still match. Shrinking
+// it instead left a client area smaller than the size the game kept (it
+// ignores WM_SIZE in its fullscreen mode), which put the UI and the cursor
+// off. A window that already fits is left alone, so a size the player
+// picks stays.
 void fit_window(HWND hwnd) noexcept {
     if (!hwnd || ::IsZoomed(hwnd) || ::IsIconic(hwnd)) return;
-    RECT window{}, client{};
-    if (!::GetWindowRect(hwnd, &window) || !::GetClientRect(hwnd, &client)) return;
+    RECT window{};
+    if (!::GetWindowRect(hwnd, &window)) return;
     MONITORINFO mi{sizeof(mi)};
     if (!::GetMonitorInfoW(::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi)) return;
 
-    const bool framed = (::GetWindowLongW(hwnd, GWL_STYLE) & WS_CAPTION) == WS_CAPTION;
+    const LONG style = ::GetWindowLongA(hwnd, GWL_STYLE);
+    const bool framed = (style & WS_CAPTION) == WS_CAPTION;
     const RECT& area = framed ? mi.rcWork : mi.rcMonitor;
     const LONG area_w = area.right - area.left, area_h = area.bottom - area.top;
     const LONG win_w = window.right - window.left, win_h = window.bottom - window.top;
     if (win_w <= area_w && win_h <= area_h) return;
-    if (client.right <= 0 || client.bottom <= 0) return;
 
-    const LONG frame_w = win_w - client.right, frame_h = win_h - client.bottom;
-    const double scale = std::min(double(area_w - frame_w) / client.right,
-                                  double(area_h - frame_h) / client.bottom);
-    if (scale <= 0.0) return;
-    const LONG w = LONG(client.right * scale) + frame_w;
-    const LONG h = LONG(client.bottom * scale) + frame_h;
+    const RECT& mon = mi.rcMonitor;
+    // The game's window class is ANSI: the A functions keep it so.
+    ::SetWindowLongA(hwnd, GWL_STYLE, style & ~(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU |
+                                                WS_MINIMIZEBOX | WS_MAXIMIZEBOX));
     // Asynchronous: the window belongs to the game thread, which may be
     // waiting on this one.
-    ::SetWindowPos(hwnd, nullptr, area.left + (area_w - w) / 2, area.top + (area_h - h) / 2, w, h,
-                   SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
-    diag::logf("proxy: mirror window {}x{} did not fit the monitor, now {}x{}", win_w, win_h, w, h);
+    ::SetWindowPos(hwnd, nullptr, mon.left, mon.top, mon.right - mon.left, mon.bottom - mon.top,
+                   SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS);
+    diag::logf("proxy: mirror window {}x{} did not fit the monitor, now borderless {}x{}", win_w, win_h,
+               mon.right - mon.left, mon.bottom - mon.top);
+}
+
+// The game treats losing the keyboard focus in its fullscreen mode as a
+// pause request (its WM_KILLFOCUS handler posts the event that opens the
+// pause menu) and drops its input. Under VR it keeps that mode while the
+// swapchain is forced windowed, and the window is only a mirror: whatever
+// takes the desktop focus (SteamVR, a streaming client) paused the game or
+// left it stuck behind a loading screen. The focus loss is swallowed while
+// a headset is attached; WM_ACTIVATE still goes through, so the game
+// releases its cursor clip.
+WNDPROC g_game_wndproc = nullptr;
+
+void log_focus_loss() noexcept {
+    DWORD pid = 0;
+    ::GetWindowThreadProcessId(::GetForegroundWindow(), &pid);
+    wchar_t name[MAX_PATH] = L"?";
+    if (HANDLE p = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid)) {
+        DWORD size = MAX_PATH;
+        if (!::QueryFullProcessImageNameW(p, 0, name, &size)) name[0] = L'\0';
+        ::CloseHandle(p);
+    }
+    diag::logf("proxy: focus taken by process {} ({}), game kept running", pid,
+               diag::utf8(std::filesystem::path{name}.filename()));
+}
+
+LRESULT CALLBACK game_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == WM_KILLFOCUS && mothervr::stereo::manager().device) {
+        log_focus_loss();
+        return 0;
+    }
+    return ::CallWindowProcA(g_game_wndproc, hwnd, msg, wp, lp);
+}
+
+void keep_focus_while_vr(HWND hwnd) noexcept {
+    if (!hwnd || g_game_wndproc || !mothervr::stereo::manager().device) return;
+    g_game_wndproc = reinterpret_cast<WNDPROC>(
+        ::SetWindowLongPtrA(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&game_wndproc)));
+    if (g_game_wndproc) diag::log_line("proxy: focus loss no longer pauses the game");
 }
 
 void fit_game_window(IDXGISwapChain* sc) noexcept {
@@ -394,6 +436,7 @@ void install_swapchain_hooks(void* swapchain) noexcept {
     auto* sc = static_cast<IDXGISwapChain*>(swapchain);
     log_swapchain_desc(sc);
     fit_game_window(sc);
+    if (DXGI_SWAP_CHAIN_DESC desc{}; SUCCEEDED(sc->GetDesc(&desc))) keep_focus_while_vr(desc.OutputWindow);
 
     void** vtbl = *reinterpret_cast<void***>(sc);
 
