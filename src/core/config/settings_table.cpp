@@ -22,6 +22,7 @@ bool& toggle_grips(Settings& s) noexcept { return s.input.toggle_grips; }
 bool& toggle_crouch(Settings& s) noexcept { return s.input.toggle_crouch; }
 bool& debug_options(Settings& s) noexcept { return s.debug.debug; }
 bool& skip_startup_intro(Settings& s) noexcept { return s.debug.skip_startup_intro; }
+bool& discord_rich_presence(Settings& s) noexcept { return s.discord_rich_presence; }
 
 // Key names are the original's (spec 06 §3); "StereoAntiAliasing" and the
 // OpenXR runtime value are this project's.
@@ -54,6 +55,8 @@ constexpr std::array kRows{
                CommandRule::Switch},
     SettingRow{Section::Settings, "SkipStartupIntro", "SkipStartupIntro", &skip_startup_intro,
                "mvr_skipintro", CommandRule::Switch},
+    // Ours, file only (no options-page entry).
+    SettingRow{Section::Settings, "DiscordRichPresence", "DiscordRichPresence", &discord_rich_presence},
 };
 
 } // namespace

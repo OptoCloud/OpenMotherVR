@@ -93,6 +93,9 @@ struct Settings {
     RenderingSettings rendering{};
     InputSettings input{};
     DebugSettings debug{};
+    // Ours: show the game and the VR runtime on the player's Discord
+    // profile. Stored as Settings.DiscordRichPresence.
+    bool discord_rich_presence = true;
 };
 
 } // namespace omvr::core::config

@@ -148,7 +148,7 @@ add_library(mothervr SHARED "${CMAKE_CURRENT_BINARY_DIR}/version.rc")
 set(MOTHERVR_SOURCE_DIRS
     util/base util/binary util/hash util/math util/sync util/text
     platform/win32 platform/win32/input platform/win32/patching platform/win32/window
-    platform/d3d11 platform/d3d11/render platform/openvr platform/openxr platform/audio
+    platform/d3d11 platform/d3d11/render platform/openvr platform/openxr platform/audio platform/discord
     game game/sites game/stereo game/input game/ui game/audio
     core/diag core/diag/ports core/config core/config/ports core/ui core/ui/ports
     core/vr core/vr/ports core/input core/input/ports core/stereo core/stereo/ports core/render

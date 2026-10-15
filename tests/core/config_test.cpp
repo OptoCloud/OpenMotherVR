@@ -174,11 +174,12 @@ TEST_CASE("describe names each setting by its key path") {
     CHECK(d.find(R"("Rendering.PixelScale":1.0)") != std::string::npos);
     CHECK(d.find(R"("Input.SnapRotationSegments":12)") != std::string::npos);
     CHECK(d.find(R"("DebugOptions":false)") != std::string::npos);
+    CHECK(d.find(R"("DiscordRichPresence":true)") != std::string::npos);
     CHECK(json::parse(d).size() == settings_table().size());
 }
 
 TEST_CASE("the settings table: commands and their rules") {
-    CHECK(settings_table().size() == 14);
+    CHECK(settings_table().size() == 15);
     const SettingRow* row = find_command("mvr_pixelscale");
     REQUIRE(row != nullptr);
     CHECK(row->rule == CommandRule::PixelScale);

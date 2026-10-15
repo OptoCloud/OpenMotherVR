@@ -6,10 +6,12 @@
 #include "game/build.h"
 #include "loader/context.h"
 #include "loader/install.h"
+#include "platform/discord/constants.h"
 #include "platform/win32/module.h"
 #include "platform/win32/process_info.h"
 #include "platform/win32/text.h"
 
+#include <chrono>
 #include <format>
 #include <string>
 
@@ -67,6 +69,48 @@ void welcome_first_launch(Context& ctx, bool installed) {
     }
 }
 
+// The runtime's name as players know it.
+std::string_view runtime_label(core::config::VRRuntime r) noexcept {
+    switch (r) {
+        case core::config::VRRuntime::OpenVR: return "SteamVR";
+        case core::config::VRRuntime::Oculus:
+        case core::config::VRRuntime::OpenXR: return "OpenXR";
+        case core::config::VRRuntime::None: break;
+    }
+    return "";
+}
+
+// Shows the game on the player's Discord profile. The worker polls only the
+// stereo device's atomic flags; the runtime is fixed for the run, so it is
+// read here.
+void start_discord(Context& ctx) {
+    if (!ctx.settings.current().discord_rich_presence) {
+        ctx.log.line("discord: Rich Presence off in mothervr.json");
+        return;
+    }
+    const auto runtime = ctx.launch.forced_runtime().value_or(ctx.settings.current().vr_runtime);
+    const std::string label{runtime_label(runtime)};
+    const std::int64_t start =
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+            .count();
+    ctx.discord.start(
+        std::string(platform::discord::kApplicationId),
+        [&stereo = ctx.stereo, label, start] {
+            platform::discord::Activity a{.start_unix = start};
+            if (stereo.vr_session_active()) {
+                a.details = "In VR";
+                a.state   = label;
+            } else if (label.empty() || stereo.runtime_failed()) {
+                a.details = "VR off";
+            } else {
+                a.details = "Starting VR";
+                a.state   = label;
+            }
+            return a;
+        },
+        ctx.log);
+}
+
 } // namespace
 
 void attach(Context& ctx) {
@@ -84,6 +128,7 @@ void attach(Context& ctx) {
         ctx.log.line("hooks not (fully) installed, see the [hook] lines above");
     }
     if (first_launch) welcome_first_launch(ctx, installed);
+    start_discord(ctx);
 }
 
 } // namespace omvr::loader

@@ -36,6 +36,7 @@
 #include "loader/runtime_state.h"
 #include "platform/d3d11/render/mirror_renderer.h"
 #include "platform/d3d11/system_d3d11.h"
+#include "platform/discord/presence.h"
 #include "platform/openvr/runtime_probe.h"
 #include "platform/openxr/runtime_probe.h"
 #include "platform/openxr/session.h"
@@ -119,6 +120,8 @@ struct Context {
     platform::d3d11::SystemD3d11 system_d3d11;
     std::atomic<bool> ui_set_only{false};
     HookTargets targets;
+    // Discord Rich Presence; its worker polls `stereo` for the VR state.
+    platform::discord::Presence discord;
 };
 
 // Builds the context once, in DLL_PROCESS_ATTACH, before the first log line.

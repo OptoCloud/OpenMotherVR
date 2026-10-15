@@ -1,0 +1,7 @@
+# OpenMotherVR-Provenance: clean
+# Sources of src/platform/discord/; each directory lists its own files.
+target_sources(mothervr PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/constants.h
+    ${CMAKE_CURRENT_LIST_DIR}/presence.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/presence.h
+)
