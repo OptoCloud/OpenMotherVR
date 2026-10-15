@@ -596,12 +596,22 @@ bool stereo_running() noexcept {
     return dev && load_state(*dev) == DeviceState::Running;
 }
 
-// The first stereo frame with each AA mode.
-void log_stereo_aa(std::int32_t mode) noexcept {
-    static std::int32_t s_last = kAaOff;
-    if (std::exchange(s_last, mode) == mode) return;
-    constexpr const char* kNames[] = {"off", "FXAA", "SMAA T1x", "SMAA T2x, run as SMAA T1x"};
-    diag::logf("[stereo] anti-aliasing in stereo: {}", kNames[mode]);
+// The first stereo frame with each AA mode, and each change of what the
+// mod does with it: run it, run T2x as T1x, or skip it (setting off, or
+// Auto above its pixel scale). Render thread: once per change only.
+void log_stereo_aa(std::int32_t mode, bool run) noexcept {
+    static std::int32_t s_mode = -1;
+    static int s_action = -1;
+    const config::StereoAA setting = config::current().rendering.stereo_aa;
+    const int action = !run ? 0 : mode == kSmaaT2x ? 2 : 1;
+    if (mode == s_mode && action == s_action) return;
+    s_mode   = mode;
+    s_action = action;
+    constexpr const char* kModes[]   = {"off", "FXAA", "SMAA T1x", "SMAA T2x"};
+    constexpr const char* kActions[] = {"skipped", "runs it", "runs it as SMAA T1x"};
+    const char* name = mode >= kAaOff && mode <= kSmaaT2x ? kModes[mode] : "unknown";
+    diag::logf("[stereo] Stereo anti-aliasing for game mode {}: {} (setting {})", name,
+               mode == kAaOff ? "nothing to run" : kActions[action], config::to_string(setting));
 }
 
 } // namespace
@@ -616,11 +626,12 @@ void __cdecl stereo_final_draw() noexcept {
     const std::int32_t mode = postfx ? field<std::int32_t>(postfx, kPostFxAaMode) : kAaOff;
     // StereoAntiAliasing: off, or Auto above the pixel scale where the eyes
     // are already supersampled (about 0.6 ms GPU for little gain).
-    if (mode < kFxaa || mode > kSmaaT2x || !config::stereo_aa_enabled(config::current().rendering)) {
+    const bool run = mode >= kFxaa && mode <= kSmaaT2x && config::stereo_aa_enabled(config::current().rendering);
+    if (postfx) log_stereo_aa(mode, run);
+    if (!run) {
         reinterpret_cast<DrawFn>(g_aa.fullscreen_draw)();   // as the game does
         return;
     }
-    log_stereo_aa(mode);
     // The AA pass draws the bound effect (postprocess_stereo_final, fade
     // already in c36) into its intermediate, then filters into the output.
     // The stereo path always draws with the full-screen triangle; keep that.
