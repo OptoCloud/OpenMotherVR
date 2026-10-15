@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 """DXBC container helpers: checksum and chunk listing.
 
     python -I scripts/dxbc.py <shader.bin> [...]

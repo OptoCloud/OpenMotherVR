@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 import sys, pefile, struct
 pe = pefile.PE(sys.argv[1]); B = pe.OPTIONAL_HEADER.ImageBase
 img = pe.get_memory_mapped_image()

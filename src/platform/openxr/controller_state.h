@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // The controllers as OpenXR reports them: grip poses, buttons and axes for

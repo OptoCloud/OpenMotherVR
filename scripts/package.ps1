@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Build the player-facing release folder and zip from a built d3d11.dll.
 #
 #   pwsh scripts/package.ps1 -Dll build/d3d11.dll -Version 1.0.0 [-OutDir out]

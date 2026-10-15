@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // The render fixes (07, 08): planar reflections, anti-aliasing, culling, the
 // head-in-wall fade and the event tap. Each checks its own code right
 // before it is written and stays off on its own (01 §2.5.2).

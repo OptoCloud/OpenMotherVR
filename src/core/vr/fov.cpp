@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/vr/fov.h"
 
 #include <algorithm>

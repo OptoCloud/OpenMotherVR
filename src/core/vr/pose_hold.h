@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 #include "util/math/pose.h"

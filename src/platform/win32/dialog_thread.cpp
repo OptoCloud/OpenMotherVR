@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/win32/dialog_thread.h"
 
 #include "platform/win32/message_box.h"

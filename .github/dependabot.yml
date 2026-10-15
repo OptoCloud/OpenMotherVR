@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Keep the pinned action SHAs current. vcpkg dependencies are pinned by
 # vcpkg.json's builtin-baseline and updated by hand.
 version: 2

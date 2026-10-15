@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/vr/pose_hold.h"
 
 namespace omvr::core::vr {

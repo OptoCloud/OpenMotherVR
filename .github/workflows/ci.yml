@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Every push to master and every pull request: repository policy checks and
 # a test build. Releases are release.yml.
 name: ci

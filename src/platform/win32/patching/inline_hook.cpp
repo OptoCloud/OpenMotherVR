@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/win32/patching/inline_hook.h"
 
 #include "platform/win32/patching/memory.h"

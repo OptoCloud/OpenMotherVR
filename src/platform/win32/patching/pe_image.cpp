@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/win32/patching/pe_image.h"
 
 #include <windows.h>

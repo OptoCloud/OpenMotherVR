@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/win32/patching/memory.h"
 
 #include "util/sync/once_latch.h"

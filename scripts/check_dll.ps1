@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Checks on a built d3d11.dll before it ships (spec 13 section 7). Needs
 # dumpbin on PATH (a "Native Tools Command Prompt for VS", or vcvars32.bat).
 # CI runs it before packaging; a failure means no package.

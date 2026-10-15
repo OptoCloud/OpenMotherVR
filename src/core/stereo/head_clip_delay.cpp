@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/stereo/head_clip_delay.h"
 
 #include "core/stereo/tuning.h"

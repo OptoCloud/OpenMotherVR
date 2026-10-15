@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # cleanroom/STYLEGUIDE.md section 1: 4-space indent, 110 columns, braces on
 # the same line, pointer `T* p`. Includes keep their order (some Windows
 # headers must come first); comments are not rewrapped, so `// From:` lines

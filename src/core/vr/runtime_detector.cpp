@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // Probe for installed VR runtimes and choose which one the mod drives.
 // The precedence is choose_runtime's (runtime_choice.h).
 

@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "loader/hooks/window_hooks.h"
 
 #include "loader/context.h"

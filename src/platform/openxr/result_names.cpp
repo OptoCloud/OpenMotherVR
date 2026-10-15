@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/openxr/result_names.h"
 
 #include "core/vr/runtime_failure.h"

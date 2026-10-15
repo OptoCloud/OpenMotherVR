@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // The real d3d11.dll behind the proxy (01 §1.1, §1.2: Windows 11 loads a
 // local d3d11.dll from the game's folder).
 

@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Sources of src/core/render/; each directory lists its own files.
 target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/dither_fix.cpp

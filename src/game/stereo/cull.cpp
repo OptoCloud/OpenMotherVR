@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "game/stereo/cull.h"
 
 #include "game/code_address.h"

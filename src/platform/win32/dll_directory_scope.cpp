@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/win32/dll_directory_scope.h"
 
 #include <windows.h>

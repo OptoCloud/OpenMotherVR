@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Deploy the rebuilt d3d11.dll, launch Alien: Isolation through Steam, wait,
 # then report whether it is still running, the new mothervr.log lines and any
 # crash recorded in the Application event log (with the faulting AI.exe RVA

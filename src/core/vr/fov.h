@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 #include "core/vr/types.h"

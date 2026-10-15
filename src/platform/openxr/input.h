@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // OpenXR controller input (04 §5.8.4): the action set, its suggested bindings

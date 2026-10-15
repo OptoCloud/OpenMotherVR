@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // OpenVR session bring-up (03 §6.4). The IVRSystem* that
 // VR_GetGenericInterface returns is the C++ vtable form: openvr.h declares
 // it as a class with virtuals, and the SDK's vtable layout is MSVC's, so

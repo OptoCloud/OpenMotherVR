@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // The OpenXR session, so the mod runs on any OpenXR runtime (09).

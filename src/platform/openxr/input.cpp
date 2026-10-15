@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/openxr/input.h"
 
 #include "platform/openxr/constants.h"

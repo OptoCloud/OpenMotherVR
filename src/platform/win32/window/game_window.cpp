@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/win32/window/game_window.h"
 
 #include "platform/win32/patching/memory.h"

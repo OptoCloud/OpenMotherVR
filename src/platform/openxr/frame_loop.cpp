@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // The OpenXR frame boundary (09 §5): end the frame the previous call began,
 // then begin the next one. Render thread.
 

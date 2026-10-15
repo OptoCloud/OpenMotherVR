@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 """Convert a mod debug dump (.dds with a DX10 header) to .png.
 
     python -I scripts/dds2png.py <in.dds> [out.png] [--exposure X]

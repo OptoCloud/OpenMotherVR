@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Pushing a tag vMAJOR.MINOR.PATCH[-pre] publishes a GitHub release:
 # the tag must be on master and have release-notes/<tag>.md, the DLL is
 # built and stamped with the version, and the zip, the symbols zip

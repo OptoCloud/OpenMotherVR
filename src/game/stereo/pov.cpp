@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // The POV accessors and the per-eye reflection pass (07).
 // Analysis: dumps/07_reflections_head_pose.md.
 

@@ -1,3 +1,4 @@
+<!-- OpenMotherVR-Provenance: clean -->
 @AGENTS.md
 
 AGENTS.md is this project's CLAUDE.md: treat its contents as your project

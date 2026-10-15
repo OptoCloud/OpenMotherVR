@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // Append-only logger.
 //
 // One file per game install: <dir-of-our-DLL>\mothervr.log. Each line is

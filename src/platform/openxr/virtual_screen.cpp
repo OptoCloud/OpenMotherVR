@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // The OpenXR virtual-screen path (09 §8), driven from the swapchain Present
 // hook. Render thread.
 

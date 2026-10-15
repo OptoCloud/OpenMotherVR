@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/win32/named_mutex.h"
 
 #include <windows.h>

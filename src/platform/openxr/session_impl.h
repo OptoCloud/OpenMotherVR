@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // Session's OpenXR and D3D11 state and the functions that work on it, split

@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "loader/hooks/render_fix_hooks.h"
 
 #include "core/stereo/cull_policy.h"

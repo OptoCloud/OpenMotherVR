@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "util/text/command_line_split.h"
 
 namespace omvr::util {

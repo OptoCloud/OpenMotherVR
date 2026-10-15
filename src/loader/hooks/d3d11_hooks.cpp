@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // The IDXGISwapChain and ID3D11Device replacements of the d3d11.dll proxy
 // (01 §1). D3D11CreateDeviceAndSwapChain returns the game's device and
 // swapchain, whose CreatePixelShader, Present, SetFullscreenState and

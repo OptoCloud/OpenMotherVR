@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "loader/runtime_state.h"
 
 namespace omvr::loader {

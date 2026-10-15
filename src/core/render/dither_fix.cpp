@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/render/dither_fix.h"
 
 #include "core/render/dxbc.h"

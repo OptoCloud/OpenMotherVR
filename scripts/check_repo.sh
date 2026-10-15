@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# OpenMotherVR-Provenance: clean
 # Repository policy checks for CI (AGENTS.md, "Content rules").
 #
 #   scripts/check_repo.sh files

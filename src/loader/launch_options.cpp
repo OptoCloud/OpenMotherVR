@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "loader/launch_options.h"
 
 #include "core/config/launch_options.h"

@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "loader/hooks/event_tap_hook.h"
 
 #include "loader/context.h"

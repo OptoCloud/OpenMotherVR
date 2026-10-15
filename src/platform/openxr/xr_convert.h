@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // Conversions between OpenXR's structs and the project's. Only the .cpp

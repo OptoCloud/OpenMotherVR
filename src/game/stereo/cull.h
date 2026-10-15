@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // The game's object culling tests (08 §2). Which tests exist and why the

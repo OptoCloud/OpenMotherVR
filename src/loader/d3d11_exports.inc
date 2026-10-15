@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // X-macro list of every System32 (SysWOW64) d3d11.dll export we forward
 // verbatim. D3D11CreateDeviceAndSwapChain is deliberately absent: it has a
 // real interceptor in d3d11_entry.cpp.

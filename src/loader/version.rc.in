@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // Version resource, filled in by CMake from MOTHERVR_VERSION (see
 // CMakeLists.txt). Shown in the file's Properties > Details in Explorer, so
 // a player can tell which release they have installed.

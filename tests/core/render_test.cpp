@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // core/render: the DXBC checksum against fxc's own on the project's mirror
 // shaders, and the position-dither fix on a synthetic pixel shader.
 

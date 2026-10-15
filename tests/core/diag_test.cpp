@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // core/diag: the log line prefix and bounds, the logger over a sink and a
 // clock, and logf's fixed buffer.
 

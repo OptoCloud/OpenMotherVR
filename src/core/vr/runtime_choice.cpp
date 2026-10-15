@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/vr/runtime_choice.h"
 
 namespace omvr::core::vr {

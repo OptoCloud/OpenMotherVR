@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/diag/log_format.h"
 
 #include <algorithm>

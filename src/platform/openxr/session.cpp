@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/openxr/session.h"
 
 #include "core/ui/notices.h"

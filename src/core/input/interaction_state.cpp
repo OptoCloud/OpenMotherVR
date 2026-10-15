@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/input/interaction_state.h"
 
 #include "game/constants.h"

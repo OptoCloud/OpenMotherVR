@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "game/detour.h"
 
 #include "platform/win32/patching/inline_hook.h"

@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // Owners of OpenXR handles (STYLEGUIDE 5): each destroys its handle when

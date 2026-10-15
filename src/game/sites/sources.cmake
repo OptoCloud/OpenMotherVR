@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Sources of src/game/sites/; each directory lists its own files.
 target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/controls.cpp

@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/stereo/desktop_window.h"
 
 #include "core/stereo/stereo_device.h"

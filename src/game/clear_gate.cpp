@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "game/clear_gate.h"
 
 #include "game/code_address.h"

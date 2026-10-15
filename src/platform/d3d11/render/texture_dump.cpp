@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/d3d11/render/texture_dump.h"
 
 #include "platform/d3d11/render/dds.h"

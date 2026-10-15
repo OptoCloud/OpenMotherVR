@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # cleanroom/STYLEGUIDE.md section 1 and PLAN I.6: bugprone, cppcoreguidelines
 # (minus the checks that only restate other rules or that the game's ABI
 # forces), modernize (minus trailing return types), performance and a

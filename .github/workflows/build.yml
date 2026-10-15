@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Reusable build: d3d11.dll as a 32-bit release build with warnings as
 # errors, checked and packaged. Called by ci.yml and release.yml.
 name: build

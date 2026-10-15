@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/render/shader_fix_stats.h"
 
 #include "core/render/tuning.h"

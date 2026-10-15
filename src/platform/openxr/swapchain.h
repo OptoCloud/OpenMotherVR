@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // A runtime swapchain the game's images are copied into (09 §5.2).

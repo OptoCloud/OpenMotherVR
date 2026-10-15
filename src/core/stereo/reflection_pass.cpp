@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // Planar reflections per eye (07). Analysis: dumps/07_reflections_head_pose.md.
 
 #include "core/stereo/reflection_pass.h"

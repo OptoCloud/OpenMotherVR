@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # 32-bit, static libraries, static CRT: matches the DLL's /MT so compiled
 # dependencies (openxr-loader, jsoncpp) link in without CRT mismatches and
 # the deployed d3d11.dll needs no runtime DLLs.

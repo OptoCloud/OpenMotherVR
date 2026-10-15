@@ -136,6 +136,10 @@ links both.
   added, unknown keys are preserved on save.
 - Comments explain why. Keep `// From: FUN_xxxxxxxx` lines: they map code to
   the original's functions.
+- A file whose first lines carry `OpenMotherVR-Provenance: clean` holds
+  nothing derived from MotherVR or any other mod (game facts and public APIs
+  are allowed); remove the line when such a file gains mod-derived content.
+  List them with `rg -l "OpenMotherVR-Provenance: clean"`.
 - Commit messages follow Conventional Commits 1.0.0:
   `type(scope): imperative summary`, at most 72 characters, no trailing
   period. Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `build`, `ci`,

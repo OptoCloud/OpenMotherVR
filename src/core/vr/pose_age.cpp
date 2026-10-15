@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/vr/pose_age.h"
 
 #include "core/diag/tuning.h"

@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 #include "core/vr/ports/runtime_probe.h"

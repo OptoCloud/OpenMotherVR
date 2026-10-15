@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 """Write binary files as C++ byte arrays.
 
     python -I scripts/bin2inc.py <out.inc> <name>=<file> [<name>=<file> ...]

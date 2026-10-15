@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // The OpenXR instance and system: what the stereo device needs before the
 // game has a D3D11 device (09 §2.2).
 

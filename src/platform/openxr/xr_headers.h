@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // OpenXR with the Win32 + D3D11 platform bindings. Include this instead of

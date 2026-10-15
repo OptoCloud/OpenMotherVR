@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 """Alien: Isolation PAK2 archive tool (list / extract / diff).
 
 Layout (little-endian):

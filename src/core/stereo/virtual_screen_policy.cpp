@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 // Per-frame Present: the OpenXR virtual-screen path (09 §8).
 
 #include "core/stereo/virtual_screen_policy.h"

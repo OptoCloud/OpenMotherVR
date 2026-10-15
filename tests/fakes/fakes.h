@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // Test doubles for the core ports: a clock the test moves, logs and sinks

@@ -1,3 +1,4 @@
+# OpenMotherVR-Provenance: clean
 # Sources of src/util/math/; each directory lists its own files.
 target_sources(omvr_util PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/angle.h

@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "platform/win32/module.h"
 
 #include "platform/win32/constants.h"

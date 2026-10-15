@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #include "core/ui/notices.h"
 
 #include <format>

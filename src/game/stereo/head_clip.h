@@ -1,3 +1,4 @@
+// OpenMotherVR-Provenance: clean
 #pragma once
 
 // The game's head-in-wall fade (08 §4.1). The delay the stereo device puts
