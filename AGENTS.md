@@ -33,7 +33,47 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
   prints the new `mothervr.log` lines and disassembles any crash (the log
   also has a `crash:` record with module, offset and callers). `-Keep`
   leaves the game running.
-- There are no unit tests.
+- Unit tests of `src/util` and `src/core` are in `tests/` (doctest; target
+  `omvr_tests`, built by default, never linked into the DLL):
+  `ctest --test-dir build -C Release --output-on-failure` after a build. CI
+  runs them after its build. Core logic changes come with tests; expected
+  values come from the behaviour before the change or the spec, not from
+  the new code.
+- `.clang-format` and `.clang-tidy` hold the style guide's formatting and
+  analysis rules: `clang-format -i <file>` on what you touch;
+  `clang-tidy -p <ninja build dir> <file.cpp>` for analysis.
+
+## Source layout
+
+The code follows `cleanroom/STYLEGUIDE.md` (namespace `omvr`), in layers
+that each depend only on the ones before them:
+
+- `src/util/`: standard library only (maths, sync, hashing, binary, text,
+  `Error`/`Result`).
+- `src/platform/{win32,d3d11,openvr,openxr,audio}/`: one external API each,
+  wrapped in project types. Platform headers (`<windows.h>`, D3D, OpenVR,
+  OpenXR) only in their `.cpp` files.
+- `src/game/`: everything about `AI.exe`: addresses, layouts, facts
+  (`constants.h`), x86 encodings (`x86.h`), verified patching, `sites/`,
+  and thin accessors over game objects (`stereo/`, `input/`, `ui/`,
+  `audio/`).
+- `src/core/{stereo,render,vr,input,config,ui,diag}/`: the mod's logic over
+  value structs. It reaches the outside only through `ports/` (abstract
+  interfaces) handed in at construction; each area's constants are in its
+  `tuning.h`. Core may include `game/constants.h` and nothing else of the
+  game (exception: `core/stereo/stereo_device`, which works on the game's
+  `StereoInterface` in place); `platform/` and `game/` may include only
+  `core/**/ports/*.h`, `core/**/types.h` and `core/**/tuning.h`.
+- `src/loader/`: the composition root. `Context` (`loader/context.h`)
+  builds and wires every long-lived object once at attach; `hooks/` holds
+  every function the game, COM or the OS calls, each thin: read game
+  memory into values, call one `context()` member, write the result back.
+- No globals or singletons outside `loader/` (the few the patched game
+  code reads at a fixed address are commented where they are).
+
+Each source directory lists its files in its own `sources.cmake`. util and
+core build as the static libraries `omvr_util` and `omvr_core`; the DLL
+links both.
 
 ## Definition of done
 
@@ -61,13 +101,18 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
 - Every `AI.exe` address goes in a table: `src/game/ai_address_tables.inc`
   (generated, from the original's table) or `src/game/addresses.h`,
   with the 2015 RVA and the 2020 RVA, or 0 when the 2020 one is unknown so
-  the feature stays off there. No address literals in feature code.
+  the feature stays off there. No address literals in feature code. The
+  x86 encodings the patches check and write are named in `src/game/x86.h`,
+  and every write goes through `game::Patcher` and
+  `platform::win32::write_memory`.
 - Verify before writing: a call site with `calls(site, target)`, code bytes
   in the installer's preflight, a function entry through `game::detour` with
   its expected prologue bytes. If anything differs, patch nothing and log it.
 - A replacement for a `__thiscall` method is
   `__fastcall(void* self, void* edx, ...)` with the same stack arguments and
-  cleanup. Get this wrong and the game crashes at the first call.
+  cleanup. Get this wrong and the game crashes at the first call. Every
+  replacement lives in `src/loader/hooks/`, is `noexcept` and has a
+  `static_assert` that its type converts to the game's.
 - `StereoManager`, `StereoInterface` and `HmdDesc` have the game's memory
   layout; their `static_assert`s on size and offsets must keep holding.
 - Threads: the game thread reads head poses, the render thread runs
@@ -96,7 +141,7 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
   period. Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `build`, `ci`,
   `test`, `chore`, `revert`. Scope is the module or area: `hook`, `stereo`,
   `runtime`, `input`, `proxy`, `config`, `render`, `integration`, `game`,
-  `audio`, `ui`, `scripts`. The body says what changed and why;
+  `audio`, `ui`, `scripts`, `util`, `core`, `platform`, `loader`, `tests`. The body says what changed and why;
   a breaking change (for example to `mothervr.json` or the install layout)
   gets `!` after the scope and a `BREAKING CHANGE:` footer. One logical
   change per commit. No AI-attribution trailers or footers.

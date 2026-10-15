@@ -14,7 +14,9 @@ The project has two parts:
 
 | Path | Contents |
 |---|---|
-| `src/`, `res/`, `CMakeLists.txt`, `vcpkg.json`, `triplets/` | The reconstruction. See `BUILDING.md` to build |
+| `src/`, `res/`, `CMakeLists.txt`, `vcpkg.json`, `triplets/` | The reconstruction, in layers: `util/`, `platform/` (Windows, D3D11, OpenVR, OpenXR, audio), `game/` (AI.exe addresses, layouts, patching), `core/` (the mod's logic behind ports), `loader/` (DLL entry, wiring, hooks). See `BUILDING.md` to build |
+| `tests/` | Unit tests of `util/` and `core/` (doctest, run with ctest) |
+| `.clang-format`, `.clang-tidy` | Formatting and static-analysis rules of the style guide |
 | `cleanroom/` | The clean-room process (`CLEANROOM.md`), the specification (`spec/`, v1 in 00 to 14, v2 in 20 to 24), the C++ style guide for the reimplementation and the spec lint |
 | `dumps/` | Analysis notes on the original and the game. Start with `dumps/03_*`, `04_*`, `05_*.md`; `09_*` maps every original function to the reconstruction |
 | `scripts/` | Ghidra headless scripts, Python tools (PAK2 archives, address tables, the UI patch, disassembly) and the build, packaging and in-game test scripts |

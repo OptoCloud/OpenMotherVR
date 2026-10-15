@@ -14,26 +14,47 @@ tracked any more (`archive/dumps/v2/decompiled/` where kept locally).
 
 ```
 ./
-  CMakeLists.txt               build config (32-bit MSVC target)
-  vcpkg.json                   nlohmann-json, openxr-loader, openvr (headers only)
+  CMakeLists.txt               build config (32-bit MSVC): omvr_util, omvr_core, d3d11.dll, tests
+  vcpkg.json                   nlohmann-json, openxr-loader, openvr (headers only), minhook, doctest
+  .clang-format, .clang-tidy   formatting and static analysis (cleanroom/STYLEGUIDE.md section 1)
   res/                         payloads embedded in the DLL
     ui_patch.bin               delta stock UI.PAK -> MotherVR's MOTHER.PAK (neither archive is in the repo)
     openvr_api.dll             Valve OpenVR loader 1.0.10
-  src/                         layers, each depending only on those above it
-    util/                      generic helpers: maths, sync, hashing, binary, text
+  src/                         layers, each depending only on those above it; every
+                               directory lists its files in its own sources.cmake
+    util/                      standard library only: math, sync, hash, binary, text, base
+                               (Error, Result); the omvr_util static library
     platform/                  one external API each, wrapped in project types
-      win32/                   log file, dialogs, payload files, patching, window, crash record
-      d3d11/                   the system d3d11.dll, swapchain, mirror renderer, texture dump
+      win32/                   OS base: files, handles, registry, environment, log file,
+                               dialogs, crash record; patching/, window/, input/
+      d3d11/                   the system d3d11.dll, swapchain, handle conversions;
+                               render/ (mirror renderer, texture dump, shaders/)
       openvr/, openxr/         the VR runtimes, their input and probes
       audio/                   game audio to the headset (OpenXR on Meta runtimes)
-    game/                      AI.exe: address tables (generated .inc), layouts, build
-                               detection, verified patching, the patch sites
-    core/                      the mod's logic: stereo, render (shader fix), vr, input,
-                               config (mothervr.json), ui (options page, MOTHER.PAK), diag
-    loader/                    DLL entry, the context that wires everything, the d3d11
-                               exports (d3d11.def, resources.rc, resource_ids.h) and the
-                               hooks the game, COM and the OS call
+    game/                      AI.exe: addresses.h and ai_address_tables.inc (every
+                               address), layout.h, constants.h, x86.h, build detection,
+                               verified patching (patcher, preflight), sites/ (the
+                               patch sites); stereo/, input/, ui/, audio/: accessors
+                               over the game's objects and functions
+    core/                      the mod's logic, plain C++ over value structs, talking
+                               to the outside through ports/ (abstract interfaces):
+                               stereo, render (shader fix), vr, input, config
+                               (mothervr.json), ui (options page, MOTHER.PAK), diag;
+                               each area's tuning.h holds its constants; the
+                               omvr_core static library
+    loader/                    composition root: DLL entry, the Context that builds
+                               and wires every object, the d3d11 exports (d3d11.def,
+                               resources.rc, resource_ids.h) and hooks/, the thin
+                               functions the game, COM and the OS call
+  tests/                       unit tests of util and core (doctest), fakes/ for the ports
 ```
+
+The layers and what each may include are in `cleanroom/STYLEGUIDE.md`
+section 2.1: `util` < `platform` < `game` < `core` < `loader`; `platform` and
+`game` see only the `core/**/ports/*.h`, `core/**/types.h` and
+`core/**/tuning.h` headers of core, and core sees only `game/constants.h` of
+the game. The one exception is `core/stereo/stereo_device`, which works on
+the game's `StereoInterface` in place (`game/layout.h`).
 
 `src/game/ai_address_tables.inc` is generated from the original binary:
 
@@ -106,7 +127,8 @@ which gives `build-ninja/d3d11.dll`.
 CI (`.github/workflows/ci.yml`) runs on every push to `master` and every pull
 request: it checks that no game files are tracked and that commit subjects
 follow Conventional Commits (`scripts/check_repo.sh`), then builds with
-`-DMOTHERVR_WERROR=ON` (warnings are errors; off by default locally), checks
+`-DMOTHERVR_WERROR=ON` (warnings are errors; off by default locally), runs
+the unit tests (`ctest`), checks
 the DLL (`scripts/check_dll.ps1 <dll> -Version <version>`: x86; exactly the
 51 exports of the system `d3d11.dll`; imports only from allowed system DLLs,
 never `d3d11.dll`, `dxgi.dll`, the OpenVR or OpenXR loader or a C/C++
@@ -127,6 +149,31 @@ be mapped to source with that release's PDB.
 
 `src/loader/d3d11.def` and `src/loader/d3d11_exports.inc` both list the pass-through
 exports; configure fails if they differ.
+
+### Unit tests
+
+`MOTHERVR_BUILD_TESTS` (on by default) builds `omvr_tests` from `tests/`: a
+doctest executable that links `omvr_core` and `omvr_util` only, never the
+DLL, so it needs no game, headset or Windows feature beyond the CRT. Run it
+with ctest after a build:
+
+```powershell
+ctest --test-dir build -C Release --output-on-failure   # Visual Studio generator
+ctest --test-dir build-ninja --output-on-failure         # Ninja
+```
+
+CI runs the same after its build. Expected values come from the behaviour
+of the code before the restructure, the published known answers (CRC-32,
+MD5) or the spec. `tests/fakes/fakes.h` has test doubles for the ports
+(clock, log, file store, script variables, game signals, archive files).
+
+### Formatting and static analysis
+
+`.clang-format` and `.clang-tidy` carry the rules of
+`cleanroom/STYLEGUIDE.md` section 1. Format a file with
+`clang-format -i <file>` (the naked forwarder thunks are excluded in
+`.clang-format-ignore`). clang-tidy needs the `compile_commands.json` a
+Ninja configure writes: `clang-tidy -p build-ninja <file.cpp>`.
 
 ### Install and test
 
