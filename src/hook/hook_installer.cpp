@@ -469,6 +469,8 @@ bool redirect_ui_archive(HMODULE self, const std::filesystem::path& game_dir, st
         return true;
     }
     diag::log_line("[hook] no mod UI archive: options page unavailable, continuing");
+    // The stock movies register no VR glyph ids: keep the game's pad glyphs.
+    input::use_stock_glyphs_only();
     return false;
 }
 
