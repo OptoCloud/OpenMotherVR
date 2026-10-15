@@ -17,6 +17,7 @@
 #include "diag/log.h"
 #include "input/gamepad.h"
 #include "input/vr_controls.h"
+#include "integration/dialogs.h"
 #include "openvr_actions.h"
 #include "openvr_backend.h"
 #include "seqlock.h"
@@ -29,6 +30,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <filesystem>
 #include <format>
 #include <string>
 #include <utility>
@@ -41,6 +43,21 @@ namespace {
 constexpr std::uint64_t kButtonMenu     = 1ull << vr::k_EButton_ApplicationMenu;
 constexpr std::uint64_t kButtonGrip     = 1ull << vr::k_EButton_Grip;
 constexpr std::uint64_t kButtonTouchpad = 1ull << vr::k_EButton_SteamVR_Touchpad;
+
+// Frames after the first submit at which the compositor is asked whether it
+// shows this process: SteamVR has settled by then (about 3 s at 90 Hz).
+constexpr std::uint32_t kSceneCheckFrame = 270;
+
+// Name of a process's executable, for the log; empty if unknown.
+std::string process_name(DWORD pid) {
+    HANDLE p = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!p) return {};
+    wchar_t buf[MAX_PATH] = {};
+    DWORD size = MAX_PATH;
+    const BOOL ok = ::QueryFullProcessImageNameW(p, 0, buf, &size);
+    ::CloseHandle(p);
+    return ok ? diag::utf8(std::filesystem::path{buf}.filename()) : std::string{};
+}
 
 float length(float x, float y, float z) noexcept { return std::sqrt(x * x + y * y + z * z); }
 
@@ -70,6 +87,7 @@ private:
     const Hands& hands_now();
     void read_hands();
     void write_controls();
+    void check_scene_app();
     openvr::Controls legacy_controls(const vr::TrackedDeviceIndex_t (&index)[2]);
 
     const vr::HmdMatrix34_t& hmd_matrix() const noexcept {
@@ -104,6 +122,7 @@ private:
     SeqLock<Hands>     hands_;
     int                tracking_origin_ = vr::TrackingUniverseStanding;  // WaitGetPoses' universe
     std::uint32_t      hand_log_frames_ = 0;                             // render thread
+    std::uint32_t      submitted_frames_ = 0;                            // render thread
     // Game thread: the hands as of this frame's head_pose, and whether
     // head_pose ran since the last submit.
     Hands              hands_rendered_{};
@@ -298,6 +317,10 @@ void OpenVrHmd::begin_frame(float eye_offsets[6], bool head_tracked) {
         const vr::HmdMatrix34_t e = system_->GetEyeToHeadTransform(static_cast<vr::EVREye>(eye));
         for (int i = 0; i < 3; ++i) eye_offsets[eye * 3 + i] = e.m[i][3];
     }
+    // Debug: screen frames (menus, videos, loading) against tracked ones,
+    // once per change.
+    if (cinema_mode_ != !head_tracked && config::current().debug.debug)
+        diag::logf("[diag] frames now {}", head_tracked ? "tracked" : "on the screen");
     cinema_mode_ = !head_tracked;
 }
 
@@ -341,6 +364,31 @@ void OpenVrHmd::submit_frame(ID3D11Texture2D* side_by_side) {
     // The controllers as of this WaitGetPoses go to the game now, before its
     // next simulation step, not at the next BeginFrame (P10, as OpenXR).
     write_controls();
+    if (++submitted_frames_ == kSceneCheckFrame) check_scene_app();
+}
+
+// SteamVR shows one scene application. If it is not this process (SteamVR's
+// Desktop Game Theatre showing the game as a flat window, or an application
+// that has not exited), the frames submitted here never reach the headset.
+// Render thread, once.
+void OpenVrHmd::check_scene_app() {
+    auto* apps = static_cast<vr::IVRApplications*>(openvr::generic_interface(vr::IVRApplications_Version));
+    if (!apps) return;
+    const DWORD scene = apps->GetCurrentSceneProcessId();
+    const DWORD self  = ::GetCurrentProcessId();
+    if (scene == self) {
+        diag::log_line("openvr: the headset shows the game");
+        return;
+    }
+    const std::string name = scene ? process_name(scene) : std::string{};
+    diag::logf("openvr: the headset shows process {} ({}), not the game", scene, name.empty() ? "unknown" : name);
+    integration::show_message_box_async(
+        std::format("SteamVR is not showing the game in the headset{}.\n\n"
+                    "This is usually SteamVR's Desktop Game Theatre. In Steam, open the "
+                    "Properties of Alien: Isolation and uncheck 'Use Desktop Game Theatre while "
+                    "SteamVR is active', then restart SteamVR and the game.",
+                    name.empty() ? std::string{} : " (it shows " + name + ")"),
+        MB_OK | MB_ICONWARNING);
 }
 
 // ---- extension -----------------------------------------------------------------

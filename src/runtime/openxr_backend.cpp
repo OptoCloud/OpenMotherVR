@@ -4,9 +4,12 @@
 #include "vr_detect.h"
 #include "config/config.h"
 #include "diag/log.h"
+#include "integration/dialogs.h"
 
 #include <nlohmann/json.hpp>
+#include <openxr/openxr_reflection.h>
 
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -83,6 +86,40 @@ std::vector<std::filesystem::path> x86_siblings(const std::filesystem::path& man
         }
     }
     return out;
+}
+
+// The manifest probe() chose; init_system hands it to the loader.
+std::filesystem::path g_manifest;
+
+bool process_elevated() noexcept {
+    HANDLE token = nullptr;
+    if (!::OpenProcessToken(::GetCurrentProcess(), TOKEN_QUERY, &token)) return false;
+    TOKEN_ELEVATION e{};
+    DWORD size = 0;
+    const BOOL ok = ::GetTokenInformation(token, TokenElevation, &e, sizeof(e), &size);
+    ::CloseHandle(token);
+    return ok && e.TokenIsElevated;
+}
+
+// The loader ignores XR_RUNTIME_JSON in an elevated process; a loader
+// property (XR_EXT_loader_init_properties) is honoured there too. Must run
+// before the first other loader call.
+void point_loader_at(const std::filesystem::path& manifest) noexcept {
+    if (manifest.empty()) return;
+    PFN_xrInitializeLoaderKHR init_loader = nullptr;
+    if (XR_FAILED(xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrInitializeLoaderKHR",
+                                        reinterpret_cast<PFN_xrVoidFunction*>(&init_loader))) ||
+        !init_loader) {
+        diag::log_line("openxr: loader has no xrInitializeLoaderKHR");
+        return;
+    }
+    const std::string path = diag::utf8(manifest);
+    XrLoaderInitPropertyValueEXT value{"XR_RUNTIME_JSON", path.c_str()};
+    XrLoaderInitInfoPropertiesEXT props{XR_TYPE_LOADER_INIT_INFO_PROPERTIES_EXT};
+    props.propertyValueCount = 1;
+    props.propertyValues     = &value;
+    const XrResult r = init_loader(reinterpret_cast<const XrLoaderInitInfoBaseHeaderKHR*>(&props));
+    if (XR_FAILED(r)) diag::logf("openxr: loader property not set: {}", static_cast<int>(r));
 }
 
 // ---- Session state ------------------------------------------------------------
@@ -168,10 +205,22 @@ void count_pose_age(XrTime rendered_for) {
     g.age_sum = 0.0;
 }
 
+// xrResultToString needs an instance, and there is none when xrCreateInstance
+// itself fails; the names come from the registry header instead.
+const char* result_name(XrResult r) noexcept {
+    switch (r) {
+#define MVR_XR_RESULT_CASE(name, value) case name: return #name;
+        XR_LIST_ENUM_XrResult(MVR_XR_RESULT_CASE)
+#undef MVR_XR_RESULT_CASE
+        default: return "unknown XrResult";
+    }
+}
+
 bool check(XrResult r, const char* what) {
     if (XR_SUCCEEDED(r)) return true;
     char text[XR_MAX_RESULT_STRING_SIZE] = {};
     if (g.instance != XR_NULL_HANDLE) xrResultToString(g.instance, r, text);
+    if (text[0] == '\0') strncpy_s(text, result_name(r), _TRUNCATE);
     diag::logf("openxr: {} failed: {} ({})", what, static_cast<int>(r), text);
     set_init_failure(std::string{what} + ": " + text, static_cast<int>(r));
     return false;
@@ -303,14 +352,51 @@ bool do_recenter(XrTime t) {
     return true;
 }
 
+const char* state_name(XrSessionState s) noexcept {
+    switch (s) {
+#define MVR_XR_STATE_CASE(name, value) case name: return #name;
+        XR_LIST_ENUM_XrSessionState(MVR_XR_STATE_CASE)
+#undef MVR_XR_STATE_CASE
+        default: return "unknown XrSessionState";
+    }
+}
+
+// A running session that the runtime never makes visible is not shown in
+// the headset: with SteamVR, usually its Desktop Game Theatre showing the
+// game as a flat window. Said once, this long after the session started.
+constexpr auto kVisibleTimeout = std::chrono::seconds(10);
+std::chrono::steady_clock::time_point g_running_since{};
+bool g_visible_once = false;
+
+void check_visible() noexcept {
+    if (g_visible_once || g_running_since == std::chrono::steady_clock::time_point{}) return;
+    if (g.state == XR_SESSION_STATE_VISIBLE || g.state == XR_SESSION_STATE_FOCUSED) {
+        g_visible_once = true;
+        return;
+    }
+    if (std::chrono::steady_clock::now() - g_running_since < kVisibleTimeout) return;
+    g_visible_once = true;  // said once
+    diag::logf("openxr: session not visible after {} s (state {})", kVisibleTimeout.count(), state_name(g.state));
+    integration::show_message_box_async(
+        "The OpenXR runtime is not showing the game in the headset.\n\n"
+        "With SteamVR this is usually its Desktop Game Theatre. In Steam, open the Properties "
+        "of Alien: Isolation and uncheck 'Use Desktop Game Theatre while SteamVR is active', "
+        "then restart SteamVR and the game.",
+        MB_OK | MB_ICONWARNING);
+}
+
 void handle_state(XrSessionState s) {
     g.state = s;
+    diag::logf("openxr: session state {}", state_name(s));
     switch (s) {
         case XR_SESSION_STATE_READY: {
             XrSessionBeginInfo bi{XR_TYPE_SESSION_BEGIN_INFO};
             bi.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
             g.running = check(xrBeginSession(g.session, &bi), "xrBeginSession");
-            if (g.running) diag::log_line("openxr: session running");
+            if (g.running) {
+                diag::log_line("openxr: session running");
+                g_running_since = std::chrono::steady_clock::now();
+            }
             break;
         }
         case XR_SESSION_STATE_STOPPING:
@@ -386,24 +472,39 @@ std::filesystem::path probe() noexcept {
                 return set;
             }
         }
-        // Registered for 32-bit processes: the loader finds it unaided.
-        if (auto m = active_runtime(KEY_WOW64_32KEY); usable_from_x86(m)) return m;
-
-        // Only a 64-bit registration: look for its 32-bit sibling and point
-        // the loader at it. _wputenv_s updates both this module's CRT
-        // environment (the statically linked loader reads it) and the process.
-        if (auto m64 = active_runtime(KEY_WOW64_64KEY); !m64.empty()) {
+        // SteamVR and most runtimes' "make active" write only the 64-bit
+        // view, so a different 32-bit entry is usually left over from a
+        // runtime used before: prefer the 32-bit build of the one the user
+        // made active, and take the 32-bit entry only when that has none.
+        const auto m64 = active_runtime(KEY_WOW64_64KEY);
+        const auto m32 = active_runtime(KEY_WOW64_32KEY);
+        diag::logf("openxr: active runtime 64-bit {}, 32-bit {}",
+                   m64.empty() ? "(none)" : diag::utf8(m64), m32.empty() ? "(none)" : diag::utf8(m32));
+        std::filesystem::path chosen;
+        if (usable_from_x86(m64)) {
+            chosen = m64;
+        } else {
             for (const auto& m : x86_siblings(m64)) {
                 if (usable_from_x86(m)) {
-                    _wputenv_s(L"XR_RUNTIME_JSON", m.c_str());
+                    chosen = m;
                     diag::logf("openxr: using 32-bit sibling {} of active runtime", diag::utf8(m));
-                    return m;
+                    break;
                 }
             }
-            diag::logf("openxr: active runtime {} has no 32-bit build", diag::utf8(m64));
-        } else {
-            diag::log_line("openxr: no active runtime registered");
         }
+        if (chosen.empty() && usable_from_x86(m32)) chosen = m32;
+        if (chosen.empty()) {
+            if (m64.empty() && m32.empty()) diag::log_line("openxr: no active runtime registered");
+            else diag::log_line("openxr: no active runtime has a 32-bit build");
+            return {};
+        }
+        // Point the loader at the choice: the environment for the loader's
+        // own lookup (this module's CRT and the process), and a loader
+        // property in init_system, which an elevated process also honours.
+        _wputenv_s(L"XR_RUNTIME_JSON", chosen.c_str());
+        g_manifest = chosen;
+        if (process_elevated()) diag::log_line("openxr: the game runs elevated (as administrator)");
+        return chosen;
     } catch (const std::exception& e) {
         diag::logf("openxr: probe failed: {}", e.what());
     }
@@ -415,6 +516,7 @@ bool init_system() noexcept {
 
     // Instance with the D3D11 binding, and the per-eye FOV query where the
     // runtime offers it (the FOV is needed before a session can exist).
+    point_loader_at(g_manifest);
     std::uint32_t n_ext = 0;
     xrEnumerateInstanceExtensionProperties(nullptr, 0, &n_ext, nullptr);
     std::vector<XrExtensionProperties> props(n_ext, {XR_TYPE_EXTENSION_PROPERTIES});
@@ -739,6 +841,7 @@ bool frame(IDXGISwapChain* swapchain) noexcept {
     if (g.lost) return false;
     poll_events();
     if (!g.running) return false;
+    check_visible();
     return begin_frame();
 }
 

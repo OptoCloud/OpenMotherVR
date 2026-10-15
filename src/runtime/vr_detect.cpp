@@ -189,12 +189,25 @@ void report_init_failure(detect_result::Chosen runtime) noexcept {
             "SteamVR is active' in the Steam Properties for Alien: Isolation, and make sure that "
             "VR Game Theatre isn't running when you start the game.\n\n{}",
             f.what, f.code, kDisabled);
-    } else {
-        const char* name = runtime == detect_result::Chosen::OpenVR ? "SteamVR" : "OpenXR";
+    } else if (runtime == detect_result::Chosen::OpenVR) {
         text = std::format(
-            "Failed to initialize {}!\n[{} | {}]\n\n"
+            "Failed to initialize SteamVR!\n[{} | {}]\n\n"
             "Look into the above error, and try again once it has been resolved.\n\n{}",
-            name, f.what.empty() ? "unknown error" : f.what, f.code, kDisabled);
+            f.what.empty() ? "unknown error" : f.what, f.code, kDisabled);
+    } else {
+        // The choice is kept, so a restart retries OpenXR: say how to get back.
+        constexpr int kRuntimeUnavailable = -51; // XR_ERROR_RUNTIME_UNAVAILABLE
+        const std::string_view cause =
+            f.code == kRuntimeUnavailable
+                ? "No usable 32-bit OpenXR runtime could be loaded. mothervr.log lists the "
+                  "runtimes that were tried.\n\n"
+                : "";
+        text = std::format(
+            "Failed to initialize OpenXR!\n[{} | {}]\n\n{}"
+            "Look into the above error, and try again once it has been resolved.\n\n"
+            "To go back to SteamVR, choose \"Use SteamVR\" on the MotherVR options page, "
+            "or start the game with -vrforceopenvr.\n\n{}",
+            f.what.empty() ? "unknown error" : f.what, f.code, cause, kDisabled);
     }
     diag::message_box(text, MB_OK | MB_ICONERROR);
 }

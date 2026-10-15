@@ -3,6 +3,7 @@
 #include "diag/log.h"
 
 #include <atomic>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -55,6 +56,25 @@ void show_posted_message_boxes() noexcept {
 
 void wait_for_message_boxes() noexcept {
     if (HANDLE h = g_thread.load()) ::WaitForSingleObject(h, INFINITE);
+}
+
+void show_message_box_async(std::string text, unsigned type) noexcept {
+    try {
+        auto* box = new Posted{std::move(text), type, nullptr};
+        auto show = [](void* arg) -> DWORD {
+            std::unique_ptr<Posted> p{static_cast<Posted*>(arg)};
+            diag::message_box(p->text, p->type | MB_SETFOREGROUND);
+            return 0;
+        };
+        if (HANDLE h = ::CreateThread(nullptr, 0, show, box, 0, nullptr)) {
+            ::CloseHandle(h);
+        } else {
+            diag::logf("dialogs: CreateThread failed err=0x{:08X}", ::GetLastError());
+            delete box;
+        }
+    } catch (...) {
+        diag::log_line("dialogs: cannot show a message box");
+    }
 }
 
 } // namespace mothervr::integration

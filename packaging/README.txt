@@ -14,7 +14,10 @@ Requirements
 Install
 1. Copy d3d11.dll into the game folder, next to AI.exe.
    (Steam: right-click Alien: Isolation > Manage > Browse local files)
-2. Start SteamVR, then start the game from Steam.
+2. In Steam, open the game's Properties > General and uncheck "Use
+   Desktop Game Theatre while SteamVR is active". Left on, SteamVR shows
+   the game as a flat screen instead of in VR.
+3. Start SteamVR, then start the game from Steam.
    On first start the mod builds DATA\MOTHER.PAK (its options menu)
    from the game's own UI.PAK, and writes openvr_api.dll,
    mothervr.json and the mothervr_input folder (controller bindings).
@@ -48,6 +51,13 @@ Playing
   already does the job; "On" or "Off" force it.
 
 If something goes wrong
+- The headset shows the game as a flat screen (Theatre), or the game
+  starts in a small window: uncheck the Desktop Game Theatre option
+  (Install, step 2), then restart SteamVR and the game. After a crash,
+  check that the Theatre is not still open before starting again.
+- OpenXR fails to start: choose "Use SteamVR" on the MotherVR options
+  page, or start the game with -vrforceopenvr. After a failed start the
+  page shows the runtime as None and offers both runtimes.
 - Send mothervr.log from the game folder.
 - Crashes: also check Windows Event Viewer > Windows Logs > Application
   for an "AI.exe" error and send its details.

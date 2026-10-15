@@ -23,4 +23,8 @@ void show_posted_message_boxes() noexcept;
 // Never call it under the loader lock.
 void wait_for_message_boxes() noexcept;
 
+// Shows a box on a thread of its own and returns at once, for reports made
+// while the game runs (the render thread must not wait on the player).
+void show_message_box_async(std::string text, unsigned type) noexcept;
+
 } // namespace mothervr::integration

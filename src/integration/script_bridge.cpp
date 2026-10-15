@@ -15,7 +15,9 @@
 #include "config/config.h"
 #include "diag/log.h"
 #include "input/vr_controls.h"
+#include "runtime/vr_detect.h"
 #include "stereo/game_hooks.h"
+#include "stereo/stereo_device.h"
 
 #include <cstring>  // strtok_s, strncmp, strcmp
 #include <cstdlib>  // atoi, atof
@@ -58,6 +60,19 @@ int ui_runtime_value(config::VRRuntime r) noexcept {
         case config::VRRuntime::Oculus: return 1;
         case config::VRRuntime::OpenVR: return 2;
         default:                        return 0;
+    }
+}
+
+// The runtime this run drives: None when the chosen one failed to start, the
+// fallback when the stored one was not available. The menu then offers the
+// stored runtime (a retry) and the other one (the way back), where showing
+// the stored choice would hide that VR is not running.
+config::VRRuntime running_runtime(const config::Config& cfg) noexcept {
+    if (cfg.vr_runtime == config::VRRuntime::None || stereo::runtime_failed()) return config::VRRuntime::None;
+    switch (runtime::last_result().chosen) {
+        case runtime::detect_result::Chosen::OpenVR: return config::VRRuntime::OpenVR;
+        case runtime::detect_result::Chosen::OpenXR: return config::VRRuntime::OpenXR;
+        default:                                     return config::VRRuntime::None;
     }
 }
 
@@ -111,7 +126,7 @@ void push_settings_to_game(void* ui) noexcept {
     g_fire_bool (ui, nullptr, "setMotherVROptionsEnabled",       g_vr_session_active ? 1 : 0);
 
     // VR backend selector and debug/startup flags
-    g_fire_int  (ui, nullptr, "setMotherSetVRRuntime",           ui_runtime_value(cfg.vr_runtime));
+    g_fire_int  (ui, nullptr, "setMotherSetVRRuntime",           ui_runtime_value(running_runtime(cfg)));
     g_fire_int  (ui, nullptr, "setMotherDebug",                  cfg.debug.debug ? 1 : 0);
     g_fire_bool (ui, nullptr, "setMotherSkipIntro",              cfg.debug.skip_startup_intro ? 1 : 0);
 
