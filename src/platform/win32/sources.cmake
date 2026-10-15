@@ -1,0 +1,34 @@
+# Sources of src/platform/win32/; each directory lists its own files.
+target_sources(mothervr PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/build_stamp.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/build_stamp.h
+    ${CMAKE_CURRENT_LIST_DIR}/clock.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/clock.h
+    ${CMAKE_CURRENT_LIST_DIR}/command_line.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/command_line.h
+    ${CMAKE_CURRENT_LIST_DIR}/constants.h
+    ${CMAKE_CURRENT_LIST_DIR}/crash_filter.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/crash_filter.h
+    ${CMAKE_CURRENT_LIST_DIR}/dialog_thread.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/dialog_thread.h
+    ${CMAKE_CURRENT_LIST_DIR}/dll_directory_scope.h
+    ${CMAKE_CURRENT_LIST_DIR}/file_io.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/file_io.h
+    ${CMAKE_CURRENT_LIST_DIR}/file_log_sink.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/file_log_sink.h
+    ${CMAKE_CURRENT_LIST_DIR}/message_box.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/message_box.h
+    ${CMAKE_CURRENT_LIST_DIR}/module.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/module.h
+    ${CMAKE_CURRENT_LIST_DIR}/named_mutex.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/named_mutex.h
+    ${CMAKE_CURRENT_LIST_DIR}/payload_files.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/payload_files.h
+    ${CMAKE_CURRENT_LIST_DIR}/proc.h
+    ${CMAKE_CURRENT_LIST_DIR}/process_info.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/process_info.h
+    ${CMAKE_CURRENT_LIST_DIR}/resources.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/resources.h
+    ${CMAKE_CURRENT_LIST_DIR}/text.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/text.h
+)

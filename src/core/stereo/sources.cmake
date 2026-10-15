@@ -1,0 +1,34 @@
+# Sources of src/core/stereo/; each directory lists its own files.
+target_sources(mothervr PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/blinders.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/blinders.h
+    ${CMAKE_CURRENT_LIST_DIR}/cull_policy.h
+    ${CMAKE_CURRENT_LIST_DIR}/desktop_window.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/desktop_window.h
+    ${CMAKE_CURRENT_LIST_DIR}/head_clip_delay.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/head_clip_delay.h
+    ${CMAKE_CURRENT_LIST_DIR}/mirror_layout.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/mirror_layout.h
+    ${CMAKE_CURRENT_LIST_DIR}/mode_policy.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/mode_policy.h
+    ${CMAKE_CURRENT_LIST_DIR}/reflection_pass.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/reflection_pass.h
+    ${CMAKE_CURRENT_LIST_DIR}/render_target.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/render_target.h
+    ${CMAKE_CURRENT_LIST_DIR}/scene_tracker.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/scene_tracker.h
+    ${CMAKE_CURRENT_LIST_DIR}/sensor_start.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/sensor_start.h
+    ${CMAKE_CURRENT_LIST_DIR}/stereo_aa.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/stereo_aa.h
+    ${CMAKE_CURRENT_LIST_DIR}/stereo_device.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/stereo_device.h
+    ${CMAKE_CURRENT_LIST_DIR}/stereo_update.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/stereo_update.h
+    ${CMAKE_CURRENT_LIST_DIR}/tuning.h
+    ${CMAKE_CURRENT_LIST_DIR}/types.h
+    ${CMAKE_CURRENT_LIST_DIR}/ui_placement.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ui_placement.h
+    ${CMAKE_CURRENT_LIST_DIR}/virtual_screen_policy.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/virtual_screen_policy.h
+)

@@ -24,9 +24,9 @@ endif()
 set(MOTHERVR_VERSION_MAJOR ${CMAKE_MATCH_1})
 set(MOTHERVR_VERSION_MINOR ${CMAKE_MATCH_2})
 set(MOTHERVR_VERSION_PATCH ${CMAKE_MATCH_3})
-configure_file(src/version.rc.in "${CMAKE_CURRENT_BINARY_DIR}/version.rc" @ONLY)
+configure_file(src/loader/version.rc.in "${CMAKE_CURRENT_BINARY_DIR}/version.rc" @ONLY)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -40,7 +40,7 @@ find_package(minhook CONFIG REQUIRED)
 
 # openvr: headers only. Linking openvr_api would add a static import on
 # openvr_api.dll, which lives at a path discovered at runtime; we instead
-# LoadLibrary + GetProcAddress from runtime/openvr_backend.cpp.
+# LoadLibrary + GetProcAddress from platform/openvr/api_loader.cpp.
 # The vcpkg openvr port installs only headers (no CMake config file), so we
 # locate them with find_path rather than find_package. The vcpkg toolchain
 # puts its include directory on the search path.
@@ -84,13 +84,13 @@ endif()
 # The pass-through exports are listed twice: as thunks (d3d11_exports.inc)
 # and as aliases in the module definition file (d3d11.def). Check that the
 # two name the same functions; reconfigure when either changes.
-set(MOTHERVR_EXPORTS_INC "${CMAKE_CURRENT_SOURCE_DIR}/src/proxy/d3d11_exports.inc")
-set(MOTHERVR_DEF "${CMAKE_CURRENT_SOURCE_DIR}/src/d3d11.def")
+set(MOTHERVR_EXPORTS_INC "${CMAKE_CURRENT_SOURCE_DIR}/src/loader/d3d11_exports.inc")
+set(MOTHERVR_DEF "${CMAKE_CURRENT_SOURCE_DIR}/src/loader/d3d11.def")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${MOTHERVR_EXPORTS_INC}" "${MOTHERVR_DEF}")
-file(STRINGS "${MOTHERVR_EXPORTS_INC}" _inc_lines REGEX "^MVR_D3D11_FORWARD\\(")
+file(STRINGS "${MOTHERVR_EXPORTS_INC}" _inc_lines REGEX "^OMVR_D3D11_FORWARD\\(")
 set(_inc_names "")
 foreach(_line IN LISTS _inc_lines)
-    string(REGEX REPLACE "^MVR_D3D11_FORWARD\\([0-9]+, *([A-Za-z0-9_]+)\\).*$" "\\1" _name "${_line}")
+    string(REGEX REPLACE "^OMVR_D3D11_FORWARD\\([0-9]+, *([A-Za-z0-9_]+)\\).*$" "\\1" _name "${_line}")
     list(APPEND _inc_names "${_name}")
 endforeach()
 file(STRINGS "${MOTHERVR_DEF}" _def_lines REGEX "= *mvr_fwd_")
@@ -107,46 +107,26 @@ endforeach()
 list(SORT _inc_names)
 list(SORT _def_names)
 if(NOT _inc_names STREQUAL _def_names)
-    message(FATAL_ERROR "src/d3d11.def and src/proxy/d3d11_exports.inc list different pass-through "
+    message(FATAL_ERROR "src/loader/d3d11.def and src/loader/d3d11_exports.inc list different pass-through "
                         "exports.\n.inc: ${_inc_names}\n.def: ${_def_names}")
 endif()
 
-add_library(mothervr SHARED
-    src/dllmain.cpp
-    src/d3d11.def
-    src/audio/audio_redirect.cpp
-    src/proxy/d3d11_proxy.cpp
-    src/render/shader_patch.cpp
-    src/diag/crash_log.cpp
-    src/diag/log.cpp
-    src/diag/texture_dump.cpp
-    src/config/config.cpp
-    src/integration/dialogs.cpp
-    src/integration/exe_check.cpp
-    src/integration/script_bridge.cpp
-    src/integration/payloads.cpp
-    src/integration/ui_patch.cpp
-    src/hook/memory_patch.cpp
-    src/hook/ai_patches.cpp
-    src/hook/ai_addresses.cpp
-    src/hook/hook_installer.cpp
-    src/hook/detour.cpp
-    src/game/game_events.cpp
-    src/stereo/present.cpp
-    src/stereo/stereo_device.cpp
-    src/stereo/game_hooks.cpp
-    src/input/gamepad.cpp
-    src/input/vr_controls.cpp
-    src/runtime/vr_detect.cpp
-    src/runtime/openvr_backend.cpp
-    src/runtime/openvr_hmd.cpp
-    src/runtime/openvr_actions.cpp
-    src/runtime/openxr_backend.cpp
-    src/runtime/openxr_hmd.cpp
-    src/runtime/openxr_input.cpp
-    src/mothervr.rc
-    "${CMAKE_CURRENT_BINARY_DIR}/version.rc"
+add_library(mothervr SHARED "${CMAKE_CURRENT_BINARY_DIR}/version.rc")
+
+# Each source directory lists its own files (src/**/sources.cmake), in the
+# order of the layers: util, platform, game, core, loader.
+set(MOTHERVR_SOURCE_DIRS
+    util/base util/binary util/hash util/math util/sync util/text
+    platform/win32 platform/win32/input platform/win32/patching platform/win32/window
+    platform/d3d11 platform/d3d11/render platform/openvr platform/openxr platform/audio
+    game game/sites game/stereo game/input game/ui game/audio
+    core/diag core/diag/ports core/config core/config/ports core/ui core/ui/ports
+    core/vr core/vr/ports core/input core/input/ports core/stereo core/stereo/ports core/render
+    loader loader/hooks
 )
+foreach(_dir IN LISTS MOTHERVR_SOURCE_DIRS)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/src/${_dir}/sources.cmake")
+endforeach()
 
 if(MSVC)
     target_compile_options(mothervr PRIVATE

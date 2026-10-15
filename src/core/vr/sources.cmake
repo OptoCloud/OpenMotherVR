@@ -1,0 +1,13 @@
+# Sources of src/core/vr/; each directory lists its own files.
+target_sources(mothervr PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/hand_offsets.h
+    ${CMAKE_CURRENT_LIST_DIR}/pose_convert.h
+    ${CMAKE_CURRENT_LIST_DIR}/runtime_choice.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/runtime_choice.h
+    ${CMAKE_CURRENT_LIST_DIR}/runtime_detector.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/runtime_detector.h
+    ${CMAKE_CURRENT_LIST_DIR}/runtime_failure.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/runtime_failure.h
+    ${CMAKE_CURRENT_LIST_DIR}/tuning.h
+    ${CMAKE_CURRENT_LIST_DIR}/types.h
+)

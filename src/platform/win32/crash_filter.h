@@ -1,0 +1,64 @@
+#pragma once
+
+#include "platform/win32/constants.h"
+
+#include <atomic>
+#include <cstddef>
+#include <format>
+#include <utility>
+
+struct _EXCEPTION_POINTERS;
+
+// One log line for a crash: the exception, the module and offset it happened
+// in, and the registers, so a report needs only mothervr.log. Windows still
+// records the crash as before: the filter that was installed before ours
+// runs after it.
+namespace omvr::platform::win32 {
+
+class CrashRecorder {
+public:
+    // An unhandled-exception filter (LPTOP_LEVEL_EXCEPTION_FILTER).
+    using Filter = long(__stdcall*)(_EXCEPTION_POINTERS* info);
+
+    // Installs `ours` as the unhandled-exception filter. Call once, at attach.
+    void install(Filter ours) noexcept;
+
+    // Puts `ours` back on top if something installed another one after
+    // attach (the game or its C runtime), which would otherwise silently drop
+    // the crash record. The filter found there is kept and runs after the
+    // record. Logs once per change. Cheap (one system call), but not for the
+    // render thread's every frame: call it at points the game passes now and
+    // then, such as a menu opening or the first frame.
+    void reassert(Filter ours) noexcept;
+
+    // The filter's work: the record (first crash only), then the chain.
+    long on_crash(_EXCEPTION_POINTERS* info) noexcept;
+
+private:
+    template <class... Args>
+    void record(std::format_string<Args...> fmt, Args&&... args) noexcept;
+    void write_record(const _EXCEPTION_POINTERS& info) noexcept;
+    long chain(_EXCEPTION_POINTERS* info) noexcept;
+
+    Filter                     g_previous = nullptr;
+    std::atomic<bool>          g_logged{false};
+    // A filter the game (or its C runtime) installed over ours after attach.
+    // Ours is put back on top and this one runs after the record, so neither
+    // the record nor the game's own handling is lost.
+    std::atomic<Filter>        g_game_filter{nullptr};
+    // The thread currently inside g_game_filter: if that filter chains to the
+    // one it replaced (ours), the nested call goes on to g_previous instead of
+    // looping back into it.
+    std::atomic<unsigned long> g_chaining_thread{0};
+
+    // The record is rendered in storage allocated once at attach, not on the
+    // faulting thread's stack: after a stack overflow only the guard region
+    // is left, too little for log_line's buffer plus two MAX_PATH names.
+    // g_logged makes the record a one-off, so one set of buffers is enough.
+    char    g_message[1024];
+    char    g_line[1280];
+    wchar_t g_path[kMaxPath];
+    char    g_name[kMaxPath * 3]; // UTF-8 of a MAX_PATH wide name
+};
+
+} // namespace omvr::platform::win32

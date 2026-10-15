@@ -1,6 +1,0 @@
-#include "resource.h"
-
-// Payloads extracted from the original dxgi.dll's .rsrc (see
-// dumps/05_embedded_resources_and_ui.md). Paths are relative to this file.
-IDR_OPENVR_API BINARY "../res/openvr_api.dll"
-IDR_UI_PATCH   BINARY "../res/ui_patch.bin"

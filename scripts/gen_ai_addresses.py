@@ -1,4 +1,4 @@
-"""Generate src/hook/ai_address_tables.inc from the original dxgi.dll.
+"""Generate src/game/ai_address_tables.inc from the original dxgi.dll.
 
 The original keeps one 127-entry table of AI.exe RVAs per supported build:
   - Patched_2020 (timestamp 0x5FD25676): written entry by entry in

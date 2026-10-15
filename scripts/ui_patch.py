@@ -5,7 +5,7 @@ against the player's own DATA/UI.PAK, so no game files are distributed.
     python -I scripts/ui_patch.py apply <stock UI.PAK> <patch.bin> <out.PAK>
     python -I scripts/ui_patch.py check <stock UI.PAK> <modded UI.PAK> <patch.bin>
 
-Patch format (little-endian), read by src/integration/ui_patch.cpp:
+Patch format (little-endian), read by src/core/ui/ui_patch.cpp:
 
     char[8] magic "MVRUIP01"
     u32     alignment        of the output PAK2 archive

@@ -58,12 +58,12 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
 
 ## Rules for patching the game
 
-- Every `AI.exe` address goes in a table: `src/hook/ai_address_tables.inc`
-  (generated, from the original's table) or `src/hook/recon_addresses.h`,
+- Every `AI.exe` address goes in a table: `src/game/ai_address_tables.inc`
+  (generated, from the original's table) or `src/game/addresses.h`,
   with the 2015 RVA and the 2020 RVA, or 0 when the 2020 one is unknown so
   the feature stays off there. No address literals in feature code.
 - Verify before writing: a call site with `calls(site, target)`, code bytes
-  in the installer's preflight, a function entry through `hook::detour` with
+  in the installer's preflight, a function entry through `game::detour` with
   its expected prologue bytes. If anything differs, patch nothing and log it.
 - A replacement for a `__thiscall` method is
   `__fastcall(void* self, void* edx, ...)` with the same stack arguments and
@@ -72,7 +72,7 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
   layout; their `static_assert`s on size and offsets must keep holding.
 - Threads: the game thread reads head poses, the render thread runs
   begin/end frame and the runtime, and job threads run the cull hooks.
-  Data crossing threads goes through atomics or `runtime::SeqLock`.
+  Data crossing threads goes through atomics or `util::SeqLock`.
 - No allocation, file I/O or logging per frame on the render thread; log
   once per change, or every 900 frames behind `DebugOptions`.
 - Never link `d3d11.lib`: this DLL is `d3d11.dll` and would import itself.

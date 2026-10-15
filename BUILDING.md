@@ -19,36 +19,26 @@ tracked any more (`archive/dumps/v2/decompiled/` where kept locally).
   res/                         payloads embedded in the DLL
     ui_patch.bin               delta stock UI.PAK -> MotherVR's MOTHER.PAK (neither archive is in the repo)
     openvr_api.dll             Valve OpenVR loader 1.0.10
-  src/
-    dllmain.cpp                DLL entry, init order
-    d3d11.def, mothervr.rc     exports, embedded payloads (resource.h has the IDs)
-    proxy/                     d3d11 forwarders, swapchain Present/ResizeBuffers and
-                               CreatePixelShader hooks
-    render/                    pixel shader fix (per-eye lighting dither)
-    diag/                      log file; texture_dump writes a texture to .dds (debug)
-    config/                    mothervr.json
-    util/                      small helpers (typed GetProcAddress)
-    audio/                     game audio to the headset (OpenXR on Meta runtimes)
-    integration/
-      exe_check                AI.exe build detection (2015 / 2020)
-      payloads                 deploys MOTHER.PAK and openvr_api.dll
-      ui_patch                 builds MOTHER.PAK from UI.PAK and the embedded patch
-      script_bridge            mvr_* console commands, setMother* UI pushes
-      dialogs                  message boxes queued in DllMain, shown after it
-    hook/
-      ai_addresses             per-build AI.exe address tables (generated .inc)
-      hook_installer           the patch sequence from FUN_1001d6f0
-      ai_patches, memory_patch patch tables and write helpers
-    runtime/                   VR runtime detection, OpenVR and OpenXR backends and input
-    input/                     VR input through the game's gamepad (vtable hooks, action-map remap)
-    stereo/                    StereoManager and stereo device, game-side stereo hooks
-                               (game_hooks), the OpenXR virtual-screen Present path
+  src/                         layers, each depending only on those above it
+    util/                      generic helpers: maths, sync, hashing, binary, text
+    platform/                  one external API each, wrapped in project types
+      win32/                   log file, dialogs, payload files, patching, window, crash record
+      d3d11/                   the system d3d11.dll, swapchain, mirror renderer, texture dump
+      openvr/, openxr/         the VR runtimes, their input and probes
+      audio/                   game audio to the headset (OpenXR on Meta runtimes)
+    game/                      AI.exe: address tables (generated .inc), layouts, build
+                               detection, verified patching, the patch sites
+    core/                      the mod's logic: stereo, render (shader fix), vr, input,
+                               config (mothervr.json), ui (options page, MOTHER.PAK), diag
+    loader/                    DLL entry, the context that wires everything, the d3d11
+                               exports (d3d11.def, resources.rc, resource_ids.h) and the
+                               hooks the game, COM and the OS call
 ```
 
-`src/hook/ai_address_tables.inc` is generated from the original binary:
+`src/game/ai_address_tables.inc` is generated from the original binary:
 
 ```
-python scripts/gen_ai_addresses.py archive/dxgi.dll archive/dumps/v2/decompiled/FUN_10001840_10001840.c src/hook/ai_address_tables.inc
+python scripts/gen_ai_addresses.py archive/dxgi.dll archive/dumps/v2/decompiled/FUN_10001840_10001840.c src/game/ai_address_tables.inc
 ```
 
 ## Mapping back to the original
@@ -135,7 +125,7 @@ be mapped to source with that release's PDB.
 `-DMOTHERVR_VERSION=1.2.3` stamps a version into the DLL's version resource
 (Properties > Details in Explorer); local builds are `0.0.0-dev`.
 
-`src/d3d11.def` and `src/proxy/d3d11_exports.inc` both list the pass-through
+`src/loader/d3d11.def` and `src/loader/d3d11_exports.inc` both list the pass-through
 exports; configure fails if they differ.
 
 ### Install and test

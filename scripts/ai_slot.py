@@ -4,7 +4,7 @@
 
 Each DAT_10066bc8 + 4*i global in the original dxgi.dll holds the AI.exe
 address for slot i, rebased at startup. The per-build RVAs are in
-src/hook/ai_address_tables.inc; this prints slot, RVA and the code or
+src/game/ai_address_tables.inc; this prints slot, RVA and the code or
 data found there in the given AI.exe (2015 table unless --2020).
 """
 import pathlib
@@ -15,7 +15,7 @@ import sys
 import capstone
 import pefile
 
-INC = pathlib.Path(__file__).resolve().parent.parent / "src/hook/ai_address_tables.inc"
+INC = pathlib.Path(__file__).resolve().parent.parent / "src/game/ai_address_tables.inc"
 
 
 def table(use_2020: bool) -> list[int]:
