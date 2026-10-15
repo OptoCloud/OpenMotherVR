@@ -48,6 +48,8 @@ bool          g_follow_active = false;
 constexpr std::ptrdiff_t kFollowYaw         = 0x204;  // ±1 = ±180°
 constexpr std::ptrdiff_t kFollowYawMirror   = 0x1FC;
 constexpr std::ptrdiff_t kFollowLookEnabled = 0x264;  // game stick/mouse look
+constexpr std::ptrdiff_t kFollowRootPos     = 0x1C0;  // character root, world x y z
+constexpr std::ptrdiff_t kFollowHeadPos     = 0x1CC;  // "Head1" bone, world x y z
 
 // A cutscene or level fade is running; the camera left the player during
 // it. Original: DAT_1006863a, DAT_1006863b.
@@ -70,6 +72,9 @@ struct {
 constexpr int   kTurnCode        = 0x12C;  // player map, analog #3 (turn)
 constexpr float kTurnThreshold   = 0.5f;
 constexpr auto  kSnapRepeat      = std::chrono::milliseconds(300);
+// Debug: how long after a snap step the camera is traced.
+constexpr auto  kSnapTraceTime   = std::chrono::milliseconds(600);
+std::chrono::steady_clock::time_point g_last_snap{};  // kept past the stick's release
 constexpr int   kPadLB = 10, kPadRB = 11, kPadRStick = 15;
 constexpr int   kScanLCtrl = 0x1D, kScanLAlt = 0x38;
 
@@ -78,11 +83,21 @@ constexpr int   kScanLCtrl = 0x1D, kScanLAlt = 0x38;
 template <class Fn>
 Fn game_fn(AiAddr slot) noexcept { return reinterpret_cast<Fn>(ai_address(slot)); }
 
+// Debug: each change of the mode (0 world, 1 virtual screen), to follow
+// which menus, videos and loading screens get the screen.
+void log_mode_change(int before, int after) noexcept {
+    if (before != after && config::current().debug.debug) diag::logf("[diag] mode {} -> {}", before, after);
+}
+
 void game_push_mode(StereoManager* sm, int mode) noexcept {
+    const int before = sm->mode;
     game_fn<void (__fastcall*)(StereoManager*, void*, int)>(AiAddr::GamePushMode)(sm, nullptr, mode);
+    log_mode_change(before, sm->mode);
 }
 void game_pop_mode(StereoManager* sm) noexcept {
+    const int before = sm->mode;
     game_fn<void (__fastcall*)(StereoManager*, void*)>(AiAddr::GamePopMode)(sm, nullptr);
+    log_mode_change(before, sm->mode);
 }
 
 template <class T = void>
@@ -117,6 +132,22 @@ void identity(float* m) noexcept {
 }
 
 StereoManager& sm() noexcept { return manager(); }
+
+// Debug: the camera around a snap step, to tell the body catching up with
+// the new heading (the eye follows the head bone, which swings around the
+// root as the body turns) from game look turning as well. Game thread.
+void trace_snap(std::chrono::steady_clock::time_point step, bool keyboard_mouse) noexcept {
+    if (!config::current().debug.debug || step == std::chrono::steady_clock::time_point{}) return;
+    const auto since = std::chrono::steady_clock::now() - step;
+    if (since > kSnapTraceTime) return;
+    const float dx = field<float>(g_follow, kFollowHeadPos) - field<float>(g_follow, kFollowRootPos);
+    const float dz = field<float>(g_follow, kFollowHeadPos + 8) - field<float>(g_follow, kFollowRootPos + 8);
+    diag::logf("[diag] snap +{}ms: yaw {:.3f} target {:.3f}, head-root {:.3f} m ({:.3f}, {:.3f}), look {}, k&m {}",
+               std::chrono::duration_cast<std::chrono::milliseconds>(since).count(),
+               field<float>(g_follow, kFollowYawMirror), field<float>(g_follow, kFollowYaw),
+               std::hypot(dx, dz), dx, dz, field<std::uint8_t>(g_follow, kFollowLookEnabled),
+               keyboard_mouse);
+}
 
 } // namespace
 
@@ -162,9 +193,10 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
         const bool  out  = turn < -kTurnThreshold || turn > kTurnThreshold;
         if (g_follow_active && input_cfg.snap_rotation && out && self->mode != 1 && !u.snap_latch) {
             // One step; yaw is in half turns, wrapped to [-1, 1].
-            u.snap_time = std::chrono::steady_clock::now();
-            const int   half_segments = input_cfg.snap_rotation_segments / 2;
-            const float step = 1.0f / static_cast<float>(half_segments > 0 ? half_segments : 1);
+            u.snap_time = g_last_snap = std::chrono::steady_clock::now();
+            // A full turn is 2 half turns; in floating point, so 3 segments
+            // step 120 degrees rather than 180.
+            const float step = 2.0f / static_cast<float>(std::max(input_cfg.snap_rotation_segments, 2));
             float yaw = field<float>(g_follow, kFollowYaw) + (turn < -kTurnThreshold ? -step : step);
             if (yaw > 1.0f) yaw -= 2.0f;
             if (yaw < -1.0f) yaw += 2.0f;
@@ -192,6 +224,7 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
     }
     if (g_follow_active) {
         field<std::uint8_t>(g_follow, kFollowLookEnabled) = !input_cfg.snap_rotation || u.keyboard_mouse;
+        trace_snap(g_last_snap, u.keyboard_mouse);
     }
 
     // Recenter on the chord (or our own request), then re-place the menu
