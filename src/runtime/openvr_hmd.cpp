@@ -487,7 +487,7 @@ void OpenVrHmd::check_scene_app() {
                     "Properties of Alien: Isolation and uncheck 'Use Desktop Game Theatre while "
                     "SteamVR is active', then restart SteamVR and the game.",
                     name.empty() ? std::string{} : " (it shows " + name + ")"),
-        MB_OK | MB_ICONWARNING);
+        MB_OK | MB_ICONWARNING, "headset not showing the game");
 }
 
 // ---- extension -----------------------------------------------------------------

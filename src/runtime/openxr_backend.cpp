@@ -528,7 +528,7 @@ void check_visible() noexcept {
         "With SteamVR this is usually its Desktop Game Theatre. In Steam, open the Properties "
         "of Alien: Isolation and uncheck 'Use Desktop Game Theatre while SteamVR is active', "
         "then restart SteamVR and the game.",
-        MB_OK | MB_ICONWARNING);
+        MB_OK | MB_ICONWARNING, "headset not showing the game");
 }
 
 void handle_state(XrSessionState s) {

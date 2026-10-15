@@ -243,7 +243,7 @@ void report_init_failure(detect_result::Chosen runtime) noexcept {
             "or start the game with -vrforceopenvr.\n\n{}",
             f.what.empty() ? "unknown error" : f.what, f.code, cause, kDisabled);
     }
-    diag::message_box(text, MB_OK | MB_ICONERROR);
+    diag::message_box(text, MB_OK | MB_ICONERROR, "runtime failed");
 }
 
 } // namespace mothervr::runtime
