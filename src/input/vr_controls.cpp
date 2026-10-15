@@ -9,6 +9,7 @@
 #include "config/config.h"
 #include "gamepad.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 
@@ -69,7 +70,11 @@ void write_controls(const Controls& c, bool near_head) noexcept {
         tier.digital[k] = v;
         active |= v;
     };
+    // Every analog value stays within the range the game's own pad delivers,
+    // scaled or not: a runtime may report a stick slightly past 1 (spec 04
+    // section 9). NaN fails both compares of clamp, so map it to 0 first.
     auto analog = [&active](ActionTier& tier, int j, float v) {
+        v = std::isnan(v) ? 0.0f : std::clamp(v, -1.0f, 1.0f);
         tier.analog[j] = v;
         active |= std::fabs(v) > kActive;
     };
