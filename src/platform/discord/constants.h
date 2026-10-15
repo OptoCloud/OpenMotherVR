@@ -12,7 +12,7 @@ namespace omvr::platform::discord {
 // application is named "Alien: Isolation VR". Created at
 // https://discord.com/developers/applications. Empty: Rich Presence stays
 // off in this build.
-inline constexpr std::string_view kApplicationId = "";
+inline constexpr std::string_view kApplicationId = "1560307824381263962";
 
 // Art key uploaded under the application's Rich Presence assets, and its
 // hover text. A key Discord does not know shows no image.
