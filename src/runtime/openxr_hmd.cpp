@@ -169,6 +169,8 @@ public:
             eye_offsets[e * 3 + 1] = o.y;
             eye_offsets[e * 3 + 2] = o.z;
         }
+        if (cinema_ != !head_tracked && config::current().debug.debug)
+            diag::logf("[diag] frames now {}", head_tracked ? "tracked" : "on the screen");
         cinema_ = !head_tracked;
     }
 

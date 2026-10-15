@@ -15,6 +15,7 @@
 // start when the game creates its stereo device.
 
 #include "config/config.h"
+#include "diag/crash_log.h"
 #include "diag/log.h"
 #include "hook/hook_installer.h"
 #include "integration/dialogs.h"
@@ -83,6 +84,7 @@ void attach(HINSTANCE self) {
 void on_attach(HINSTANCE self) noexcept {
     mothervr::diag::init(self);
     mothervr::diag::log_line("== MotherVR attach ==");
+    mothervr::diag::install_crash_log();
     // Nothing may leave DllMain: a throw here would kill the game at launch.
     try {
         attach(self);

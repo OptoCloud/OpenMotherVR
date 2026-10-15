@@ -5,12 +5,16 @@
 #include "hook/detour.h"
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <atomic>
 #include <mutex>
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
+
+#include <windows.h>
 
 namespace mothervr::game {
 
@@ -110,8 +114,24 @@ TapFn g_original = nullptr;
 
 // __thiscall(this, const char*), callee pops the argument: __fastcall with
 // the unused edx matches it.
+// The tap's code is shared: the game's linker folded other functions with
+// the same body into it, some of which Scaleform calls through a vtable with
+// an argument that is not a string. Every event name is a literal in the
+// game's image, so only pointers into it are read.
+bool in_game_image(const char* p) noexcept {
+    static const auto [lo, hi] = [] {
+        const auto* base = reinterpret_cast<const std::uint8_t*>(::GetModuleHandleW(nullptr));
+        const auto* dos  = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+        const auto* nt   = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + dos->e_lfanew);
+        return std::pair{reinterpret_cast<std::uintptr_t>(base),
+                         reinterpret_cast<std::uintptr_t>(base) + nt->OptionalHeader.SizeOfImage};
+    }();
+    const auto a = reinterpret_cast<std::uintptr_t>(p);
+    return a >= lo && a < hi;
+}
+
 void* __fastcall tap(void* self, void* edx, const char* text) noexcept {
-    if (text) {
+    if (text && in_game_image(text)) {
         const std::string_view s{text};
         const bool changed = on_event(s);
         if (config::current().debug.debug) log_event(s, changed);

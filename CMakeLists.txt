@@ -90,6 +90,7 @@ add_library(mothervr SHARED
     src/audio/audio_redirect.cpp
     src/proxy/d3d11_proxy.cpp
     src/render/shader_patch.cpp
+    src/diag/crash_log.cpp
     src/diag/log.cpp
     src/diag/texture_dump.cpp
     src/config/config.cpp
