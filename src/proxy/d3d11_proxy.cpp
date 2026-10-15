@@ -253,6 +253,24 @@ void fit_game_window(IDXGISwapChain* sc) noexcept {
     if (SUCCEEDED(sc->GetDesc(&desc)) && desc.Windowed) fit_window(desc.OutputWindow);
 }
 
+// DXGI's own Alt+Enter would also switch the side-by-side buffer to
+// fullscreen. It goes through SetFullscreenState, which refuses, but the
+// association is switched off as well, on the factory that made the
+// swapchain, so the toggle is not attempted at all while VR is up.
+void no_alt_enter_while_vr(IDXGISwapChain* sc, HWND hwnd) noexcept {
+    if (!hwnd || !mothervr::stereo::manager().device) return;
+    IDXGIFactory* factory = nullptr;
+    HRESULT hr = sc->GetParent(__uuidof(IDXGIFactory), reinterpret_cast<void**>(&factory));
+    if (SUCCEEDED(hr) && factory) {
+        hr = factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+        factory->Release();
+    }
+    if (FAILED(hr)) {
+        diag::logf("proxy: DXGI Alt+Enter not switched off (hr=0x{:08X}); fullscreen requests are still refused",
+                   static_cast<unsigned>(hr));
+    }
+}
+
 HRESULT __stdcall hook_ResizeBuffers(void* This, UINT BufferCount,
                                      UINT Width, UINT Height,
                                      DXGI_FORMAT NewFormat,
@@ -274,11 +292,12 @@ HRESULT __stdcall hook_ResizeBuffers(void* This, UINT BufferCount,
 }
 
 // VirtualProtect-swap a single vtable slot. Returns the previous slot value
-// (so the caller can stash it as the "real" function pointer).
-void* patch_vtable_slot(void** slot, void* replacement) noexcept {
+// (so the caller can stash it as the "real" function pointer), or null after
+// logging `method` when the slot cannot be written.
+void* patch_vtable_slot(void** slot, void* replacement, const char* method) noexcept {
     DWORD old_protect = 0;
     if (!::VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &old_protect)) {
-        mothervr::diag::logf("proxy: VirtualProtect failed err=0x{:08X}",
+        mothervr::diag::logf("proxy: interception of {} failed: VirtualProtect error {}", method,
                              ::GetLastError());
         return nullptr;
     }
@@ -330,7 +349,7 @@ void install_device_hooks(void* device) noexcept {
     if (!device || s_done.exchange(true)) return;
     void** vtbl = *reinterpret_cast<void***>(device);
     if (auto* prev = patch_vtable_slot(&vtbl[kCreatePixelShaderVtblIndex],
-                                       reinterpret_cast<void*>(&hook_CreatePixelShader))) {
+                                       reinterpret_cast<void*>(&hook_CreatePixelShader), "CreatePixelShader")) {
         g_real_create_ps = reinterpret_cast<PFN_CreatePixelShader>(prev);
         mothervr::diag::log_line("proxy: CreatePixelShader hooked (shader fixes)");
     }
@@ -442,33 +461,36 @@ void install_swapchain_hooks(void* swapchain) noexcept {
     auto* sc = static_cast<IDXGISwapChain*>(swapchain);
     log_swapchain_desc(sc);
     fit_game_window(sc);
-    if (DXGI_SWAP_CHAIN_DESC desc{}; SUCCEEDED(sc->GetDesc(&desc))) keep_focus_while_vr(desc.OutputWindow);
+    if (DXGI_SWAP_CHAIN_DESC desc{}; SUCCEEDED(sc->GetDesc(&desc))) {
+        keep_focus_while_vr(desc.OutputWindow);
+        no_alt_enter_while_vr(sc, desc.OutputWindow);
+    }
 
+    // Each replacement goes in on its own: one that cannot be installed is
+    // logged and the others still are. The stereo frame depends on none of
+    // them; without Present the OpenXR path without a stereo device is off,
+    // without ResizeBuffers the back buffer follows the game's size after a
+    // resize, without SetFullscreenState the fullscreen option may break the
+    // mirror.
     void** vtbl = *reinterpret_cast<void***>(sc);
 
     if (auto* prev = patch_vtable_slot(&vtbl[kPresentVtblIndex],
-                                       reinterpret_cast<void*>(&hook_Present))) {
+                                       reinterpret_cast<void*>(&hook_Present), "Present")) {
         g_real_present = reinterpret_cast<PFN_Present>(prev);
         diag::logf("proxy: Present hooked, original=0x{:08X}",
                    reinterpret_cast<std::uintptr_t>(g_real_present));
-    } else {
-        // Could not patch Present: abort to avoid a partially-hooked state.
-        g_hooks_installed.store(false);
-        return;
     }
 
     if (auto* prev = patch_vtable_slot(&vtbl[kSetFullscreenStateVtblIndex],
-                                       reinterpret_cast<void*>(&hook_SetFullscreenState))) {
+                                       reinterpret_cast<void*>(&hook_SetFullscreenState), "SetFullscreenState")) {
         g_real_set_fullscreen = reinterpret_cast<PFN_SetFullscreenState>(prev);
     }
 
     if (auto* prev = patch_vtable_slot(&vtbl[kResizeBuffersVtblIndex],
-                                       reinterpret_cast<void*>(&hook_ResizeBuffers))) {
+                                       reinterpret_cast<void*>(&hook_ResizeBuffers), "ResizeBuffers")) {
         g_real_resize = reinterpret_cast<PFN_ResizeBuffers>(prev);
         diag::logf("proxy: ResizeBuffers hooked, original=0x{:08X}",
                    reinterpret_cast<std::uintptr_t>(g_real_resize));
-    } else {
-        diag::log_line("proxy: ResizeBuffers patch failed, resize events will be silent");
     }
 }
 
