@@ -550,8 +550,10 @@ void __fastcall render_reflection(void* pov, void*) noexcept {
     auto* owner = static_cast<std::uint8_t*>(*g_reflection.renderer_eye_owner);
     const std::int32_t saved_renderer_eye = owner ? field<std::int32_t>(owner, 0x2C) : 0;
 
+    // The capture is a DebugOptions diagnostic: with it off the key does
+    // nothing.
     static bool s_dump_key = false;
-    const bool dump_key = ::GetAsyncKeyState(VK_F10) & 0x8000;
+    const bool dump_key = config::current().debug.debug && (::GetAsyncKeyState(VK_F10) & 0x8000);
     const bool dump = dump_key && !s_dump_key;
     s_dump_key = dump_key;
 
