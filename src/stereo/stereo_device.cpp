@@ -587,7 +587,9 @@ void render_target_size(StereoInterface& si, runtime::HmdBackend& backend, int* 
     const runtime::Sizei l = backend.eye_texture_size(0, scale);
     const runtime::Sizei r = backend.eye_texture_size(1, scale);
     const int width  = l.w + r.w;
-    const int height = l.w <= r.w ? r.h : l.h;   // compares widths, as the original
+    // The taller eye, so neither eye's image is cut off. The original took
+    // the height of the wider eye.
+    const int height = std::max(l.h, r.h);
 
     // Keep the eye layout of the texture in use until the game makes one of
     // the new size (it then calls ConfigureRendering again).
