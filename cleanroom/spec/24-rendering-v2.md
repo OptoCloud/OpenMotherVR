@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). Revision: r1 -->
+<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). Revision: r2 -->
 
 # 24. Rendering in v2
 
@@ -40,8 +40,8 @@ that the implementation may rename them.
 |---|---|---|---|
 | `PostFxGet` | 0x5F19C0 | ? | cdecl, no arguments, returns the post-processing object (bytes `b8` + 4-byte address + `c3`) (08 §3.1) |
 | `RendererPtr` | global pointer at 0x13583E4 | ? | the renderer; the int at `+0x2C` is the current eye (07 §1) |
-| `StereoObjectPtr` | global pointer at 0x1366A2C | 0x1376BDC (01) | stereo object; `+0x04` device, device `+0x04` state (2 = stereo running); `+0x64` scene visibility (02, 05 §3.2g) |
-| `SettingsObject` | object at 0x1358A50 | 0x1368C00 (01) | the game's settings; `SettingSet` at 0x5A8910 (02 §6.5); `SettingFind` at 0x59DF70, thiscall `(settings, int id)`, returns the setting object or null |
+| `StereoObjectPtr` | global pointer at 0x1366A2C (01) | ? | stereo object; `+0x04` device, device `+0x04` state (2 = stereo running); `+0x64` scene visibility (02, 05 §3.2g) |
+| `SettingsObject` | object at 0x1358A50 (01) | ? | the game's settings; `SettingSet` at 0x5A8910 (02 §6.5); `SettingFind` at 0x59DF70, thiscall `(settings, int id)`, returns the setting object or null |
 | `SettingCurrent` | 0x5A4D00 | ? | thiscall `(setting)`, returns the selected quality record (records 0x70 bytes apart): `+0x4C` float value, `+0x50` int value, `+0x54` bool value |
 | `SettingNameTable` | 0x124FC20 | ? | array of string pointers indexed by setting id (table 1.2), followed by the paths of the engine settings files (1.9) |
 | `JitterMatrixGet` | 0x61A360 | ? | `b8` + address + `c3`: returns the jitter matrix at 0x17DF540 (1.4) |
@@ -217,12 +217,14 @@ That pass calls 0x594050, which calls 0x592EB0 with (true, `eye != 1`).
 So the light lists are submitted again in **each** eye's render, while the
 follow-up step runs only for eye 0 (and in flat play). A separate job,
 `ALPHALIGHT_TASK` (registered at 0xD48D10, job function 0x3753C0), runs
-0x5D52D0 on `LightObject` once per frame. That these lists and this job are
-the lighting of smoke, fog and particles (the game's "alpha light"
-textures, sampled by particle shaders as `alphalightIntensitiesReg`) is
-[likely]: the job name, the shader resource name and the transparent pass
-agree; the link from 0x592E10 to the particle shaders' textures is not
-traced.
+0x5D52D0 on `LightObject` once per frame. The levels' compiled shader packs
+bind a texture and a sampler named `alphalightIntensitiesReg_TEX` and
+`alphalightIntensitiesReg_SMP` (72 shaders of each in the Torrens level's
+`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, read by the spec side) [sure for
+the names]. That these lists and this job are the lighting of smoke, fog
+and particles, read through that texture, is [likely]: the job name, the
+shader resource name and the transparent pass agree; the link from
+0x592E10 to that texture is not traced.
 
 ### 1.8 Lens flares [sure]
 
@@ -310,12 +312,10 @@ these results hold every frame:
    velocity target holds the motion of that eye's pixels: computed from that
    eye's own current and previous view-projection and that eye's depth,
    written within that eye's viewport only. Eye 0's velocity uses the eye-0
-   data, not the stale slot 1 of 1.4; eye 1 gets a velocity pass that the
-   game does not run. How (calling the game's velocity pass for eye 1 with
-   eye 1's slot, making the slot written and the slot read agree, or a
-   project shader) is the implementation's choice; the velocity pass's
-   pass set-up and viewport must put eye 1's output in the right half
-   (07 §8 item 1 describes the same viewport question for reflections).
+   data, not the stale slot 1 of 1.4; eye 1's half gets its velocity
+   although the game draws none for it. How is the implementation's
+   choice; eye 1's velocity must land in eye 1's half of the velocity
+   target (§12 items 1 and 2 give the viewport and units questions).
 3. **Previous matrices per eye.** "Previous" for an eye means the same
    eye's matrices of the previous rendered stereo frame. The two eyes never
    share a previous matrix.
@@ -390,21 +390,18 @@ With `"On"`, while stereo runs and AA runs in stereo (08 §3.2):
 - the project's own TAA replaces the game's AA pass output (any game AA
   mode, including Off) and is written by this project in HLSL (CLEANROOM:
   shaders are made here);
-- it uses the jitter, per-eye velocity, per-eye previous matrices, the
-  per-eye history clamp and the history resets of §2.2 items 2 to 7, with a
-  jitter sequence of at least 8 positions [proposal: a low-discrepancy
-  sequence of 8 or more gives a stable result; 2 positions is T2x];
-- the history is per eye and is clamped to the neighbourhood of the
-  current pixel so that moving objects do not trail;
-- surfaces that the game draws with screen-like content (terminals, the
-  motion tracker screen, UI quads in the world) must not ghost when they
-  change; how they are recognised is an open question (§12 item 3);
-- transparent passes are drawn after the jittered opaque passes in the
-  game; they must not shimmer more than without TAA (an open question
-  whether the jitter must also apply to them);
-- an optional sharpening after TAA [proposal: TAA softens the image, which
-  is more visible in a headset; strength as a setting only if needed in
-  game].
+- it uses the per-eye velocity, per-eye previous matrices, the per-eye
+  history rule and the history resets of §2.2 items 2 to 7, with a jitter
+  sequence of at least 8 positions [proposal: a low-discrepancy sequence
+  of 8 or more gives a stable result; 2 positions is T2x];
+- the image in each eye has no more shimmer than with §2; nothing that
+  moves leaves a trail; no surface whose content changes (screens,
+  displays) shows trails; transparent surfaces shimmer no more than
+  without TAA; and the image is not visibly softer than with SMAA T1x
+  [proposal: these are what a player notices of a temporal AA in a
+  headset]. How (masks, jitter on transparent passes, sharpening) is the
+  implementation's choice; §12 item 3 asks how changing surfaces can be
+  recognised.
 
 With `"Off"`: §2 or v1 applies. `"On"` is ignored (log once) while
 `PerEyeTemporalAA` is the only temporal mode available in a build that does
@@ -419,11 +416,10 @@ GPU at pixel scale 1.0].
 
 ### 4.1 Problem
 
-Reported by players of earlier VR mods and to be confirmed by the spec side
-in game [guess]: smoke, steam, fog and dust particles flicker in brightness
-from frame to frame and can differ between the two eyes, most visibly in
-dark areas lit by a few lights (for example vents and corridors with
-steam). Candidate cause from the game code (1.7): the light lists are
+[guess, to be confirmed in game, §4.4]: smoke, steam, fog and dust
+particles may flicker in brightness from frame to frame or differ between
+the two eyes, most visibly in dark areas lit by a few lights (for example
+vents and corridors with steam). Candidate cause from the game code (1.7): the light lists are
 submitted to `LightObject` again during eye 1's render, after eye 0's
 follow-up step has run and before the `ALPHALIGHT_TASK` job of the next
 frame, so the lighting state the particles read can belong to either
@@ -438,17 +434,15 @@ While stereo runs and the key is on:
 - with the camera and lights still, their brightness does not change from
   frame to frame;
 - they still respond to lights the game turns on, off or moves (no frozen
-  or constant lighting) [proposal: replacing particle lighting with a
-  constant was rejected because the game's dark scenes depend on it];
-- in flat play and with the key off, the game's submission runs as it does
-  (v1).
+  or constant lighting) [proposal: the game's dark scenes depend on
+  particle lighting];
+- in flat play and for eye 0, and with the key off, the game's submission
+  runs as it does (v1).
 
 Proposed means [proposal, to be confirmed by the in-game check of §4.4
-step 2]: in stereo, make the eye-1 pass skip the second submission of 1.7,
-so that both eyes read the state built for eye 0. Site: 0x592FF4 with the
-bytes of 1.7; the condition must depend on the eye being rendered (the
-renderer's current eye `+0x2C`, or the transparent pass's fifth argument),
-not be a permanent jump.
+step 2]: in stereo, eye 1's transparent pass does not submit the light
+lists a second time (1.7, site 0x592FF4 with the bytes of 1.7), so both
+eyes read the state built for eye 0.
 
 If the check shows the flicker exists in flat play too (a game behaviour,
 not a stereo one), the requirement still holds but the means is open
@@ -576,26 +570,35 @@ initialisation); a change of the key applies at the next launch.
 
 ### 6.2 Additions
 
+Each addition answers a need of VR play that the stock options do not
+meet:
+
+- **Shadows** are seen closer and larger in a headset than on a monitor,
+  so the stock maximum of 2048 shows blocky shadow edges; the engine
+  accepts resolutions up to 4096 (1.9).
+- **Reflections**: the blurred mips of the planar reflection cross the
+  seam between the eye halves of the reflection target (07 §4.6), and a
+  blurred mirror reads as a smear at headset resolution; the engine
+  already has a mode with one mip and no blur (1.9, 07 §2.2).
+- **Streaming heaps**: turning the head in VR reveals more of the level
+  in a short time than turning a camera with a stick, so textures and
+  models arrive late more often with the stock heap sizes.
+
 | Key (all `Graphics.`) | Setting | Addition | Reason |
 |---|---|---|---|
-| `ShadowMap4096` | ShadowMapResolution | a `4096` option, int 4096, highest precedence, no default requirements | shadows are seen larger and closer in a headset; the engine clamps at 4096 (1.9), so no code change is needed. Never chosen automatically [proposal: it must not become the default on a fresh settings file; give it the highest precedence only if the precedence does not make it the default, otherwise a precedence below 2048's] |
-| `SharpReflections` | Planar Reflections | an option with a value other than 0, 2 and 3 (one mip, no blur, 1.9 and 07 §2.2) | sharp mirror reflections, and no blur crossing the seam between the eye halves of the reflection target (07 §4.6). Value [proposal: 1, the smallest that is neither off nor a mip mode; must be checked in game that 1 is not treated as "off" elsewhere, §12 item 6] |
-| `StreamingTextureHeapMB` | Streaming Texture Heap Size | when not 0: an option with that int value, highest precedence | turning the head in VR reveals more of the level at once; on GPUs with more memory a larger heap reduces late texture loads. Range 300 to 1024 [proposal: 300 is the stock size; 1024 keeps a 32-bit process's address space safe, §12 item 7] |
-| `StreamingModelHeapMB` | Streaming Model Heap Size | when not 0: an option with that int value, highest precedence | as above; range 128 to 512 [proposal: 128 is stock; 512 bounds address space] |
+| `ShadowMap4096` | ShadowMapResolution | a `4096` option, int 4096, no default requirements | shadows above. Never chosen automatically [proposal: it must not become the default on a fresh settings file; give it the highest precedence only if the precedence does not make it the default, otherwise a precedence below 2048's] |
+| `SharpReflections` | Planar Reflections | an option with a value other than 0, 2 and 3 (one mip, no blur, 1.9 and 07 §2.2) | reflections above. Value [proposal: 1, the smallest that is neither off nor a mip mode; must be checked in game that 1 is not treated as "off" elsewhere, §12 item 6] |
+| `StreamingTextureHeapMB` | Streaming Texture Heap Size | when not 0: an option with that int value, highest precedence | streaming heaps above. Range 300 to 1024 [proposal: 300 is the stock size; 1024 keeps a 32-bit process's address space safe, §12 item 7] |
+| `StreamingModelHeapMB` | Streaming Model Heap Size | when not 0: an option with that int value, highest precedence | streaming heaps above; range 128 to 512 [proposal: 128 is stock; 512 bounds address space] |
 
 The heap additions become the selected value only if the game selects by
 precedence for these two settings (they have no menu control) [likely]; if
 the game keeps a saved value instead, the requirement is that the value in
 effect is the key's (§12 item 7).
 
-Not added [proposal, with reasons]:
-
-- **SSAO and SMAA precedences.** v1 keeps SSAO off in stereo (02 §6.5,
-  05 §7.1) and decides AA in stereo by its own rule (08 §3.2). Precedence
-  only picks the default for a new game settings file; changing it changes
-  flat play for no VR gain.
-- **Stereo Mode options.** The stereo path is forced by patches (02 §6.6).
-- **Field of view.** Ignored in stereo (the headset's FOV is used, 03 §3).
+No other option or precedence is changed [proposal]: precedence only picks
+the default of a new settings file, which concerns flat play, and the
+settings v1 controls in stereo (02 §6.5, 08 §3.2) need no XML change.
 
 ### 6.3 Edge cases
 
@@ -645,8 +648,9 @@ GPU and driver that support it:
   stays off, the log says why once, and v1 rendering runs.
 
 Which game passes are "the opaque scene passes" must be identified (the
-pass types of 0x995170: the main view's solid passes) before this is
-implemented (§12 item 9). Cost and gain to be measured; the feature is
+pass types the main view gives the pass set-up 0x595170, 07 §8 item 1;
+the velocity pass gives it type 0xB) before this is implemented (§12 item
+9). Cost and gain to be measured; the feature is
 worth keeping only if it saves at least 10 % GPU time at pixel scale 1.5
 [proposal].
 
@@ -655,8 +659,8 @@ worth keeping only if it saves at least 10 % GPU time at pixel scale 1.5
 v1 has one resolution multiplier, `Rendering.PixelScale` (03 §4.1, §10),
 applied on top of the runtime's own resolution. v2 adds **no second static
 scale** [proposal: two multipliers that multiply each other confuse players
-(03 §10 already warns about the runtime's one)]. v2 offers the pixel scale
-on the in-headset options page (22).
+(03 §10 already warns about the runtime's one)]. The pixel scale stays the
+v1 options-page control it is (06 §5).
 
 Dynamic resolution (changing the render size with load) is not offered
 [proposal]: the game rebuilds its targets only through a display reset,
@@ -765,10 +769,12 @@ missing key reads as its default; unknown keys are kept, 06 §3):
 | `Graphics.FilmGrain` | bool | true | | non-bool: default | at once |
 | `Graphics.StateCache` | bool | false | | non-bool: default | next launch [proposal: the cache is set up with the context wrapper] |
 
-All defaults are v1 values (20 §1.1). The v2 master switch of 20 §9, when
-off, makes every key here read as its default. The options page (22) shows
-those the user confirms; the engine settings keys need a restart, which the
-page must say.
+All defaults are v1 values (20 §1.1). The master switch `EnhancedMode`
+(20 §1.3, 22 §3.1), when off, makes every key here read as its default;
+for the keys that apply at the next launch, the value it had at that
+launch counts. The options page shows those the user confirms, where 20
+§10 item 6 puts v2 settings; the engine settings keys need a restart,
+which the page must say.
 
 ## 11. Common requirements
 
@@ -777,7 +783,7 @@ page must say.
 | Situation | Rule |
 |---|---|
 | runtime None | nothing of this document runs or is installed (20 §1.2) |
-| runtime fails to start | no stereo; every feature inactive; engine settings override still applies if on (it does not depend on stereo) [proposal: it is a game-settings feature, useful flat too, and is decided at attach before the runtime starts] |
+| runtime fails to start | no stereo; every feature inactive except the engine settings override, which still applies if on (the exception of 20 §1.2) [proposal: it is a game-settings feature, useful flat too, and is decided at attach before the runtime's outcome is known] |
 | OpenVR and OpenXR | every feature works on both; §5 submits through each runtime's own API (03 §6, 09 §5) |
 | screen frames (menus, loading, cutscenes on the virtual screen) | §2 and §3 reset history on the next head-tracked frame; §4, §8 act on whatever the game renders; §5 as stated |
 | display reset | features re-acquire resources after slot 3 (03 §4.4); §2 and §3 reset history |
@@ -817,7 +823,8 @@ Each event must convey:
 ## 12. Open questions
 
 1. **Velocity pass viewport for eye 1.** Does the velocity pass's pass
-   set-up (type 0xB at 0x995170) keep the eye's viewport origin, or rebuild
+   set-up (0x595170 called with type 0xB at 0x5B17D7) keep the eye's
+   viewport origin, or rebuild
    it from `{0, 0, w, h}` (the same question as 07 §8 item 1)? Look for: a
    capture of the velocity target after both eyes with §2 on.
 2. **Velocity shader units.** Does the game's velocity shader compute
@@ -849,9 +856,12 @@ Each event must convey:
    table at 0xFE7088 and how the saved file is applied (0x5AFC60).
 8. **Saved value naming a removed option (§6.3).** What the game does when
    its saved settings name an option the XML no longer has.
-9. **Opaque scene passes for foveation (§7.1).** The pass types of
-   0x995170 used by the main view's solid passes, and a point where the
-   shading-rate state can be set and cleared around them.
+9. **Opaque scene passes for foveation (§7.1).** Which pass types given
+   to the pass set-up 0x595170 belong to the main view's opaque scene
+   passes (the main render 0x5B3F10 gives type 4 at 0x5B3F98; the function
+   at 0x5B3A80 gives types 2 and 3; its relation to the main render is to
+   be traced), and a point where the shading-rate state can be set and
+   cleared around them.
 10. **Letterboxing.** Do in-engine cutscenes draw bars, and how (a camera
     aspect, a UI movie, a post-processing mask)? Look for: a cutscene in
     game, captured; cinematic camera entities (`CINEMATIC_*` names in

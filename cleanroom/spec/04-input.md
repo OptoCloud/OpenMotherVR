@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its names, wording or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons; a tester's report on SteamVR with a Steam Frame headset (input while another window has the desktop focus); project decision of r5, with its reason inline (the touchpad scheme's scaled move limited to length 1 as a vector). Revision: r5 -->
+<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its names, wording or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons. r5 (spec r6): a tester's report on SteamVR with a Steam Frame headset (input while another window has the desktop focus); project decision of spec r6, with its reason inline (the touchpad scheme's scaled move limited to length 1 as a vector). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the map's digital evaluation (binding flag bit 0x40 marks a composite reference; codes reach the pad methods zero-extended), of the stock ControlToName for codes above 0x17, and of the FollowBehavior fields (the yaw setter, the character's position and its head bone's position); the five pad slots as one patch, checked against their exact functions; the controls help as content, not a page, and its crossing between threads; prompts while the options archive is not in use; VR activity seen by every reader in a game frame; the remap's flag writes given their game reason; thresholds and the initial glyph mode given reasons; keyboard and mouse each read whenever their own device exists; the recenter chord re-armed by release alone; controller identification and the OpenXR actions stated as results; the structure offsets marked as 2015 facts. Revision: r6 -->
 
 # 04 Input
 
@@ -14,6 +14,18 @@ means unknown, and a feature that needs an unknown
 address stays off on that build (01). Bytes given inline are the 2015
 originals; the implementation checks them before writing (01, preflight) and
 patches nothing if any check fails.
+
+The structure offsets of section 2 (input manager, devices, pad object,
+action maps, binding records, FollowBehavior fields) were read from the
+2015 build. On the 2020 build they are assumed equal and are not verified:
+before enabling the pad patches there, an implementation confirms the
+action map layout (the counts at map +0x1054 and +0x1058 within the
+capacities of 2.4, and the counts it logs plausible) and keeps the pad
+patches off when that check fails.
+
+In this document a bare "§11" means this document's open questions
+(section 11); `11` or "11 §n" with a section number means
+`11-diagnostics.md`.
 
 All game methods named "thiscall" take `this` in ECX and their arguments on
 the stack, and pop them (`ret N` given). A replacement must match `ret N`,
@@ -136,7 +148,7 @@ Vtable slots used (offset from the vtable start):
 | +0x08 | **0x576780 / 0x4C8520** | `float GetValue(int code)`: non-negative magnitude. Buttons 1 or 0; 0x10 / 0x11 / 0x16 / 0x17 the raw trigger or zoom value; sticks (0x12..0x15) return 0; unknown codes 0 | thiscall, `ret 4`, ST0 |
 | +0x0C | **0x576820 / 0x4C85C0** | `float GetAxis(int code, int negate)`: signed value, multiplied by -1 when `negate` is non-zero. Buttons ±1 or 0, triggers, sticks, zoom | thiscall, `ret 8`, ST0 |
 | +0x10 | 0x576830 / ? | `int NameToControl(const char*)` | thiscall, `ret 4` |
-| +0x14 | **0x576840 / 0x4C85E0** | `const char* ControlToName(code)`: the control's name for prompts and the input-mapping screen. The code is passed in a 32-bit stack slot; only the low 16 bits are meaningful and they compare as **signed 16-bit**. The game keeps the returned pointer, so it must stay valid for the whole process | thiscall, `ret 4`, EAX |
+| +0x14 | **0x576840 / 0x4C85E0** | `const char* ControlToName(code)`: the control's name for prompts and the input-mapping screen. The code is passed in a 32-bit stack slot; only the **low 16 bits** are meaningful: the stock method reads them as an unsigned 16-bit value and returns the name for 0x00..0x17 and **null for anything above**, -1 (0xFFFF) included [sure]. The game keeps the returned pointer, so it must stay valid for the whole process | thiscall, `ret 4`, EAX |
 | +0x1C | 0x576850 / ? | `int ControlType(code)`: 0 button, 2 trigger (0x10, 0x11), 1 axis (0x12..0x17) | thiscall, `ret 4` |
 | +0x20 | 0x60EE30 / ? | per-frame read: calls `XInputGetState(+0x290)` and sets +0x289 | |
 | +0x28 | 0x60F280 / ? | scans XInput users 0..3 | |
@@ -144,8 +156,12 @@ Vtable slots used (offset from the vtable start):
 | +0x40 | ? | "active state changed" notification, called by device selection | |
 
 The five bold slots are the ones the mod replaces (3.3). Before writing
-them, check that each of the five current slot values points inside
-`AI.exe`'s image.
+them, check that each of the five slots holds exactly the function this
+table (and 01 §4.4) lists for the running build; if any slot differs,
+nothing is patched (01 §2.5). A slot that points into the image but at
+another function means the vtable is not the one described here (another
+build, or another tool already replaced the slot), and chaining to it
+with these ABIs would be wrong.
 
 Connected flag: in the method at 0x60EE30 the instruction at **0x60EE6F /
 0x56133F** is `setne cl` (`0F 95 C1`), following a compare of the
@@ -170,10 +186,10 @@ Pad control codes (the game's names, from `ControlToName`):
 | 0x0B | RB | 0x17 | TOUCH_ZOOM_OUT |
 
 A code of -1 (0xFFFF as 16 bits) means "no control". The game's own pad
-codes are 0x00..0x17; any other value that fits a signed 16-bit field
-(the binding record's code field, and the comparison in `ControlToName`)
-and is not -1 is free for the mod. The game passes a binding's code to the
-pad methods unchanged [likely, 2.4].
+codes are 0x00..0x17; any other value of the binding record's 16-bit code
+field (2.4) that is not -1 is free for the mod. The game passes a
+binding's code to the pad methods zero-extended from that field, and never
+passes -1 to IsDown [sure for digital actions, 2.4].
 
 The prompt pipeline hands these names to the UI movies, which look them up
 case-insensitively as input ids ("A" becomes the UI's `a` glyph, "LB"
@@ -218,29 +234,37 @@ Binding record (8 bytes):
 | +0x00 | 4 bytes, meaning unknown |
 | +0x04 | int16: control code (device-specific; for the pad, the codes in 2.3) |
 | +0x06 | byte: device type (0 pad, 1 keyboard, 2 mouse) |
-| +0x07 | byte: flags (meaning of the bits unknown; whether bit 0x40 matters to the game is an open question, 11) |
+| +0x07 | byte: flags. Bit 0x40: the record refers to a composite entry, not a device control (below) [sure]. Bit 0x80: tested after a device reports the control down; its effect is not known (§11). Other bits: meaning unknown |
 
 So binding *i* of an entry has its code at entry+0x04+8*i, its device at
 entry+0x06+8*i and its flags at entry+0x07+8*i. A seventh record would
 start at +0x30 and overwrite the record pointer and the count.
 
 Composite entry (0x24 bytes): seven dword control codes at +0x00, a count
-at +0x1C, a byte at +0x20, and a "keep" byte at +0x21. Composite entries
-whose +0x21 byte is zero combine raw pad controls (believed to be stick
-vectors or chords). They are the only path, other than per-action bindings,
-by which a raw pad code reaches an action.
+at +0x1C, a byte at +0x20, and a "keep" byte at +0x21. The map holds a
+pointer to its composite list at +0x1034. Composite entries whose +0x21
+byte is zero combine raw pad controls (believed to be stick vectors or
+chords). They are the only path, other than per-action bindings, by which
+a raw pad code reaches an action.
 
-When the game evaluates an action it calls the method of
-`device_by_type[binding.device]` (IsDown for digital actions, GetValue or
-GetAxis for analog ones) with `binding.code` [likely: follows from the
-per-map device array and from the virtual codes arriving at the pad
-methods in game].
+How the game evaluates a digital action [sure, 2015]: the map's
+evaluation (0x586D80, thiscall on the map, called once per map at
+0x590A08, 0x590A13 and 0x590A1E) walks each action's binding records. A
+record with flag bit 0x40 set is a **composite reference**: its code is an
+index into the map's composite list, and the record counts as down when
+bit 0x02 of that entry's +0x20 byte is set; no device method is called. A
+record without bit 0x40 is evaluated by calling IsDown (vtable +0x04) of
+`device_by_type[binding.device]` with the record's code zero-extended,
+when that device exists, its +0x10 byte is set and the code is not
+0xFFFF. Analog actions are evaluated through GetValue or GetAxis of the
+same device [likely: from the virtual codes arriving at those methods in
+game; the analog evaluation was not traced].
 
 Action indices that matter for VR (inferred from which game function
 responds when each action is driven, see the provenance header; the AI.exe
 names are unknown). Entries marked *unconfirmed* respond to VR controls in
 the observed behaviour but their game function is not known: they are
-**kept for parity, function unconfirmed** (open question, 11), so an
+**kept for parity, function unconfirmed** (open question, §11), so an
 implementer must drive them as specified but must not read a design
 requirement into them:
 
@@ -310,14 +334,21 @@ and slot 1 is `OnDeactivate(arg)` (0x02BBF0 / 0x03B340), both thiscall
 `ret 4`, return value in EAX. Hooking these two slots (05 §6.1) is how the
 mod learns which camera instance is the live first-person camera and
 whether it is active. Before writing, check that slot 0 holds the
-OnActivate address above and slot 1 points inside the image.
+OnActivate address and slot 1 the OnDeactivate address above, for the
+running build.
 
 | Offset | Type | Meaning |
 |---|---|---|
-| +0x1FC | float | yaw, mirror copy |
+| +0x1C0 | float x 3 | the position of the character the camera follows: copied from that character's object (`[[this+0x34]+0x148]`, its +0x70..+0x78) at activation and in every update (slot 8, 0x02E970 / ?, which takes the frame time) [sure for the copy; likely the character's root position in world space, metres] |
+| +0x1CC | float x 3 | the position of the character's head: the translation of the transform of the bone named `Head1`, obtained in the same places through the bone index at +0x248 [sure]; in the same space as +0x1C0 [likely: the camera code subtracts it from a world-space point] |
+| +0x1FC | float | second yaw copy: the game's yaw setter (0x02DF30 / ?, thiscall, a float yaw and a bool, `ret 8`) wraps the yaw, writes it to +0x204 and, when the bool is non-zero, the same value to +0x1FC [sure] |
 | +0x204 | float | yaw. ±1.0 = ±180°; the game keeps it wrapped to [-1, 1] |
 | +0x208 | float | pitch (clamped by the game) |
+| +0x248 | int | index of the `Head1` bone, looked up by name at activation [sure] |
 | +0x264 | byte | **look input enabled**: the game applies stick and mouse look deltas (slot 11, 0x02D200 / ?) only while this is set |
+
+The mod only reads +0x1C0, +0x1CC and +0x248 (for the snap-turn
+diagnostic of 11 §4.5), and only while the camera is tracked and active.
 
 The stock OnActivate sets +0x264 to 1; 05 §7.6 removes that store so the
 mod controls the byte. After OnDeactivate the object may be freed (level
@@ -335,9 +366,10 @@ code** of its own. The game constrains these codes, and nothing else does:
 
 - a virtual code is outside the game's pad codes 0x00..0x17 and is not -1
   ("no control"), so the stock pad never mistakes it for a real control;
-- it fits a signed 16-bit value, because the binding record stores the
-  code in an int16 and `ControlToName` compares it as signed 16-bit (2.3,
-  2.4);
+- it fits the binding record's 16-bit code field (2.4), and the
+  replacements recognise it from the low 16 bits of the argument alone,
+  because the game passes the field zero-extended (2.4) and only the low
+  16 bits are meaningful (2.3);
 - it identifies exactly one (map, action) pair, and whether that action is
   digital or analog, so a query can be traced back to its action without
   ambiguity; a code the mod did not assign is recognisable as such.
@@ -374,18 +406,25 @@ entry's record pointer and count (2.4). After a pass:
    the action's virtual code. Any further pad records hold -1, so a real
    pad reaches the action only through its virtual code.
 2. **The original control is remembered**: the code the first pad record
-   held before the pass (which may be -1, "no control").
-3. **Actions without a pad record** remember "none" and gain a pad record
-   carrying their virtual code, **only if the action has fewer than 6
-   records**; the count grows by one. The new record has device 0 and
-   flags 0 for a digital action, 1 for an analog one (kept for parity,
-   meaning unconfirmed, 11); its first 4 bytes are left as they are.
+   held before the pass (which may be -1, "no control"). A first pad
+   record with flag bit 0x40 set is a composite reference (2.4): its code
+   is an index, not a pad control, so the remembered original is "none"
+   (whether the game builds such pad records is open, §11).
+3. **Actions without a pad record** remember "none" whatever their record
+   count. They also gain a pad record carrying their virtual code when they
+   have fewer than 6 records; the count grows by one. The new record has
+   device 0, its first 4 bytes are left as they are, and its flags are
+   those of a pad record of the same kind (digital or analog) that the
+   game built in the same map, or 0 when there is none, with bit 0x40
+   clear (item 5); what the other flag bits mean is open (§11).
 4. **Composite entries** (count limited to [0, 12]) whose +0x21 byte is
    zero no longer deliver raw pad codes: each of their first min(count, 7)
    code dwords holds -1. Writing -1 into the whole dword satisfies the
    game whether it reads the code as 32 or 16 bits.
-5. Pad records of digital actions have flag bit 0x40 clear (kept for
-   parity, effect unconfirmed, 11).
+5. Every pad record that carries a virtual code has flag bit 0x40 clear.
+   Game fact (2.4): the map evaluates a record with bit 0x40 as a
+   composite reference and never passes its code to the pad, so a virtual
+   code in such a record would not reach the replaced IsDown.
 6. **Re-running is harmless**: a pass over maps that are already
    virtualised changes nothing; in particular a record that already holds
    its action's virtual code keeps the remembered original control.
@@ -404,6 +443,16 @@ for rebuilds. Log the counts of each map once, at the first pass (in game:
 ### 3.3 Pad method replacements
 
 The mod replaces the pad vtable slots +0x04, +0x08, +0x0C, +0x14 and +0x2C.
+The five slots, the connected-flag patch (3.4) and the left-stick redirect
+(4.3) form **one patch**: they depend on each other (a replaced IsDown
+virtualises the maps, after which a stock GetValue or GetAxis receives
+codes it does not know and returns 0, and a stock ControlToName shows
+nothing for them). If any of them cannot be written after its checks
+passed, the ones already written are restored to the values they held
+before, none of the group is left applied, and the log says that the
+controls area is off and why (11 §2.1); the game then runs with its stock
+pad and VR controllers have no effect.
+
 Each replacement has exactly the stock method's ABI (2.3): thiscall with
 `this` in ECX, the same stack arguments popped by the same `ret N`, the
 result in the same register (AL, ST0 or EAX), and EBX, ESI, EDI and EBP
@@ -415,14 +464,20 @@ section 5 (false / 0 until written). Required results:
 |---|---|---|
 | `IsDown(code)` (+0x04, `ret 4`, AL) | digital action: true when the real pad reports the original control down (stock IsDown; false when the original is "none") or the action's VR digital state is set. Analog action: the real pad's answer for the original control only (an analog action has no VR digital state) | false; a code that is not -1 first triggers a virtualisation pass (3.2) |
 | `GetValue(code)` (+0x08, `ret 4`, ST0) | the larger of the real pad's stock GetValue for the original control (0 when "none") and the action's VR analog value (0 for a digital action) | 0 |
-| `GetAxis(code, negate)` (+0x0C, `ret 8`, ST0) | of the real pad's stock GetAxis for the original control with the same `negate` (0 when "none") and the action's VR analog value (0 for a digital action), the one with the larger magnitude. The VR value is already in the game's sign convention and is not negated (11) | 0 |
-| `ControlToName(code)` (+0x14, `ret 4`, EAX), code compared as signed 16-bit | stock-glyph mode: the stock name of the original control (the stock method given -1 when the original is "none"). VR-glyph mode: the glyph for the original control (4.1), or the unbound glyph when the original is "none" or outside 0x00..0x17 | null |
+| `GetAxis(code, negate)` (+0x0C, `ret 8`, ST0) | of the real pad's stock GetAxis for the original control with the same `negate` (0 when "none") and the action's VR analog value (0 for a digital action), the one with the larger magnitude. The VR value is already in the game's sign convention and is not negated (§11) | 0 |
+| `ControlToName(code)` (+0x14, `ret 4`, EAX), low 16 bits of the code | stock-glyph mode: the stock name of the original control; null when the original is "none", which is what the stock method returns for -1 (2.3), so the prompt looks as it does for an unbound action in the unmodded game. VR-glyph mode: the glyph for the original control (4.1), or the unbound glyph when the original is "none" or outside 0x00..0x17 | null |
 
 `HasActivity()` (+0x2C, plain `ret`, AL): true when the stock HasActivity
-is true or VR controllers were active since the flag was last consumed
-(5.1). The flag is read and cleared as one atomic operation, so activity
-written by the render thread in between is never lost. The prompt switch
-of 4.2 is driven from the same activity.
+is true or VR controllers were active (5.1). VR activity written for a
+render frame is seen as activity by every HasActivity call the game
+thread makes for the next game frame: the game's device selection (2.5)
+and the mod's own checks alike, so one reader taking it never hides it
+from another in the same game frame. It never carries over into a game
+frame for which no VR activity was written. The flag the render thread
+sets is read and cleared as one atomic operation, so activity written in
+between is never lost; how the result is held for the rest of the game
+frame is the implementation's choice. The prompt switch of 4.2 is driven
+from the same activity.
 
 No method fails or reads outside the mod's state for any code, and every
 string `ControlToName` returns lives for the whole process.
@@ -475,7 +530,11 @@ is written on the render thread (5.9); the general thread rules are in
   scheme for game actions) is touched only on the render thread; the glyph
   set (4.1) is chosen on the render thread and read on the game thread,
   and a read on the game thread always yields a complete name (the old or
-  the new one, never a mix) that lives for the whole process.
+  the new one, never a mix) that lives for the whole process;
+- the controls help entries (5.7) are chosen on the render thread and read
+  on the game thread when a menu opens: a reader gets one whole set, the
+  old one or the new one, never entries of one set with the count of
+  another, and never reads outside the set it got.
 
 No allocation, file I/O or logging per frame on the render thread; log on
 a change, or every 900 frames behind `DebugOptions` (06).
@@ -486,8 +545,9 @@ a change, or every 900 frames behind `DebugOptions` (06).
 
 The patched UI (14) provides a glyph image for every VR control
 that a default binding (5.2, 5.3) gives to a prompted game function, and
-one **unbound** glyph for an action with no pad control (it may be the menu
-button's glyph):
+one **unbound** glyph for an action with no pad control; it must not look
+like any bound control's glyph, so a player never presses a control the
+prompt did not mean:
 
 - the right lower and upper face buttons, the left lower and upper face
   buttons;
@@ -536,12 +596,15 @@ face-button glyphs for the left A / B, which take those roles (5.3).
 
 ### 4.2 Switching prompts with the input source
 
-The prompts are in one of two glyph modes, VR or stock, initially VR.
-Required results:
+The prompts are in one of two glyph modes, VR or stock, initially VR
+(project decision: a VR run starts with the controllers in hand, and a real
+pad switches to stock at its first use). Required results:
 
 - When VR controllers show activity, the mode is VR; when only the real pad
   shows activity (the stock HasActivity), the mode is stock. Activity from
-  both in the same check selects VR. No activity leaves the mode as it is.
+  both in the same check selects VR (project decision: a pad lying on a
+  desk can report stick noise, while VR activity needs a deliberate press
+  or a deflection past 0.85). No activity leaves the mode as it is.
 - When the mode changes, the prompts on screen redraw with the new glyphs
   without the player having to touch another device, and this also works
   while the pad is already the active device (3.3).
@@ -559,11 +622,19 @@ keyboard are at manager +0x1084 / +0x1088 and the active pad at +0x4A7C.
 The redraw is therefore caused through the game's own device selection;
 how is the implementation's choice. Game fields are touched only while the
 input manager exists, and after the redraw exactly one device is active,
-the pad.
+the pad. Every device pointer the redraw uses (map 0's pad and keyboard
+entries, the active pad) is tested before use: a map entry can be null
+before a device of that type was registered or selected. If a device the
+redraw needs is absent, the glyph mode still changes and the prompts
+redraw at the game's next device change; no game field is written through
+a null pointer.
 
-When the patched UI archive is not in use (14), the movies know no VR
-glyph ids: the mod then stays in stock-glyph mode permanently, so prompts
-show the game's own pad glyphs.
+When the patched UI archive is not in use, the movies know no VR glyph
+ids: the mod then stays in stock-glyph mode for the whole run, so prompts
+show the game's own pad glyphs. "In use" means that in this run the VR
+change set of 14 §1.3 was linked or reused and the UI archive pointer was
+redirected to it (14 §5); with a missing or rejected archive (14 §5.9), or
+with the menu set only, it is not in use.
 
 ### 4.3 Left-stick prompt check
 
@@ -586,13 +657,26 @@ a function that answers that. Listed with the game patches in 05 §7.11.
   (map 1 values included). 0.85 is the game's own HasActivity threshold
   for sticks and triggers (2.3), so a VR control counts as activity under
   the same rule as a real pad.
-- Thresholds: trigger as a button > 0.5; analog grip (squeeze) as a button
-  > 0.5; touchpad centre zone \|x\| < 0.33 and \|y\| < 0.33; "near the head"
-  = right hand within 0.2 m of the head (5.10); weapon-switch and snap-turn
-  deflection > 0.5.
-- Analog outputs must stay within [-1, 1]: a scaled value (5.2) is clamped
-  after scaling, because the game's own pad never delivers more than 1;
-  the scaled touchpad move is limited as a vector to length 1 (5.2).
+- Thresholds:
+  - trigger as a button > 0.5: the game's own trigger press threshold
+    (pad +0x04, 2.3), so a VR trigger fires where a pad trigger does;
+  - analog grip (squeeze) as a button > 0.5, by the same rule;
+  - touchpad centre zone \|x\| < 0.33 and \|y\| < 0.33 (project decision:
+    the middle third of the pad in each axis, large enough to hit without
+    looking, small enough to leave the upper, lower and edge regions
+    usable);
+  - "near the head" = right hand within 0.2 m of the head (5.10; project
+    decision: about the distance from a hand held at the side of the head
+    to the headset's centre, beyond the reach of a hand held in front of
+    the chest);
+  - weapon-switch and snap-turn deflection > 0.5 (project decision: half
+    deflection, so drift or a light touch never acts; the reason is the
+    one 05 §3.2c gives for snap turn).
+- Every analog value written to the game is limited to [-1, 1] (0 to 1 for
+  triggers), whether or not it was scaled, because the game's own pad never
+  delivers more (a runtime can report a stick slightly past 1, or a
+  square-gated stick on a diagonal). The move vector may be limited to
+  length 1 in either scheme; in the touchpad scheme it must be (5.2).
 - **No input focus**: while the runtime does not give the game input focus
   (the SteamVR dashboard or another overlay has it; OpenXR session not
   `FOCUSED`), every control reads as released / 0, so every VR action value
@@ -635,7 +719,7 @@ Map 0:
 | Motion tracker | L grip and not padCentre (`Input.ToggleGrips`, 5.6) |
 | Flashlight | padDown while the right hand is near the head |
 | Map | L application-menu button |
-| 0x27 / 0x28 (kept for parity, function unconfirmed, 11) | L grip / R grip, held (never toggled) |
+| 0x27 / 0x28 (kept for parity, function unconfirmed, §11) | L grip / R grip, held (never toggled) |
 | Previous / next weapon | never |
 | Turn | see below |
 
@@ -650,25 +734,24 @@ walking speed a little inside the rim of the round pad, where it rarely
 rests; × 0.85 on turning keeps smooth turning from the pad, which has no
 spring return, a little below the full rate a stick at its stop gives.
 
-The scaled move is a vector, and it is limited as one: when its length
-(the square root of x² + y²) exceeds 1, both components are divided by
-that length, so the direction is kept and the length is 1; otherwise it is
-unchanged. Clamping each component to [-1, 1] alone is not enough: near
-the rim on a diagonal it leaves a vector longer than 1 (up to about 1.1).
-Project decision of spec r6: the round pad's full deflection is length 1,
-as a stick at its round stop is, so the × 1.1 only moves where full speed
-is reached and never makes a diagonal faster than straight ahead.
+After the × 1.1, the move keeps its direction and its length is the
+smaller of its own length and 1. Project decision of spec r6: a round pad
+at full deflection must give the same speed as a stick at full deflection
+in every direction, so the × 1.1 only changes where full speed is reached
+and a diagonal is never faster than straight ahead. Limiting each
+component to [-1, 1] on its own does not meet this: on a diagonal near the
+rim it leaves a move up to about 1.1 long.
 
 Map 1:
 
 | Action | Input |
 |---|---|
 | Confirm (both) | padDown or L pad click |
-| Index 1 (kept for parity, function unconfirmed, 11) | padCentre |
+| Index 1 (kept for parity, function unconfirmed, §11) | padCentre |
 | Pause | R application-menu button |
-| Index 9 (kept for parity, function unconfirmed, 11) | L grip, held (never toggled) |
+| Index 9 (kept for parity, function unconfirmed, §11) | L grip, held (never toggled) |
 | Back (both) | padUp |
-| Indices 0x0B / 0x0E (kept for parity, function unconfirmed, 11) | the flashlight value of map 0 |
+| Indices 0x0B / 0x0E (kept for parity, function unconfirmed, §11) | the flashlight value of map 0 |
 | Analog 0 / 1 | L / R trigger value |
 | Analog 2 / 3 | L pad x / y while touched (not scaled) |
 | Analog 4 / 5 | R pad x / y while touched (not gated, not scaled) |
@@ -696,7 +779,7 @@ Map 0:
 | Motion tracker | L grip and not R stick click (`Input.ToggleGrips`) |
 | Flashlight | Y, or A while the right hand is near the head |
 | Map | X (left lower face button) |
-| 0x27 / 0x28 (kept for parity, function unconfirmed, 11) | L grip / R grip, held (never toggled) |
+| 0x27 / 0x28 (kept for parity, function unconfirmed, §11) | L grip / R grip, held (never toggled) |
 | Turn | R stick x when horizontal and not centre, else 0 (no click needed, whatever the snap option) |
 
 Map 1:
@@ -704,11 +787,11 @@ Map 1:
 | Action | Input |
 |---|---|
 | Confirm (both) | A |
-| Index 1 (kept for parity, function unconfirmed, 11) | R stick click |
+| Index 1 (kept for parity, function unconfirmed, §11) | R stick click |
 | Pause | the menu button (Touch: left menu button); on Index, which has no menu button, the left trackpad press |
-| Index 9 (kept for parity, function unconfirmed, 11) | L grip, held (never toggled) |
+| Index 9 (kept for parity, function unconfirmed, §11) | L grip, held (never toggled) |
 | Back (both) | B |
-| Indices 0x0B / 0x0E (kept for parity, function unconfirmed, 11) | the flashlight value of map 0 |
+| Indices 0x0B / 0x0E (kept for parity, function unconfirmed, §11) | the flashlight value of map 0 |
 | Analog 0 / 1 | L / R trigger |
 | Analog 2 / 3 | L stick |
 | Analog 4 / 5 | R stick |
@@ -757,11 +840,11 @@ frame from what the runtime reports:
 | OpenVR, legacy | touchpad set and entries | no change |
 | OpenXR | thumbstick set and entries | the first frame on which a right-hand profile is known: `htc/vive_controller`: touchpad set and entries; any other: thumbstick set and entries (including Index: under OpenXR its pause entry names the menu button) |
 
-"Identified" under OpenVR: on each controls write, look up
-`IVRSystem::GetTrackedDeviceIndexForControllerRole` for both hand roles;
-when a role's device index is valid and differs from the one last seen,
-read and log its controller type (left and right, every change). The glyph
-choice is made at the first such right-hand identification only. Under
+"Identified" under OpenVR: a hand's controller is identified when the
+runtime first reports a valid device for that hand role, and again
+whenever the device for the role changes; each identification is logged
+with the hand and its `Prop_ControllerType_String`. The glyph set is
+chosen from the first right-hand identification of the run. Under
 OpenXR, the profile is read at each
 `XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED` (5.8.4).
 
@@ -796,34 +879,29 @@ the next frame.
 ### 5.7 Controls help page
 
 The options menu has a read-only controls help page that the mod fills
-with one entry per game function of the current set (5.5), each naming the
-physical control that drives that function under the default binding. The
-entries are delivered to the menu through the UI interface of 06 §4.3, one
-message per entry carrying the function's text and the control's text,
-whenever the mod pushes its settings to a menu. The texts, their order and
-the page's layout are the implementation's; the content must be:
+with entries for the current set (5.5). The entries are delivered to the
+menu through the UI interface of 06 §4.3, one message per entry carrying
+the function's text and the control's text, whenever the mod pushes its
+settings to a menu. Required content:
 
-| Game function | Touchpad set (5.2) | Thumbstick set (5.3) |
-|---|---|---|
-| move | left touchpad | left stick |
-| sprint | left touchpad click | left stick click |
-| crouch | left trigger | left trigger |
-| turn | right touchpad, left or right edge | right stick, left or right |
-| aim | right grip | right grip |
-| fire, throw, melee | right trigger | right trigger |
-| motion tracker | left grip | left grip |
-| interact | right touchpad, lower-half click | right lower face button |
-| radial menu | right touchpad, centre click | right stick click |
-| reload, activate | right touchpad, upper-half click | right upper face button |
-| flashlight | (no entry: no control of its own) | left upper face button |
-| flashlight by interact near the head | right touchpad, lower-half click, near the head | right lower face button, near the head |
-| next weapon | (no entry: not available) | right stick up |
-| previous weapon | (no entry: not available) | right stick down |
-| map | left menu button | left lower face button |
-| pause | right menu button | menu button |
+- For every game function that has a default control in the current set
+  (5.2 for the touchpad set, 5.3 for the thumbstick set; 5.4 for WMR,
+  which uses the thumbstick entries), the page names that control.
+- Touchpad set: the flashlight is reachable only by interact with the
+  right hand near the head (5.10), and the page says so; weapon selection
+  has no control and no entry.
+- Thumbstick set: the flashlight has its own button and is also reachable
+  by interact near the head; the page names both.
+- Index variant (5.5): the thumbstick entries, with pause on the left
+  trackpad press.
+- Until a set is chosen in this run (5.5: runtime None, a runtime that
+  failed to start, or before the stereo device is created), the page lists
+  no controller entries; it may show one entry saying that the controls
+  appear once VR is running. Showing a layout for controllers that are not
+  in use would mislead the player.
 
-Index variant (5.5): the thumbstick entries, with pause on the left
-trackpad press.
+The texts, the order and grouping of the entries and the page's layout are
+the implementation's.
 
 ### 5.8 Runtime input layer
 
@@ -843,43 +921,20 @@ rules and are not yet verified on hardware.
 
 The runtime's action system is asked for inputs named by game function,
 not by physical control, so that a player rebinding in the runtime's UI
-rebinds a game function. The set must cover:
-
-- movement (a 2D vector);
-- turning, which on thumbstick controllers also selects the next or
-  previous weapon (a 2D vector: x turns, y selects weapons);
-- on wands, a press that engages touchpad turning (a boolean; it gates
-  turning while `Input.SnapRotation` is on, 5.2);
-- sprint, aim, motion tracker, interact, reload / activate (also back in
-  menus), radial menu, flashlight, map and pause (booleans);
-- crouch and fire / throw / melee (1D values 0..1, pressed above 0.5, so a
-  trigger works as the default control);
-- a pose for each hand (not used by the game in v1, 5.11).
-
-The table gives the short labels the rest of this document uses for these
-inputs. **The labels are descriptive only**: the identifiers, display
-names and localisation in the runtime's files, and the exact split into
-actions, are the implementation's own, as long as the default bindings
+rebinds a game function. The set must cover the inputs below. Each is
+referred to in the rest of this document by the game function it drives
+(2.4); these labels are descriptive only: the identifiers, display names,
+localisation, order and the exact split into actions in the runtime's
+files are the implementation's own, as long as the default bindings
 reproduce 5.2 to 5.4 and the player can recognise each input's game
 function from its display name in the runtime's binding UI.
 
-| Label (descriptive) | Type | Drives (5.8.5) |
-|---|---|---|
-| Move | 2D vector | move X / Y |
-| Turn | 2D vector | turn (x), previous / next weapon (y, thumbstick scheme) |
-| Turn engage | boolean | touchpad scheme only: engages turning while `Input.SnapRotation` is on |
-| Sprint | boolean | sprint |
-| Crouch | 1D (0..1) | crouch (> 0.5) |
-| Fire | 1D (0..1) | fire, throw, melee (> 0.5) |
-| Aim | boolean | aim (`Input.ToggleGrips`); right grip |
-| Tracker | boolean | motion tracker (`Input.ToggleGrips`); left grip |
-| Interact | boolean | interact; flashlight when the right hand is near the head |
-| Reload | boolean | reload / activate; back in menus |
-| Radial | boolean | radial menu |
-| Flashlight | boolean | flashlight |
-| Map | boolean | map |
-| Pause | boolean | pause |
-| Hand poses | pose, one per hand | not used by the game in v1 (5.11) |
+| Type | Inputs (label: what it drives, 5.8.5) |
+|---|---|
+| 2D vector | Move: move X / Y. Turn: turn (x) and, in the thumbstick scheme, previous / next weapon (y) |
+| 1D value, 0..1, pressed above 0.5 (so a trigger works as the default control) | Crouch: crouch. Fire: fire, throw, melee |
+| boolean | Aim: aim (`Input.ToggleGrips`). Tracker: motion tracker (`Input.ToggleGrips`). Interact: interact, and the flashlight when the right hand is near the head. Reload: reload / activate, back in menus. Radial: radial menu. Flashlight: flashlight. Sprint: sprint. Map: map. Pause: pause. Turn engage: touchpad scheme only, engages turning while `Input.SnapRotation` is on (5.2) |
+| pose, one per hand | Hand poses: not used by the game in v1 (5.11) |
 
 #### 5.8.2 OpenVR: SteamVR Input
 
@@ -987,26 +1042,17 @@ The glyphs are then the touchpad set (4.1).
 Required when the runtime is OpenXR (09), when the session is created
 (before it begins):
 
-- one action set (priority 0) with eight per-hand physical-control
-  actions, each with the subaction paths `/user/hand/left` and
-  `/user/hand/right` (names and localised names are the implementation's):
-
-  | Action | Type |
-  |---|---|
-  | grip pose | `XR_ACTION_TYPE_POSE_INPUT` |
-  | trigger | `XR_ACTION_TYPE_FLOAT_INPUT` |
-  | squeeze | `XR_ACTION_TYPE_FLOAT_INPUT` |
-  | stick | `XR_ACTION_TYPE_VECTOR2F_INPUT` |
-  | stick click | `XR_ACTION_TYPE_BOOLEAN_INPUT` |
-  | primary (A / X) | `XR_ACTION_TYPE_BOOLEAN_INPUT` |
-  | secondary (B / Y) | `XR_ACTION_TYPE_BOOLEAN_INPUT` |
-  | menu | `XR_ACTION_TYPE_BOOLEAN_INPUT` |
-
-  (Semantic OpenXR actions with the same suggested assignments would meet
-  the requirement equally; what is required is which physical control
-  drives which game function, per profile.)
-
-  No haptic output in v1;
+- one action set (priority 0) whose actions, each with both hand
+  subaction paths (`/user/hand/left`, `/user/hand/right`), together read
+  every physical control the suggested bindings below name, each with an
+  action of the matching type: the grip pose as `XR_ACTION_TYPE_POSE_INPUT`,
+  trigger and squeeze values as `XR_ACTION_TYPE_FLOAT_INPUT`, the stick or
+  trackpad position as `XR_ACTION_TYPE_VECTOR2F_INPUT`, clicks and buttons
+  as `XR_ACTION_TYPE_BOOLEAN_INPUT`. How the controls are split into
+  actions (per physical control, or per game function with the same
+  suggested assignments), and their names, are the implementation's; what
+  is required is which physical control drives which game function, per
+  profile. No haptic output in v1;
 - `xrSuggestInteractionProfileBindings` for each profile below (a profile
   the runtime rejects is logged and skipped; the others still apply), then
   `xrAttachSessionActionSets`; one action space per hand for the grip pose
@@ -1029,9 +1075,9 @@ Required when the runtime is OpenXR (09), when the session is created
 - a grip pose is used only when both `XR_SPACE_LOCATION_ORIENTATION_VALID_BIT`
   and `XR_SPACE_LOCATION_POSITION_VALID_BIT` are set; its velocity only when
   `XR_SPACE_VELOCITY_LINEAR_VALID_BIT` is set. When a hand's grip cannot be
-  located, log once per hand and per change of outcome why (the locate
-  result, the location flags, whether the pose and trigger actions are
-  active);
+  located, log once per hand and per change of cause, with enough to tell
+  an unbound pose action from a controller the runtime cannot track and
+  from a failed call (11 owns the wording);
 - on `XrEventDataInteractionProfileChanged`, read the right hand's profile
   with `xrGetCurrentInteractionProfile(/user/hand/right)` and log it, or
   log that no profile is bound (`XR_NULL_PATH` or a failure). The profile
@@ -1040,9 +1086,10 @@ Required when the runtime is OpenXR (09), when the session is created
   `/interaction_profiles/valve/index_controller` within 20 ms.
 
 Suggested bindings (paths under `/user/hand/<hand>/`; `L` left, `R` right,
-both hands when not marked):
+both hands when not marked). Rows are physical controls; "primary" and
+"secondary" are the lower and upper face buttons (A / X and B / Y):
 
-| Action | `oculus/touch_controller` | `valve/index_controller` | `htc/vive_controller` | `microsoft/motion_controller` | `khr/simple_controller` |
+| Control | `oculus/touch_controller` | `valve/index_controller` | `htc/vive_controller` | `microsoft/motion_controller` | `khr/simple_controller` |
 |---|---|---|---|---|---|
 | grip pose | `input/grip/pose` | same | same | same | same |
 | trigger | `input/trigger/value` | same | same | same | `input/select/click` |
@@ -1098,7 +1145,7 @@ Map 0:
 | Motion tracker (0x1C) | toggle off: Tracker and not Radial; toggle on: the toggled state (5.6) |
 | Flashlight (0x1D) | flash |
 | Map (0x26) | Map |
-| 0x27 / 0x28 (kept for parity, function unconfirmed, 11) | Tracker / Aim, held (never toggled) |
+| 0x27 / 0x28 (kept for parity, function unconfirmed, §11) | Tracker / Aim, held (never toggled) |
 | Turn (analog 3) | 0 if `Input.SnapRotation` is on and not engaged; else, if horizontal and not centre: turn.x (× 0.85 in the touchpad scheme), else 0 |
 
 Map 1:
@@ -1106,11 +1153,11 @@ Map 1:
 | Game action | Value |
 |---|---|
 | Confirm (0, 0x10) | Interact, or (touchpad scheme only) Sprint, the left pad click |
-| Index 1 (kept for parity, function unconfirmed, 11) | Radial |
+| Index 1 (kept for parity, function unconfirmed, §11) | Radial |
 | Pause (8) | Pause |
-| Index 9 (kept for parity, function unconfirmed, 11) | Tracker, held (never toggled) |
+| Index 9 (kept for parity, function unconfirmed, §11) | Tracker, held (never toggled) |
 | Back (0x0A, 0x0F) | Reload |
-| 0x0B, 0x0E (kept for parity, function unconfirmed, 11) | flash |
+| 0x0B, 0x0E (kept for parity, function unconfirmed, §11) | flash |
 | Analog 0 / 1 | Crouch / Fire values |
 | Analog 2 / 3 | Move (not scaled) |
 | Analog 4 / 5 | turn.x / turn.y (not gated, not scaled) |
@@ -1193,7 +1240,13 @@ render thread to the game thread as one consistent pair (both hands, with
 or without a lock-free sequence lock); a game-thread reader gets the hands
 that belong to the head pose the game read for the frame it is building
 (the hands published with the views of that head pose), or the newest when
-no head pose was read since the last slot 6 (menus).
+no head pose was read since the last slot 6 (menus). Under OpenVR the head
+pose the game reads comes from the compositor's last poses (03 §6.3),
+which belong to the new `WaitGetPoses` before that call's hand poses are
+read; a game-thread read in that window must still not pair the new head
+pose with the hands of an earlier `WaitGetPoses`. How (for example by
+publishing the head pose the game reads together with the hands) is the
+implementation's choice.
 
 With `DebugOptions` on (06), every 900 frames on the render thread, log
 each hand's offset from the head in head coordinates (+x right, +y up, -z
@@ -1232,19 +1285,22 @@ active (2.7, tracked through its activate and deactivate slots),
 virtual screen). Required results:
 
 - **A step.** Each step adds `step` to the camera yaw (+0x204) when
-  turn > 0.5, or subtracts it when turn < -0.5, wraps the result into
-  [-1, 1] (above 1 subtract 2, below -1 add 2), and writes the same value
-  to +0x1FC (game fact: the game keeps the two in step). A positive turn
+  turn > 0.5, or subtracts it when turn < -0.5 (the 0.5 threshold and its
+  reason are those of 05 §3.2c), wraps the result into [-1, 1] (above 1
+  subtract 2, below -1 add 2), and writes the same value to +0x1FC, as the
+  game's own yaw setter does when asked to set both (2.7). A positive turn
   value (stick or pad to the right) turns the player to the right [likely:
   same sign as the game's own stick look, which receives the same value
   when snap is off].
 - **When steps happen.** Deflecting the stick past 0.5 steps at once. While
   it stays deflected past 0.5 with the camera active, a further step follows
   every 300 ms, measured with a monotonic clock (project decision: a held
-  stick keeps turning at about three steps a second, slow enough to stop on
-  the step wanted). Returning inside 0.5 lets the next deflection step at
-  once. While the camera is inactive, a held stick does not step, and
-  releasing it re-arms snap turn as above. This matches 05 §3.2c.
+  stick keeps turning at about three steps a second, slow enough to release
+  after one extra step or to stop on the step wanted, fast enough to turn
+  around in under two seconds at 30° steps; 05 §3.2c refers here). Returning
+  inside 0.5 lets the next deflection step at once. While the camera is
+  inactive, a held stick does not step, and releasing it re-arms snap turn
+  as above. This matches 05 §3.2c.
 
 Step size: yaw is in half-turn units, so **step = 2 / segments**, computed
 in floating point. `segments` (`Input.SnapRotationSegments`) is one of
@@ -1260,16 +1316,18 @@ per-frame update (05 §3.2a, d), only while a FollowBehavior is active:
 
 - Stereo device not running (VR off, failed, or not yet tracking): set it
   to 1 so the game's normal look works.
-- Otherwise set it to `(not Input.SnapRotation) or keyboardMouseMode`.
+- Otherwise set it to 1 when `Input.SnapRotation` is off or keyboard and
+  mouse are in use, and to 0 otherwise.
 
-`keyboardMouseMode` (initially off) is updated every frame in this order:
-cleared when the replaced HasActivity (3.3, including VR activity) returns
-true on the active pad device; then set when both keyboard and mouse
-devices exist and the keyboard's AnyKey or the mouse's Active returns true
-(2.2). Keyboard or mouse activity in the same frame as pad or VR activity
-therefore wins. With snap off, the game's own smooth look runs from the
-right stick or the VR turn value; with snap on, look only comes from the
-head (and the mouse while keyboard/mouse is in use).
+Whether keyboard and mouse are in use follows 05 §3.2b: keyboard activity
+(the keyboard's AnyKey, 2.2, while the keyboard device exists) or mouse
+activity (the mouse's Active, while the mouse device exists) in a frame
+makes it true, also when the pad or VR controllers show activity in the
+same frame; pad or VR activity alone (the replaced HasActivity of 3.3)
+makes it false; no activity leaves it; it starts false. With snap off, the
+game's own smooth look runs from the right stick or the VR turn value;
+with snap on, look only comes from the head (and the mouse while keyboard
+and mouse are in use).
 
 ## 8. Recentering inputs
 
@@ -1278,8 +1336,7 @@ Recentering (taking the yaw-only reference pose, 03 §2) is triggered by:
 - the chord: LB and RB held together on a real pad, read with the
   **stock** IsDown and raw codes 0x0A / 0x0B on the active pad device (the
   replaced method ignores raw codes), or left Ctrl and left Alt held
-  together (KeyDown 0x1D and 0x38, read only when both keyboard and mouse
-  devices exist);
+  together (KeyDown 0x1D and 0x38, whenever the keyboard device exists);
 - a pending automatic request (03 §2.2: device created with the headset not
   in use, a loading screen closed), executed on the first update where the
   headset is in use (03 §2.3);
@@ -1287,11 +1344,11 @@ Recentering (taking the yaw-only reference pose, 03 §2) is triggered by:
   reference space only re-anchors the mod's base space (09 §6.3) and does
   not move the game's reference; OpenVR has no such request in v1.
 
-The chord fires once per press: after a chord recenter, the next one
-requires the chord to be released first (and the two re-placements below
-to be done). A pending automatic request takes precedence over the chord in
-the same frame. After any recenter the virtual screen is re-placed in front
-of the player on the next two updates (05 §3.2e, 03 §7). The game's own
+The chord recenters once per press; holding it does not repeat; releasing
+it re-arms it (05 §3.2e). A pending automatic request takes precedence over
+the chord in the same frame. After any recenter the virtual screen is
+re-placed in front of the player on the next two updates (05 §3.2e, 03 §7);
+a new recenter during them starts the two re-placements again. The game's own
 LB+RB recenter in its stereo update is not run (its update is replaced),
 and the pause menu's "reset view" is routed to the same recenter (05 §8).
 
@@ -1320,7 +1377,12 @@ Robustness requirements (user requirement: bounds safety):
   (3.2).
 - Codes and indices are derived from each map's counts, never assumed
   (3.1).
-- Every analog value handed to the game stays within [-1, 1] (5.1).
+- Every analog value handed to the game stays within [-1, 1] (0 to 1 for
+  triggers), scaled or not (5.1).
+- The five pad slots, the connected flag and the left-stick redirect are
+  applied together or not at all (3.3).
+- The prompt redraw writes no game field through a null device pointer
+  (4.2).
 - The near-head test uses the render thread's own poses, never the head
   pose the game thread reads (5.10).
 - The first-person camera is not written after its deactivation, since it
@@ -1342,8 +1404,9 @@ Start-up and game interface:
 3. Pull the XInput pad out (or play without one): VR controllers still
    drive the game (connected-flag patch).
 4. Preflight: with one of the checked bytes altered (for example the
-   `setne cl` at 0x60EE6F), nothing is patched and the log names the
-   failed check.
+   `setne cl` at 0x60EE6F), or with a test build that expects a different
+   function in one of the five pad slots (2.3), nothing is patched and the
+   log names the failed check.
 
 SteamVR Input (OpenVR):
 
@@ -1413,6 +1476,19 @@ Common:
 23. With a headset attached, click on another desktop window during play:
     the VR controllers and a real pad keep driving the game; keyboard and
     mouse do nothing until the game window is clicked again (03 §9.6).
+24. Runtime None, and runtime OpenVR with SteamVR not able to start: the
+    controls help page shows no controller layout (5.7).
+25. Runtime OpenVR with the options archive not in use (a `UI.PAK` the mod
+    rejects, 14 §5.9): prompts show the game's own pad glyphs, never an
+    empty button.
+26. Keyboard and mouse in use, then a VR controller used: the prompts
+    switch from keyboard prompts to pad-style prompts with VR glyphs in the
+    same moment the controller is used, also when the mod's own activity
+    check runs before the game's device selection in that frame (3.3).
+27. In a test build that fails to write the fourth pad slot after the
+    checks passed: none of the pad slots, the connected flag or the
+    left-stick redirect is left applied, the log says the controls area is
+    off, and a real pad plays as stock.
 
 ## 11. Open questions
 
@@ -1425,11 +1501,19 @@ Common:
 - Meaning of the composite list and its +0x21 flag. To resolve: break on
   writes to map+0x1038 and inspect the codes of a composite entry with a
   pad preset loaded.
-- Whether the binding records' first dword or flag bit 0x40 matter to the
-  game after virtualisation, and what the flags value of an added record
-  (0 digital, 1 analog, 3.2) means. Clearing bit 0x40 and those flags values
-  are kept for parity; no effect has been seen in game. To resolve, find
-  the readers of entry+0x07+8*i.
+- The binding records' first dword, and the flag bits other than 0x40
+  (2.4): what bit 0x80 does after a device reports a control down (the
+  digital evaluation at 0x586D80 tests it), what the flags of analog
+  records mean (the analog evaluation was not traced), and whether the game
+  ever builds a pad record with bit 0x40 set (3.2 item 2). A lead
+  [guess]: code between 0x595EB1 and 0x596190 ORs 0x40, 0x20, 0x80, 0x30
+  and 0x10 into a byte at +7 of a record and may be where the game builds
+  binding records from `DATA\INPUT.XML`; to resolve, confirm that and
+  trace which bindings lead to each bit.
+- In which order the game's device selection (2.5) and the mod's
+  per-frame update (05 §3.2) run within a game frame. 3.3 requires VR
+  activity to reach both in either order; to confirm in game, log the
+  order of the two calls once.
 - Whether any binding is evaluated through GetAxis with `negate` set; if so
   the VR value may need the same negation. Movement, look and menu axes
   behave correctly in game with the VR value not negated, so any such
@@ -1441,9 +1525,10 @@ Common:
   each path; if the legacy path keeps state, gate it on
   `IVRSystem::IsInputAvailable`.
 - 2020 build: every "?" above (device selection, IsMoveOnLeftStick, the
-  look-apply slot, map constructors, keyboard and mouse vtables) and every
-  2020 value from the earlier mod's table need checking against a 2020
-  `AI.exe`.
+  look-apply slot, the camera update and yaw setter, map constructors,
+  keyboard and mouse vtables), every 2020 value from the earlier mod's
+  table, and every structure offset of section 2 (assumed equal to 2015)
+  need checking against a 2020 `AI.exe`.
 - WMR and Touch defaults are not verified on hardware; under OpenXR, WMR
   has no reload input (5.4), a candidate for a binding change once
   verified.

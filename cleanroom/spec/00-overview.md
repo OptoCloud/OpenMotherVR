@@ -1,4 +1,4 @@
-<!-- Provenance: user requirements; in-game observation of the earlier mod's last release on the 2015 build; AI.exe 2015 analysis; 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; in-game observation by the spec side in a headset (per-eye lighting and mirror fixes confirmed; OpenXR stereo confirmed on SteamVR with Index; controls on Index confirmed); measurements by the spec side of render-thread and GPU cost in game (pixel scale, culling, mirror size, anti-aliasing, display resets, shader patching, logging, OpenXR frame loop); user decisions of spec r3 (runtimes None / OpenVR / OpenXR, flat play with runtime None is the unmodded game, "Oculus" means OpenXR), later (OpenVR is the default runtime; the options page is project-authored and built into the player's own UI archive; the project's log format; no other mod named in the spec) and r5 (SteamVR need not be running; invalid head poses; no elevation, registry change or folder rename; settings named by their key; known problems stated as observed effects); a tester's report on SteamVR with a Steam Frame headset and project decisions of spec r6 (borderless mirror window, focus loss does not pause, the options page shows the runtime this run drives, the headset-not-showing-the-game warning, the crash record). Revision: r6 -->
+<!-- Provenance: user requirements; in-game observation of the earlier mod's last release on the 2015 build; AI.exe 2015 analysis; 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; in-game observation by the spec side in a headset (per-eye lighting and mirror fixes confirmed; OpenXR stereo confirmed on SteamVR with Index; controls on Index confirmed); measurements by the spec side of render-thread and GPU cost in game (pixel scale, culling, mirror size, anti-aliasing, display resets, shader patching, logging, OpenXR frame loop); user decisions of spec r3 (runtimes None / OpenVR / OpenXR, flat play with runtime None is the unmodded game, "Oculus" means OpenXR), later (OpenVR is the default runtime; the options page is project-authored and built into the player's own UI archive; the project's log format; no other mod named in the spec) and r5 (SteamVR need not be running; invalid head poses; no elevation, registry change or folder rename; settings named by their key; known problems stated as observed effects); a tester's report on SteamVR with a Steam Frame headset and project decisions of spec r6 (borderless mirror window, focus loss does not pause, the options page shows the runtime this run drives, the headset-not-showing-the-game warning, the crash record); clean-room review round 2 and coverage review of spec r6, applied in r7 (v1 defined by what the player sees; console commands moved to the robustness requirements; process exit allows only the detach log line; settings keys given for every option on the page; a program other than the game that loads the DLL is left alone; the welcome only on a run where the mod is active). Revision: r7 -->
 
 # 00. Overview
 
@@ -18,11 +18,9 @@ running its own gameplay, AI, audio and scripting unchanged.
 
 ### 1.1 Versions
 
-- **v1** reproduces the user-visible behaviour of the earlier community VR
-  mod for this game (the first to use this path, in its last release), on
-  Windows 10 and 11 and current runtimes, and fixes that mod's known
-  problems and the further problems found in game testing (§4). v1 adds no
-  gameplay features beyond those fixes.
+- **v1** provides the behaviour of §2 on Windows 10 and 11 and current
+  runtimes, and fixes the known problems listed in §4. v1 adds no gameplay
+  features beyond those fixes.
 - **v2** (later, separate spec revision) adds enhancements: tracked hands
   and hand aiming, smooth turning, comfort options, haptics, per-controller
   glyphs in more places, OpenXR as the default runtime. Nothing in v1 may
@@ -134,15 +132,17 @@ has them all); the labels on the page are the implementation's own wording
   existing config files, 06).
 - Which eye the desktop mirror shows (both, left, right;
   `MirrorViewType`) and whether it is symmetric (`SymmetricMirrorView`).
-- Pixel scale (render resolution relative to the runtime's recommendation,
-  which already includes SteamVR's own resolution setting; capped so the
-  side-by-side target stays within 16384 pixels in each direction, D3D11's
-  texture size limit).
+- Pixel scale (`PixelScale`: render resolution relative to the runtime's
+  recommendation, which already includes SteamVR's own resolution setting;
+  capped so the side-by-side target stays within 16384 pixels in each
+  direction, D3D11's texture size limit).
 - Head-in-wall blackout on/off (`ClippingBlinders`).
 - Snap turn on/off (`SnapRotation`) and the number of snap turn segments
   (`SnapRotationSegments`).
-- VR input options passed to the game's scripts: toggle grips (and the
-  stored-only relative walking, strafing and toggle crouch, 06 §1).
+- Grips that toggle aiming and the motion tracker instead of being held
+  (`ToggleGrips`, 04 §5.6). `VRInputRelativeWalking`, `VRInputStrafing`
+  and `ToggleCrouch` are kept in the config file for compatibility and have
+  no effect and no control in v1 (06 §1).
 - Skipping the start-up logo and intro sequence (`SkipStartupIntro`, from
   the next launch).
 - Developer diagnostics (`DebugOptions`): shows the game's hidden "Select
@@ -167,10 +167,11 @@ at pixel scale 1.3 or below, where the eyes are not already supersampled;
 `On`; `Off`), which has no menu control. It is read at start-up; missing or
 invalid entries take their defaults and out-of-range values are sanitised;
 it is rewritten when an option changes, keeping keys it does not know. On
-the first start without a config file the player is told once where the VR
-options are, and the file is written only after that message is closed,
-so that a process that exits first (Steam relaunching the game) leaves the
-one-time message for the next launch (13). The format, the command-line
+the first start without a config file, on a run where the mod is active
+(01 §2.4), the player is told once where the VR options are, and the file is
+written only after that message is closed, so that a process that exits
+first (Steam relaunching the game) leaves the one-time message for the next
+launch (13). The format, the command-line
 switches (`-vrforcenone`, `-vrforceopenvr`, `-vrforceopenxr`,
 `-vrforceoculus`, `-vrscale`) and the `mvr_*` console commands are in 06.
 
@@ -194,10 +195,11 @@ switches (`-vrforcenone`, `-vrforceopenvr`, `-vrforceopenxr`,
 - When the runtime is installed but fails to start (no headset, runtime
   error), the player is told once with the runtime's error, VR stays off
   for the session, and the game continues on the monitor at its normal
-  resolution, never stuck in stereo (12 §7). The options page then shows
-  runtime None while the stored choice is kept, so the player can retry
-  it or pick the other runtime; an OpenXR failure message also says how to
-  go back to SteamVR (06 §5.2, 13 §5.3).
+  resolution, never stuck in stereo (12 §7). After a failed start the
+  options page shows that no runtime is running (None); the stored choice
+  is not changed, so a restart tries it again and the page still offers
+  every runtime (06 §5.2). An OpenXR failure message also says how to go
+  back to SteamVR (13 §5.3).
 - When SteamVR does not show the game in the headset although VR started
   (its Desktop Game Theatre is the usual cause), the player is warned once,
   without the game stopping, and told which Steam setting to turn off
@@ -212,15 +214,18 @@ switches (`-vrforcenone`, `-vrforceopenvr`, `-vrforceopenxr`,
   opened (12, 13).
 - If `AI.exe` is not a supported build, or its code at any patched place is
   not what the mod expects, the mod patches nothing and the game runs
-  unmodified; an unknown build is reported once (01 §2.4, §2.5).
+  unmodified; an unknown build is reported once (01 §2.4, §2.5). A program
+  other than the game that loads the DLL from the game folder (a test
+  harness, a tool) gets the forwarded `d3d11.dll` functions and nothing
+  else (01 §3.1).
 
 ### 2.9 Diagnostics
 
 The mod writes `mothervr.log` next to the game: one session per process,
-every decision and failure once, nothing per frame (11). A crash is
-recorded in the log too (where it happened, the registers and the
-callers), and Windows still records it as without the mod. Players send
-this file with a bug report (11 §6, 13).
+every decision and failure once, nothing per frame (11). A crash leaves a
+record in the log that is enough to locate it, and Windows' own crash
+reporting is not affected (11 §6). Players send this file with a bug
+report (13).
 
 ## 3. Platform
 
@@ -296,11 +301,13 @@ Each item states the effect observed in game and the requirement v1 meets.
 14. **Settings changed from the menu did not reach the renderer** until a
     restart. v1 rebuilds the render targets when pixel scale or mirror
     settings change (§2.6).
-15. **A console command with arguments that is not one of the mod's lost
-    its arguments** before reaching the game. v1 passes such commands on
-    unchanged (06 §4.2).
 
-### 4.2 Robustness required beyond the earlier mod
+### 4.2 Robustness requirements
+
+15. **Console commands pass through intact.** A console command that is
+    not one of the `mvr_*` commands reaches the game exactly as typed,
+    arguments included (06 §4.2).
+
 
 16. **Calling conventions of replaced game methods.** The game calls its
     gamepad, stereo device and UI methods as `thiscall` and relies on each
@@ -335,8 +342,10 @@ Each item states the effect observed in game and the requirement v1 meets.
     the render thread or a job thread reads head poses, views, hand poses
     or the device state written by another thread, it sees one complete,
     consistent value (12 §3).
-24. **No work at process exit**: no runtime shutdown or D3D release while
-    the process ends (12 §7).
+24. **No work at process exit**: no runtime shutdown, D3D release or
+    library unloading while the process ends. The one thing done then is
+    appending the detach line to the log, which is already open (01 §1.4,
+    11 §2.1, 12 §7).
 25. **Hooks on shared DXGI and D3D11 vtables act only on the game's own
     swapchain** (12 §4.4).
 26. **Files written completely or not at all**: a partly written
@@ -361,7 +370,8 @@ behaviour.
 30. **Mirror back buffer at window size**, not at the side-by-side size
     (about 0.3 ms GPU and 250 MB saved at 8064x4032) (03 §9.2).
 31. **Stereo anti-aliasing policy**: `Auto` skips AA above pixel scale 1.3,
-    where it cost about 0.6 ms GPU for little gain (08 §3, §2.7).
+    where it cost about 0.6 ms GPU for little gain (08 §3; the setting is in
+    §2.7 here).
 32. **Display reset only on a change** of pixel scale or mirror settings,
     not on every menu, pause or loading screen (each reset is a 0.2 s
     freeze) (12 §6.3).

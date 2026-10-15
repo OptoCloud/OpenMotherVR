@@ -1,11 +1,11 @@
-<!-- Provenance: project goals (roadmap, v2 section); user requirements (v1 = the earlier mod's behaviour with its problems fixed, v2 = enhanced mode on top of it; every v2 feature off or v1-compatible by default); proposals of this project, pending user confirmation where marked [proposal]. This document states no new game facts: game facts used here are cited from the v1 documents 00 to 14, and those for v2 are in 21 to 24, where game facts were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. 2020 values: none (v2 gives 2015 RVAs only). Revision: r1 -->
+<!-- Provenance: project goals (roadmap, v2 section); user requirements (v1 = the earlier mod's behaviour with its problems fixed, v2 = enhanced mode on top of it; every v2 feature off or v1-compatible by default); proposals of this project, pending user confirmation where marked [proposal]. This document states no new game facts: game facts used here are cited from the v1 documents 00 to 14, and those for v2 are in 21 to 24, where game facts were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. 2020 values: none (v2 gives 2015 RVAs only). r2: project decisions of the second clean-room review of 20 to 24 (the master switch covers 21 to 24, one owner for seated and standing play, the engine settings override and a failed runtime, where v2 addresses are listed, this project's own feature names). Revision: r2 -->
 
 # 20. v2 overview: enhanced mode
 
 ## 1. Goal
 
-v1 (00 to 14) plays the whole game in a current PC VR headset with the
-behaviour of the earlier mod, its problems fixed. It drives the game
+v1 (00 to 14) plays the whole game in a current PC VR headset as 00 to 14
+specify. It drives the game
 through its gamepad: the VR controllers are buttons and sticks, the head
 is tracked, and the hands are read (04 §5.11) but not used.
 
@@ -46,22 +46,41 @@ Consequences:
   optional fixes in that sense, never core patches).
 
 Defaults that may break rule 1 only by user decision (§9): OpenXR as the
-default runtime (22), and whether tracked hands are on for a fresh config.
+default runtime (22 §11), and whether tracked hands are on for a fresh
+config. Either decision is also an exception to rule 2: once made, a fresh
+config with every v2 key absent no longer gives v1's runtime or v1's
+controls, and the document that owns the default says so.
 
 ### 1.2 Runtime None and VR failure
 
 With runtime None the game is the unmodded game (01 §2.3); no v2 feature
 runs and no v2 patch is applied. When the runtime fails to start, the game
 runs flat as v1 says (12 §7) and every v2 feature is inactive. v2 features
-exist only while the stereo device runs.
+exist only while the stereo device runs, with one exception: the engine
+settings override of 24 §6, when it is on, is decided at attach and still
+applies after a runtime failure, because it changes the game's own option
+list before the runtime's outcome is known and concerns flat play as much
+as stereo [proposal: undoing it after the parse is not possible, and a
+player who turned it on wants it in flat play too].
+
+### 1.3 The master switch [proposal]
+
+`EnhancedMode` (22 §3.1) is the single v2 switch. While it is false, every
+v2 key of 21, 22, 23 and 24 is treated as its v1 value, whatever the file
+holds; the stored values are kept and written back unchanged, so turning
+it on again restores the player's choices. While it is true each key
+applies as stored. Reason: one switch tells a v2 problem from a v1 one, and
+keeps an upgrade at v1. `VRRuntime`'s default (22 §11) is not a v2 key and
+is not gated. A key that applies only at the next launch (for example 24
+§6) follows the value `EnhancedMode` had at that launch.
 
 ## 2. Documents
 
 | Document | Covers |
 |---|---|
 | `20-v2-overview.md` | this document: goals, the v1 rule, document set, what the player sees, modes, platform, phasing, glossary, cross-cutting questions |
-| `21-hands-and-body.md` | tracked hands in the game; aiming with the hand; the motion tracker, flashlight and melee by hand; hiding the player's body where it conflicts with the real one; the head moving independently of the body; room-scale movement; seated and standing height; real crouch driving the game's crouch; re-syncing the body after the game's animations; physical throwing; health on a wrist display; haptics |
-| `22-controls-and-comfort.md` | smooth turning; snap-turn repeat; a comfort vignette; seated and standing modes and their calibration; world scale as a setting; d-pad emulation; gestures (body-relative holsters); turning that respects interactions; holding breath and leaning by head movement; glyphs per controller type; OpenXR as the default runtime; settings in the headset; a hotkey that turns VR off; crash-safe logging |
+| `21-hands-and-body.md` | tracked hands in the game; aiming with the hand; the motion tracker, flashlight and melee by hand; hiding the player's body where it conflicts with the real one; the eye forward or back of the body; room-scale movement; the seated eye raise; real crouch driving the game's crouch; control hand-back after the game's animations; throwing by motion; health on a wrist display; haptics |
+| `22-controls-and-comfort.md` | the `EnhancedMode` switch; smooth turning; snap-turn repeat; a comfort vignette; seated and standing modes and their calibration (the one owner of both); world scale as a setting; d-pad emulation; gestures (body-relative holsters); turning that respects interactions; holding breath and leaning by head movement; glyphs per controller type; OpenXR as the default runtime; settings in the headset; a hotkey that turns VR off; crash-safe logging |
 | `23-interactions-and-hud.md` | physical levers, valves, the rewiring tool and terminals; fewer camera takeovers during interactions; activation distances for hands; the terminal font in a headset; HUD placement and crosshair options; highlighting items that can be picked up |
 | `24-rendering-v2.md` | temporal anti-aliasing and a real SMAA T2x with per-eye history; smoke and fog lighting in stereo; the pause menu over the live world; the game's engine settings; foveated rendering and a resolution scale; 2D-only effects (lens flare, chromatic aberration, film grain, cutscene letterboxing); the cost of D3D11 state changes |
 
@@ -87,7 +106,7 @@ By area. Each item is a goal; the document named holds what is required.
   swings follow the hand.
 - The view follows the real head: leaning, ducking and stepping move the
   head without the game's body snapping after it, within limits that keep
-  the game's collision honest (room-scale, head independent of body).
+  the game's collision honest (free head, room-scale).
 - In standing mode the player's real height sets the eye height, and
   crouching for real crouches in the game. In seated mode the eye height is
   that of the standing character.
@@ -114,9 +133,11 @@ By area. Each item is a goal; the document named holds what is required.
 - Holding breath and leaning while hiding follow the real head.
 - Button prompts show the glyphs of the controller actually in use, and
   change when it changes.
-- OpenXR becomes the default runtime (user decision, §9).
+- OpenXR may become the default runtime (pending user decision, §9).
 - The new settings can be changed in the headset, on the options page.
-- A hotkey turns VR off without quitting; logging survives a crash.
+- A hotkey turns VR off without quitting; log lines also survive a crash
+  of the whole system, and the crash record gains the mod's state (22
+  §14).
 
 ### 3.3 Interactions and HUD (23)
 
@@ -167,8 +188,10 @@ document named.
 | **Seated** | v1 controls, plus the comfort options the player chose; eye height of the standing character | hands aim and hold; gestures within seated reach; crouch by button |
 | **Standing** | v1 controls; eye height from the calibrated real height; real crouch drives the game's crouch | everything of 21: hands, real crouch, room-scale |
 
-- **Seated or standing** (22, used by 21): sets where eye height comes
-  from and whether real crouch is used. A fresh config is seated
+- **Seated or standing** (22 §6, which owns the mode key and the height
+  calibration; 21 §11 reads them for real crouch and room-scale): sets
+  where eye height comes from and whether real crouch is used. A fresh
+  config is seated
   [proposal: matches v1, where the head offset is the runtime's own and no
   calibration is needed].
 - **Hands on or off** (21): with hands off, the controllers drive the game
@@ -190,11 +213,16 @@ feature.
 
 - **Settings** are new keys in new sections inside `Settings` of
   `mothervr.json`, one section per area, named by the document that owns
-  it (V2 conventions: for example `Hands`, `Comfort`, `Interaction`,
-  `Graphics`). Each key has a type, default, range and sanitise rule as in
-  06 §1. Unknown keys are kept on save (06 §3); v1 keys keep their layout.
-- **Game addresses** are 2015 RVAs in the address table of 01 §4; the 2020
-  column is `?` (§6). Every site is verified before it is written (12 §4);
+  it (`Hands` and `Body` in 21, `Comfort` and `Controls` in 22,
+  `Interaction` and `Hud` in 23, `Graphics` in 24), plus `EnhancedMode`
+  (§1.3). Each key has a type, default, range and sanitise rule as in 06
+  §1. A setting has exactly one key, in the document that owns it; other
+  documents refer to that key. Unknown keys are kept on save (06 §3); v1
+  keys keep their layout.
+- **Game addresses** are 2015 RVAs, listed in the address table of the
+  document that uses them (21 §20, 22 §2, 23 §2, 24 §1.1 and §2.3); the
+  2020 column is `?` (§6). 01 §4 collects them in a later revision (§11).
+  Every site is verified before it is written (12 §4);
   a v2 feature is an optional fix: a mismatch turns that feature off alone
   and is logged.
 - **Threads** follow 12: hand and head poses reach the game thread through
@@ -228,11 +256,10 @@ feature.
 Supporting the 2020 build is itself a v2 goal. It takes:
 
 1. A 2020 `AI.exe` available to the spec side.
-2. Verifying every v1 address and byte string against it. Today every 2020
-   value in v1 was taken from the earlier mod's per-build address table
-   (and, for inline sites, its installer) and none has been verified against
-   a 2020 `AI.exe` (01 §3.2). Each one is confirmed or corrected, and each
-   `?` is found or the feature it serves stays off there.
+2. Verifying every v1 address and byte string against it. Today no 2020
+   value in v1 has been verified against a 2020 `AI.exe` (01 §3.2 gives
+   their source). Each one is confirmed or corrected, and each `?` is found
+   or the feature it serves stays off there.
 3. Finding every v2 address in it (21 to 24 give 2015 RVAs only), with the
    same verification as for 2015.
 4. Checking the game data the mod depends on: the UI archive and its movies
@@ -251,9 +278,9 @@ phase leaves the mod releasable with all v2 options off equal to v1.
 
 | Phase | Contents | Why here |
 |---|---|---|
-| A. Foundations | v2 settings sections and their place on the options page (22); input ownership between v1 bindings and v2 features (§5); the VR-off hotkey and crash-safe logging (22) | everything later needs the settings and the input rules; the hotkey and the logging make every later test safer and its failures readable |
+| A. Foundations | v2 settings sections, the master switch (§1.3) and their place on the options page (22); input ownership between v1 bindings and v2 features (§5); the VR-off hotkey and crash-safe logging (22) | everything later needs the settings and the input rules; the hotkey and the logging make every later test safer and its failures readable |
 | B. Hands and turning | tracked hands and hand aiming, the tracker and flashlight by hand (21); smooth turning and snap repeat, comfort vignette (22) | the most requested features; hand aiming builds on hand poses v1 already reads (04 §5.11); smooth turning is small and independent |
-| C. Body and modes | seated and standing modes with calibration, real crouch, head independent of body, room-scale, body sync after animations, world scale (21, 22); haptics (21) | depends on B's hands and on a settled seated/standing model; body work touches the game's camera and collision and is the riskiest gameplay change |
+| C. Body and modes | seated and standing modes with calibration (22), real crouch, free head, room-scale, control hand-back after animations (21), world scale (22); haptics (21) | depends on B's hands and on a settled seated/standing model; body work touches the game's camera and collision and is the riskiest gameplay change |
 | D. Controls polish | gestures and d-pad emulation, interaction-aware turning, hold breath and lean, per-controller glyphs, in-headset settings for everything so far, OpenXR as default (22) | needs B and C to know which inputs are free; glyphs and the options page change the UI archive once for all |
 | E. Interactions and HUD | physical levers, valves, rewiring, terminals; fewer camera takeovers; activation distances; terminal font; HUD, crosshair, item highlight; melee and throwing by hand (21, 23) | each interaction is its own game study; they need hands (B) and the interaction state (11 §5.3) |
 | F. Rendering | per-eye temporal AA and SMAA T2x, smoke and fog, pause menu over the world, engine settings, foveated rendering and resolution scale, 2D-only effects, D3D11 state cost (24) | v1 already renders correctly; these improve quality and cost and are independent of gameplay, so they can also run in parallel by a separate implementer |
@@ -272,20 +299,25 @@ v1 terms are in 00 §5. v2 adds:
   default unless a user decision says otherwise.
 - **Hands on / hands off**: whether the tracked hands drive aiming and held
   items (21), or the controllers act only as a gamepad (v1).
+- **Master switch**: `EnhancedMode`, which while off makes every v2 key
+  read as its v1 value (§1.3).
 - **Seated / standing mode**: where the eye height comes from (the
   standing character's height, or the player's calibrated real height) and
-  whether real crouch is used.
+  whether real crouch is used (22).
 - **Height calibration**: taking the player's standing eye height as the
   reference for the game character's eye height (22).
 - **Real crouch**: lowering the real head below a threshold under the
   calibrated height makes the game character crouch (21).
 - **Hand aiming**: the weapon's aim follows the tracked hand, not the head.
-- **Head independent of body**: the camera follows the real head's
-  position within limits, without moving the game character's body (21).
+- **Free head**: the view follows the real head's position within limits
+  while the character's body stays where the game put it (21 §11).
+- **Eye forward offset**: the eye moved forward or back of the game body
+  by a set distance (21 §11.2).
 - **Room-scale**: the player's real walking in the play space moves the
   game character, through the game's own movement and collision (21).
-- **Body sync**: bringing body and head back into agreement after a game
-  animation moved the body (21).
+- **Control hand-back**: when the game returns control of the character
+  after one of its own animations moved it, the view, hands and crouch
+  agree with the player again (21 §12).
 - **Body hiding**: not drawing parts of the game character's body that
   would conflict with the player's real body (21).
 - **Smooth turning**: continuous yaw from the turn stick at a set speed, as
@@ -322,8 +354,10 @@ v1 terms are in 00 §5. v2 adds:
   the headset (22, 14).
 - **VR-off hotkey**: a key that turns the stereo device off for the rest of
   the session without quitting (22).
-- **Crash-safe logging**: log lines written so that those before a crash
-  survive it (22, 11).
+- **Crash-safe logging**: log lines flushed to disk so that they also
+  survive a crash of the whole system, and the crash record extended with
+  the mod's state (22 §14; v1 already records a crash of the process,
+  11 §6).
 
 ## 9. Decisions the user must make
 
@@ -331,7 +365,7 @@ v1 terms are in 00 §5. v2 adds:
 |---|---|---|
 | Default runtime for a fresh config | OpenVR (v1 decision r4) or OpenXR (roadmap) | OpenXR once phase D has verified v2 on both runtimes; existing config files keep their value |
 | Hands on for a fresh config | off (v1 rule) or on | off: the v1 rule; the options page makes it one switch |
-| A single switch for all of v2 | none (each feature its own key) or one master key that forces every v2 key to its v1 value while off | one master key, default off [proposal: one switch to tell a v2 bug from a v1 bug, and a safe default for upgrades]; 22 owns it |
+| A single switch for all of v2 | none (each feature its own key) or one master key that forces every v2 key to its v1 value while off | one master key, `EnhancedMode`, default off, covering every key of 21 to 24 (§1.3) [proposal: one switch to tell a v2 bug from a v1 bug, and a safe default for upgrades]; 22 §3.1 defines the key |
 | Seated or standing for a fresh config | seated or standing | seated (no calibration needed) |
 | Phasing | §7 | as §7 |
 | 2020 build in v2 | off until verified, or best effort | off until §6.1 is done for each feature |
@@ -347,15 +381,17 @@ v1 terms are in 00 §5. v2 adds:
    Input manifest and OpenXR action set (04 §5.8.2, §5.8.4). A player's
    saved custom binding lacks them. Required: detect that and say so, as
    04 §5.11 does for pose actions; which document owns it?
-3. **Camera ownership.** Head independent of body, room-scale, real crouch,
-   body sync, lean and fewer camera takeovers all change how the game's
+3. **Camera ownership.** Free head, room-scale, real crouch, control
+   hand-back, lean and fewer camera takeovers all change how the game's
    first-person camera and the stereo view are combined (03 §1, 05 §3, 05
    §6). One model is needed so they do not fight; 21 proposes it, 22 and
    23 use it.
 4. **World scale and height.** World scale (22), seated and standing
-   height (21, 22) and real crouch all scale or offset the head position.
-   In which order do they apply, and is the crouch threshold measured
-   before or after world scale?
+   height (22), the seated eye raise (21) and real crouch all scale or
+   offset the head position. Answered: positions are taken relative to the
+   reference in runtime metres, the offsets are summed there and the sum
+   is scaled by `s`; the standing height and the crouch threshold are in
+   runtime metres, before `s` (22 §6.3, 21 §11.1).
 5. **Interaction state.** 11 §5.3 keeps whether an interaction is running
    and its kind. Is it enough for 21 to 23 (hand features off during an
    interaction, interaction-aware turning, physical interactions), or do
@@ -387,6 +423,10 @@ Not made here; to be applied in a later revision:
   `Input.VRInputRelativeWalking`, `Input.VRInputStrafing` and
   `Input.ToggleCrouch` (stored only in v1) may gain effect in v2 if 21 or
   22 says so.
+- `01-loading.md` §4: the v2 addresses of 21 §20, 22 §2, 23 §2 and 24
+  §1.1 and §2.3, 2015 only, as optional-fix sites.
 - `11-diagnostics.md`: v2 events and the v2 options in the session start
   (§10 item 10).
-- `ANSWERS.md`: record the user decisions of §9 once made.
+- `ANSWERS.md`: record the user decisions of §9 once made, and the
+  decisions of this revision (§1.2 exception, §1.3 master switch, one owner
+  for seated and standing play, where v2 addresses are listed).

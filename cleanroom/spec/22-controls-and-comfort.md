@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6). Revision: r2 -->
+<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6); r3: second clean-room review: the crash event stated as the state that must hold, at the level of v1's crash record; the gestures and d-pad emulation stated as results with this project's reasons; the HUD game facts of 2.4 re-read by the spec side in the 2015 `AI.exe` and reconciled with 23 (the pending flag of each HUD object, the objects the game's own hide and show touch); this document is the one owner of seated and standing play and the calibration (21 reads them); `EnhancedMode` gates 21 to 24 (20 §1.3); lever interactions own the grips, the move action and turning (23 §3.2). Revision: r3 -->
 
 # 22. Controls and comfort (v2)
 
@@ -32,7 +32,7 @@ marked **[proposal]** with a one-line reason.
 
 | Feature | Key (section 3) | v1 value | Section |
 |---|---|---|---|
-| all v2 features of this document at once | `EnhancedMode` | false | 3.1 |
+| all v2 features of 21 to 24 at once (20 §1.3) | `EnhancedMode` | false | 3.1 |
 | smooth turning at a set speed, time-based | `Comfort.SmoothTurnSpeed` | 0 (the game's own look, as v1) | 4.2 |
 | snap-turn repeat interval | `Comfort.SnapTurnRepeatMs` | 300 | 4.3 |
 | a short fade at each snap step | `Comfort.SnapTurnFade` | false | 4.3 |
@@ -69,8 +69,8 @@ the debug map (map 2, from RVA 0x124F490). These are the names
 The entry counts match the counts observed in each map at the first remap
 (04 §2.4: 41/6, 19/6, 32/8), and every action function 04 §2.4 inferred from
 play matches the name at its index, so the table index is the map entry
-index [likely: the counts and all observed functions agree; confirmed by
-the logging of 19 item 1].
+index [likely: the counts and all observed functions agree; to be
+confirmed by the logging of 19 item 1].
 
 Map 0 (player), digital:
 
@@ -172,23 +172,42 @@ lean the view in a hiding place, are not verified (19 items 3 and 4).
 | `UiManagerPtr` | 0x134A78C | global pointer to the game's UI manager |
 | `UiFindObject` | 0x410420 | thiscall on the UI manager, one argument `const char* name`, `ret 4`; returns the UI object of that name or null. It takes the manager's critical section, so it is called on the game thread. Prologue `83 ec 08 53 55 56 8b f1`. 515 call sites |
 | `UiInvoke` | 0x4081E0 | thiscall on a UI object, one argument `const char* function`, `ret 4`: calls that public function of the object's movie. SEH prologue `6a ff 68 <imm32> 64 a1 00 00 00 00` |
-| `WeaponHudHide` | 0x40C220 | thiscall on the `weaponstuff` UI object, no arguments, plain `ret`: when the movie (+0x68) exists, invokes `force_hud_hidden`, else marks the request pending (+0x129); sets +0x40 to 1. Bytes `56 8b f1 83 7e 68 00` |
-| `WeaponHudShow` | 0x40C250 | the same object; invokes `force_hud_visible` (or marks it pending) and sets +0x40 to 0. Bytes `56 8b f1 83 7e 68 00` |
+| `WeaponHudHide` | 0x40C220 | thiscall on the `weaponstuff` UI object, no arguments, plain `ret`: when the movie (+0x68) exists, invokes `force_hud_hidden`, else sets the pending byte +0x129 to 1; either way sets +0x40 to 1. Bytes `56 8b f1 83 7e 68 00` |
+| `WeaponHudShow` | 0x40C250 | the same object; invokes `force_hud_visible` when the movie exists, else sets +0x129 to 1; either way sets +0x40 to 0. Bytes `56 8b f1 83 7e 68 00` |
 | `PickupHudHide` | 0x40ADC0 | thiscall on the `pickupOverlay` UI object, no arguments, plain `ret`: invokes `force_hud_hidden`, sets +0x40 to 1. Bytes `56 68`, then the address of the string `force_hud_hidden` |
-| `PickupHudShow` | 0x40ADE0 | the same, `force_hud_visible`, +0x40 to 0. Bytes `56 68`, then the address of `force_hud_visible` |
+| `PickupHudShow` | 0x40ADE0 | the same, invokes `force_hud_visible`, sets +0x40 to 0. Bytes `56 68`, then the address of `force_hud_visible` |
 | names | 0xDC6CE8, 0xDC3934, 0xE0451C | the strings `weaponstuff`, `pickupOverlay`, `reaction_game` that the game passes to `UiFindObject` |
 | function names | 0xEFB2D8, 0xEFB2EC | `force_hud_hidden`, `force_hud_visible` |
 
 In the player's `UI.PAK`, three movies define `force_hud_hidden` and
 `force_hud_visible`: `WEAPONSTUFF.GFX` (the HUD: weapon, ammunition,
-prompts), `PICKUPOVERLAY.GFX` and `REACTION_GAME.GFX`. The game hides its
-HUD for its own reasons through these methods: the function at RVA
-0x1094A0 looks up `weaponstuff`, `pickupOverlay` and `radial_menu` and hides
-the first two through `WeaponHudHide` and `PickupHudHide`; the HUD's
-per-frame update (around RVA 0x44C0A1) re-applies hidden or visible from
-the object's +0x40 byte when its pending byte +0x408 is set. The +0x40 byte
-is the game's own "HUD forced hidden" state of that object [likely, from
-its writers].
+prompts), `PICKUPOVERLAY.GFX` and `REACTION_GAME.GFX`.
+
+The +0x40 byte is the game's own "HUD forced hidden" state of each of the
+two objects [sure for its writers: the four methods above and the two
+re-apply sites below]. Each object re-applies that state when its movie
+has been (re)loaded [sure for the code; likely for the trigger]:
+
+- `weaponstuff`: an update at RVA 0x44D020, at 0x44D415, finds the
+  pending byte +0x129 set and invokes `force_hud_hidden` or
+  `force_hud_visible` according to +0x40 when the movie exists [likely
+  that this update belongs to `weaponstuff`: it reads the same pending
+  byte and +0x68].
+- `pickupOverlay`: an update at RVA 0x44BBE0, at 0x44C0A1, finds its
+  pending byte +0x408 set and the movie present, clears +0x408 and
+  invokes the function matching +0x40 [likely that this update belongs to
+  `pickupOverlay`: it reads the same fields]. +0x408 is set to 1 by the
+  method at 0x40AE00, which in one path also sets +0x40 to 0 [sure for the
+  writes; likely: the movie's load], so a reload of this movie can reset
+  the game's state to visible.
+
+The game hides its HUD for its own reasons through these methods: a
+scripted entity's methods at RVA 0x1094A0 (hide) and 0x1095A0 (show)
+[likely: the levels' HUD visibility entity] look up `weaponstuff`,
+`pickupOverlay` and `radial_menu` (the show method also `SCANNER`); hide
+calls `PickupHudHide` and `WeaponHudHide`, show calls `PickupHudShow` and
+`WeaponHudShow`, and each also calls a method of the other objects it
+found. 23 §2.7 cites this section for these facts.
 
 ### 2.5 v1 game facts used here
 
@@ -241,15 +260,19 @@ keys with their values.
 | `Controls.VrOffHotkey` | bool | false | | at once |
 | `Controls.CrashSafeLog` | bool | false | | next launch (14) |
 
-**`EnhancedMode`** is the single v2 switch 20 §9 proposes [proposal: one
+**`EnhancedMode`** is the single v2 switch of 20 §1.3 [proposal: one
 switch tells a v2 problem from a v1 one, and keeps an upgrade at v1]. While
-it is false every key of this table except `EnhancedMode` is treated as its
-v1 value, whatever the file holds; the stored values are kept and written
-back unchanged, so turning it on again restores the player's choices.
-While it is true each key applies as stored. Whether `EnhancedMode` also
-gates the keys of 21, 23 and 24 is 20's decision; this document requires
-only that it gates the keys above. (`VRRuntime`'s default, section 11, is
-not a v2 key and is not gated.)
+it is false every key of this table except `EnhancedMode`, and every key of
+21, 23 and 24, is treated as its v1 value, whatever the file holds; the
+stored values are kept and written back unchanged, so turning it on again
+restores the player's choices. While it is true each key applies as
+stored. (`VRRuntime`'s default, section 11, is not a v2 key and is not
+gated.)
+
+`Comfort.PlayMode` and `Comfort.StandingEyeHeight` are the only keys for
+seated and standing play and the calibration; 21 §11 reads them for its
+height adjustment, real crouch and room-scale and defines no keys of its
+own for them (one owner per setting, 20 §5).
 
 Reasons for the ranges [proposal for each]:
 
@@ -337,7 +360,11 @@ value the table and this rule reduce to v1's.
 All turning (snap and smooth) applies only while the conditions of 04 §6
 hold (stereo running, the active pad device exists, a FollowBehavior is
 tracked and active, stereo mode not 1), and, with
-`Controls.InteractionAwareTurning` on, while 4.4 allows it.
+`Controls.InteractionAwareTurning` on, while 4.4 allows it. Independently
+of that key, no turning happens while 23's lever mapping is active (a
+lever or junction with `Interaction.PhysicalLevers` on, 23 §3.2), because
+the mapping then owns the grips and the move and look actions (one owner
+per input, 20 §5).
 
 ### 4.2 Smooth turn
 
@@ -418,7 +445,7 @@ terminals, levers and hacking the stick drives the interaction; turning
 the body at the same time moves the interaction prompt out of view.]
 
 Hiding (11 §5.3 "hiding") does not by itself block turning: the game limits
-the camera in a hiding place itself [likely; to confirm in game, 18 item 7].
+the camera in a hiding place itself [likely; to confirm in game, 19 item 7].
 
 With the key off, turning is v1's: the interaction state is ignored.
 
@@ -540,8 +567,9 @@ Floor height comes from the runtime:
   logged once [proposal: a height without a floor reference drifts with
   each re-anchor of the base space, 09 §6.3].
 
-Who uses the mode: 21 (real crouch, room-scale) reads it; this document
-owns the setting and the calibration (20 §4).
+Who uses the mode: 21 (its height adjustment, real crouch and room-scale,
+21 §11.4) reads it; this document owns the setting and the calibration
+(20 §4).
 
 The mode takes effect at the next recenter, which a change from the menu
 requests (as a pending automatic request, 05 §3.2e) [proposal: switching
@@ -596,26 +624,41 @@ not change with the world's scale].
 the game's d-pad functions (2.2) can still be used: weapon cycling in play
 and item navigation in menus and interaction screens.
 
-**Source** [proposal]: the left stick's direction becomes a d-pad press
+**Required results.** With `Controls.DpadEmulation` on:
+
+- every game function the player's bindings put on a d-pad direction can
+  be reached from the VR controllers, in play, in menus and in
+  interaction screens;
+- one physical input never drives both walking and a d-pad press at the
+  same moment;
+- a prompt for such a function shows the control the player must use for
+  it (section 10).
+
+**Source** [proposal]. The left stick's direction gives the d-pad press,
 while any of these holds:
 
-- an interaction is in progress (11 §5.3), or the breathing game (9.1);
+- an interaction is in progress (11 §5.3), or the breathing game (9.1),
+  except while 23's lever mapping is active (23 §3.2), which owns the move
+  action then;
 - a menu is on the virtual screen (stereo mode 1);
 - the player holds the "d-pad modifier", a new semantic boolean input (04
-  §5.8.1) whose default binding is the left stick click held for 0.3 s
-  [proposal: the click alone is sprint; a hold distinguishes it]; on wands
-  the left touchpad's four edges while clicked.
+  §5.8.1) whose default binding is the left stick click held for 0.3 s; on
+  wands the left touchpad's four edges while clicked.
 
-Reason: during interactions and in menus the left stick does not walk the
-player, so its direction is free; elsewhere a deliberate modifier keeps
-walking unaffected.
+Reasons: the left stick is the one control every supported controller has
+under the left thumb, where a d-pad sits on a pad, so no new reach is
+learned; during interactions and in menus it does not walk the player, so
+its direction is free; elsewhere a deliberate modifier keeps walking
+unaffected, and holding the click (rather than a click alone, which is
+sprint) tells the two apart.
 
 **Direction.** With the left stick at `(x, y)`: a direction is pressed when
 the stick is beyond 0.6 along that axis and the larger of `|x|`, `|y|`
 (one direction at a time); it is released below 0.4. [proposal: hysteresis
 so a stick at the threshold does not chatter; one direction at a time as on
 a d-pad's common use.] While a d-pad direction is pressed from the stick,
-the movement value read from that stick is 0 (no double input).
+the movement value read from that stick is 0, which meets the "never both"
+result above.
 
 **What it drives** (required result): while a direction is pressed, every
 action of maps 0 and 1 whose **original pad control** (04 §3.2) is that
@@ -627,9 +670,10 @@ action by OR. Under the default bindings this is `prev_main_weapon` /
 the d-pad and needs no table of actions. Activity (04 §5.1) counts these
 values like any other.
 
-**Glyphs.** With d-pad emulation on, prompts for actions whose original
-control is a d-pad direction show a glyph of the emulated control (the
-left stick direction) instead of the stock d-pad glyph (10, 14).
+**Glyphs.** As a consequence of section 10's rule that a prompt shows the
+control that drives it, with d-pad emulation on, prompts for actions whose
+original control is a d-pad direction show the emulated control (the left
+stick direction) instead of the stock d-pad glyph (14).
 
 **With the key off** no d-pad state is written (v1).
 
@@ -664,7 +708,11 @@ which interaction screens need the d-pad at all, is open (19 item 5).
 §5.8.1) while both hands are within 0.30 m of the head, held together for
 0.75 s. [proposal: both hands at the face with both grips held for most of
 a second does not happen in play; the hold time and the second hand rule
-out aiming with the tracker raised.]
+out aiming with the tracker raised. Both hands are required, rather than
+one hand or a button, so that a single raised hand during play never
+triggers it, and both grips are used because they are the controls every
+supported controller has and the player can find without looking; v1's
+recenter chord (04 §8) stays for players who prefer buttons.]
 
 **Result.** A manual recenter as the v1 chord gives (04 §8): taken at once
 (once per gesture), never from an invalid pose (03 §2.1), the virtual
@@ -681,8 +729,12 @@ distance of 04 §5.10, used for the left hand) and a press of the Map input
 (04 §5.8.1; the left lower face button by default). While the left hand is
 near the head and this gesture is on, the Map input drives the HUD toggle
 and not the map. [proposal: a deliberate "touch the side of the helmet"
-movement; the map is never opened by accident because Map does one thing at
-a time.]
+movement. The near-head distance is the one v1 already uses for the
+flashlight (04 §5.10), so the player learns one distance. The Map input is
+chosen because it is on the left hand, which is free when the right holds
+a weapon, and because opening the map is never wanted with the hand
+raised to the head, so taking it there costs nothing; the map is never
+opened by accident because Map does one thing at a time.]
 
 **Result.** Each gesture flips a "HUD hidden by the player" state, which
 starts visible each session:
@@ -887,7 +939,8 @@ labels, layout and grouping are the implementation's own (06 §5).
 State rules as 06 §5.3: with VR not running the v2 controls are disabled;
 values pushed never send a command back; steps apply from first use (06
 §5.2). The calibration and the HUD state are not settings and are not
-pushed except the stored height. The page's v2 additions are part of the
+pushed except the stored height; the HUD state's value at session start
+comes from 23's `Hud.Hidden` (23 §7.2). The page's v2 additions are part of the
 menu change set of 14 (14 §3.1); where they go in the page map follows 06
 §7.3 (new pages and items created after every stock one).
 
@@ -956,16 +1009,15 @@ launch):
   holds no lock the render thread takes, and is not joined at exit (12 §7:
   no work at process exit).
 
-**Crash event.** v1's crash record (11 §6.1: an unhandled-exception
-filter that logs the exception, its place, the registers and the callers
-once, then passes the exception to the filter it replaced) stays as it is.
-With the key on, the same filter also records one further event after
-v1's record, then flushes the file before passing the exception on. It
-conveys the last v2 and v1 states that help to place the crash (device
-state, stereo mode, interaction kind, whether a menu was open) and the
-thread name (11 §1.4). It is rendered without allocation, like every
-event, and written with one `WriteFile`. A vectored handler is not used:
-it would see every first-chance exception the game handles itself
+**Crash event.** v1's crash record (11 §6.1) is unchanged. With the key
+on, the same crash also produces one further event that conveys the last
+v2 and v1 states that help to place the crash (device state, stereo mode,
+interaction kind, whether a menu was open) and the thread name (11 §1.4).
+By the time the exception leaves the mod's handling, this event and v1's
+record are flushed to disk, because the process may end as soon as the
+exception is passed on. The event is rendered without allocation and
+written with one `WriteFile`, like every event. Only unhandled exceptions
+produce it, never a first-chance exception the game handles itself
 [proposal: only unhandled exceptions are crashes].
 
 **With the key off**, logging is v1's exactly.
@@ -1008,7 +1060,7 @@ events. Each is logged once when it happens or changes (11 §3):
 | INF | Diagnostics | the breathing game starts and ends (tap) | the state, as 11 §4.3 gated by `DebugOptions` |
 | WRN | Input | a feature whose game input is unconfirmed is requested (9.2, 9.3) | which; that it stays off |
 | INF | Stereo | VR turned off by the hotkey | that it was the player's request; that a restart turns it on |
-| FTL | Load | crash event (14) | the content of 14 |
+| ERR | Load | crash event (14) | the content of 14; the same level as v1's crash record (11 §6.1), since both describe one crash |
 
 ## 17. Edge cases
 
@@ -1016,7 +1068,7 @@ events. Each is logged once when it happens or changes (11 §3):
 |---|---|
 | Menus, videos, loading (mode 1) | no turning, no vignette, no fade; d-pad emulation from the left stick is on (7); holsters off; HUD toggle still allowed (it changes no menu) |
 | Cutscenes and level fades | FollowBehavior inactive: no turning (v1); vignette strength 0; the HUD state is kept and re-applied after (8.3) |
-| Interactions | turning blocked only with 4.4 on; d-pad from the left stick; holsters off |
+| Interactions | turning blocked with 4.4 on, and always while 23's lever mapping is active (4.1); d-pad from the left stick except during the lever mapping (7); holsters off |
 | Hiding | lean and hold breath per 9 (when confirmed); turning as 4.4 |
 | Death and reload | smooth-turn `dt` restarts at 0; vignette falls to 0; the HUD state is kept for the session [proposal: the player chose it]; the breathing-game state is cleared at the loading screen |
 | Headset taken off | nothing changes; calibration waits for a pose while the headset is in use (6.2) |
@@ -1042,8 +1094,8 @@ On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
    at 45 Hz alike; the stick at rest never drifts; Camera Speed at its
    minimum and maximum changes nothing. With speed 0 and snap off the turn
    is the game's own (v1).
-3. `SnapTurnRepeatMs` 500: a held stick steps about twice a second; 0: one
-   step per flick. With the fade on, no view jump is visible; the first
+3. `SnapTurnRepeatMs` 600: a held stick steps about every 0.6 s (half
+   v1's rate); 0: one step per flick. With the fade on, no view jump is visible; the first
    frame after a step is black.
 4. `Vignette` 1.0: walking with the stick narrows the view to a clear
    circle of about 25° around the centre of each eye; it clears within
@@ -1086,10 +1138,11 @@ On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
     flat on the monitor at window resolution after one short freeze; the
     headset shows the runtime's own environment; no message box; the log
     records it; pressing it again does nothing.
-16. `CrashSafeLog` on, crash test build (11 §7 item 13): the log ends with
-    the crash event naming `AI.exe` (or the proxy) and the RVA, matching
-    Event Viewer; with a performance overlay no render-thread spike comes
-    from flushing during 10 minutes of play.
+16. `CrashSafeLog` on, crash test build (11 §7 item 13): the log holds
+    v1's crash record (module and offset matching Event Viewer) followed by
+    the crash event of §14, and both are on disk after a forced system
+    reset right after the crash; with a performance overlay no
+    render-thread spike comes from flushing during 10 minutes of play.
 17. With `DebugOptions` on, hide in a locker until the Alien searches it:
     the log shows `Start_Breathing_Game` and `End_Breathing_Game` around
     the breathing prompt (confirms 9.1).
@@ -1131,9 +1184,10 @@ On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
 8. **The `reaction_game` HUD movie** defines `force_hud_hidden` too
    (2.4); which screen it is and whether the HUD toggle must include it.
 9. **HUD state ownership.** Whether any game path other than the +0x40
-   byte shows the HUD (for example the deferred show through +0x129 when
-   the movie is reloaded after a level load); to resolve, toggle the HUD
-   off, load a level, and check it stays hidden.
+   byte shows the HUD (for example the deferred re-apply through +0x129,
+   or the `pickupOverlay` load at 0x40AE00 that resets +0x40 to visible,
+   2.4); to resolve, toggle the HUD off, load a level, and check it stays
+   hidden.
 10. **2020 build.** Every RVA here; to resolve, find the action name table
     by its strings, `UiFindObject` by its call count, and the HUD methods by
     their string operands.
@@ -1149,8 +1203,9 @@ Not made here; to be applied in a later revision:
   disagreement of the stock layout with `DATA\INPUT.XML` (19 item 2).
 - `04-input.md` §5.5: the glyph set is re-chosen per hand and per change
   when `Controls.ControllerGlyphs` is on (10); §6: the repeat interval is
-  `Comfort.SnapTurnRepeatMs`, the fade of 4.3, and the turning block of
-  4.4; §7: the look byte rule of 4.1; §5.8.1: the d-pad modifier input (7);
+  `Comfort.SnapTurnRepeatMs`, the fade of 4.3, the turning block of 4.4
+  and the block during 23's lever mapping (4.1); §7: the look byte rule of
+  4.1; §5.8.1: the d-pad modifier input (7);
   §5.8.5: d-pad and holster VR state (7, 8.4) and the Map input consumed by
   the HUD toggle near the head (8.3); §5.10: the near-head test extended to
   the left hand for 8.3.

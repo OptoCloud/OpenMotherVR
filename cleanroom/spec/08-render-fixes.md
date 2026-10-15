@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build; every site and byte below re-read from the binary for r2) and of the game's pixel shaders (DXBC from the level and global shader packs); the public DXBC container layout and checksum; analyses of other VR mods, used to learn which problems exist: the approach of sections 1 and 2 agrees with a design seen in another mod's analysis, and is justified here from the game's own shaders (1.1 to 1.4) and cull code (2.1 to 2.3); in-game observation by the spec side in a headset (section 1 and section 5 confirmed working); measurements in game by the spec side (culling cost, AA cost, shader-creation cost); user requirements (anti-aliasing choice with an automatic mode, no MD5 of every shader, shaders changed by other tools pass through); project decisions (head-in-wall delay of 600 ms and its clear tolerance, with reasons inline). Revision: r3 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build; every site and byte below re-read from the binary for r2; for r4 the spec side re-read the cull function 0x61FD20 and its distance test, the register 39 upload and the head-in-wall fade 0x346DE0) and of the game's pixel shaders (DXBC from the level and global shader packs; for r4 the spec side counted the pixel shaders holding the dither's immediates in three level packs); the public DXBC container layout and checksum; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and shader packs by the spec side (the dither sequence and how it fails, register 39, the cull function's tests); that analysis served only as a lead to which problems exist, and the required results of sections 1, 2 and 4 are stated as this project's own properties; in-game observation by the spec side in a headset (section 1 and section 5 confirmed working); measurements in game by the spec side (draw-submission cost with the distance, occlusion and view-volume tests all bypassed; AA cost; shader-creation cost over the first 3500 shaders of a session); user requirements (anti-aliasing choice with an automatic mode, no MD5 of every shader, shaders changed by other tools pass through); project decisions, each with its reason inline (the head-in-wall delay D, chosen afresh for r4; the bound on the dither's input). r4: clean-room review round 2 applied (section 1 as properties, section 2.1 restated from the spec side's own reading, the head-in-wall delay and its "clear" test re-derived from the game, measurement conditions stated). Section numbers are unchanged from r3. Revision: r4 -->
 
 # 08: Rendering fixes
 
@@ -49,10 +49,12 @@ confirmed in game.
 
 ### 1.1 What the shaders do [sure]
 
-Several hundred of the game's pixel shaders (716 of the 2178 distinct pixel
-shaders in one level's `LEVEL_SHADERS_DX11_BIN.PAK`, plus some global
-shaders; about 676 sites in the first 3500 shaders created in one session)
-add a small anti-banding dither to a lighting or reflectance factor. The
+Several hundred of the game's pixel shaders add a small anti-banding
+dither to a lighting or reflectance factor (counted by the spec side: 353
+of the 887 distinct pixel shaders in the Torrens level's
+`LEVEL_SHADERS_DX11_BIN.PAK`, 443 of 1068 in the `TECH_HUB` level's and 434
+of 1046 in the `SCI_HOSPITALUPPER` level's contain both immediates of
+instructions 1 and 2 below; some global shaders contain them too). The
 dither is a hash of the pixel's **absolute** position. In the compiled
 shaders (shader model 5.0) it is always this sequence, where `vP` is the
 `SV_Position` input, `vT` another input (a texture coordinate) and `rA`, `rB`,
@@ -77,22 +79,29 @@ factor then scales an output colour (emissive or environment light).
 
 ### 1.2 Why it fails on a side-by-side target [likely]
 
-`p` is in pixels of the bound target. On the side-by-side target the right
-eye's `x` is offset by the eye width, so its `p` is much larger than the left
-eye's, and the larger the render resolution the larger both are. `d` grows
-roughly as `(0.001·|p|)²`:
+The hash input is `d = (0.001·p - t)·(0.001·p)`, with `p` in pixels of
+the bound target, so for texture coordinates near 0 it is about the square
+of the pixel's distance from the target's top left corner, in thousands of
+pixels. The spec side's evaluation of the sequence:
 
-- once `2^d · 10000` passes 2^24, `frc` returns 0 and the dither vanishes;
-  before that it degrades into coarse patterns;
-- with large or negative tiled texture coordinates `t`, `d` passes 128,
-  `2^d` overflows to infinity, `frc` gives NaN, and under Direct3D's rules
-  `min(NaN, 1)` returns 1: the factor is forced to 1 and the surface is
-  fully lit or fully reflective.
+- A float of 2^24 or more has no fractional bits, so `frc` of
+  `2^d · 10000` is 0 once `d` exceeds about 10.7, that is beyond about 3300
+  pixels from the corner; on the way there the hash loses precision and
+  shows coarse patterns. On a flat 1920x1080 target no pixel is that far,
+  so the game is correct there. On a side-by-side target of 5376x2688
+  (Index at pixel scale 1.0) the right eye's pixels start 2688 pixels from
+  the left edge, so the dither is gone from most of the right eye and only
+  from the lower right corner of the left eye; a larger render size spreads
+  this over both eyes.
+- A large or negative tiled coordinate `t` adds `-t·0.001·p`, which can
+  push `d` past 128. `2^d` is then infinite, `frc` of infinity is NaN, and
+  Direct3D's `min` returns its non-NaN operand, so the factor becomes 1
+  and the surface is lit fully or reflects fully.
 
 The result is surfaces lit differently in the two eyes, first in the right
-eye and worse at higher resolution (a known issue of the earlier mod).
-Players described it as reflections moving against the head; it is
-lighting, not the planar reflection of 07.
+eye and worse at higher resolution (an earlier mod showed this). Players
+described it as reflections moving against the head; it is lighting, not
+the planar reflection of 07.
 
 ### 1.3 What the game provides [sure]
 
@@ -103,34 +112,35 @@ constant upload 0x621C90 with buffer 2, register 0x27, count 1). The
 shaders' reflection data names it `SourceResolution`. It differs from
 register 60 (`ScreenResolution`, 07 §2.7).
 
-### 1.4 Required arithmetic
+### 1.4 Required result
 
-At each occurrence of the pair 1-2 the dither must use the position
-**relative to the render target**, `n = p · (1/W, 1/H)` (register 39's `zw`
-components, each component of `n` in `[0, 1]`), **keeping the 0.001
-factor**:
+At each occurrence of the pair 1-2, the values instruction 3 reads (the two
+operands of the dot product that gives `d`) are replaced so that the hash
+works in both eyes at any render size. Any arithmetic is acceptable that
+has these properties:
 
-- the value instruction 2 produces becomes `b = 0.001·n - t` (same
-  destination, mask and `vT` operand as in the game's shader);
-- the value instruction 3 reads from `rA` becomes `a = 0.001·n` (same
-  register and components as in the game's shader);
-- everything else is unchanged, so `d = (0.001·n - t)·(0.001·n)`.
+- **Independent of the target.** The input no longer grows with the
+  pixel's absolute position: it is computed from the position relative to
+  the bound target, `p · (1/W, 1/H)` (register 39's `zw` components, §1.3),
+  and the texture coordinate `t` of instruction 2, so it does not depend
+  on the target's size or the pixel scale.
+- **Bounded.** For every pixel of the target and every texture coordinate
+  with `|t|` up to 1000, `|d|` stays at or below 8 (project decision:
+  `2^8 · 10000` is below 2^24, so `frc` keeps the hash's fractional bits
+  and nothing overflows; texture coordinates in the game's materials stay
+  far below 1000 in magnitude [likely]). Never NaN or infinite.
+- **Still a dither.** `d` still varies between neighbouring pixels for the
+  texture coordinates the materials use, so the hash still breaks up
+  banding, and its amplitude is unchanged: instructions 4 to 7 are kept,
+  and at most 0.0025 is added in either eye.
+- **Only those values change.** The values instruction 3 reads are the
+  only change to what the rest of the shader sees (see "No live value
+  overwritten" below).
 
-Numeric effect: `d` is about `-0.001·t·(n.x + n.y)` plus at most 2e-6. It no
-longer depends on the target size or on which half of the target the eye
-occupies, and stays far from overflow for any texture coordinate the game
-uses. The dither keeps its amplitude (at most 0.0025) in both eyes.
-
-The 0.001 factor must stay. Using `a = n` instead (dropping it from one
-operand) gives `d` about `-t·(n.x + n.y)`, a thousand times larger: with
-tiled or negative texture coordinates beyond about |t| = 5, `2^d·10000`
-passes 2^24 again and the original failure returns, in both eyes.
-
-Computing `0.001·n` from `vP` needs one more operation than the game's pair
-(the scale by `1/W, 1/H` and the scale by 0.001 cannot be folded into one
-immediate), so the patched program is longer than the original. Any
-instruction sequence with the result above is acceptable, subject to these
-required results:
+A result with these properties generally needs more instructions than the
+game's pair (the target size is not an immediate), so the patched program
+may be longer than the original. The rewrite is subject to these required
+results:
 
 - **Exact match only.** A site is patched only if instructions 1 and 2 have
   exactly the form of §1.1: the operand kinds, the `vP` components read, the
@@ -162,10 +172,11 @@ required results:
 - **Cheap pre-filter.** Before any hashing or parsing, a shader that does not
   contain two consecutive dwords 0x3A83126F anywhere in its bytes (the
   immediate of instruction 1) is passed through untouched. Most shaders are
-  skipped this way. Without the pre-filter, checksumming every shader costs
-  about 20 µs each on the thread that creates shaders (the game's main
-  thread), about 56 % on top of shader creation with a warm driver cache, or
-  about 1.3 s per session; with it, almost none.
+  skipped this way. Measured in game by the spec side over the first 3500
+  shaders created in one session: without the pre-filter, checksumming
+  every shader costs about 20 µs each on the thread that creates shaders
+  (the game's main thread), about 56 % on top of shader creation with a
+  warm driver cache, or about 1.3 s per session; with it, almost none.
 
 **Shaders not as expected.** Every shader that does not match the exact
 pattern of §1.1 passes through unchanged. This includes shader packs that
@@ -197,26 +208,23 @@ only are lit the same in both eyes after the change.
 
 ### 2.1 The game's per-object visibility test [sure]
 
-The scene's object lists are culled by one function (0x61FD20, cdecl:
-`(cull context*, per-object flags*, bounds[] with stride 0x40, items[],
-count, out[])`, the caller pops 0x18), whose only call is at 0x5E984B. It
-runs on the game's job threads. For each object it:
+One function builds every culled object list of the scene (0x61FD20,
+cdecl `(cull context*, per-object records*, bounds[] with stride 0x40,
+items[], count, out[])`, the caller pops 0x18); its only call is at
+0x5E984B, and it runs on the game's job threads. Each object has an 8-byte
+record: a 32-bit layer word, a 16-bit LOD value, a flags byte and a mask
+byte. An object reaches `out[]` (room for 128 entries; a null follows the
+last kept item when there is room) only if no row below drops it:
 
-1. tests masks: the object's mask byte against context `+0x54`, its layer
-   word against context `+0x58`; flags `& 0x19` skip it; flags `& 2` keep it
-   unconditionally;
-2. unless flags `& 4`: a **distance/LOD test** (0x619A50, cdecl
-   `(const bounds*, const vec3* camera position = context + 0x40, float s)`,
-   result in AL, true = keep) with `s` = the object's 16-bit LOD value times
-   context `+0x50`; it culls when `|centre - camera|² · s² > radius²`
-   (centre at bounds `+0x0C`, `+0x1C`, `+0x2C`; radius at `+0x3C`);
-3. a **frustum test** (0x619030, `(bounds*, context*)`);
-4. if context `+0x5C` is non-null, an **occlusion test** (0x619860, cdecl
-   `(const bounds*, context*, occlusion buffer* = context +0x5C)`, result in
-   AL); if context `+0x60` is non-null, a **view-volume test** (0x619920,
-   cdecl, 3 arguments: bounds, context `+0x70`, context `+0x60`; result in
-   AL);
-5. appends the item to `out[]` (at most 128 entries, null-terminated).
+| Test | Applies | Drops the object when |
+|---|---|---|
+| mask | always | its mask byte shares no bit with context `+0x54` |
+| layer | always | its layer word shares a bit with context `+0x58` |
+| flags | always | flags bit 0, 3 or 4 is set. With none of those and bit 1 set, the object is kept without any test below |
+| **distance/LOD** (0x619A50) | unless flags bit 2 is set | `|centre - camera|² · s² > radius²`, with the camera at context `+0x40`, `s` the object's LOD value times context `+0x50`, the centre at bounds `+0x0C`, `+0x1C`, `+0x2C` and the radius at `+0x3C`. cdecl `(const bounds*, const vec3* camera, float s)`, result in AL, true = keep |
+| **frustum** (0x619030) | always | it is outside the view's frustum; `(bounds*, context*)` |
+| **occlusion** (0x619860) | context `+0x5C` not null | it is hidden in the occlusion buffer at `+0x5C`; cdecl `(const bounds*, context*, buffer*)`, result in AL |
+| **view volume** (0x619920) | context `+0x60` not null | it is outside that volume; cdecl, arguments bounds, context `+0x70`, context `+0x60`; result in AL |
 
 Which tests exist depends on the view being culled [likely: from which views
 fill the context fields; POV `+0x314` is the view's render-list group, the
@@ -240,14 +248,15 @@ Sites (2015; check every byte before writing):
 
 ### 2.2 Why it fails in VR [likely]
 
-The distance scale `+0x50` is derived from the field of view and resolution
-of the single centre view, and the occlusion buffer is drawn from that centre
+The distance scale `+0x50` belongs to the single centre view [likely that
+it is derived from that view's field of view and resolution; its writer
+was not read, §7], and the occlusion buffer is drawn from that centre
 view. In a headset each eye has a much wider field of view and its own
 position. Small props and decals vanish or appear at distances that do not
 match what the player sees, and objects near the edges of each eye are
 dropped by an occlusion test made for the centre view (worse on wide-FOV
 headsets). Shadows of such objects pop as well, since shadow-caster lists go
-through the same distance test (a known issue of the earlier mod).
+through the same distance test (an earlier mod showed this pop-in).
 
 ### 2.3 Required behaviour
 
@@ -266,8 +275,9 @@ otherwise call the game's test with the same arguments and return its
 result. They run on job threads (0.1 to 4 thousand calls per frame) and must
 do nothing but the atomic "stereo running" read and the forward.
 
-**Cost [sure, measured on an earlier version that also bypassed the
-view-volume test].** About 1 ms of render-thread CPU per frame in the main
+**Cost [sure; measured in game by the spec side with the distance,
+occlusion and view-volume tests all bypassed, so an upper bound for this
+fix].** About 1 ms of render-thread CPU per frame in the main
 menu scene (draw submission 2.7 to 3.2 ms with the game's tests, 3.5 to 4.4
 ms without), and 0 to 0.4 ms GPU; more is expected in levels with many
 occluded rooms. Accepted.
@@ -385,17 +395,24 @@ with HeadClipFade's ABI (stdcall, two pointer arguments, pops 8, result in
 ST0) that calls the game's HeadClipFade with the same arguments, so that:
 
 - the scene visibility used is 1.0 until the game's fade has stayed below
-  "clear" for **600 ms** of real time without a break (project decision:
-  long enough to pass through a doorway or brush a wall, short enough that
-  holding the head in a wall still blacks out); from then on, and for as
-  long as it stays below "clear", it is the game's value;
-- "clear" means the game's value is 1 allowing for float rounding: the fade
-  is 1 only when nothing is touched, but a product of factors can then come
-  out a few units in the last place below 1.0, so a tolerance of about 1e-5
-  is used (project decision: far above rounding error, far below any
-  visible darkening);
-- any clear value restarts the 600 ms, so leaving the wall resets the
-  delay;
+  1.0 for a delay **D = 0.5 s** of real time without a break; from then
+  on, and for as long as it stays below 1.0, it is the game's value. D is a
+  project decision: a contact that ends within half a second (the head
+  passing a door frame or brushing a wall while walking, a quick lean) is
+  incidental, while a head kept in geometry for longer is being held
+  there and must still black out promptly, well under 1 s. The value is
+  to be confirmed in game by the acceptance check below, which records the
+  longest incidental contact seen; D is raised only if incidental contacts
+  still darken the view;
+- "clear" is the game's value exactly 1.0, with no tolerance. Game fact
+  [sure] (HeadClipFade, read by the spec side): the fade is the product of
+  two powers of clamped terms, one from the eye's distance to the pivot and
+  one from a probe of the geometry ahead of the eye; each term is exactly 1
+  when its clamp saturates (nothing near), and a power of 1 is exactly 1,
+  so a head near nothing gives exactly 1.0 and any smaller value means
+  geometry is near;
+- any value of exactly 1.0 restarts the delay, so leaving the wall resets
+  it;
 - if stereo starts with the head already in geometry (no clear value seen
   yet), the game's fade applies at once: the delay exists to hide brief
   contact during movement, and a head that starts inside geometry is not
@@ -403,8 +420,8 @@ ST0) that calls the game's HeadClipFade with the same arguments, so that:
 - time is measured with a monotonic clock, not in frames, so the delay is
   the same at any frame rate.
 
-So contact shorter than 0.6 s never darkens the view, and longer contact
-fades exactly as the game computes, from the 0.6 s mark. It applies whether
+So contact shorter than D never darkens the view, and longer contact
+fades exactly as the game computes, from the moment D is reached. It applies whether
 `ClippingBlinders` is on or off. When stereo is not running the game's
 value passes through unchanged.
 
@@ -414,9 +431,13 @@ forced 0 behind a loading screen) are applied after this and win over it.
 **Log** once at install that the fix is in.
 
 **Acceptance (in game, not yet done).** With `ClippingBlinders` on: walking
-through doorways and brushing a wall with the head never flashes black; holding
-the head inside a wall turns the view black after about 0.6 s, with the
-game's fade; pulling the head out restores the view at once. In the mission
+through doorways, leaning around corners and brushing a wall with the head
+at normal speed never flashes black; note the longest of these contacts
+(the time the game's fade stays below 1.0, by any means, for example a
+debug log line behind `DebugOptions`) and record it in §7 as the
+measurement behind D. Holding the head inside a wall turns the view black
+after about D (0.5 s), with the game's fade; pulling the head out restores
+the view at once. In the mission
 4 android encounter the view never goes black from head clipping (05 §15
 item 18, and its open question in 05 §16).
 
@@ -424,8 +445,8 @@ item 18, and its open question in 05 §16).
 
 The mirror (03 §8) must fill the window as specified in 03 §8.2, every
 frame: the mirror image is drawn at scale 1.0 every frame, and no factor
-depends on the pixel scale. (An earlier version shrank the image into a
-corner of the window.)
+depends on the pixel scale (a factor that did would shrink the image into
+a corner of the window at pixel scales above 1).
 
 The mirror draw must also set its viewport to the whole back buffer
 (`{0, 0, width, height, 0, 1}` from the back buffer's own description)
@@ -455,6 +476,11 @@ itself: the game leaves whatever viewport it last used bound.
   0x5B2FB0).
 - **View groups (§2.1).** Confirm that only group 2 fills context `+0x5C`.
   Look for: the writers of POV `+0x310` and of context `+0x5C`.
+- **Distance scale (§2.2).** Confirm that context `+0x50` comes from the
+  centre view's field of view and resolution. Look for: the writer of
+  context `+0x50` before the call at 0x5E984B.
+- **Head-in-wall delay (§4.2).** Record the measured longest incidental
+  contact and confirm or adjust D.
 - **`+0x1B2F` and the jitter (§3.1).** Confirm their meaning. Look for: the
   AA pass's branch on `+0x1B2F` and the SMAA runner's write of the jitter.
 - **Per-eye T2x.** True temporal SMAA in stereo (a velocity pass for eye 1

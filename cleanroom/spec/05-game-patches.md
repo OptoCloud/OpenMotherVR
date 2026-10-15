@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build, every original byte below re-read from the binary for r3), required behaviour restated from observing the earlier mod in game, in-game observation by the spec side in a headset (head tracking, stereo, menus, HUD, loading screens confirmed), measurements in game by the spec side (render-target rebuild stall, per-menu-open freeze of an earlier build), user requirements (automatic recenter on headset-on and gameplay start, no 0.2 s freeze on every menu open), project decisions (snap-turn threshold and repeat, each with its reason inline), AI.exe 2015 analysis of the mode-stack container (answer to Q5, ANSWERS.md), a head-in-wall blackout in the mission 4 android scene noted in another mod's analysis (acceptance item and open question only). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; a tester's report on SteamVR with a Steam Frame headset (a view sliding after snap-turn steps); project decision of r5 (the stereo-mode and snap-turn diagnostics of 11 §4.5 behind DebugOptions). Revision: r5 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build, every original byte below re-read from the binary for r3), required behaviour restated from observing the earlier mod in game, in-game observation by the spec side in a headset (head tracking, stereo, menus, HUD, loading screens confirmed), measurements in game by the spec side (render-target rebuild stall), user requirements (automatic recenter on headset-on and gameplay start, no 0.2 s freeze on every menu open), project decisions (snap-turn threshold and repeat, each with its reason inline), AI.exe 2015 analysis of the mode-stack container (answer to Q5, ANSWERS.md), a head-in-wall blackout in the mission 4 android scene noted in another mod's analysis (acceptance item and open question only). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; a tester's report on SteamVR with a Steam Frame headset (a view sliding after snap-turn steps); project decisions of spec r6 (ANSWERS.md: the stereo-mode and snap-turn diagnostics of 11 §4.5 behind `DebugOptions`). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the FollowBehavior yaw setter (the two yaw fields); the stereo-mode diagnostic covers every mode change; the snap-turn trace window, the head-in-wall delay and the "headset in use" test are owned by 11, 08 and 03 and only referred to here; keyboard and mouse each read whenever their own device exists; vtable slots checked against the exact function of 01 §4; the mouse-displacement low byte checked before it is changed; skip intro only with the mod's UI archive in place; the script event tap deferred to 11 §5; the render-target rebuild flag stated as a result; acceptance items for raising the mode-stack count and for the mode-change log. Revision: r6 -->
 
 # 05: Changes to game behaviour
 
@@ -22,7 +22,7 @@ mismatching site, game unmodified).
 
 These changes are applied only when the runtime for this run is OpenVR or
 OpenXR. With runtime None only the UI set of 01 §2.3 is applied; from this
-document that is the settings push in the front-end and pause Open wrappers
+document that is the settings push when the front-end and pause menus open
 (§5, without the stereo-mode handling) and skip intro (§11).
 
 Settings are named by their `mothervr.json` key (`06` §1).
@@ -68,7 +68,7 @@ right, up and normal axes in world space, already scaled; row 3 is its centre
 | Field / slot | Meaning |
 |---|---|
 | `+0x204` | yaw (float), normalised: ±1.0 = ±180°, wraps at ±1 |
-| `+0x1FC` | mirror of the yaw; must be written with the same value |
+| `+0x1FC` | second yaw copy. The game's yaw setter (0x2DF30 / ?, thiscall, a float yaw and a bool, `ret 8`) wraps the yaw, writes it to `+0x204` and, when the bool is non-zero, the same value to `+0x1FC` [sure]; the mod writes both (3.2c) |
 | `+0x208` | pitch, clamped by the game |
 | `+0x260`, `+0x261` | look-integration enable bytes (see 7.4) |
 | `+0x264` | look input enabled (byte): the game applies stick/mouse look deltas (slot 11, 0x2D200) only while this byte is set |
@@ -157,8 +157,8 @@ frame:
 
 | Activity this frame | Keyboard/mouse in use afterwards |
 |---|---|
-| keyboard or mouse activity: both devices exist (input manager `+0x4A74`, `+0x4A70`) and the keyboard's any-key test or the mouse-active test (§1) is true | yes, also when the pad reports activity in the same frame |
-| pad activity only: the active pad device (`+0x4A7C`) exists and its HasActivity method, as replaced by the mod (`04` §7), reports activity (a real pad **or** the VR controllers) | no |
+| keyboard or mouse activity: the keyboard device (input manager `+0x4A74`) exists and its any-key test is true, or the mouse device (`+0x4A70`) exists and its mouse-active test is true (§1) | yes, also when the pad reports activity in the same frame |
+| pad activity only: the active pad device (`+0x4A7C`) exists and its HasActivity method, as replaced by the mod (`04` §3.3), reports activity (a real pad **or** the VR controllers) | no |
 | neither | unchanged |
 
 At start-up keyboard/mouse is not in use.
@@ -178,9 +178,8 @@ tracked and active, `SnapRotation` is on and the current stereo mode
 - deflecting the stick turns the player by one step at once: one step added
   to the FollowBehavior yaw `+0x204` for a positive value, subtracted for a
   negative one;
-- holding it deflected repeats a step every 300 ms (project decision: slow
-  enough that a held stick can be released after one extra step, fast
-  enough to turn around in under two seconds at 30° steps);
+- holding it deflected repeats a step every 300 ms (project decision; its
+  reason is in `04` §6);
 - returning it inside ±0.5 allows the next deflection to step at once.
 
 After each step the yaw is wrapped into [-1, 1] (above 1 subtract 2.0,
@@ -189,10 +188,11 @@ both `+0x204` and `+0x1FC`. The step is computed in floating point as
 `step = 2.0 / segments` in the game's normalised yaw units (±1.0 = ±180°),
 so `segments` steps make a full turn (24: 15°, 12: 30°, 6: 60°, 4: 90°, 3:
 120°, 2: 180°); `segments` is `SnapRotationSegments` (one of 24, 12, 6, 4,
-3, 2; default 12, giving 30° steps; `06` §1). The step must not be derived
-with integer division anywhere (that turns 180° for 3 segments); see `04`
-§6. Timing uses a monotonic clock. With `DebugOptions` on, the camera is
-traced for 600 ms after each step (11 §4.5).
+3, 2; default 12, giving 30° steps; `06` §1). Every allowed value of
+`segments` gives exactly 360° / `segments` per step (3 segments: 120°); see
+`04` §6. Timing uses a monotonic clock. With `DebugOptions` on, the
+camera's state after each step is logged for a short, bounded time (11
+§4.5 sets its length and its reason).
 
 Why: smooth yaw from a stick in VR causes motion sickness; the yaw field is
 the game's own first-person heading, so turning through it keeps movement,
@@ -212,14 +212,16 @@ player needs mouse look. See also 7.6.
 **e. Recenter.** The chord is LB and RB held on the active pad device (pad
 buttons 10 and 11, read with the game's own button test and raw codes, `04`
 §8), or Left Ctrl (scan code 0x1D) and Left Alt (0x38) held, read with the
-key test while both keyboard and mouse devices exist. A recenter makes the
+key test whenever the keyboard device exists. A recenter makes the
 stereo device write the yaw-only reference transform to stereo `+0x78` (`02`
 §6.4, `03` §2: heading and position, no pitch or roll). Required:
 
 - a pending automatic request (below) recenters on the first update where
   the headset is in use and its pose is valid; until then it stays pending.
   A recenter is never taken from an invalid pose (`03` §2.1);
-- holding the chord recenters once per press; releasing it re-arms it;
+- holding the chord recenters once per press; releasing it re-arms it (a
+  new press during the two re-placements below is a new recenter, and the
+  two re-placements start again from it);
 - after any recenter, an open virtual screen (mode 1) is re-placed (§4.2,
   rebuilding stereo `+0x20`) on each of the next two updates, with the same
   inverse aspect the game's SetMode passes (UI target height / width, 0.5625
@@ -244,12 +246,9 @@ A request that is already pending stays pending (requests do not queue). A
 recenter in the VR runtime's own UI does not create a request: on OpenXR it
 re-anchors the mod's base space only (`09` §6.3); OpenVR reports none in v1.
 
-"Headset in use" (`03` §2.3, `09`): OpenVR: `GetTrackedDeviceActivityLevel`
-for the HMD is `k_EDeviceActivityLevel_UserInteraction` and the world-up
-component of the head's up axis is greater than 0.7 (about 45°); OpenXR: the
-session is running, the frame's view poses are valid, and the same uprightness
-test holds on the head orientation. A pending request waits as long as needed;
-it never fires on a headset lying on a desk.
+"Headset in use" is defined in `03` §2.3 (for OpenXR also `09`), with its
+uprightness test and the reason for it. A pending request waits as long as
+needed; it never fires on a headset lying on a desk.
 
 **f. Mode stack count.** At the end of each update the stack count (stereo
 `+0x6C`) equals the current mode (`+0x60`): 0 in mode 0, 1 in mode 1, even
@@ -404,7 +403,7 @@ results:
 
 The game's own PushMode and PopMode, called directly (not through a
 redirected site), are the means: they keep the game's lock and its SetMode
-call. Together with 3.2f and the menu wrappers (section 5), the game is in
+call. Together with 3.2f and the menu objects (section 5), the game is in
 mode 1 exactly while a full-screen menu, loading screen or title video is
 up.
 
@@ -412,9 +411,12 @@ Why: the game's menus push and pop unevenly (nested screens, pops on resume
 without a matching push); with the stack as written the game could stay in
 the virtual screen during gameplay or show a menu in mode 0.
 
-With `DebugOptions` on, each push or pop the mod performs that changes the
-current mode is logged with the mode before and after (11 §4.5), so a log
-shows which menus, videos and loading screens are on the virtual screen.
+With `DebugOptions` on, each change of the current stereo mode (stereo
+`+0x60`) is logged once, with the mode before and after, whatever made the
+change (a redirected push or pop, a menu's Open or Close of section 5, or
+the game's own SetMode), no later than the next stereo update (11 §4.5), so
+a log shows which menus, videos and loading screens are on the virtual
+screen.
 
 **Two stray stack operations are removed:**
 
@@ -427,8 +429,9 @@ shows which menus, videos and loading screens are on the virtual screen.
 `StereoObjectPtr`; it differs when the image is rebased and in 2020, so check
 only the opcode bytes.)
 
-Why: the pause and front-end wrappers (section 5) now own entering and
-leaving mode 1 for these screens; the game's own calls would unbalance it.
+Why: the pause and front-end Open and Close replacements (section 5) now
+own entering and leaving mode 1 for these screens; the game's own calls
+would unbalance it.
 
 ## 5. Menu objects
 
@@ -436,9 +439,13 @@ All methods below are thiscall with no stack arguments and a plain `ret`.
 Replace the vtable slot with a function of the same ABI that calls the
 original with the same ECX and adds the results below. Vtables are in
 `.rdata`; the slot must be made writable to patch it and its protection
-restored. Before patching, check that each slot to be replaced holds an
-address inside `AI.exe`, and that the front-end vtable's slot 0 holds the
-front-end Open RVA below.
+restored. Before patching, check each slot to be replaced by the
+vtable-slot rule of 01 §2.5.1: it holds exactly the original method the
+table below lists for the running build; where the table gives no value
+for the build (2020: ?), it holds an address inside `AI.exe`'s code. A slot
+that points into the image but at another function means the vtable is not
+the one described here (another build, or another tool replaced the slot),
+and nothing is patched.
 
 | Menu | Vtable 2015 / 2020 | Slot 0 Open (original) | Slot 2 Close (original) | Recognisable by |
 |---|---|---|---|---|
@@ -464,8 +471,8 @@ Order: on Open, the original runs before the settings are pushed, because
 they are pushed into the menu's movie, which the original Open sets up
 [likely]. No other order relative to the original is required.
 
-With runtime None the front-end and pause Open wrappers do only the settings
-push (01 §2.3); the other slots are not touched.
+With runtime None the front-end and pause Open replacements do only the
+settings push (01 §2.3); the other slots are not touched.
 
 Effect: menus, the loading screen and the title video appear on the level
 virtual screen 1.5 m ahead, placed when they open; behind a loading screen
@@ -480,8 +487,9 @@ current values (`06`).
 Replace FollowBehavior vtable slots 0 and 1 (the dwords at 0xDC6600 and
 0xDC6604; 2020: at 0xDDD6E8 and 0xDDD6EC) with functions of the same ABI
 (thiscall, one stack argument, `ret 4`, return value passed through).
-Before patching, check that slot 0 holds the OnActivate RVA of §1 and slot 1
-an address inside `AI.exe`.
+Before patching, check that slot 0 holds the OnActivate RVA and slot 1 the
+OnDeactivate RVA of §1 for the running build (the vtable-slot rule of 01
+§2.5.1).
 
 Required results:
 
@@ -509,8 +517,9 @@ The UI entity class's message handler is vtable slot 2: the slot is at
 0xDFCE18 / 0xE13F38 (vtable at 0xDFCE10 in 2015), original handler 0x51BD70 /
 0x6241A0. ABI: thiscall(this, const ShortGuid* message, a, b, c), `ret 0x10`,
 returns a value in EAX; the first dword the message pointer points to is the
-hashed message name. Before patching, check that the slot holds an address
-inside `AI.exe`.
+hashed message name. Before patching, check that the slot holds the
+original handler above for the running build (the vtable-slot rule of 01
+§2.5.1).
 
 Four globals hold the names' hashes. They are computed at start-up by static
 initialisers, so read them when comparing, not at install time:
@@ -546,8 +555,8 @@ protection and an instruction-cache flush.
 | 7.4 | 0x02D83C / 0x03D0BC | `8a 4c 24 0f` | `8a 4c 24` | an instruction that sets CL to 1, padded to 4 bytes (for example `b1 01 90 90`) |
 | 7.5 | 0x34A0CE / 0x35ACCE | `0f 86 2b 03 00 00` | all six bytes | `e9 2c 03 00 00 90` |
 | 7.6 | 0x02C938 / 0x03C1A8 | `88 86 64 02 00 00` | `88`, ModRM `& 0xF8 == 0x80`, dword `0x264` at +2 | six `90` |
-| 7.7 | 0x443568 / 0x454708 | `dc` (2020: `8c`, inferred, see 7.7) | the load at 0x443564 is `f3 0f 10` with ModRM `& 0xC7 == 0x05` | original + 0x10: `ec` (2020: `9c`) |
-| 7.7 | 0x4435C6 / 0x454766 | `e0` (2020: `90`, inferred, see 7.7) | the load at 0x4435C2, same form | original + 0x10: `f0` (2020: `a0`) |
+| 7.7 | 0x443568 / 0x454708 | `dc` (2020: `8c`, inferred, see 7.7) | the load at 0x443564 is `f3 0f 10` with ModRM `& 0xC7 == 0x05`, and the byte at the site is the listed original | original + 0x10: `ec` (2020: `9c`) |
+| 7.7 | 0x4435C6 / 0x454766 | `e0` (2020: `90`, inferred, see 7.7) | the load at 0x4435C2, same form, and the byte at the site is the listed original | original + 0x10: `f0` (2020: `a0`) |
 | 7.8 | 0x43EB3A / 0x44FCFA | `74 0c` | first byte `74` | `eb` at +0 |
 | 7.9 | 0x43B01C / 0x44C1CC | `51` | `51` | `53` |
 | 7.10 | 0x60EE6F / 0x56133F | `0f 95 c1` | all three bytes | `b1 01 90` |
@@ -600,8 +609,9 @@ synchronisation.
 moves into a wall, which prevents seeing through geometry. Some players
 prefer no blackout; with 1.0 the wall probe only runs at distances where the
 0.5 to 0.6 m falloff has already blacked the view out, so leaning into walls
-no longer darkens the view (stepping more than 0.5 m away from the body still
-does). The 0.6 s grace period of 08 §4 applies on top, in both settings.
+no longer darkens the view (moving the head away from the body still does:
+darker from 0.5 m, black at 0.6 m). The delay of 08 §4.2 applies on top, in
+both settings.
 
 ### 7.3 No procedural camera sway or breathing [likely]
 
@@ -674,7 +684,10 @@ The same structure holds the UI reference size 1280.0 and 720.0 at `+0x3C` and
 `+0x40` (set at 0x610360).
 
 **Change.** Make the two loads read `+0x3C` and `+0x40` instead, by adding
-0x10 to the low byte of each 4-byte address (table above).
+0x10 to the low byte of each 4-byte address (table above). The low byte is
+checked before it is changed: a different low byte is a failed core check,
+because the reference size may then not sit 0x10 bytes past the
+back-buffer size.
 
 2020: the reference size is assumed to sit 0x10 bytes past the back-buffer
 size there too. The new low bytes `9c` and `a0` are the earlier mod's
@@ -778,9 +791,10 @@ SetMode(1) (the menu is open) or the next push.
   runtimes that report one) is specified in `10-audio.md`.
 - **R3.** R3 has no function in v1, with or without the recenter chord.
 - **The game's fade animation** (`+0xA8`/`+0xAC`) is not run (3.2).
-- **Display reset on every menu open.** An earlier build froze for about
-  0.2 s on every pause or loading-screen open; v1 raises the render-target
-  rebuild flag only when a setting that needs it changed (section 10).
+- **Display reset on every menu open.** Raising the render-target rebuild
+  flag on every pause or loading-screen open would freeze the game for
+  about 0.2 s each time (section 10); v1 raises it only when a setting that
+  needs it changed.
 
 ## 10. Render-target rebuild when a target setting changes
 
@@ -800,11 +814,13 @@ a stale frame for about 0.2 s, and hundreds of MB of VRAM are re-allocated.
 
 **Required.** Three settings are baked into the render targets or the mirror
 set up with them: pixel scale, mirror view type and symmetric mirror view
-(`06` §1). The mod records their values at start-up (what the targets are
-first built with). After each options command (`06` §4.2) and at each
-settings push, it compares the current values with the record; if any
-differs, it updates the record and writes 1 to the flag, once. It never
-raises the flag otherwise: not on a menu open, not for any other setting.
+(`06` §1). The flag is raised exactly once for each change of any of these
+three away from the values the render targets were last built with (at
+start-up, the values in effect then), no later than the next options
+command (`06` §4.2) or settings push after the change. It is never raised
+otherwise: not on a menu open, not for any other setting, not when a value
+is changed and changed back before the next options command or settings
+push. How the built values are remembered is the implementation's choice.
 With runtime None the flag is never written (01 §2.3).
 
 An implementation that refreshes the mirror's parameters (`03` §8) without a
@@ -823,16 +839,19 @@ of the string `ShowBootup` (`68` + 4-byte address, 2015 bytes `68 78 e2 2f
 01`, string at RVA 0xEFE278) as the name of the ActionScript function that
 plays the start-up logos and intro.
 
-**Required.** When `SkipStartupIntro` is on at start-up (`06` §1, §6),
-check that the byte at the site is `68` and that its operand points at the
+**Required.** When `SkipStartupIntro` is on at start-up (`06` §1, §6) and
+the UI archive pointer was redirected to the mod's archive in this run
+(`14` §5, 01 §2.3), check that the byte at the site is `68` and that its operand points at the
 NUL-terminated string `ShowBootup` inside `AI.exe` (case-insensitive
 compare), then point the operand (4 bytes at +1) at the NUL-terminated name
 of the skip-intro function, held by the mod for the life of the process. The
 skip-intro function is defined by the project's own movie (`14`) and goes
 straight to the title screen; its name is the implementation's choice and
 only has to agree between the movie and this operand. This is part of the
-UI set and is also applied with runtime None. Changing the option takes
-effect on the next launch.
+UI set and is also applied with runtime None. Without the mod's archive
+the operand is left alone and the intro plays, because the stock movie has
+no skip-intro function (`06` §6). Changing the option takes effect on the
+next launch.
 
 ## 12. Game events the mod reacts to
 
@@ -856,18 +875,18 @@ start and end there (`start_interaction`, `stop_interaction`,
 `keypad_interaction`, `hacking_interaction`, `cutting_panel`,
 `terminal_interaction`, `ladder_interaction`, `rewire_interaction`), as does
 hiding (`hiding_visibility_start`, `hiding_visibility_finish`). Most traffic is
-per-frame engine chatter (strings starting with `C` or `on_`). No v1 behaviour
-depends on these. With `DebugOptions` on (`06` §1) the mod may hook the
-function (detour after checking its five bytes, calling the original with the
-same arguments) and log each distinct string once and every change of the
-derived interaction/hiding state; this is how new event names are found. The
-hook must not allocate or log per call when the option is off.
+per-frame engine chatter (strings starting with `C` or `on_`). No behaviour
+of this document depends on these. When the tap is installed, which
+arguments it may read (only one that points into the loaded `AI.exe` image,
+because the same code is also reached with arguments that are not
+strings), the state it derives and what it logs with `DebugOptions` on are
+specified in `11` §5; this document does not repeat them.
 
 ## 13. Threads
 
 | Code | Thread |
 |---|---|
-| Stereo update (3), push/pop redirects (4.4), menu wrappers (5), FollowBehavior slots (6.1), UI message handler (6.2), options commands and settings push (`06`), HeadClipFade (7.2, 08 §4) | the game's main thread [likely: all are reached from the game's update loop] |
+| Stereo update (3), push/pop redirects (4.4), menu Open and Close replacements (5), FollowBehavior slots (6.1), UI message handler (6.2), options commands and settings push (`06`), HeadClipFade (7.2, 08 §4) | the game's main thread [likely: all are reached from the game's update loop] |
 | Quad builders (4.1) | the thread that runs SetMode and the overlay draw [likely the main thread] |
 
 All state of this document is written and read on the main thread, so it needs
@@ -885,7 +904,7 @@ logged; the wording and format are those of `11-diagnostics.md`.
   fixes are checked and applied separately (08 §0).
 - **No device, or device not running** (runtime missing, failed, headset not
   yet tracking): 3.2a only; everything else is idle; menus still push and pop
-  through the redirected sites and wrappers (harmless without a device: the
+  through the redirected sites and menu replacements (harmless without a device: the
   game draws flat).
 - **Headset taken off.** The device stays in state 2 and the update keeps
   running; snap turn and look gating continue; pending recenter requests wait.
@@ -910,7 +929,7 @@ Each item is checked in game on the 2015 build with OpenVR and with OpenXR,
 headset worn unless stated. "Log" means the mod's log file.
 
 1. The log records, once at start-up, which groups of this document were
-   applied (Rift checks, stereo hooks, menu wrappers, byte patches), and on a
+   applied (Rift checks, stereo hooks, menu objects, byte patches), and on a
    modified `AI.exe` the first mismatching site and that nothing was patched
    (wording is the implementation's).
 2. The front-end menu appears on a level screen about 1 m wide, 1.5 m ahead,
@@ -937,8 +956,9 @@ headset worn unless stated. "Log" means the mod's log file.
 9. During a cutscene, moving the head into the cutscene camera's geometry does
    not black the view out.
 10. With `ClippingBlinders` on, pushing the head into a wall darkens the
-    view (after 08 §4's delay); with it off, leaning into a wall does
-    not, but stepping more than 0.6 m from the body still does.
+    view (after the delay of 08 §4.2); with it off, leaning into a wall
+    does not, but moving the head away from the body still does (darker
+    from 0.5 m, black at 0.6 m).
 11. Standing still with the headset still, the view does not sway or breathe;
     leaning moves the view by exactly the head motion.
 12. Screen-space AO is absent with every SSAO setting.
@@ -958,6 +978,17 @@ headset worn unless stated. "Log" means the mod's log file.
     view never goes black from head clipping,
     with `ClippingBlinders` on. Whether 3.2g covers it depends on the open
     question below.
+19. From a fresh start, open the title screen and the pause menu ten times
+    each, including openings the game makes without a push of its own: no
+    crash; with `DebugOptions` on, the log shows the stack count raised
+    only through the game's append routine (3.2f), or the once-only event
+    that it was left unchanged.
+20. With `DebugOptions` on, open and close the pause menu, load a level and
+    let the title video play: each change between mode 0 and mode 1 is
+    logged once, with the modes before and after (4.4).
+21. With `SkipStartupIntro` on and the options archive not in use (a
+    `UI.PAK` the mod rejects, `14` §5.9): the intro plays, the game does not
+    hang at start-up, and the log says skip intro was not applied.
 
 ## 16. Open questions
 
@@ -986,5 +1017,5 @@ headset worn unless stated. "Log" means the mod's log file.
   whether the UI message handler (6.2) receives a start message during that
   sequence.
 - **2020 build.** Every 2020 value here is from the earlier mod's table (and,
-  for inline sites, its installer); the mode-stack append, the skip-intro
-  string and the event tap are unknown.
+  for inline sites, its installer); the mode-stack append, the yaw setter
+  (§1), the skip-intro string and the event tap are unknown.

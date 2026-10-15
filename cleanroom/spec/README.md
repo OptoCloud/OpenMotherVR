@@ -1,4 +1,4 @@
-<!-- Provenance: process document, written by the spec side. Revision: r6 -->
+<!-- Provenance: process document, written by the spec side; the index follows the documents of spec r7 (05 menu objects; 13 release process, integrity, source and symbol files). Revision: r7 -->
 
 # OpenMotherVR functional specification
 
@@ -23,7 +23,7 @@ Reading order: 00, 01, 02, 12, then the others as needed.
 | `02-game-stereo-path.md` | The game's dormant HMD rendering path: the stereo manager and device layouts, calling conventions, the game sites the mod changes or serves, device states, threads and display reset |
 | `03-hmd-and-frames.md` | Head tracking, the recenter pose, field of view, render-target size and eye layout, frame timing on OpenVR, the virtual screen, the desktop mirror, the game's swapchain and window while a headset is attached, pixel scale |
 | `04-input.md` | The game's input system and how VR controllers drive it; SteamVR Input and OpenXR actions with default bindings; button prompts; snap turn; look gating; recentering inputs; hand poses kept for v2 |
-| `05-game-patches.md` | Changes to game behaviour: the Rift tests, the per-frame stereo update, UI quad placement and the stereo mode stack, menu wrappers, camera and cutscene tracking, byte patches, render-target rebuild on a settings change, skip intro |
+| `05-game-patches.md` | Changes to game behaviour: the Rift tests, the per-frame stereo update, UI quad placement and the stereo mode stack, menu objects (stereo mode while a menu is open), camera and cutscene tracking, byte patches, render-target rebuild on a settings change, skip intro |
 | `06-options-and-config.md` | Settings, `mothervr.json`, the command line, the protocol between the game's UI and the mod, the options page and its behaviour, skip intro, the game's UI scripting interface |
 | `07-reflections.md` | Planar reflections in stereo: how the game renders them, why they break, the per-eye render, diagnostics |
 | `08-render-fixes.md` | Per-eye lighting (shader dither), object pop-in (culling), anti-aliasing in stereo, head-in-wall blackout delay, desktop mirror scale |
@@ -31,7 +31,7 @@ Reading order: 00, 01, 02, 12, then the others as needed.
 | `10-audio.md` | Game audio to the headset's own audio device when the runtime names it (OpenXR), through the game's audio output |
 | `11-diagnostics.md` | The log file `mothervr.log` and its format, the events that must be logged, rate rules, the debug diagnostics (`DebugOptions` in `mothervr.json`: pose age, hand poses, game events, reflection capture), logging of game script events, crash reporting |
 | `12-threads-and-robustness.md` | The game's threads and which mod work runs on each, data crossing threads, verify-before-write for every patch, ABI rules for replacing game methods, per-frame budget, behaviour on every failure, display reset and process exit |
-| `13-distribution.md` | What the player installs, the files the mod writes and when, the log as a file, message boxes, uninstall, the DLL's properties, the release package |
+| `13-distribution.md` | What the player installs, the files the mod writes and when, the log as a file, message boxes, uninstall, the DLL's properties and how the build checks them, the release package, making a release, its integrity, source and symbol files |
 | `14-ui-resources.md` | The options menu's UI resources: authoring them from scratch, the developer build (AS3 compiled against declarations of the game's classes, glyph images to DDS), and linking them into the player's stock `UI.PAK` at install time to produce `MOTHER.PAK`, with validation, reuse and atomic replacement |
 | `20-v2-overview.md` | v2 (enhanced mode): goals, the rule that every v2 option off is exactly v1, what the player sees, modes, phasing proposal, open questions across 21 to 24 |
 | `21-hands-and-body.md` | v2: tracked hands and arms, aiming per weapon class, tracker and flashlight by hand, melee, throwing, body visibility, camera offset, room-scale, height and real crouch, body resync, wrist health, haptics |
@@ -46,4 +46,6 @@ Every document starts with a provenance header:
 <!-- Provenance: <what it was derived from>. Revision: rN -->
 ```
 
-Run `python -I tools/spec_lint.py spec` before committing a spec change.
+Run `python -I cleanroom/tools/spec_lint.py cleanroom/spec` from the
+repository root before committing a spec change; it must report no
+problems.

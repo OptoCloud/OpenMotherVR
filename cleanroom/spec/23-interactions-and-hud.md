@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were found by the spec side without that lead. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). Revision: r1 -->
+<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were verified by the spec side in the game's data; the existence of a terminal font change and of lever input emulation was known from the analysis of another mod. The camera takeover sites of 2.4 were located with the help of that analysis and verified. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). r2: second clean-room review: terminal text steps derived from this project's own legibility criterion; the reduced animation set defined by a criterion; facts with no use removed; item highlight stated as a result; the HUD game facts cited from 22 §2.4 (one description); the tap's thread left open as 11 §8 does; lever interactions own turning and the move action (22 §4.1, §7); the master switch of 20 §1.3. Revision: r2 -->
 
 # 23. Interactions and HUD
 
@@ -12,8 +12,9 @@ and its toggle, item highlight, HUD placement).
 
 v2 rules (20 §1.1, §5) apply to every feature here: each is turned on by
 its own key under `Settings.Interaction` or `Settings.Hud`, its default
-gives v1 behaviour exactly, and with runtime None or a failed runtime none
-of it runs and none of its patches is applied.
+gives v1 behaviour exactly, every key reads as its default while the
+master switch `EnhancedMode` is off (20 §1.3), and with runtime None or a
+failed runtime none of it runs and none of its patches is applied.
 
 Addresses are RVAs in the 2015 `AI.exe` (PE timestamp 0x54E3199D, image
 base 0x400000). 2020 is `?` throughout, and every feature here stays off
@@ -108,9 +109,6 @@ each mechanism is driven on a pad:
 | Door button | `AI_UI_INTERACTIONS_OPEN_DOOR`, `AI_UI_INTERACTIONS_CLOSE_DOOR` | | interact |
 | Crafting | `RADIALMENU.GFX`, `CRAFTINGSCREEN.GFX` (14) | | radial menu, hold to craft |
 
-The 1st-person idle animation `IDLE_AIMED` (and `_LOW`, `_HIGH`) is in
-`ANIMATION.PAK`.
-
 So levers and junctions are already analog interactions in the game: the
 player grabs with one or two held buttons and drives the handle with a
 stick. No other class in the table is driven by an analog motion of the
@@ -136,8 +134,6 @@ by static initialisers near 0xD58000, include `AnimationSet`, `Animation`,
 - The convergence parameters move and turn the player to the animation's
   marker before it plays (the game's own error strings say "told to use
   convergence but has no MARKER attached").
-- The command's start and stop methods are slots 244 and 245 of the table
-  at 0xE34960 (0x130A70, 0x130CE0).
 
 ### 2.4 Camera takeovers [sure for the code; likely for the situations]
 
@@ -156,6 +152,11 @@ where the player looks:
 | `CameraResource` stop | 0x245F0, table entry at 0xDC5A78; `ret 8` | returns to the player; reads `reset_player_camera_on_exit` (getter 0x4DDC20, default false, call at 0x2472B) and calls `FollowSteer` (call at 0x2471C) |
 | `CameraResetRequest` | 0x33540, thiscall, two stack arguments, `ret 8`, 26 call sites between 0x250ABA and 0x2763A5 (the player's action code [likely]); prologue `55 8b ec 83 e4 c0 83 ec` | for mode 6: looks up the follow camera, re-aligns it to the body heading (method 0x2C6F0), levels its pitch (method 0x2C730 with 0.0) and clears its steering (method 0x2DF30) |
 | player state entry | call at 0x281132 | the same lookup, then re-align to the body and clear steering |
+
+These sites were located with the help of an analysis of another mod and
+verified by the spec side. Each is listed for the effect on the view in
+its last column, which is what §4.2 keeps or reduces; the other callers of
+the lookup are not needed by this document.
 
 Because the mod adds the head pose on top of the follow camera (02, 03),
 any change of the follow camera's yaw turns the whole world around the
@@ -176,10 +177,7 @@ distance the record becomes a candidate for the prompt. In the shipped
 other code or data refers to it (searched by its address in every section).
 So in the stock game this test never passes, and the stock activation
 range of terminals and rewire stations is decided elsewhere [likely: by
-the level's trigger volumes and `Interaction` entities; to be found, 12].
-The function also copies each record's position with a small helper at
-0x3EB180 (cdecl, `vec4* out, const vec3* in`, sets w to 0) called at
-0x3C5454 and 0x3C5659.
+the level's trigger volumes and `Interaction` entities; to be found, §12].
 
 ### 2.6 `UI_Icon` parameters [sure]
 
@@ -212,23 +210,13 @@ visible it also resets `staticPrompt_mc` to its `off` frame). Both keep
 a `m_hud_forced_hidden` field. The game calls them through its movie
 wrapper objects (the movie at `+0x68`, null until loaded) with the
 movie-invoke method 0x4081E0 (thiscall, one stack argument, the function
-name, `ret 4`):
-
-| Method | Effect |
-|---|---|
-| 0x40ADC0 (no arguments, plain `ret`; starts `56 68`) | invokes `force_hud_hidden`, sets `+0x40` = 1 |
-| 0x40ADE0 (same form) | invokes `force_hud_visible` |
-| 0x40C220 (starts `56 8b f1 83 7e 68 00 74`) | if the movie is loaded, `force_hud_hidden` and `+0x40` = 1 |
-| 0x40C250 (same prologue) | if the movie is loaded, `force_hud_visible` and `+0x40` = 0 |
-
-`+0x40` is the game's own "HUD forced hidden" state of that movie; the HUD
-updates at 0x44BBE0 and 0x44D020 re-invoke the matching function from it
-when a movie (re)loads [likely: `+0x129` and `+0x408` are pending flags]. A scripted game
-entity hides the HUD this way: its methods at 0x1094A0 (hide) and 0x1095A0
-(show), entries of the method table at 0xDFD014 to 0xDFD028, look up the
-movies named `pickupOverlay` and `weaponstuff` (lookup 0x410420 on the UI
-manager at 0x134A78C) and call the methods above [sure for the code;
-likely: the levels' HUD visibility entity, used in scripted scenes].
+name, `ret 4`). The wrappers' hide and show methods, their "HUD forced
+hidden" byte `+0x40`, how each wrapper re-applies it when its movie
+(re)loads, and the scripted entity that hides and shows the HUD (methods
+at 0x1094A0 and 0x1095A0, entries of the method table at 0xDFD014 to
+0xDFD028) are described once, in 22 §2.4, with its labels
+(`WeaponHudHide`, `WeaponHudShow`, `PickupHudHide`, `PickupHudShow`,
+`UiFindObject` 0x410420, `UiManagerPtr` 0x134A78C).
 
 **Crosshair.** `CrosshairUpdate` at **0x4371F0** (thiscall on the
 `weaponstuff` wrapper, no stack arguments, plain `ret`; prologue
@@ -285,7 +273,7 @@ hand action.
 The mod does not move the lever itself: it produces, from the hands, the
 pad inputs the game already reads for these mechanisms (2.2), through the
 virtual pad of 04 §3. While the interaction kind (section 10, 11 §5.3) is
-**lever** or the prompt is a junction prompt [see 12: how the mod knows a
+**lever** or the prompt is a junction prompt [see §12: how the mod knows a
 junction is running]:
 
 | Hands | Game input produced |
@@ -311,10 +299,11 @@ needs no knowledge of where the handle is.
 releasing `aim` on a pad. What the game does then (the lever springs back,
 or stays where it is) is the game's own behaviour and is not changed
 [guess: check both lever kinds in game]. Turning, snap or smooth, is
-suppressed while this mapping is active [proposal: a pull made while the
-world turns is lost and uncomfortable; 22 owns interaction-aware turning
-and this document only requires that turning not happen during a lever
-or junction].
+suppressed while this mapping is active, whatever
+`Controls.InteractionAwareTurning` says, and 22's d-pad emulation does not
+take the left stick then (22 §4.1, §7) [proposal: a pull made while the
+world turns is lost and uncomfortable; the mapping owns the grips and the
+move and look actions, one owner per input, 20 §5].
 
 **What stays the game's.** The interaction's start (walking to the marker,
 the grab animation), the lever's travel and its result are the game's.
@@ -323,7 +312,7 @@ torch, crafting, ladders, vents and door buttons keep their v1 controls
 in r1 [proposal: their stock input is menu navigation or a single press,
 so a hand motion would only replace one button press with a gesture;
 touching a screen by hand needs the in-world placement of each screen,
-which is not known (12)]. They are kept as the game's animations, subject
+which is not known (§12)]. They are kept as the game's animations, subject
 to section 4.
 
 ### 3.3 Parameters
@@ -374,7 +363,7 @@ grabs, deaths and cutscenes keep the game's camera.
 
 | Takeover (2.3, 2.4) | `"Reduced"` | Reason |
 |---|---|---|
-| Animation-driven view (`PlayerAnimDrivenView`) for the first-person interaction animations of 2.2 (terminal use, rewire box, lever, button, portable computer) | cleared: the animation plays, the view does not follow the animated head | these animations move the viewpoint by small amounts while the player stands still; in a headset that is felt as the body being pushed. The player looks at the device anyway |
+| Animation-driven view (`PlayerAnimDrivenView`) for the **short device animations**: the player's first-person animations played while the player stands at an interaction marker in front of a device and does not travel (for example the terminal and rewire box animations named in 2.2); the set is enumerated from `ANIMATION.PAK` by this rule (§12 item 12) | cleared: the animation plays, the view does not follow the animated head | these animations move the viewpoint by small amounts while the player stands still; in a headset that is felt as the body being pushed. The player looks at the device anyway |
 | Animation-driven view for traversal (ladders, vents), grabs and kills, `FullCinematic` animations and anything not in the list | kept | the viewpoint really travels along a path the player cannot walk, or the scene is a staged moment; a fixed view would show the inside of geometry [proposal] |
 | `StealCamera` | the steer is not applied: the follow camera's yaw and pitch are unchanged [proposal] | a scripted turn of the view is a turn of the world in a headset, the classic cause of sickness; the point of interest is still announced by sound and the scene |
 | `CameraResetRequest` (mode 6) and the state entry at 0x281132 re-aligning yaw to the body | the yaw re-align is not applied; levelling the pitch still is | a yaw snap at the end of an interaction rotates the world; pitch comes from the head in VR (05 §3.2d) so levelling it is invisible |
@@ -385,16 +374,16 @@ grabs, deaths and cutscenes keep the game's camera.
 With `"Game"` (default) every takeover is the game's, as in v1.
 
 Required results, not a mechanism: while `"Reduced"` is in effect, (a) a
-`CMD_PlayAnimation` request for one of the listed interaction animations
-has bit 0x40 of its flag byte `+0x55` clear when the request is built,
+`CMD_PlayAnimation` request for one of the short device animations has
+bit 0x40 of its flag byte `+0x55` clear when the request is built,
 (b) no call of `FollowSteer` from the `StealCamera` start or the
 `CameraResource` stop changes the follow camera's yaw `+0x1FC` / `+0x204`
 or pitch, and (c) the re-align to the body of `CameraResetRequest` (mode
 6) and of the state entry at 0x281132 leaves the yaw unchanged. How each
-is achieved (a detour after checking the listed prologue, a call-site
-redirect after checking the call target) is the implementation's choice
-under 12 §4. The animation list is matched by the animation's name as the
-game identifies it [open, 12: how `CMD_PlayAnimation` identifies the
+is achieved is the implementation's choice under 12 §4, after checking the
+listed prologue or call target. The animation set is matched by the
+animation's name as the
+game identifies it [open, §12: how `CMD_PlayAnimation` identifies the
 animation in the request (name string or hash)].
 
 ### 4.3 Off
@@ -415,8 +404,8 @@ animation in the request (name string or hash)].
   view after a terminal and a lever].
 - **Death and reload:** nothing persists; the next level starts as the
   game sets it.
-- **Hands on (21):** 21's body sync after animations still runs; this
-  section does not depend on it.
+- **Hands on (21):** 21's control hand-back after animations (21 §12)
+  still runs; this section does not depend on it.
 
 ### 4.5 Comfort reason
 
@@ -429,14 +418,14 @@ eyes inside walls.
 
 ### 4.6 Shorter interaction animations [proposal]
 
-With `Interaction.FastAnimations` on, the first-person interaction
-animations of 4.2's first row play faster by a factor of 1.5 [proposal:
+With `Interaction.FastAnimations` on, the short device animations of
+4.2's first row play faster by a factor of 1.5 [proposal:
 the terminal intro and the rewire box open and close are long when the
 player is standing at the device already; 1.5 keeps the device's
 animation readable]. The game's parameter for it is `PlaySpeed` (2.3);
 where the request's play speed is stored and whether the device's own
 animation (`_PROP`) must be sped up with it to stay aligned are not yet
-known (12). Until they are, this key is reserved and has no effect, and
+known (§12). Until they are, this key is reserved and has no effect, and
 the options page does not show it.
 
 ## 5. Activation distances
@@ -452,7 +441,7 @@ to the marker or from so close that the head is inside the screen.
 ### 5.2 Required behaviour
 
 The game's own activation for these devices is not the dormant test of
-2.5 (it never passes in the stock game) and has not been located (12).
+2.5 (it never passes in the stock game) and has not been located (§12).
 Required result, once it is: with a value `d` > 0, the prompt for a
 terminal (respectively a rewire station) is offered exactly when the
 distance from the camera position of POV 0 to the device's icon position
@@ -468,7 +457,10 @@ which work at standing height].
 | Key | Range | Proposal | Reason |
 |---|---|---|---|
 | `Interaction.TerminalDistance` | 0, or 0.6 to 2.0 m | 1.0 m when the player turns it on | arm's length plus the distance a person stands from a wall screen; below 0.6 m the head would be at the screen surface |
-| `Interaction.RewireDistance` | 0, or 0.6 to 2.0 m | 1.2 m | the rewire box opens towards the player and needs room for it |
+| `Interaction.RewireDistance` | 0, or 0.6 to 2.0 m | 1.2 m when the player turns it on | the rewire box opens towards the player and needs room for it |
+
+The default of both keys is 0 (section 8); the "Proposal" column is the
+value the options page offers first when the player turns the feature on.
 
 ### 5.4 Off, edge cases
 
@@ -506,7 +498,7 @@ change of the VR set (14 §1.3, §3.6):
 
 | Parameter | Values | Reason |
 |---|---|---|
-| `t` | 1.0, 1.2, 1.4, 1.6 [proposal] | 20 px text on a terminal seen at about 0.6 m in a headset is small; 1.4 gives 28 px; above 1.6 a typical log no longer fits on one screen and needs much scrolling |
+| `t` | 1.0, 1.25, 1.5, 1.75 [proposal] | the stock 20 px body text on a terminal seen at about 0.6 m in a headset is small; steps of a quarter add 5 px each (25, 30, 35 px), a change the player sees at once; 1.75 is the largest because a body line in the 620-unit field must still hold about 30 characters (a character is about half the font height wide), below which prose reads in fragments and a typical log needs many screens |
 
 Takes effect on the next launch: the options archive is built at launch
 (14 §5), and `t` becomes part of its staleness key (section 13).
@@ -581,20 +573,15 @@ update [likely]. Menus and the virtual screen are not affected.
 items, so items are found by looking, not by their glow [proposal: wanted
 by players for immersion].
 
-**Required.** With false, every interaction icon's highlight distance
-threshold (2.6, record `+0x8C`) is 0, so no icon is within it; with true,
-it is the level's value or the default 3.15 m, as in v1. The getter at
-0x4F0650 is the only reader of the parameter, so the result can be reached
-there; a change takes effect for icons started after it [likely; icons
-already started keep their threshold until they restart, for example on a
-level load; acceptable: the options page says the change applies from the
-next load, proposal]. Prompts and the ability to interact are unchanged:
-only the highlight goes.
-
-[guess] What exactly the threshold highlights (the item's geometry, the
-icon, or both) is to be confirmed in game, and whether
-`force_disable_highlight` (2.1) is a simpler lever for the same result
-(12).
+**Required.** With false, no item, prop or icon is drawn highlighted,
+while prompts and the ability to interact work as in v1. With true, the
+highlight is the game's, as in v1. How is the implementation's choice under
+12 §4; the game facts of 2.6 (the `highlight_distance_threshold`
+parameter, its getter and the icon record field it fills) and the open
+question of §12 item 7 (what reads that field and what it highlights)
+apply. A change may take effect only for icons started after it, for
+example from the next level load [proposal: acceptable when the options
+page says so].
 
 ### 7.4 HUD placement
 
@@ -649,7 +636,7 @@ its own, a wrong type gives the default, unknown keys are kept.
 | `Interaction.FastAnimations` | bool | false | | | reserved (4.6) |
 | `Interaction.TerminalDistance` | number | 0 | 0, or 0.6 to 2.0 | values in (0, 0.6) become 0.6, above 2.0 become 2.0, negative or NaN become 0 | at once (once 5.2 is available) |
 | `Interaction.RewireDistance` | number | 0 | as above | as above | as above |
-| `Interaction.TerminalTextScale` | number | 1.0 | 1.0, 1.2, 1.4, 1.6 | the nearest listed value; NaN gives 1.0 | next launch (14) |
+| `Interaction.TerminalTextScale` | number | 1.0 | 1.0, 1.25, 1.5, 1.75 | the nearest listed value; NaN gives 1.0 | next launch (14) |
 | `Hud.Crosshair` | string | `"On"` | `"On"`, `"Off"`, `"Auto"` | other: `"On"` | at once |
 | `Hud.Hidden` | bool | false | | | at once (7.2) and at each session start |
 | `Hud.ItemHighlight` | bool | true | | | icons started after the change (7.3) |
@@ -674,7 +661,7 @@ guide. `Interaction.FastAnimations` gets no control while reserved.
 | Work | Thread |
 |---|---|
 | Lever mapping (3): reading hand poses and grips, writing the virtual pad | the game thread, in the virtual pad's poll (04 §3.6), from the hand poses handed over by 04 §5.11 |
-| Interaction kind (11 §5.3) | written by the tap on the game thread; read as single atomics |
+| Interaction kind (11 §5.3) | written by the tap on whichever thread calls it (open, 11 §8); read as single atomics, so the reader's thread does not matter |
 | Camera takeover suppression (4), crosshair (7.1), HUD hide and show (7.2), item highlight (7.3) | the game thread (the game's camera, entity and HUD updates) [likely: all reached from the game's update loop, 05 §13] |
 | HUD placement (7.4) | the thread that runs the overlay draw (05 §13), reading the settings as single words (06 §3.4) |
 | Settings changes | the game thread (06 §3.4) |
@@ -718,7 +705,7 @@ OpenXR unless stated.
    end; climbing a ladder and entering a vent still move the view along
    the path; a scripted look-at (`StealCamera`) does not turn the world.
    `"Game"`: all as v1.
-6. `Interaction.TerminalTextScale` 1.4, restart: terminal body text is
+6. `Interaction.TerminalTextScale` 1.5, restart: terminal body text is
    larger, a long log scrolls to its last line; 1.0 restores the stock
    look.
 7. `Hud.Crosshair` `"Off"`: no crosshair with any weapon raised; the ammo
@@ -768,8 +755,15 @@ OpenXR unless stated.
 10. **The scripted HUD entity.** The class owning the method table at
     0xDFD014 (2.7), and whether other HUD movies (objectives, subtitles)
     are hidden by other means in scripted scenes.
-11. **Input ownership** (20 §10 item 1): this document takes the grips
-    during lever interactions; 22's table must agree.
+11. (Resolved in r2: during the lever mapping this document owns the
+    grips and the move and look actions; 22 §4.1 blocks turning and 22 §7
+    leaves the left stick to the mapping.)
+12. **Short device animations** (4.2): the names in `ANIMATION.PAK` of
+    the player's first-person animations played at an interaction marker
+    in front of a device without travel. To resolve: list the
+    `1ST_PERSON` animation set's names and keep those whose device class
+    (2.2) is not traversal; confirm with the tap's log (11 §4.3) which of
+    them play during each interaction kind.
 
 ## 13. Changes to v1 documents
 
@@ -789,7 +783,8 @@ Not made here; for the v1 revision that collects v2 changes (20 §10 item
   there. §12: the events of 2.1 that v2 reacts to.
 - `04-input.md` §5.8.5 and §5.6: during a lever or junction interaction
   with `Interaction.PhysicalLevers` on, the grips drive 3.2's mapping
-  instead of Aim and Tracker; hand poses (5.11) gain a game-thread reader.
+  instead of Aim and Tracker; hand poses (5.11) gain a game-thread reader;
+  §6: no turning while the mapping is active (22 §4.1).
 - `14-ui-resources.md` §1.3, §3.6, §5.1: the terminal text change of 6.2
   as part of the VR set (the movie is already a touched entry, §2.3); the
   staleness key includes `Interaction.TerminalTextScale`; §3.6.2's

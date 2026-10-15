@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (disassembly of every site, wrapper and game method named here, re-checked against the binary for r2: frame loop, present step, display reset, configure-rendering and shutdown wrappers, CreateDevice, setting handlers); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; public LibOVR 0.4.0 headers (layouts of the headset description, eye descriptors and texture descriptors, and their constants); observation in game by the spec side (thread ids and call counts per hook; frame times after a display reset; an earlier mod showed each eye at half resolution); user requirements (full resolution from the first answer, eye layout from the created texture, display reset only on a changed setting); AI.exe 2015 analysis by the spec side for r4 (the game's window procedure on focus loss and deactivation); a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus). Revision: r4 -->
+<!-- Provenance: game analysis of AI.exe 2015 (disassembly of every site, wrapper and game method named here, re-checked against the binary for r2: frame loop, present step, display reset, configure-rendering and shutdown wrappers, CreateDevice, setting handlers); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; public LibOVR 0.4.0 headers (layouts of the headset description, eye descriptors and texture descriptors, and their constants); observation in game by the spec side (thread ids and call counts per hook; frame times after a display reset; an earlier mod showed each eye at half resolution); user requirements (full resolution from the first answer, eye layout from the created texture, display reset only on a changed setting); AI.exe 2015 analysis by the spec side for r4 (the game's window procedure on focus loss and deactivation); a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus); clean-room review round 2 and coverage review of spec r6, applied in r5 (2020 cells not taken from the earlier mod's table set to "?"; the device description fields left free without example values; the function at RVA 0x5E0D40 labelled `CreateDevice` in every document; the no-headset outcome told to the player only when a runtime was chosen; the thread rule of a late detach; the Stereo Mode handler changes no other setting, and a VR run leaves the player's saved values alone; AI.exe 2015 analysis by the spec side for r5: the only call site of `CreateDevice`, the window procedure's RVAs in 01 §4.6). Revision: r5 -->
 
 # 02 - The game's dormant stereo path
 
@@ -41,9 +41,8 @@ Required by the game:
 
 Free for the implementation:
 
-- where the objects live (static or heap), and whether the device is
-  embedded in the manager. The game only follows the pointer at manager
-  +0x04;
+- where the objects live and how they relate in memory beyond the game's
+  layouts. The game only follows the pointer at manager +0x04;
 - anything the mod stores after +0xB0 in the manager or after +0x1F4 in the
   device;
 - how the recenter call sites reach a yaw-only pose, within the constraints
@@ -79,16 +78,15 @@ constructs it in place:
 | RVA 2015 | RVA 2020 | Bytes (2015) | Meaning |
 |---|---|---|---|
 | 0x5AFBA1 | 0x501CC1 | `68 b0 00 00 00` | `push 0xB0` (size for `operator new`) |
-| 0x5AFBA6 | 0x501CC6 [likely] | `89 be 98 f6 0c 00` | `mov [esi+0xCF698], edi` (edi = 0): zeroes RVA 0x1427A38 |
-| 0x5AFBAC | 0x501CCC [likely] | `89 be 9c f6 0c 00` | `mov [esi+0xCF69C], edi`: zeroes RVA 0x1427A3C |
-| 0x5AFBB2 | 0x501CD2 [likely] | `e8 rel32` | `operator new` (RVA 0x044330) |
-| 0x5AFBB7 | 0x501CD7 [likely] | `83 c4 04`, `3b c7`, `74 12` | pop the argument, test for null |
-| 0x5AFBC0 | 0x501CE0 [likely] | `e8 rel32` | constructor (RVA 0x5D9A60), `this` = new block |
-| 0x5AFBC5 | 0x501CE5 [likely] | `89 86 8c e6 00 00` | `mov [esi+0xE68C], eax`: store the manager pointer |
+| 0x5AFBA6 | ? | `89 be 98 f6 0c 00` | `mov [esi+0xCF698], edi` (edi = 0): zeroes RVA 0x1427A38 |
+| 0x5AFBAC | ? | `89 be 9c f6 0c 00` | `mov [esi+0xCF69C], edi`: zeroes RVA 0x1427A3C |
+| 0x5AFBB2 | ? | `e8 rel32` | `operator new` (RVA 0x044330) |
+| 0x5AFBB7 | ? | `83 c4 04`, `3b c7`, `74 12` | pop the argument, test for null |
+| 0x5AFBC0 | ? | `e8 rel32` | constructor (RVA 0x5D9A60), `this` = new block |
+| 0x5AFBC5 | ? | `89 86 8c e6 00 00` | `mov [esi+0xE68C], eax`: store the manager pointer |
 
-The 2020 rows other than the first assume the same instruction sequence
-(the earlier mod's table gives only the first address); check the 2015 bytes
-there before use.
+On 2020 only the first address is known; the rest of the sequence must be
+located and checked against the 2015 bytes before use (section 11 item 1).
 
 `[esi+0xE68C]` is the global that every other game site reads as the
 manager pointer: VA 0x1766A2C in the 2015 file, RVA 0x1366A2C (2020: RVA
@@ -117,9 +115,9 @@ differs, patch nothing (01 §2.4).
 
 | Slot | Off | Game RVA 2015 | 2020 | Signature | Meaning | Required of the mod |
 |---|---|---|---|---|---|---|
-| 0 | +0x00 | 0x5E3F40 | ? | `(unsigned flags)` `ret 4`, returns `this` | scalar deleting destructor | Do nothing (no game call on the replaced manager was observed). A static object must not free itself |
+| 0 | +0x00 | 0x5E3F40 | ? | `(unsigned flags)` `ret 4`, returns `this` | scalar deleting destructor | Never called once the game's manager is replaced (no call was observed). Must not free the manager |
 | 1 | +0x04 | 0x5CCDB0 | 0x51EF20 | `(const Setting* s)` `ret 4` | a graphics setting changed; `s+0` is the setting id | Section 6.5 |
-| 2 | +0x08 | 0x5CCEB0 | 0x51F020 [likely; the earlier mod's table says 0xD1F020, almost certainly a typo] | `(const Setting* s, const int* value)` `ret 8`, bool in AL | may this setting take this value? The game refuses "Stereo Mode = Rift" unless a device exists with state 1 | Return true (AL = 1) for everything |
+| 2 | +0x08 | 0x5CCEB0 | ? | `(const Setting* s, const int* value)` `ret 8`, bool in AL | may this setting take this value? The game refuses "Stereo Mode = Rift" unless a device exists with state 1 | Return true (AL = 1) for everything |
 
 The manager's vtable pointer must point at the mod's own three-entry table;
 it must never point at the game's (slot 1 of the game's would run the game's
@@ -195,17 +193,9 @@ ovrHmdDesc 0.4.0, at device +0x10 (device offsets):
 | +0x88 | DisplayId | 0 |
 
 No game code outside the replaced device slots reads Type, the three caps
-fields, ProductName or Manufacturer, so their values are free. An
-implementation that wants the description to look like the headset the
-game's integration was written for (for example so that a debugger shows a
-coherent description) can use the public LibOVR 0.4 constants of a DK2:
-Type `ovrHmd_DK2` (6); HmdCaps the present, available and low-persistence
-bits (0x01, 0x02, 0x80); SensorCaps the orientation, yaw-correction and
-position tracking bits (0x10, 0x20, 0x40); DistortionCaps the time-warp bit
-(0x02). The headset's model and manufacturer strings
-from the runtime (OpenVR `Prop_ModelNumber_String` and
-`Prop_ManufacturerName_String`; OpenXR the system name and runtime name) are
-a natural choice for the two names, and null is equally valid.
+fields, ProductName or Manufacturer, so any values are acceptable (zero, or
+any consistent description); if non-null, each name points at a string that
+lives as long as the device.
 
 Fields marked "game's own slots only" are free for the implementation once
 those slots are replaced, including the two texture descriptors. The device
@@ -232,7 +222,7 @@ is where the game calls it (section 9).
 | 8 | +0x20 | 0x5B9190 | 0x50B340 | end eye render | `int eye` | 4 | - | end-frame wrapper | render | Nothing |
 | 9 | +0x24 | 0x5B9200 | 0x50B3B0 | increment frame index | - | 0 | - | wrapper RVA 0x5B88F0, called once per frame from a task function (RVA 0x374FA0) | not established | Increment device +0x08. Nothing reads it once slot 5 is replaced |
 | 10 | +0x28 | 0xAA70F0 | ? | **device presents** | - | 0 | bool (AL); the game's returns 1 | wrapper RVA 0x5B8DD0 (returns false without a running device), called in the present step (6.8) | render | Return true. False makes the game present the back buffer itself as well |
-| 11 | +0x2C | 0x5E0DA0 | ? (the earlier mod's table gives 0x50B260, which equals slot 19 and is doubtful) | **head pose** | `float* out` (3x4) | 4 | `out` in EAX | relative pose RVA 0x5BE360 (6.3); the two recenter sites (6.4) | game | Write the current head pose (03 §1, including its rule for a pose the runtime reports as not valid; never NaN); record that the game asked for it this frame |
+| 11 | +0x2C | 0x5E0DA0 | ? | **head pose** | `float* out` (3x4) | 4 | `out` in EAX | relative pose RVA 0x5BE360 (6.3); the two recenter sites (6.4) | game | Write the current head pose (03 §1, including its rule for a pose the runtime reports as not valid; never NaN); record that the game asked for it this frame |
 | 12 | +0x30 | 0x5CD4C0 | 0x51F630 | apply eye transform | `int eye, float4x4* view, float4x4* proj` | 0xC | - | wrapper RVA 0x5B86A0 (callers RVA 0x5B3355, 0x5B3985 in `POV::SetEye`, 0x5F0946); eye shader constants RVA 0x5B8910 | render | **Keep** |
 | 13 | +0x34 | 0x5B8E70 | 0x50B010 | FOV and aspect | `int eye, float* vfov, float* aspect` | 0xC | - | wrapper RVA 0x5B86C0 (callers RVA 0x5B336C, 0x5F095D) | render | **Keep** |
 | 14 | +0x38 | 0x5B8F10 | 0x50B0C0 | NDC scale and offset of an eye's FOV | `int eye, float out[4]` | 8 | - | wrapper RVA 0x5B86E0 (default {0,0,1,1}; caller RVA 0x57EC15); slot 12 | render | **Keep** |
@@ -247,9 +237,9 @@ The table entry after slot 20 in the game's vtable is 0; the game never reads
 past slot 20. Entries the mod's vtable has after slot 20 are therefore reached
 only through sites the mod itself patches (6.4).
 
-The 2020 RVAs of slots 1 to 9 and 13 to 19 are the 2015 ones minus 0xADE60
-(slots 1 to 4, 13) or 0xADE50 (the others); this regularity helps when
-locating the 2020 wrappers, which the earlier mod's table does not list.
+The 2020 RVAs of the slots listed above differ from the 2015 ones by
+nearly constant amounts (see the table), which helps when locating the
+2020 wrappers (section 11 item 1).
 
 ### 5.1 What the kept game methods rely on
 
@@ -287,7 +277,11 @@ Consequences for the mod:
 
 ## 6. Game sites the mod changes or must serve
 
-### 6.1 CreateDevice (manager `Init(int type)`)
+### 6.1 CreateDevice (the manager's device creation)
+
+`CreateDevice` is the spec's label for the manager method at RVA 0x5E0D40
+that creates the stereo device; 01 and 03 use the same label, and its call
+site is `StereoInitCall` (01 §4.2).
 
 | | 2015 | 2020 |
 |---|---|---|
@@ -297,8 +291,10 @@ Consequences for the mod:
 Sequence at the site: `mov ecx,[StereoObjectPtr]` (`8b 0d` + VA), `push 1`
 (`6a 01`), `call rel32` (`e8 ...`). The site is in the display
 initialisation (RVA 0x6138F0), which has a single caller (RVA 0x59C307) and
-runs once at start-up on the main thread; nothing else calls the target, so
-the game creates the device exactly once per run [sure].
+runs once at start-up on the main thread; nothing else calls the target
+(`StereoInitCall` is its only call site, and no pointer to it exists in the
+image), so the game creates the device exactly once per run [sure]. In
+particular the display reset (9.3) does not call it.
 
 The target is `thiscall(manager, int type)`, `ret 4`. The game's version, for
 type 1, allocates and constructs the LibOVR device into manager +0x04; then,
@@ -317,9 +313,12 @@ target first) to its own function with the same convention. When it returns for
   reference is only ever taken from a fully valid head pose, so without one
   the retake stays pending (03 §2.1); the
   world scale from `-vrscale` (06 §2) is in effect.
-- **No headset.** Manager +0x04 is null, the reason is logged, the player
-  has been told once (13), and the game's manager shutdown has **not** run
-  (it would free objects the mod owns). The game then runs flat (7.5).
+- **No headset.** Manager +0x04 is null, the reason is logged, and the
+  game's manager shutdown has **not** run (it would free objects the mod
+  owns). When a runtime was chosen and failed to start, the player has been
+  told once (13); when no runtime was chosen (none available, or a forced
+  runtime missing) there is no message (01 §5.3). The game then runs flat
+  (7.5).
 
 For any other `type` nothing changes.
 
@@ -444,10 +443,19 @@ For any other id, or with no device, do nothing. Depth of field and motion
 blur are unpleasant in a headset; SSAO is a screen-space effect that is wrong
 across a side-by-side target (it is also disabled by a patch, 05).
 
-VSync (id 0x07) is not required and may be left as the player set it: while
+The handler changes no setting other than these three. VSync (id 0x07),
+which the game's own Rift preset turns on, keeps the player's value: while
 stereo runs it has no effect, because the game's own Present (which uses the
 sync interval) is skipped when slot 10 answers true (6.8) and the device
 presents with its own interval (03 §6).
+
+A run with runtime None must show the player's own values of the three
+settings, because runtime None is the unmodded game (01 §2.3). Whether a
+value set through the setter below reaches the player's saved graphics
+settings is not established (section 11 item 5); if it does, the three
+changes must not remain in the saved settings after a VR run (for example
+the player's values are restored before the game saves them), so that
+turning VR off gives back the effects the player chose.
 
 The setter is `thiscall(settings, int id, const char* value)` `ret 8` at RVA
 0x5A8910 (2020: 0x4FAA50) on the settings object at RVA 0x1358A50 (2020:
@@ -550,7 +558,7 @@ the `e8` opcode); its behaviour is specified in 04 and 05.
 
 | From | To | Cause |
 |---|---|---|
-| (none) | 0 | the device object before CreateDevice, or a runtime that failed |
+| (none) | 0 | the device object before `CreateDevice`, or a runtime that failed |
 | 0 | 1 | CreateDevice succeeded (6.1) |
 | 1 | 2 | slot 1, from setting event 0x18 at start-up (6.5) |
 | 2 | 1 | slot 2; not reached in normal play (the mod's manager slot 1 never calls slot 2) |
@@ -624,6 +632,17 @@ The order of these is free, with one exception: the state and manager
 +0x04 are cleared before the runtime is released, so that a thread that
 reads them afterwards (9.1) does not start using a released runtime.
 
+A late detach can happen on the render thread (slot 3 runs there, 6.7), so
+the device state and manager +0x04 then have the render thread as a writer
+and the game and job threads as readers (atomic stores and loads, 9.1). A
+call into the runtime that another thread began before the detach (for
+example a head pose read by slot 11 on the game thread) may still be
+running when the detach happens. The runtime is not released while such a
+call can still be in progress: either the release waits until none can be
+(bounded, so the render thread never waits longer than one such call), or
+the runtime is kept until process exit and only stops being used. Either
+way, no call that starts after the detach uses the runtime.
+
 ### 7.5 No device
 
 With manager +0x04 null (runtime None is a separate case: there the mod
@@ -657,7 +676,7 @@ swap chain's sync interval is the dword at renderer +0x0C.
 
 ### 9.1 Who calls what, where
 
-Observed in game (thread ids per hook, performance review) and from the call
+Observed in game by the spec side (thread id of each call) and from the call
 sites:
 
 | Thread | Calls |
@@ -675,8 +694,10 @@ frame.
 Requirements:
 
 - the device state and manager +0x04 are read on the game, render and job
-  threads: write them as single aligned 32-bit stores, and read them off
-  the main thread as atomic loads (a value one frame stale is harmless);
+  threads, and written on the game thread (6.1) and, for a late detach, on
+  the render thread (7.4): write them as single aligned 32-bit atomic
+  stores and read them as atomic loads (a value one frame stale is
+  harmless);
 - the head pose (written by slot 11 on the game thread) and anything the
   runtime produces on the render thread for the game thread (poses, view
   FOVs) must be published so that no reader sees a half-written matrix
@@ -746,7 +767,7 @@ is why slot 3 must re-read it every time.
 
 | Event | What the game does | Required of the device |
 |---|---|---|
-| Window loses focus | nothing in the stereo path. Its window procedure, on `WM_KILLFOCUS` while its display mode is fullscreen (which it keeps under VR, 03 §9.2), posts the system event that opens the pause menu and releases its mouse buttons; on `WM_ACTIVATE` inactive it releases its cursor clip and clears its keyboard state (03 §9.6) | keep running: the game keeps calling begin and end frame; the runtime keeps receiving frames. While a headset is attached, focus loss is not passed to the game, so it does not pause; activation still is (03 §9.6) |
+| Window loses focus | nothing in the stereo path. Its window procedure, on `WM_KILLFOCUS` while its display mode is fullscreen (which it keeps under VR, 03 §9.2), posts the system event that opens the pause menu and releases its mouse buttons; on `WM_ACTIVATE` inactive it releases its cursor clip and clears its keyboard state (03 §9.6; the window procedure and both branches are in 01 §4.6) | keep running: the game keeps calling begin and end frame; the runtime keeps receiving frames. While a headset is attached, focus loss is not passed to the game, so it does not pause; activation still is (03 §9.6) |
 | Window minimised and restored | display reset on restore (9.3) | as 9.3 |
 | Headset taken off, put on | nothing | keep state 2 and keep submitting; a queued recenter waits until the headset is in use again (03 §2.2) |
 | VR runtime changed in the options menu | the mod sets the game's quit request; the game exits (06 §4.5) | nothing special; the new runtime is used at the next launch |
@@ -786,21 +807,30 @@ or seen in game:
    headset connected: initialisation starts SteamVR and the game starts in
    VR as in item 1 (SteamVR need not be running first). With the runtime set
    to OpenVR or OpenXR but the runtime unable to start, or no headset
-   appearing within the bounded wait (03 §6): the log says no headset was
+   appearing within the bounded wait (03 §6.4): the log says no headset was
    attached and why, the player is told once, and the game runs flat on the
-   monitor with working menus and gameplay.
+   monitor with working menus and gameplay. With no runtime available (for
+   example `-vrforceopenvr` with SteamVR not installed) the log says why
+   and no message is shown (01 §5.3).
 9. The game's "reset view" menu item and pad LB+RB recenter yaw only:
    looking down while recentering leaves the horizon level.
 10. With the address checks of 3.1, 6.1, 6.2, 6.4 and 6.10 deliberately made
     to fail (a modified copy of the executable), nothing is patched and the
     log says which check failed.
+11. After a VR run that reached state 2, start with runtime None: Depth of
+    Field, SSAO and Motion Blur show the values the player chose in the
+    game's options, and no VR run has changed VSync.
+12. Make the OpenXR session fail at slot 3 (09 §7) while the game thread
+    is reading head poses: the game continues flat with no crash, and the
+    log shows the detach once.
 
 What cannot be checked without a 2020 binary: every 2020 address above.
 
 ## 11. Open questions
 
 1. **2020 addresses.** Slot 10 and slot 11 game functions, slot 20, the
-   manager destructor, both vtables, the CreateDevice target, every wrapper
+   manager destructor and slot 2, both vtables, the `CreateDevice` target,
+   every wrapper
    and helper of sections 6.7 to 9 and the allocation sequence bytes after
    its first instruction are unknown or unverified for 2020. Resolve by
    reading the 2020 `AI.exe`: find the stereo device vtable by the 21-entry
@@ -818,3 +848,10 @@ What cannot be checked without a 2020 binary: every 2020 address above.
 4. **Menu reset-view caller.** That RVA 0x091BD7 is the menu's "reset view"
    item is [likely]; confirm by selecting the item in game and seeing a
    recenter logged.
+5. **Are settings set through the setter saved?** Whether
+   `SettingsSetOption` (RVA 0x5A8910) only changes the running value or
+   also reaches the graphics settings the game saves for the player is not
+   established; 6.5 depends on it. Resolve by following the writers of the
+   game's saved graphics settings and their callers in the 2015 `AI.exe`,
+   or by checking the saved settings after a VR run that changed the three
+   values.

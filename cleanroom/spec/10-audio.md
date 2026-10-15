@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (the audio output reopen request function, the audio thread's device-recreate check, the game's default-device-change listener; imports SetEvent, CoInitializeEx, WaitForSingleObject); the reopen function was located from the earlier mod's use of the game's audio reopen, and its behaviour (2.2) and the listener (2.3) were then verified in AI.exe; public Windows Core Audio (MMDevice) and OpenXR XR_OCULUS_audio_device_guid documentation; user requirement (game audio on the headset when the runtime names its device); spec-side decisions with their reasons (installed once per process, pass-through when the headset device is unavailable, the player told once on failure). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. Revision: r2 -->
+<!-- Provenance: game analysis of AI.exe 2015 (the audio output reopen request function, the audio thread's device-recreate check, the game's default-device-change listener; imports SetEvent, CoInitializeEx, WaitForSingleObject); the reopen function was located from the earlier mod's use of the game's audio reopen, and its behaviour (2.2) and the listener (2.3) were then verified in AI.exe; public Windows Core Audio (MMDevice) and OpenXR XR_OCULUS_audio_device_guid documentation; user requirement (game audio on the headset when the runtime names its device); spec-side decisions with their reasons (installed once per process, pass-through when the headset device is unavailable, the player told once on failure). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. r3 (spec r7, second clean-room review): the redirect is stated as a required result, with the interception point left to the implementation (no claim about how Windows lays out its MMDevice objects); the 2020 ABI of the reopen function marked as assumed; the reopen call after installation no longer ordered after its log entry; acceptance item for a reopen function whose entry bytes differ. Revision: r3 -->
 
 # 10 Audio on the headset
 
@@ -58,7 +58,7 @@ used, see Open questions].
 | | 2015 | 2020 |
 |---|---|---|
 | RVA | **0x831B00** | 0x8473D0 |
-| ABI | `void __cdecl ReopenAudioOutput(void)`: no arguments, plain `ret`, no return value | same (from the earlier mod's table) |
+| ABI | `void __cdecl ReopenAudioOutput(void)`: no arguments, plain `ret`, no return value | assumed the same, not verified (only the address comes from the earlier mod's table; the entry-byte check of 3.2 also confirms the ABI) |
 
 What it does (2015, verified):
 
@@ -91,13 +91,11 @@ the default.
 
 ### 2.4 Windows facts used
 
-- `IMMDevice::Activate` is slot 3 of the `IMMDevice` vtable:
+- `IMMDevice::Activate` is slot 3 of the `IMMDevice` interface
+  (public header `mmdeviceapi.h`):
   `HRESULT __stdcall Activate(IMMDevice* self, REFIID iid, DWORD clsctx,
-  PROPVARIANT* params, void** out)`.
-- That vtable is shared by every `IMMDevice` object in the process (it
-  lives in the system's MMDevice implementation, so any `IMMDevice` reaches
-  it), and it is in read-only memory. Replacing slot 3 there affects every
-  device opened later, from any thread.
+  PROPVARIANT* params, void** out)`. It is how a client obtains an
+  `IAudioClient` (and the endpoint's other interfaces) on a device.
 - COM must be initialised on a thread before that thread creates any
   MMDevice object. Either apartment model works for MMDevice.
 
@@ -114,33 +112,40 @@ unsafe; 01 §2.2).
 
 ### 3.2 Installing the redirect
 
-After installation:
+Required result: from installation on, every audio endpoint activation
+in the process (every `IMMDevice::Activate` call, 2.4, whatever device
+object it is made on) behaves as 3.3 says, for devices created before or
+after the installation and on any thread, in particular on the game's
+audio thread when it recreates its output (2.1). Where the redirect is
+placed is the implementation's choice, under these constraints:
 
-- slot 3 of the shared `IMMDevice` vtable (2.4) holds the replacement of
-  3.3, and the original slot value has been kept for the replacement to
-  call; the vtable's memory protection is as it was;
-- so every `IMMDevice` the game creates later goes through the
-  replacement;
-- the installing code holds no COM reference: every interface it obtained
-  to reach the vtable has been released;
+- it reaches the activations made on the game's audio thread, which the
+  mod does not run and which may create its device objects after the
+  installation;
+- whatever the installing code obtained to put it in place (devices,
+  enumerators) has been released when the installation returns; no COM
+  reference is held beyond what 3.3 allows;
+- any memory whose protection was changed to install it has its original
+  protection again;
 - COM, if the installing thread had to initialise it, stays initialised
-  for the life of the process, because the replacement outlives the
+  for the life of the process, because the redirect outlives the
   installation.
 
-If installation fails (no `IMMDevice` could be obtained, or the slot could
-not be written), nothing is changed, VR and the game's audio continue
-normally on the default device, the failure is logged, and the player is
-told once (13 §5.3: game audio could not be moved to the headset and stays
-on the Windows default device, with the error code).
+If installation fails (the redirect cannot be put in place), nothing is
+changed, VR and the game's audio continue normally on the default device,
+the failure is logged, and the player is told once (13 §5.3: game audio
+could not be moved to the headset and stays on the Windows default device,
+with the error code).
 
-On success the event is logged, then the game's reopen function (2.2) is
+After a successful installation the game's reopen function (2.2) is
 called, so that a device the game already opened is reopened through the
-redirect. The function is called only if its address is known for the
-running build and its entry bytes match (`C6 05` at +0, `01` at +6, `E8` at
-+7); otherwise it is not called, the redirect applies from the game's next
-reopen (for example the next default-device change), and that is logged.
+redirect; the installation is logged (§4). The function is called only if
+its address is known for the running build and its entry bytes match
+(`C6 05` at +0, `01` at +6, `E8` at +7); otherwise it is not called, the
+redirect applies from the game's next reopen (for example the next
+default-device change), and that is logged.
 
-### 3.3 The replacement `Activate`
+### 3.3 A redirected `Activate`
 
 Required result, for every call, on any thread:
 
@@ -153,8 +158,8 @@ Required result, for every call, on any thread:
   unmodified `Activate` on the caller's own device.
 - No COM reference obtained during a call outlives the call, other than the
   interface returned to the caller (acceptance 6).
-- Nothing is logged inside the replacement: it can run on the audio thread
-  at any time (11).
+- Nothing is logged inside a redirected call: it can run on the audio
+  thread at any time (11).
 
 Whether the headset's endpoint is looked up on each call or cached is the
 implementation's choice, as long as an endpoint that disappears is
@@ -201,6 +206,12 @@ from the audio thread).
    crash.
 6. Play a long session: the process's handle and memory use do not grow
    with audio reopens.
+7. As item 1, with a test build whose expected entry bytes for the reopen
+   function (2.2) differ from the game's (so the check of 3.2 fails against
+   the unmodified `AI.exe`): the redirect is installed, the reopen function
+   is not called, the log says the game's output will switch at its next
+   reopen, and it does at the next change of the Windows default device;
+   no crash.
 
 ## 6. Open questions
 

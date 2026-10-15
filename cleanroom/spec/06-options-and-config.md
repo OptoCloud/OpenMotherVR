@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (UI external-call handler and its return size, script invoke methods and their return sizes, menu Open methods, bootup movie call, quit flag getter, display-reset flag, settings handlers named in 02); the stock game's ActionScript menu classes from the player's own UI.PAK (item constructors, option setters, item data replacement, automatic ids, page maps, input-mapper selection, slider snapping); the earlier mod's settings file keys and values, command-line switches and `mvr_*` console commands, kept exactly as compatibility names; compatibility facts about tools that read the same settings file; user requirements (no shipped game archive or mod-derived UI data, v1 fixes, runtime values None / OpenVR / OpenXR, -vrscale is the world scale); user decisions for r3 and r4 (default runtime OpenVR in a fresh file; Oculus means OpenXR; runtime None is the unmodded game with the patch set decided at attach; skip intro only with the archive redirect; settings push also on loading-screen Open; no other mod named; own labels and texts); spec-side decisions for r5 (VR page hidden in the game-over menu; the game's Stereo Mode item greyed in VR; Camera Speed stays active; one rule for command values; -vrscale as a whole argument; no rewrite of the settings file at start-up; reads of values only earlier builds of this project wrote are dropped); answers to Q1, Q2, Q6 (ANSWERS.md). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; a tester's report on SteamVR with a Steam Frame headset (after an OpenXR failure the page offered no visible way back to SteamVR); project decision of r5, with its reason inline (the page shows the runtime this run drives; the stored preference is kept). Revision: r5 -->
+<!-- Provenance: game analysis of AI.exe 2015 (UI external-call handler and its return size, script invoke methods and their return sizes, menu Open methods, bootup movie call, quit flag getter, display-reset flag, settings handlers named in 02); the stock game's ActionScript menu classes from the player's own UI.PAK (item constructors, option setters, item data replacement, automatic ids, page maps, input-mapper selection, slider snapping); the earlier mod's settings file keys and values, command-line switches and `mvr_*` console commands, kept exactly as compatibility names; compatibility facts about tools that read the same settings file; user requirements (no shipped game archive or mod-derived UI data, v1 fixes, runtime values None / OpenVR / OpenXR, -vrscale is the world scale); user decisions for r3 and r4 (default runtime OpenVR in a fresh file; Oculus means OpenXR; runtime None is the unmodded game with the patch set decided at attach; skip intro only with the archive redirect; settings push also on loading-screen Open; no other mod named; own labels and texts); spec-side decisions for r5 (VR page hidden in the game-over menu; the game's Stereo Mode item greyed in VR; Camera Speed stays active; one rule for command values; -vrscale as a whole argument; no rewrite of the settings file at start-up; reads of values only earlier builds of this project wrote are dropped); answers to Q1, Q2, Q6 (ANSWERS.md); a tester's report on SteamVR with a Steam Frame headset (after an OpenXR failure the page offered no visible way back to SteamVR); project decision of spec r6, with its reason inline (the runtime control shows the runtime running in this session; the stored preference is kept); project decisions of spec r7, each with its reason inline (the settings file is replaced in one step, never left partly written; a leading UTF-8 byte-order mark is accepted when reading; a null command name passes to the stock handler; the welcome needs a run on which the mod is active; added acceptance checks for command values, the display-reset flag under runtime None, settings changes crossing threads, `-vrscale` parsing and skip intro without the options archive). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. Revision: r6 -->
 
 # 06 Options and config
 
@@ -73,10 +73,10 @@ Oculus means **OpenXR**: the stored string `"Oculus"` and the switch
 
 - **None**: the unmodded game. No stereo device is created and only the
   small UI patch set is applied (01 §2.3: UI archive redirect, the
-  external-call slot of 4.1, the settings push in the menu Open wrappers of
-  4.4, skip intro when on). The patch set is decided **at DLL attach** from
-  the config file and the command line (section 2), which are both known
-  then (user decision, ANSWERS Q6).
+  external-call slot of 4.1, the settings push made when a menu's Open
+  method (4.4) runs, skip intro when on). The patch set is decided **at
+  DLL attach** from the config file and the command line (section 2),
+  which are both known then (user decision, ANSWERS Q6).
 - **OpenVR**, **OpenXR**: the full patch set is applied at attach and this
   is the preferred backend.
 
@@ -101,8 +101,9 @@ The runtime started:
 The availability of each runtime, the preferred one (and whether it was
 forced) and the one chosen are logged (11 §2.3). If the chosen runtime then
 fails to start, the player is told once and the game runs without VR (00
-§2.7, 03, 09). Neither a fallback nor a failure changes the stored
-`VRRuntime`; the options page shows the runtime this run drives (5.2).
+§2.8, 03, 09). Neither a fallback nor a failure changes the stored
+`VRRuntime`; the runtime control of the options page shows the runtime
+running in this session (5.2).
 
 ### 1.2 Value ranges
 
@@ -181,15 +182,21 @@ on the command line pauses or stops the mod while the DLL attaches.
   unless the player changes a setting; a missing key stays missing until
   then.
 - **First launch** (the file does not exist; an error while checking for it
-  does not count as "does not exist"): the defaults are used and the
-  welcome message is queued. Its content (13 §5.3): the mod is active,
-  the default runtime is SteamVR, and how to change the runtime. The
-  message is never shown under the loader lock, appears in front of the
-  game window, and the game's device creation does not complete until it
-  is closed (01 §2.2, 13 §5.2). **The file is written with the defaults
+  does not count as "does not exist"): the defaults are used and, on a run
+  where the mod is active (the build is recognised and the core checks of
+  01 §2.5.1 passed), the welcome message is queued. Its content (13 §5.3):
+  the mod is active, the default runtime is SteamVR, and how to change the
+  runtime. The message is never shown under the loader lock, appears in
+  front of the game window, and the game's device creation does not
+  complete until it is closed (01 §2.2, 13 §5.2). **The file is written with the defaults
   only after the player closes the message**, because a process that
   exits first (Steam relaunching the game) must leave the welcome for the
-  next launch. Once the file exists the message is not shown again, so a
+  next launch; a message that could not be shown at all does not count as
+  closed (13 §5.2). On a run where the mod is not active (unknown build,
+  failed core checks) neither the message nor the file appears: the message would
+  describe a mod that is not running, and writing the file would stop the
+  first run on which the mod is active from showing it (project decision of
+  spec r7). Once the file exists the message is not shown again, so a
   player normally sees it once. In a game folder that cannot be written
   the file never appears, so the message is shown at every launch; this is
   accepted for v1.
@@ -203,6 +210,16 @@ on the command line pauses or stops the mod while the DLL attaches.
 - A failed write (file locked, read-only folder) does not affect the game:
   the settings in memory stay as set for this run. Logging it is allowed
   (11).
+- **No partial file.** After any write, the file on disk is either the
+  complete previous file or the complete new one, even if the process ends
+  during the write (project decision of spec r7: a game crash, a Steam
+  relaunch or a power loss during a truncating write would leave a file
+  that does not parse, so the next launch would silently use the defaults
+  and the player's settings would be lost). Writing the new content under
+  a temporary name in the same folder and replacing the file with it in one
+  step meets this. A leftover temporary file is never read as settings and
+  is replaced or removed by the next write; its name is the
+  implementation's choice and the player guide lists it (13 §6).
 
 ### 3.2 Content
 
@@ -258,6 +275,12 @@ What is written:
   object.
 
 ### 3.3 Reading
+
+A file that starts with the UTF-8 byte-order mark (EF BB BF) is read as
+if the mark were absent, because common Windows editors add it when a
+player edits the file by hand (13 §5.3 sends players to the file when the
+options page is missing); the mod never writes the mark (project decision
+of spec r7).
 
 Each key is read on its own; a missing key or a value of the wrong type
 leaves that setting at its default without affecting other keys. A root
@@ -319,7 +342,10 @@ otherwise nothing is patched (01 §2.4).
 A `name` that, after leading space characters, begins with `mvr_` is a mod
 command and is **not** forwarded. Every other call reaches the stock method
 **unchanged** (same `this`, same four arguments, same `name` pointer and
-buffer contents).
+buffer contents). That includes a call whose `name` is null: the mod reads
+the name only when the pointer is not null, and passes a null one on, so
+how such a call is handled stays the game's own behaviour (project
+decision of spec r7).
 
 A mod command is one string with no Scaleform arguments: the command name,
 a space, and the value, for example `"mvr_pixelscale 1.5"`. Further text
@@ -370,8 +396,11 @@ After a command changes a setting:
 - the file holds the new settings (3.1); for `mvr_vrruntime` this holds
   before the game acts on its quit request (4.5).
 
-Whether a command that changes nothing (a bad value, or the value already
-set) rewrites the file is the implementation's choice. Settings that
+`mvr_vrruntime` with an accepted value always stores it and quits (4.5),
+even when that value is already stored: after a failed start the page
+offers the stored runtime as a retry (5.2). For every other command,
+whether one that changes nothing (a bad value, or the value already set)
+rewrites the file is the implementation's choice. Settings that
 affect rendering are picked up by the render thread on its next frame
 (3.4).
 
@@ -380,7 +409,7 @@ affect rendering are picked up by the render thread on its next frame
 The game has thiscall methods that call a public ActionScript function by
 name on the movie owned by `this` (a menu object). They take a critical
 section internally and must be called on the game's main thread (in
-practice: from inside the menu Open wrappers of 4.4).
+practice: when a menu's Open method runs, 4.4).
 
 | Purpose | RVA 2015 | RVA 2020 | Arguments after `this` | `ret` |
 |---|---|---|---|---|
@@ -406,7 +435,7 @@ and its own page (14).
 | Message | Value pushed |
 |---|---|
 | VR running | true when the stereo device was created and its runtime started (02 §6.1); false before that, with runtime None, and after a runtime failure |
-| `VRRuntime` | the runtime this run drives (5.2): None 0, OpenXR 1, OpenVR 2. None after a failure, the started runtime after a fallback; never read back into the stored setting |
+| `VRRuntime` | the runtime running in this session (5.2): None 0, OpenXR 1, OpenVR 2. None after a failure, the started runtime after a fallback; never read back into the stored setting |
 | `DebugOptions` | on / off |
 | `SkipStartupIntro` | on / off |
 | `Rendering.MirrorViewType` | 0 both eyes, 1 right, 2 left |
@@ -432,9 +461,10 @@ control). A pushed value never makes the page send a command back (5.2).
 
 The menu objects' **Open** methods (vtable slot 0; thiscall, no stack
 arguments, plain `ret`) are the moment their movie exists and can receive
-calls. The same Open slots are wrapped for stereo-mode handling (05 §5);
-both behaviours go in one wrapper, which calls the stock Open first with the
-same `this`, because the movie must exist before it can receive calls.
+calls. The same slots carry the stereo-mode handling of 05 §5, and a slot
+holds only one replacement, so the push and that handling share it. The
+stock Open runs (with the same `this`) before the push, because the movie
+must exist before it can receive calls.
 
 | Menu | Vtable 2015 / 2020 | Stock Open 2015 / 2020 | Push after the stock Open |
 |---|---|---|---|
@@ -442,8 +472,8 @@ same `this`, because the movie must exist before it can receive calls.
 | Pause menu | **0xF00180** / 0xF178E0 | 0x441D90 / 0x452F40 | yes, after entering mode 1 (05 §5) |
 | Loading screen | **0xF00218** / 0xF17978 | 0x441EA0 / 0x453050 | yes, after entering mode 1 (05 §5); its movie has no options page, so the calls are ignored |
 
-The loading-screen push is a user decision (r3): the Open wrapper exists
-there anyway (05 §5), it costs a few calls per load that the stock movie
+The loading-screen push is a user decision (r3): its Open slot is replaced
+anyway (05 §5), it costs a few calls per load that the stock movie
 ignores, and it seeds the render-target record of 4.6 at the first loading
 screen when no menu has opened before it. An implementation that also
 defines the receiving functions in its loading-screen movie may use them;
@@ -477,7 +507,8 @@ render-target size again (03 §4). The mod keeps a record of the
 `PixelScale`, `MirrorViewType` and `SymmetricMirrorView` the targets were
 built with (taken from the settings at the first push or command), and sets
 the flag to 1 only when a command changes one of them. Unchanged values
-never set it: a rebuild freezes the picture for about 0.2 s. With runtime
+never set it, because a rebuild recreates the back buffer and every render
+target, and the picture stops while it does (acceptance 9). With runtime
 None it is never set (there are no stereo render targets to resize).
 Details of the rebuild are in 05 §10.
 
@@ -531,7 +562,7 @@ The page offers one control per setting below.
 
 | Setting | What the control must do | Command sent on change (4.2) |
 |---|---|---|
-| `VRRuntime` | show the runtime this run drives (None, OpenXR, OpenVR, which players know as SteamVR; see below) and let the player choose another; choosing one quits the game (4.5), so the page makes that clear before the choice takes effect | `mvr_vrruntime 0` / `1` / `2` |
+| `VRRuntime` | show the runtime running in this session (None, OpenXR, OpenVR, which players know as SteamVR; see below) and let the player choose another; choosing one quits the game (4.5), so the page makes that clear before the choice takes effect | `mvr_vrruntime 0` / `1` / `2` |
 | `Rendering.MirrorViewType` | choose both eyes, right eye or left eye | `mvr_mirrorview <0..2>` |
 | `Rendering.SymmetricMirrorView` | on/off | `mvr_mirrorviewsym <0/1>` |
 | `Rendering.PixelScale` | choose a value from 0.5 to 4.0 in multiples of 0.1 and show the current value with one decimal | `mvr_pixelscale <value>` |
@@ -541,14 +572,15 @@ The page offers one control per setting below.
 | `Input.ToggleGrips` | on/off | `mvr_togglegrips <0/1>` |
 | `DebugOptions` | on/off | `mvr_debug <0/1>` |
 | `SkipStartupIntro` | on/off | `mvr_skipintro <0/1>` |
-| Controls help | a read-only list of the pushed (action, control) rows (4.3) | none |
+| Controls help | a read-only list of the pushed (action, control) rows (4.3); which rows exist, including before a controller set is chosen, is 04 §5.7's | none |
 
 `Input.VRInputRelativeWalking`, `Input.VRInputStrafing` and
 `Input.ToggleCrouch` have no effect in v1 and get no visible control (their
 commands and pushes stay valid).
 
-**The runtime shown is the one this run drives**, not the stored
-preference (project decision of spec r6):
+**The runtime control shows the runtime running in this session**, or
+None when VR is off, not the stored preference (project decision of spec
+r6):
 
 | This run | Runtime shown |
 |---|---|
@@ -557,14 +589,14 @@ preference (project decision of spec r6):
 | the chosen runtime failed to start, or failed later and detached (01 §5.3, 09 §7) | None |
 | no runtime chosen (None stored or forced, or nothing available) | None |
 
-The stored `VRRuntime` is not rewritten by any of these: a restart tries
-the stored preference again. Why: a page that showed the stored runtime
-after a failure would claim that runtime is running and offer only the
-other choices; showing None tells the player VR is off and offers both
-the stored runtime (a retry, through a restart) and the other one (the
-way back, for example to SteamVR after OpenXR failed). Choosing any value
-other than the one shown stores it and quits (4.2, 4.5), including the
-value already stored.
+The stored `VRRuntime` is not rewritten by any of these, so the next
+launch tries the stored preference again. Reason: after a failed start
+the player must see that VR is off, and must be able both to try the
+stored runtime again (by choosing it, which restarts the game) and to
+switch to the other runtime; a control that kept showing the stored
+runtime would suggest it is running and could not offer it as a choice.
+Choosing any value other than the one shown stores it and quits (4.2,
+4.5), the stored value included.
 
 Values and sending:
 
@@ -843,8 +875,10 @@ Checks that show an implementation is correct. "Log" means `mothervr.log`
    nothing.
 5. `-vrscale 1.6` gives world scale 1.0; `-vrscale 0.8` and
    `-VRSCALE 0.8` give 0.8 (head motion scaled, 03);
-   `-vrscale 0.8 -vrscale 1.2` gives 1.2; `-vrscale` as the last argument
-   gives 1.0; an unknown argument such as `-foo` changes nothing.
+   `-vrscale 0.8 -vrscale 1.2` and `-VRSCALE 0.8 -vrscale 1.2` give 1.2;
+   `-vrscale` as the last argument and `-vrscale abc` give 1.0;
+   `-xvrscale 0.8` and `-vrscale0.8` are not the switch and give 1.0; an
+   unknown argument such as `-foo` changes nothing.
 6. Hand-edit `PixelScale` to 9, `SnapRotationSegments` to 5 and add
    `"Foo": 1` at the root and `"Bar": 2` inside `Input`: the log's settings
    entry shows pixel scale 1; the menu shows 1.0 and 4 segments; after
@@ -877,22 +911,41 @@ Checks that show an implementation is correct. "Log" means `mothervr.log`
     both; the log gains the gated diagnostics (1.3).
 14. `SkipStartupIntro` on, restart: the title screen appears without the
     ident videos or the legal screen; the log records that the intro was
-    skipped.
+    skipped. With `SkipStartupIntro` on and the options archive not in use
+    (for example `DATA` read-only and no `MOTHER.PAK`), the intro plays
+    normally and the game reaches the title screen.
 15. Open the options page several times: each controls-help row appears
     once; pressing a row changes nothing, and the stock Input Mapping page
     still selects and renames its own rows normally afterwards.
 16. A stock (non-mod) `ExternalInterface` call such as
     `fe_set_field_of_view` still works on the Video page (forwarded
-    untouched); `mvr_mirrorview 7`, `mvr_pixelscale 9` and `mvr_vrruntime`
-    without a value change no setting, and the last does not quit.
+    untouched); `mvr_mirrorview 7`, `mvr_pixelscale 9`, `mvr_pixelscale`
+    without a value, `mvr_debug abc`, `mvr_snaprotation` without a value,
+    `mvr_snaprotationsegments 1` and `mvr_vrruntime` without a value change
+    no setting (the page and the file keep their values), and the last does
+    not quit.
 17. In VR, open the Video page in the front end and the pause menu: the
     eight items of 5.3 are greyed, also after showing and hiding the
     advanced options; Camera Speed on the Game page is not greyed. With
     runtime None they are all enabled.
 18. Die in game: the game-over menu's Options page has no VR page.
-19. With the script event tap of 11 on, visit every stock page of all three
-    menus with the stock archive and then with `MOTHER.PAK`: the
-    `on_page_changed` ids are identical.
+19. With the logging of game script events (11 §5) on, visit every stock
+    page of all three menus with the stock archive and then with
+    `MOTHER.PAK`: the `on_page_changed` ids are identical.
+20. With runtime None, change the pixel scale and the mirror settings on
+    the front end's VR page: no freeze, and the log shows no render-target
+    rebuild (4.6).
+21. During gameplay in VR, change the pixel scale, the mirror view, snap
+    rotation segments and clipping blinders from the pause menu twenty
+    times in a row: each change is in effect from the first frame after it,
+    the game does not stall or crash, and each render-target size in the
+    log matches one of the pixel scales chosen (3.4).
+22. Save `mothervr.json` with a UTF-8 byte-order mark (for example from
+    Notepad as "UTF-8 with BOM"): its settings are used and no welcome
+    message appears; after a menu change the file has no mark.
+23. End the game process (Task Manager) right after changing a setting,
+    several times: `mothervr.json` always parses and holds either the
+    previous or the new settings.
 
 ## 9. Open questions
 

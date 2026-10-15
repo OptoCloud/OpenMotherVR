@@ -1,4 +1,4 @@
-<!-- Provenance: format analysis of the Steam 2015 DATA/UI.PAK (PAK2 container, entry table, padding, names), its Scaleform movies (GFX header and tag stream, PlaceObject records, DefineEditText bounds, DoABC2 tags, ABC files: pools, namespaces, classes, traits, method bodies, scope depths, opcode set) and its DDS glyphs, read with the spec side's own tools; a survey of every root movie of the stock archive (stage size, named placements, their bounds and whether they hold text, later-frame matrices) and of every stock `resizeListener`, which is the source of the layout selection in 3.6; the stock game's ActionScript classes in those movies (ImageSubstitution, frontend.GameMenu and its subclasses, frontend.menu.Menu and MenuPage, NewFrontendMenu, LoadingScreen, CraftingScreen, CreditsScreen, PickupOverlay, PopupOverlay, TRCSystemOverlay, WeaponStuff, ChallengeMapOverlay, RadialMenuScreen, Reaction_Game); the game's default input bindings in DATA\INPUT.XML (source of the prompt actions in 3.4); AI.exe 2015 (UI archive path pointer, on_page_changed registration site); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; r1 used a comparison of the stock archive with the earlier mod's archive to find the movies to touch, and r2 replaces every selection that came from it with the stock survey and the game's binding data above (no value, string, name, code or image is taken from that archive); viewing geometry of 03 and 05 for the layout requirements; user requirements (archive built at launch from the player's own UI.PAK through a compiled bundle, no game or mod asset shipped, players need no tools, unknown UI.PAK leaves the game running). Revision: r2 -->
+<!-- Provenance: format analysis of the Steam 2015 DATA/UI.PAK (PAK2 container, entry table, padding, names), its Scaleform movies (GFX header and tag stream, PlaceObject records, DefineEditText bounds, DoABC2 tags, ABC files: pools, namespaces, classes, traits, method bodies, scope depths, opcode set) and its DDS glyphs, read with the spec side's own tools; a survey of every root movie of the stock archive (stage size, named placements, their bounds and whether they hold text, later-frame matrices) and of every stock `resizeListener`, which is the source of the layout selection in 3.6; the stock game's ActionScript classes in those movies (ImageSubstitution, frontend.GameMenu and its subclasses, frontend.menu.Menu and MenuPage, NewFrontendMenu, LoadingScreen, CraftingScreen, CreditsScreen, PickupOverlay, PopupOverlay, TRCSystemOverlay, WeaponStuff, ChallengeMapOverlay, RadialMenuScreen, Reaction_Game); the game's default input bindings in DATA\INPUT.XML (source of the prompt actions in 3.4); AI.exe 2015 (UI archive path pointer, on_page_changed registration site); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; r1 used a comparison of the stock archive with the earlier mod's archive to find the movies to touch, and r2 replaces every selection that came from it with the stock survey and the game's binding data above (no value, string, name, code or image is taken from that archive); viewing geometry of 03 and 05 for the layout requirements; observation in game by the spec side (the game opens a UI archive through a redirected path, and an archive whose names are in sorted order loads); user requirements (archive built at launch from the player's own UI.PAK through a compiled bundle, no game or mod asset shipped, players need no tools, unknown UI.PAK leaves the game running). r3 (spec r7, second clean-room review): the key file's name left to the implementation; the in-game observations added to these sources; the crosshair placement chosen by the rules of 3.6.2 from the spec side's own survey of `WEAPONSTUFF` (root placement and script uses of `crosshairs_mc`); the redirect string stated by its form; the fast-path cost reason given as an estimate; the DoABC2 count recounted (230 in the archive, all decoded by the spec side's own reader); the movies' change sets listed per movie; smaller consistency fixes. Revision: r3 -->
 
 # 14. UI resources: the options archive
 
@@ -75,7 +75,8 @@ Why: with runtime None flat play must be the unmodded game except for the
 options page (01 §2.3). Layout changes, prompt changes and the crafting
 prompt change what a flat player sees, so they are only linked when a VR
 runtime is configured. The set is part of the staleness key (5.1): changing
-the runtime (which restarts the game, 06 §4.5) rebuilds the archive once.
+the runtime (which quits the game; the new runtime applies at the next
+launch, 06 §4.5) rebuilds the archive once, at that launch.
 
 ## 2. Game facts
 
@@ -86,7 +87,8 @@ the runtime (which restarts the game, 06 §4.5) rebuilds the archive once.
   The game opens its UI archive through this pointer on the game thread
   during start-up, before the front end shows (01 §2.1). Redirecting the
   pointer to another NUL-terminated string of the same form makes the game
-  open that file instead [sure: observed in game].
+  open that file instead [sure: observed in game by the spec side with a
+  redirected path].
 - The path is relative. It resolves against the process's current
   directory, which Steam sets to the game folder. The mod's own directory
   (the folder of the proxy DLL) is the game folder in every supported
@@ -131,8 +133,8 @@ Names are upper-case with forward slashes (`DATA/UI/PAUSEMENU.GFX`). No
 compression: entries are stored as they are used.
 
 Whether the game's lookup needs the sorted order is not known (it may
-bisect). An archive that keeps the order loads [sure], so the output keeps
-it (5.7).
+bisect). An archive that keeps the order loads [sure: observed in game by
+the spec side], so the output keeps it (5.7).
 
 The 2020 build's `UI.PAK` is not characterised. Until it is, the bundle
 accepts no 2020 identity and the 2020 build gets no options archive (5.9).
@@ -171,12 +173,20 @@ SHA-256 of the same bytes):
 | `DATA/UI/TRCSYSTEMOVERLAY.GFX` | 484 | 16748924 | 30737 | AEFCF9C5 | `0daa26b498c891ad0a418ee6f526d66cb22d1bf0f1bf3592dafbb36d1199fee5` |
 | `DATA/UI/WEAPONSTUFF.GFX` | 504 | 17449868 | 71688 | 09984F4E | `b6d0b4bbfd262a84043de0efeeeaf74796b76fe5ae535a2942e63c1227f59e17` |
 
-Why these 24: the 19 movies that contain `ImageSubstitution` (2.7.1) get
-the prompt changes of 3.4; `NEWFRONTENDMENU`, `PAUSEMENU`, `GAMEOVERMENU`
-and `LOADINGSCREEN` carry the menu set; `CRAFTINGSCREEN` carries 3.5;
-`CREDITSSCREEN`, `MOVIEPLAYER` and `SUBTITLES` carry only layout changes
-(3.6); `PICKUPOVERLAY`, `POPUPOVERLAY`, `TRCSYSTEMOVERLAY` and `WEAPONSTUFF`
-also carry layout changes.
+Why these 24: each carries at least one change of section 3. Per movie
+(3.1 to 3.3 are the menu set, 3.4 to 3.6 the VR set):
+
+| Movie | Changes |
+|---|---|
+| `NEWFRONTENDMENU` | 3.1, 3.2, 3.4, 3.6.2 |
+| `PAUSEMENU`, `GAMEOVERMENU` | 3.1, 3.4, 3.6.2 |
+| `LOADINGSCREEN` | 3.3, 3.6.2 |
+| `CRAFTINGSCREEN` | 3.4, 3.5 |
+| `WEAPONSTUFF` | 3.4, 3.6.2, 3.6.3, 3.6.4 |
+| `PICKUPOVERLAY`, `TRCSYSTEMOVERLAY` | 3.4, 3.6.3 |
+| `POPUPOVERLAY` | 3.6.3 |
+| `CREDITSSCREEN`, `MOVIEPLAYER`, `SUBTITLES` | 3.6.2 |
+| `CHALLENGELEADERBOARDCOMPONENT`, `CHALLENGEMAPOVERLAY`, `GAMMASCREEN`, `HUB`, `HUB_INVENTORY`, `HUB_JOURNAL`, `HUB_LOGS`, `HUB_MAP`, `HUB_MISSING`, `RADIALMENU`, `REACTION_GAME`, `TERMINALINTERACTION` | 3.4 |
 
 The menu set touches `NEWFRONTENDMENU`, `PAUSEMENU`, `GAMEOVERMENU` and
 `LOADINGSCREEN`; the VR set touches all 24.
@@ -318,8 +328,12 @@ Facts about the touched classes [sure]:
 - The stock code uses 111 distinct opcodes, all from the documented AVM2
   set plus `findpropglobalstrict` (0x5B) and `findpropglobal` (0x5C),
   including `lookupswitch` and the debug opcodes `debug` (0xEF),
-  `debugline` (0xF0) and `debugfile` (0xF1). All 47 DoABC tags of the
-  archive decode completely with these operand formats.
+  `debugline` (0xF0) and `debugfile` (0xF1). The archive holds 230
+  top-level DoABC2 tags in 124 movies (69 in `RADIALMENU`, 30 in
+  `WEAPONSTUFF`, 10 in `TRCSYSTEMOVERLAY`, one in each other movie that has
+  any; 130 of them in the 24 touched movies) and no `DoABC` (code 72) tag;
+  every one decodes completely with these operand formats, and their
+  method bodies together use exactly these 111 opcodes [sure].
 - The same class is a separate copy in each movie, with its own pool
   indices. Copies of `ImageSubstitution` differ slightly between movies
   (some add mappings such as `leaderboard` and `player_info`, some have
@@ -557,7 +571,7 @@ default gamepad device:
 | A | `use` (also `button_mash`) | `ok` (also `minigame_bottom`) |
 | B | `back_close` | `cancel` |
 | X | `reload_weapon` (also `activate_item`) | `alt_1` (also `minigame_middle`) |
-| Y | `select_torch` (default device) | `alt_2` (also `minigame_top`) |
+| Y | `select_torch` | `alt_2` (also `minigame_top`) |
 
 The keyboard part of the menu map binds `ok` to `return` and `space` and
 `cancel` to `escape`, the key names the stock `@confirm@` and `@cancel@`
@@ -699,7 +713,7 @@ The 1280 x 720 UI is shown smaller in the headset than on a monitor:
 | Surface | Angle across 1280 units | Degrees per unit |
 |---|---|---|
 | Monitor reference: 27-inch 16:9 (0.598 m wide) at 0.6 m | 53.0° | 0.0414 |
-| Virtual screen (menus, loading, 00 §2.2): 1.0 m wide at 1.5 m | 36.9° | 0.0288 |
+| Virtual screen (menus, loading, 05 §4.2): 1.0 m wide at 1.5 m | 36.9° | 0.0288 |
 | HUD panel (05 §4.3): 0.55 m wide at 1.0 m | 30.8° | 0.0240 |
 
 Headsets also resolve fewer pixels per degree than a monitor. Required: the
@@ -894,22 +908,37 @@ operands from 128 to 16383 take two bytes; `pushbyte` operands are -128 to
 
 #### 3.6.4 Crosshair
 
-The crosshair is `crosshairs_mc` at root depth 1 of `WEAPONSTUFF`
-(character 62, `WeaponStuff_fla.mcCrosshairAnims_1`), placed at the stage
-centre and positioned only by the resize method. Inside it, at depth 1 of
-its first frame, character 61 (`WeaponStuff_fla.crosshairs_mc_2`,
-instance `mc`) is placed by a `PlaceObject2` with no scale and translate
-(0, 0); its later frames move it with colour transforms and no matrix
-[sure]. So one matrix edit of that inner placement holds in every frame.
-The crosshair is about 23 x 24 units.
+Required: the crosshair appears `s_hud` times its stock size, centred
+where it is in stock. Why: it is a symbol the player must find and aim
+with, and the reason of 3.6.1 (the HUD panel shows it at 0.0240° per unit
+against 0.0414° on the monitor reference, in a display with fewer pixels
+per degree) applies to it as it does to text; at the stock size it
+subtends about 0.58° in the headset against 0.99° on the monitor
+reference.
 
-Required: the crosshair is scaled by `s_hud`, by a scale in that inner
-placement's matrix (translate kept at 0, 0, so it stays centred). Why: it
-is a symbol the player must find and aim with, and the reason of 3.6.1
-(the HUD panel shows it at 0.0240° per unit against 0.0414° on the
-monitor reference, in a display with fewer pixels per degree) applies to
-it as it does to text; at the stock size it subtends about 0.58° in the
-headset against 0.99° on the monitor reference.
+Which placement carries the scale follows rules 3 to 5 of 3.6.2 (rule 2,
+text, does not apply: the crosshair is a symbol, and the reason above takes
+its place). Survey of `WEAPONSTUFF` [sure]:
+
+- `crosshairs_mc` is placed once on the root timeline, at depth 1 in the
+  first frame (character 62, `WeaponStuff_fla.mcCrosshairAnims_1`), by a
+  `PlaceObject2` with no scale and translate (640, 360), the stage centre;
+  none of the root timeline's later frames (103 in all) places depth 1
+  again (rule 5).
+- The stock script sets only its `x` and `y` (in the resize method, from
+  the stage size) and otherwise only plays and stops its frames and those
+  of its child `mc` (showing, hiding and accuracy states); nothing sets its
+  `width`, `height` or scale (rule 3).
+- Inside it, character 61 (`WeaponStuff_fla.crosshairs_mc_2`, instance
+  `mc`) is placed at translate (0, 0) with no scale, and later frames of
+  character 62 change only its colour transform. So the registration point
+  of the root placement is the crosshair's own origin, and scaling it keeps
+  the crosshair centred (rule 4). The crosshair is about 23 x 24 units.
+
+So the edit is a scale of `s_hud` in the matrix of the root placement of
+`crosshairs_mc`, translate unchanged; the stock record must match the
+values above (5.5). It is the outermost placement and passes rules 3 to 5,
+so no inner placement is edited.
 
 #### 3.6.5 Not changed
 
@@ -1026,8 +1055,12 @@ and its output is never committed.
   before attach returns (01 §2.2, 12 §2.3). There is no later hook early
   enough: the game opens its UI archive during start-up.
 - Game folder = the folder of the proxy DLL. Input `DATA\UI.PAK`, output
-  `DATA\MOTHER.PAK`, key file `DATA\MOTHER.PAK.src`. The redirect string is
-  the lower-case `data\mother.pak` in the mod's static storage (01 §2.2).
+  `DATA\MOTHER.PAK`, and a **key file** in `DATA` next to the output, under
+  a name the implementation chooses that no game file uses. The redirect
+  string is a relative path to the output in the same form as the stock
+  `data\ui.pak` (folder `data`, a backslash, the file `MOTHER.PAK`; case
+  does not matter, 2.1), NUL-terminated, in storage that lives for the
+  whole process (01 §2.2).
 - **Key**: (`UI.PAK` SHA-256, bundle SHA-256, linker version, change set).
   The output is a pure function of the key, so an existing output with a
   matching key is reused.
@@ -1074,9 +1107,12 @@ rebuild (5.3). If the process's current directory is not the game folder,
 log it once as a warning and still redirect (the stock `data\ui.pak` is
 relative in the same way).
 
-Why metadata and not a hash on the fast path: hashing 35 MB at every
-launch costs about 0.1 s under the loader lock; the full hashes are taken
-whenever anything changes, and a file that changed size or time is caught.
+Why metadata and not a hash on the fast path: hashing both archives
+(about 35 MB) at every launch would add tens of milliseconds under the
+loader lock at typical SHA-256 speeds (an estimate, not a measurement),
+against the 10 ms limit of 5.10. The full hashes are taken whenever
+anything changes, and a file whose size or last-write time changed is
+caught.
 
 ### 5.3 Rebuild: validation
 
@@ -1256,10 +1292,11 @@ header is rewritten (long form). Then the movie's file length field (offset
 Required results:
 
 - The game never opens a partly written `MOTHER.PAK`: the archive is
-  written in full under a temporary name (`DATA\MOTHER.PAK.tmp`), flushed
+  written in full under a temporary name in `DATA`, flushed
   (`FlushFileBuffers`), and then moved over `MOTHER.PAK` with
   `MoveFileExW(..., MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`;
-  the key file is replaced the same way (`MOTHER.PAK.src.tmp`). Either
+  the key file is replaced the same way, through its own temporary name
+  (the temporary names are the implementation's choice). Either
   file may land first: the fast path compares the archive's size and
   last-write time with the key (5.2), so a key and an archive from
   different builds never match.
@@ -1270,11 +1307,13 @@ Required results:
 
 A process killed at any point leaves either the old pair (rebuilt next
 time, since the key no longer matches) or a new archive with an old key
-(also rebuilt). A leftover `.tmp` is deleted before writing. A stale or
-corrupt `MOTHER.PAK` is never patched in place; it is replaced.
+(also rebuilt). A leftover temporary file is deleted before writing. A
+stale or corrupt `MOTHER.PAK` is never patched in place; it is replaced.
 
-Concurrency: when Steam restarts the game, two processes can attach close
-together (01 §2.1). The whole of 5.2 to 5.8 runs under a named mutex
+Concurrency: a second game process (for example one that Steam starts
+while the first is still starting or exiting) can reach this work while
+another process is still in it, and the two must not write the same files
+at once. The whole of 5.2 to 5.8 runs under a named mutex
 (`Local\` namespace, a project-specific name). Wait at most 5 s (project
 decision: longer than a rebuild's 500 ms limit with margin, short enough
 that a stuck process does not hold up the game's start noticeably); on
@@ -1324,9 +1363,9 @@ called (01 §2.2).
 
 "Log" is `mothervr.log` (11). Unless stated, on the Steam 2015 build.
 
-1. Delete `MOTHER.PAK` and `MOTHER.PAK.src`, start with runtime OpenVR:
+1. Delete `MOTHER.PAK` and the key file, start with runtime OpenVR:
    the log shows a build from source `stock` with 505 + `G` entries;
-   `MOTHER.PAK.src` is 152 bytes. Start again: the log shows a reuse.
+   the key file is 152 bytes. Start again: the log shows a reuse.
 2. Delete both again and rebuild: the new `MOTHER.PAK` has the same SHA-256
    as before (determinism). Do the same on a second machine with the same
    DLL: same SHA-256.
@@ -1354,18 +1393,20 @@ called (01 §2.2).
 10. Rename `UI.PAK` away: message at every launch; restoring it brings
     the options page back.
 11. Make `DATA` read-only: reason `write`, game runs, one message.
-12. Kill the process while it writes `MOTHER.PAK.tmp` (for example with a
-    debugger break at the write): the next start rebuilds and the game
-    uses a complete archive.
+12. Kill the process while it writes the temporary archive (for example
+    with a debugger break at the write): the next start rebuilds and the
+    game uses a complete archive.
 13. In the headset, with runtime OpenVR: menu text, item descriptions,
     the loading tip, subtitles, the crosshair and HUD prompts are readable
-    without leaning in; nothing is cut off at the stage edges on the Video
+    without leaning in; the crosshair is enlarged and stays at the centre
+    of the view while aiming, after the weapon changes and after an
+    accuracy change; nothing is cut off at the stage edges on the Video
     page with advanced options; the health bar, ammo counter, tutorial
     overlays and subtitles are inside the clear part of the view. Prompts
     show VR glyphs, including the confirm and back prompts of menus and the
     `$a$`-style tokens in tutorial text (04 §4.1). The crafting screen
     shows the pad form of the craft prompt after the keyboard was used.
-14. Page ids: with the script event tap of 11 §5 on, visit every stock
+14. Page ids: with the logging of game script events (11 §5) on, visit every stock
     page of the front-end, pause and game-over menus once in a run where
     the options archive is not used (for example the read-only case of
     check 11) and once with `MOTHER.PAK`. The `on_page_changed` ids of the
@@ -1382,6 +1423,11 @@ called (01 §2.2).
     method that uses `try`/`catch`, a nested function, or a hook whose
     signature differs from the declaration makes the build fail with the
     member named.
+18. Two launches close together (start the game, and start it again from
+    Steam while the first is still on its start-up screen) with
+    `MOTHER.PAK` and the key file deleted: one archive is built, neither
+    process uses a partly written one, and the log of the second shows a
+    reuse or a wait (5.8).
 
 ## 7. Open questions
 

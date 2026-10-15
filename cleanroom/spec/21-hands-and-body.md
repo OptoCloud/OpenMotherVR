@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). Revision: r1 -->
+<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. Revision: r2 -->
 
 # 21. Hands and body
 
@@ -8,7 +8,9 @@ weapon aims where the hand points; the motion tracker, the flashlight,
 melee and throwing follow the hands; the body can be hidden, follows the
 real head and height, crouches with the player, and is brought back into
 agreement with the head after the game's own animations; health is shown
-on the wrist; the controllers vibrate for game events.
+on the wrist; the controllers vibrate for game events. Seated and standing
+play and the height calibration are 22's (22 §6); this document says how
+the head pose, room-scale and real crouch use them.
 
 Read 20 first (the v1 rule: every v2 feature off or v1-compatible by
 default, and all v2 options off is exactly v1). This document builds on 02,
@@ -35,22 +37,22 @@ their `mothervr.json` key inside `Settings` (06 §1): `Hands.Enabled` is
 | Tracked hands: the character's arms reach the controllers | 4 | `Hands.Enabled` | arms play the game's animation; controllers are a gamepad (04) |
 | Aiming from the hand, per weapon class | 5 | `Hands.AimFromHand` (with `Hands.Enabled`) | aim follows the head (the game's camera) |
 | Motion tracker held and aimed with the left hand | 6 | `Hands.TrackerInHand` (with `Hands.Enabled`) | tracker faces where the body faces |
-| Flashlight aimed by a hand | 7 | `Hands.FlashlightAim` | flashlight follows the head |
-| Melee by hand | 8 | `Hands.PhysicalMelee` (with `Hands.Enabled`) | melee on the fire control |
-| Physical throwing | 9 | `Hands.PhysicalThrow` (with `Hands.Enabled`) | the game's throw on the fire control |
+| Flashlight aimed by a hand | 7 | `Hands.FlashlightAim` (with `Hands.Enabled`) | flashlight follows the head |
+| Melee by motion | 8 | `Hands.MeleeByMotion` (with `Hands.Enabled`) | melee on the fire control |
+| Throwing by motion | 9 | `Hands.ThrowByMotion` (with `Hands.Enabled`) | the game's throw on the fire control |
 | Body visibility | 10 | `Body.Visible` | the whole first-person body is drawn |
-| Camera offset forward or back from the body | 11.2 | `Body.CameraOffset` | 0 m |
+| Eye forward or back of the body | 11.2 | `Body.EyeForward` | 0 m |
 | Room-scale walking | 11.3 | `Body.RoomScale` | the body stays put; the head may leave it up to the head-in-wall limit (05 §7.2, 08 §4) |
-| Seated height offset, standing height calibration | 11.4 | `Body.Posture`, `Body.HeightOffset`, `Body.StandingEyeHeight` | eye height relative to the height at the last recenter (03 §2.1) |
+| Seated eye raise; the head pose in standing mode | 11.4 | `Body.SeatedEyeRaise`; the mode and calibration are 22's (`Comfort.PlayMode`, `Comfort.StandingEyeHeight`, 22 §6) | eye height relative to the height at the last recenter (03 §2.1) |
 | Real crouch drives the game's crouch | 11.5 | `Body.RealCrouch` | crouch on the control of 04 only |
-| Body sync after the game's animations | 12 | active whenever any of 4, 11.2 to 11.5 is on | nothing to sync |
+| Control hand-back after the game's animations | 12 | active whenever any of 4, 11.2 to 11.5 is on | nothing to restore |
 | Health on the wrist | 13 | `Hands.WristHealth` | health only on the game's HUD |
 | Haptics | 14 | `Hands.Haptics.Enabled` | no haptics (04 §5.1) |
 
-All keys are in §15. With every key at its default, nothing in this
-document is installed or runs (20 §1.1): no game site of §2 is hooked, no
-action is added to the runtime, no per-frame work is spent beyond reading
-the settings.
+All keys are in §15. With every key at its default, or with the master
+switch `EnhancedMode` off (20 §1.3), nothing in this document is installed
+or runs (20 §1.1): no game site of §2 is hooked, no action is added to the
+runtime, no per-frame work is spent beyond reading the settings.
 
 ## 2. Game facts
 
@@ -62,7 +64,7 @@ The stages this document uses, in the order they are registered:
 
 | Stage name (the game's string) | Function | Use here |
 |---|---|---|
-| `START_NEXT_FRAME` | 0x374FA0 | increments a frame counter at 0x19CB838 (the instruction at 0x5E99A0), then continues |
+| `START_NEXT_FRAME` | 0x374FA0 | the start of a frame |
 | `PLAYER_CAMERA_UPDATE` | 0x374FC0 | the player's camera |
 | `CAMERA_UPDATE` | 0x3B4090 | camera behaviours; it reaches the stereo update call of 05 §3.1 (0x3B4100) |
 | `CHARACTER_BUILD_START_PRIMARY_ANIMATION` .. `CHARACTER_BUILD_FINALISE_ANIMATION` | 0x3C9F30, 0x3C9F70 | animation of all characters |
@@ -78,7 +80,8 @@ each frame is [likely] (the names describe a pipeline in this order).
 Acceptance item 1 confirms it with thread ids and a frame number per
 stage in a debug build.
 
-`CHARACTER_IK_AND_RAGDOLL` (0x3C9FB0) does, per frame [sure]:
+`CHARACTER_IK_AND_RAGDOLL` (0x3C9FB0, spec label `CharacterIkStage`) does,
+per frame [sure]:
 
 1. for every character whose byte `+0x2FA` is set and whose equipment
    component `+0x1100` is not null, the equipment update 0x382710
@@ -93,7 +96,7 @@ the same frame (an order the game has, which §4.2 must account for).
 
 | Fact | Where | What |
 |---|---|---|
-| Character list global | 0x12F0C88 | pointer to the game's character registry |
+| `CharacterRegistry` | 0x12F0C88 | global pointer to the game's character registry |
 | `PlayerGetter` pattern | 0x00F6B0 (bytes `a1 88 0c 6f 01 8b 40 08`) | `list = [[0x12F0C88] + 8]`; the list's count is the dword at `list + 0x84`, its data pointer at `list + 0x80`; the player character is element 0 when the count is not 0, else there is none |
 | Health, current | character `+0x33C` | unsigned 16-bit |
 | Health, base maximum | character `+0x33E` | unsigned 16-bit |
@@ -102,8 +105,8 @@ the same frame (an order the game has, which §4.2 must account for).
 | Control object | character `+0x31C` | pointer; byte `+0x48` of it is set for the player-controlled character (tested by the crouch methods and by the weapon component's caller of `AimRayUpdate`, §2.5) |
 | Animation component | character `+0x3F0` | the final-pose step runs on it (§2.3) |
 | Equipment component | character `+0x1100` | see §2.5 |
-| `Crouch` | 0x3CAE20 (`56 8b f1 80`) | `thiscall` on the character, no arguments, plain `ret`. For the player (control object byte `+0x48` set) it only sets the requested-crouch byte `+0x3E3A` (to 1, or to the value of byte `+0x3E34` when that is not 0); for other characters it also sets byte `+0x2AF` and raises the game's `CROUCHED` event |
-| `Uncrouch` | 0x3CAE90 (`56 8b f1 8a`) | the same shape; sets `+0x3E3A` to 0 (or `+0x3E34`) |
+| `CharacterRequestCrouch` | 0x3CAE20 (`56 8b f1 80`) | `thiscall` on the character, no arguments, plain `ret`. For the player (control object byte `+0x48` set) it only sets the requested-crouch byte `+0x3E3A` (to 1, or to the value of byte `+0x3E34` when that is not 0); for other characters it also sets byte `+0x2AF` and raises the game's `CROUCHED` event |
+| `CharacterRequestStand` | 0x3CAE90 (`56 8b f1 8a`) | the same shape; sets `+0x3E3A` to 0 (or `+0x3E34`) |
 
 The player's requested crouch state is therefore byte `+0x3E3A` of the
 player character [likely: the player's crouch request that locomotion then
@@ -118,8 +121,8 @@ identified, so nothing here depends on it].
 **Final-pose step [sure].** `FinalPoseStep` 0x2A5040 is a `thiscall` on the
 character's animation component (character `+0x3F0`), no stack arguments,
 plain `ret` (returns at 0x2A5467 and 0x2A5553), first bytes
-`64 a1 00 00 00 00 6a ff`. It is reached only through a `cdecl` thunk at
-0x2A55E0 (`8b 4c 24 04 81 c1 f0 03 00 00 e9 51 fa ff ff`: takes the
+`64 a1 00 00 00 00 6a ff`. It is reached only through a `cdecl` thunk
+(`FinalPoseThunk`) at 0x2A55E0 (`8b 4c 24 04 81 c1 f0 03 00 00 e9 51 fa ff ff`: takes the
 character, adds 0x3F0, jumps to 0x2A5040). The final-pose pass 0x2A55F0
 queues one job per character whose byte `+0xF4C` is set, each job running
 that thunk (the thunk's address is pushed as an immediate at 0x2A5655,
@@ -144,17 +147,14 @@ are in the bone array that follows the parent indices in the public layout
 (skeleton `+0x18`, 8 bytes per bone, a name pointer first) [likely];
 acceptance item 2 logs the names the mod finds.
 
-Related game functions, present for an implementation that uses the game's
-own solvers [sure for the shape; likely for the Havok names]:
-
-| Function | RVA | Shape |
-|---|---|---|
-| model-space bone access for writing | 0x7BAB40 | `thiscall` on the pose, (bone, propagate flag) |
-| local-space bone access for writing | 0x7BA6B0 | `thiscall` on the pose |
-| CCD IK solver constructor | 0x7C1DA0 | `thiscall`, (int iterations, float gain), `ret 8`; stores the vtable at RVA 0x1029BA4, the iterations at `+0x08` and the gain at `+0x0C` |
-| CCD IK solve | 0x7C1DD0 | |
-| two-bone IK solve | 0x7C2630 | |
-| the game's own limb IK | 0x29ED80 | `stdcall`, four arguments, `ret 0x10`; skipped when the weight (float at `+0x68` of its first argument) is not above 0; called from 0x2A7986, 0x2A79A1, 0x2A79BC and 0x2A7F30 |
+**The game's own limb IK [sure for the shape].** A function at 0x29ED80
+(`stdcall`, four arguments, `ret 0x10`, first bytes `55 8b ec 83 e4 f0`)
+adjusts limbs of a pose; it does nothing when the weight (float at `+0x68`
+of its first argument) is not above 0. It is called from 0x2A7986,
+0x2A79A1, 0x2A79BC and 0x2A7F30. §4.2 item 7 states what it must not undo.
+Whether the game also contains general IK solvers an implementation could
+use for §4.2 is open (§22 item 23); the required result does not depend on
+them.
 
 **First-person skeletons [sure, game data].** The player's first-person
 character uses the skeleton definitions `FEMALEFP` and `SPACESUITFP`
@@ -185,8 +185,8 @@ same way.
 | Active camera used for aiming | camera manager `+0x1DC` (read by `AimRayUpdate`, §2.5) |
 | Camera orientation | camera `+0x2C`: quaternion (x, y, z, w) |
 | Camera position | camera `+0x3C`: x, y, z (world, metres) |
-| Position getter | 0x0295B0, `thiscall`, (vec4* out), `ret 4`; writes +0x3C..+0x44 and w = 0 |
-| Forward getter | 0x0295D0, `thiscall`, (vec4* out), `ret 4`; writes the quaternion's rotated +Z axis: `(2(xz + wy), 2(yz - wx), 1 - 2(x² + y²))`, w = 0 |
+| `CameraPosition` | 0x0295B0, `thiscall`, (vec4* out), `ret 4`; writes +0x3C..+0x44 and w = 0 |
+| `CameraForward` | 0x0295D0, `thiscall`, (vec4* out), `ret 4`; writes the camera's local +Z axis rotated by the orientation quaternion, with w = 0 |
 | Behaviour lookup | 0x0293B0, `thiscall` on the camera, (type name, instance name), `ret 8`; `AimRayUpdate` asks it for `FollowBehavior` / `Follow` |
 
 So the game's camera looks along its local +Z, with +Y up (05 §1: the world
@@ -260,7 +260,7 @@ be set while the state at `[+0x152C] + 4` is 6, 7 or 8; the update at
 withholds firing in some aiming states unless that length test passes.
 What the length measures exactly (most likely whether the held weapon is far
 enough from the head to be "out", or clear of the ray start) is open
-(§22 item 6); §5.4 states the required result.
+(§22 item 6); §5.3 states the required result.
 
 ### 2.6 Motion tracker [sure]
 
@@ -341,7 +341,7 @@ while no physical pad is connected, are open (§22 item 9).
 |---|---|
 | the player's first-person camera behaviour is active or not | FollowBehavior slots 0 and 1 (05 §6.1) |
 | a cutscene or level fade is in progress | UI entity messages (05 §6.2), and the inference of 05 §3.2g |
-| a loading screen is up | menu wrappers (05 §5) |
+| a loading screen is up | menu objects (05 §5) |
 | an interaction is in progress and its kind; hiding | the script event tap (11 §5.3) |
 | eye and body pivot positions each frame | the arguments of HeadClipFade at 0x34E2C1 (08 §4.1) |
 | head pose, recenter reference | device slot 11, manager `+0x78` (03 §1, §2) |
@@ -374,9 +374,9 @@ Result, the hand's pose in game world coordinates:
     Rrel = M (Rh^T Rg) M,  M = diag(1, 1, -1)   hand rotation relative to the head, mirrored into the left-handed camera frame
     Rw   = Qc * Rrel
 
-So hands are attached to the camera, not to the recenter reference: snap
-turn, recenter, room-scale and the camera offset of §11 move them with the
-view, and a hand in front of the eyes appears in front of the eyes. Hand
+Hands are placed relative to the eye the player sees from, so any change
+that moves the view (03 §2, 04 §6, §11 of this document) moves the hands
+with it, and a hand in front of the eyes appears in front of the eyes. Hand
 rotations are never scaled; positions scale with `s` like the head (03 §1).
 The grip pose's axes are the runtime's: on OpenXR `/input/grip/pose`
 (origin in the palm on the handle's axis; -Z along the handle in the
@@ -469,14 +469,13 @@ player character only (§2.2), every frame:
 5. **Fingers.** Fingers keep the game's animated hand pose (grip shapes
    come from the game's animation for the held item).
 6. **Held items.** The item in the right hand is drawn attached to the
-   moved hand **in the same frame**. Because the game updates equipment
-   before the final-pose step (§2.1), this requires the equipment
-   attachment to be re-evaluated after the hand bones moved, or the
-   attachment to read the edited pose; either is acceptable (§22 item 3).
+   moved hand **in the same frame**. The game updates equipment before the
+   final-pose step (§2.1), so the attachment as the game computes it
+   belongs to the pose before the edit; how the result is reached is the
+   implementation's choice (§22 item 3 says where to look).
 7. **The game's own limb IK** (0x29ED80) does not move the arm chain away
-   from the result: either it runs before the mod's edit in the frame, or
-   it is kept from touching the arms while tracked hands are active
-   (§22 item 4).
+   from the result while tracked hands are active (§22 item 4 says where
+   to look).
 8. **Other characters** are never edited.
 9. **Model-space consistency.** After the edit the pose's local and model
    transforms agree (the flags of §2.3 are left so the game recomputes what
@@ -586,11 +585,10 @@ head (§22 item 6 decides whether a further condition is needed). Nothing
 else of the game's firing rules (ammunition, reload, the weapon being
 raised, interaction states) changes.
 
-How: the implementation may make the comparison at 0x3ABD6C succeed for the
-player while hand aiming is active (the `jbe` at 0x3ABD73 is `76 11`), or
-set the byte after the test; the patch is installed only while
-`Hands.AimFromHand` is on, or is inert when off (20 §1.1), and its bytes are
-checked first (12 §4).
+How the result is reached is the implementation's choice under 12 §4: any
+change at the test is installed only while `Hands.AimFromHand` is on, or is
+inert when off (20 §1.1), and the bytes of the test at 0x3ABD6C (§2.5) are
+checked before it is made.
 
 ### 5.4 Holding a weapon "up"
 
@@ -632,12 +630,13 @@ hand is tracked:
 
 - the tracker model is in the left hand through §4.2 (the game's own
   tracker animation places it in the left hand [likely]; §22 item 11);
-- each tracker scan (§2.6) uses as its facing the left hand's aim direction
-  projected onto the horizontal plane and normalised: tracker `+0xF0` =
-  its x, `+0xF8` = its z (and the y component at `+0xF4` = 0), written
-  before the scan reads them [proposal: the cone follows the hand the
-  player holds out; vertical tilt is ignored because the game's tracker is
-  a 2D display];
+- each tracker scan (§2.6) derives its heading from the left hand: the
+  heading the scan computes equals the horizontal heading of the left
+  hand's aim direction [proposal: the cone follows the hand the player
+  holds out; vertical tilt is ignored because the game's tracker is a 2D
+  display]. Where and when the facing the scan reads is set is the
+  implementation's choice, provided no game write comes between it and the
+  scan (§22 item 7);
 - when that horizontal length is below 0.1 (the hand points nearly
   straight up or down), the previous facing is kept (reason: the heading is
   undefined there; no NaN).
@@ -667,7 +666,7 @@ where its light's transform is set is open (§22 item 12). Until that is
 verified the setting is accepted, stored, and has no effect, and that is
 logged once.
 
-## 8. Melee by hand
+## 8. Melee by motion
 
 ### 8.1 What the player experiences
 
@@ -677,7 +676,7 @@ swing; the game decides hits and damage as before.
 
 ### 8.2 Required results
 
-While `Hands.PhysicalMelee` and tracked hands are active and the current
+While `Hands.MeleeByMotion` and tracked hands are active and the current
 weapon type (§2.5) is `MELEE` or `CATTLEPROD`:
 
 - a **swing** is the right hand's speed exceeding 2.0 m/s and then falling
@@ -690,13 +689,16 @@ weapon type (§2.5) is `MELEE` or `CATTLEPROD`:
 - swings are ignored for 0.6 s after one fired [proposal: about the length
   of the game's own melee swing; §22 item 13 replaces it with the game's
   action duration once that is known];
-- during the game's melee animation the right arm plays the game's
-  animation (tracked hands blend out and back as §3.3), because the game's
-  hit detection follows its animation [likely].
+- a swing by hand hits what the same swing made with the Fire control
+  would hit: the game's hit test, damage and timing decide, as for a press
+  of Fire. Whether that requires the right arm to play the game's melee
+  animation while the swing runs (tracked hands blending out and back as
+  §3.3) depends on what the game's hit test follows, which is open (§22
+  item 13).
 
 Off: melee on the Fire control only (v1).
 
-## 9. Physical throwing
+## 9. Throwing by motion
 
 ### 9.1 What the player experiences
 
@@ -706,14 +708,17 @@ motion: the item leaves the hand with the hand's speed and direction.
 
 ### 9.2 Required results
 
-While `Hands.PhysicalThrow` and tracked hands are active and the current
+While `Hands.ThrowByMotion` and tracked hands are active and the current
 item is one of the throwables of §2.5:
 
-- **Hold.** Holding the Aim control (right grip by default) arms the
-  throw: the game's aim-to-throw state is entered as the game's own hold
-  prompt (`AI_UI_IED_HOLD_TO_AIM`) asks, through the same game action the
-  gamepad would use.
-- **Release.** Letting go of the grip throws when the right hand's speed
+- **Arm** [proposal]. The throw is armed while a hold control is held and
+  released when it is let go; the hold control is the Aim control (right
+  grip by default). Reason: a held grip matches holding an object in the
+  hand, and the game readies a throwable on its aim action (its prompt id
+  `AI_UI_IED_HOLD_TO_AIM`, §2.7 [likely, from the id]), so no control
+  changes meaning. Arming enters the game's aim-to-throw
+  state through the game action the gamepad uses for it.
+- **Release.** Letting go of the hold control throws when the right hand's speed
   at that moment is at least 1.5 m/s [proposal: a gentle lob is above it, a
   hand at rest is far below]; below it the throw is cancelled and the item
   stays in hand (reason: opening the hand by accident must not throw a
@@ -721,7 +726,7 @@ item is one of the throwables of §2.5:
 - **Velocity.** The thrown object's initial linear velocity in the world is
   the release velocity of the hand, mapped as in §3.1 (rotation only:
   `rotate(Qc, M Rh^T v)` scaled by `s`), multiplied by
-  `Hands.ThrowVelocityScale`. The release velocity is the runtime's
+  `Hands.ThrowStrength`. The release velocity is the runtime's
   reported linear velocity of the right grip, the largest-magnitude sample
   over the last 50 ms before the release [proposal: the hand decelerates as
   the fingers open, so the peak just before release is what the player
@@ -743,7 +748,7 @@ Off, or no tracked right hand: the game's own throw on the Fire control
 |---|---|---|
 | release threshold | 1.5 m/s | §9.2 |
 | velocity window | 50 ms | §9.2 |
-| `Hands.ThrowVelocityScale` | default 1.0, range 0.5 to 2.0 | players with little room swing less; 1.0 is honest physics |
+| `Hands.ThrowStrength` | default 1.0, range 0.5 to 2.0 [proposal] | players with little room, or seated, cannot swing fully and need a throw to carry as far as the game's own; 1.0 throws with the hand's real speed; 2.0 lets a short seated flick reach the distance of a full throw, and 0.5 tames a player who throws hard |
 
 ## 10. Body visibility
 
@@ -800,30 +805,33 @@ returns** (device slot 11, 03 §1) and **the reference** (manager `+0x78`,
 character by writing its physics state. The combination, for each frame:
 
     head pose returned = v1 pose (03 §1)
-                         + camera offset along the reference's forward (11.2)
+                         + eye forward offset along the reference's forward (11.2)
                          + height adjustment (11.4)
                          - room-scale origin shift (11.3)
 
 in tracking space before the conversion of 03 §1, each term 0 when its
-feature is off. The order of application is: room-scale shift, then height,
-then camera offset, then world scale `s` (03 §1 scales the whole
-translation) [proposal: the shift and height are real-world metres; the
-camera offset is a body-relative metre that should also scale with the
-world].
+feature is off. The terms are summed in runtime metres and the sum is then
+scaled by the world scale `s` (03 §1 scales the whole translation; 22
+§6.3) [proposal: the shift and height are real-world metres; the eye
+forward offset is a body-relative metre that should also scale with the
+world]. Only the place of `s` matters; the order of the sum does not.
 
-### 11.2 Camera offset
+### 11.2 Eye forward or back of the body
 
-`Body.CameraOffset` metres (default 0, range -0.20 to +0.20 [proposal:
+`Body.EyeForward` metres (default 0, range -0.20 to +0.20 [proposal:
 beyond 0.2 m the eye leaves the head of the game's body]): the eye is moved
 by that distance along the reference's horizontal forward (positive moves
 it forward of the body, so the player sees less of their own chest and the
-weapon sits further back in the view). Hands follow (§3.1 attaches them to
-the camera). The head-in-wall test (05 §7.2) sees the moved eye; an offset
-within the range keeps the eye inside the 0.5 m of that test.
+weapon sits further back in the view). Hands follow (§3.1 places them
+relative to the eye). The head-in-wall test (05 §7.2) sees the moved eye;
+an offset within the range keeps the eye inside the 0.5 m of that test.
 
-During hacking and cutting interactions (11 §5.3 kinds hacking and cutting)
-the offset is 0 [proposal: those screens are framed for the game's own eye
-point], restored at their finish.
+While an interaction whose screen the game frames for a fixed eye point is
+running, the eye forward offset is not applied, so that screen is seen as
+the game frames it [proposal: a moved eye would crop or misalign a screen
+composed for the body's own eye point]. Which interaction kinds (11 §5.3)
+these are is to be listed from in-game observation (§22 item 24); until
+then the offset applies in every interaction.
 
 ### 11.3 Room-scale
 
@@ -859,37 +867,28 @@ relative to the reference, minus the accumulated origin shift.
 - **No vertical shift**: room-scale never changes height (that is 11.4 and
   11.5).
 
-The origin shift is reset to 0 at each recenter (03 §2.2) and at each body
-sync (§12).
+The origin shift is reset to 0 at each recenter (03 §2.2) and at each
+control hand-back (§12).
 
 **Off**: no follow, no shift; v1.
 
 ### 11.4 Seated and standing height
 
-`Body.Posture` is `"Seated"` (default, v1) or `"Standing"`.
+The mode (`Comfort.PlayMode`), the calibrated standing eye height `h`
+(`Comfort.StandingEyeHeight`), when a mode change takes effect and how the
+calibration is taken are 22's (22 §6.1, §6.2; one owner per setting, 20
+§5). This document adds only:
 
-- **Seated**: the eye height is the height of the game's body eye point
-  plus the head's height relative to the height at the last recenter (v1,
-  03 §2.1 keeps the translation), plus `Body.HeightOffset` metres (default
-  0, range -0.50 to +0.50 [proposal: covers a low chair to a high stool]).
-- **Standing**: the head's height is measured against the calibrated
-  standing eye height `Body.StandingEyeHeight` (tracking-space metres above
-  the floor, default 0 meaning "not calibrated"): the vertical part of the
-  head pose the game receives is `y_head - Body.StandingEyeHeight`, so a
-  player standing upright sees from the game body's standing eye point, and
-  lowering the head lowers the view by the same amount. With no calibration
-  (0), standing behaves as seated and a notice says calibration is needed
-  (13 owns the message).
-- **Calibration**: a calibrate command (an options-page control, and the
-  console command of 06 §4 that 22 or 06 names) records the current head
-  height as `Body.StandingEyeHeight` when the headset is in use (03 §2.3)
-  and the pose valid; it is saved to `mothervr.json` and logged.
-- The recenter of 03 §2 keeps its yaw rule in both modes; in standing mode
-  it no longer takes the height from the head (the calibration owns it).
-
-20 §2 assigns seated and standing modes to 22; this document owns their
-effect on the head pose and on crouch. If 22 defines the mode key, these
-keys move there unchanged (§23).
+- **Seated eye raise**: in seated mode the height adjustment of §11.1 is
+  `Body.SeatedEyeRaise` metres added to the eye height (default 0, range
+  -0.50 to +0.50 [proposal: covers a low chair to a high stool]); in
+  standing mode it is 0. Seated play otherwise keeps v1's height rule (03
+  §2.1, 22 §6.1).
+- **Standing**: the height adjustment is what 22 §6.1 requires (the
+  vertical offset the game receives is the head's height above the floor
+  minus `h`); real crouch (§11.5) and the control hand-back (§12) use the
+  same `h`. With no calibration, standing behaves as seated (22 §6.1) and
+  real crouch is inactive.
 
 ### 11.5 Real crouch
 
@@ -897,7 +896,8 @@ keys move there unchanged (§23).
 for real makes the character crouch (quieter, lower, able to enter vents);
 standing up makes it stand, where the game allows.
 
-**Required results.** With `h = Body.StandingEyeHeight` (calibrated):
+**Required results.** With `h = Comfort.StandingEyeHeight` (calibrated,
+22 §6.2):
 
 - the character is made to crouch when the head's height falls below
   `0.78 h` and to stand when it rises above `0.86 h` [proposal: a deliberate
@@ -926,7 +926,7 @@ crossing [proposal: the player always has a manual override]. `Input.ToggleCrouc
 
 Off, or seated: crouch by control only (v1).
 
-## 12. Keeping the body in sync after the game's animations
+## 12. When the game hands control back
 
 ### 12.1 What the game does
 
@@ -952,8 +952,8 @@ open (§22 item 15).
 ### 12.2 Required results
 
 During any episode: tracked hands, hand aiming, the hand-held tracker,
-melee and throwing by hand, room-scale follow and real crouch presses are
-inactive (§4.4); the camera offset stays applied except as §11.2 says.
+melee and throwing by motion, room-scale follow and real crouch presses are
+inactive (§4.4); the eye forward offset stays applied except as §11.2 says.
 
 At the end of each episode, before the first frame the player controls the
 body again:
@@ -967,7 +967,8 @@ body again:
    height and re-synced by one press if they differ (§11.5), not before
    0.5 s after the end [proposal: the game often finishes an animation
    crouched or standing on its own; waiting lets it settle].
-4. **Hands:** blend back over 0.3 s (§3.3).
+4. **Hands:** blend back to the tracked pose as §3.3 says for returning
+   tracking (0.15 s).
 5. **Forward:** the recenter reference is not changed by the episode's end,
    except where v1 already queues a recenter (a loading screen closing, 03
    §2.2) [proposal: a recenter at every cutscene end would turn the world
@@ -994,11 +995,12 @@ With `Hands.WristHealth` on and the left hand tracked:
   4 cm wide [proposal: the size of a watch face], over the inside of the
   wrist where the game's `WATCH` part is on `RIPLEY_FP` (§2.8), shown only
   while the panel faces the head within 40 degrees [proposal: a glance at
-  the wrist, like reading a watch]. It shows the fraction as a bar and a
-  colour that moves continuously from green at full health through amber at
-  one half to red at one fifth and below [proposal: one fifth matches the
-  game's own 20 % comparison of §2.2 in spirit; a continuous colour avoids
-  arbitrary steps], blinking at 1 Hz at or below one fifth.
+  the wrist, like reading a watch]. It shows the fraction as a bar whose
+  colour moves continuously from green at full health to red at none
+  [proposal: a continuous ramp needs no thresholds and reads at a glance],
+  and the bar blinks at 1 Hz at or below one fifth [proposal: the last
+  fifth is where a player should heal before the next hit; one blink per
+  second is noticed in peripheral vision without being frantic].
 - **Drawn by the runtime** [proposal: needs no change to the game's
   rendering and works with every first-person model, including those
   without a watch]: OpenVR, an `IVROverlay` overlay positioned relative to
@@ -1009,9 +1011,8 @@ With `Hands.WristHealth` on and the left hand tracked:
 - Shown in first-person play only (not in menus, cutscenes, loading); not
   shown when the left hand is not tracked.
 
-Showing health on the game's own `WATCH` part instead (changing its
-material) is an alternative that needs the watch's draw identified at run
-time (§22 item 16).
+Whether health could be shown on the game's own `WATCH` part instead is
+open (§22 item 16).
 
 ## 14. Haptics
 
@@ -1088,6 +1089,9 @@ When the game rumble is on, the damage and firing pulses are still played
 New sections `Hands` and `Body` inside `Settings` of `mothervr.json` (06
 §1 style). Unknown keys are kept on save (06 §3). Every default gives v1.
 Keys are this project's own. "Applies" says when a change takes effect.
+While the master switch `EnhancedMode` is off, every key here reads as its
+default (20 §1.3). The seated and standing mode and the calibrated standing
+eye height are 22's keys (22 §3.1); this document only reads them.
 
 ### 15.1 `Hands`
 
@@ -1096,10 +1100,10 @@ Keys are this project's own. "Applies" says when a change takes effect.
 | `Hands.Enabled` | bool | false | | non-bool: false | at once |
 | `Hands.AimFromHand` | bool | true | | non-bool: true | at once; effective only with `Hands.Enabled` |
 | `Hands.TrackerInHand` | bool | true | | non-bool: true | at once; only with `Hands.Enabled` |
-| `Hands.FlashlightAim` | string | `"Head"` | `"Head"`, `"LeftHand"`, `"RightHand"` | other: `"Head"` | at once |
-| `Hands.PhysicalMelee` | bool | true | | non-bool: true | at once; only with `Hands.Enabled` |
-| `Hands.PhysicalThrow` | bool | true | | non-bool: true | at once; only with `Hands.Enabled` |
-| `Hands.ThrowVelocityScale` | number | 1.0 | 0.5 to 2.0 | outside or NaN: 1.0 | at once |
+| `Hands.FlashlightAim` | string | `"Head"` | `"Head"`, `"LeftHand"`, `"RightHand"` | other: `"Head"` | at once; only with `Hands.Enabled` |
+| `Hands.MeleeByMotion` | bool | true | | non-bool: true | at once; only with `Hands.Enabled` |
+| `Hands.ThrowByMotion` | bool | true | | non-bool: true | at once; only with `Hands.Enabled` |
+| `Hands.ThrowStrength` | number | 1.0 | 0.5 to 2.0 | outside or NaN: 1.0 | at once |
 | `Hands.Smoothing` | number | 0.0 | 0.0 to 1.0 | outside or NaN: 0.0 | at once |
 | `Hands.WristHealth` | bool | false | | non-bool: false | at once |
 | `Hands.Haptics.Enabled` | bool | false | | non-bool: false | next launch (the action set is created at runtime start, 04 §5.8) |
@@ -1119,23 +1123,17 @@ master key on gives the whole feature; the master keys default off (20
 | Key | Type | Default | Range / values | Sanitise | Applies |
 |---|---|---|---|---|---|
 | `Body.Visible` | string | `"Full"` | `"Full"`, `"ArmsAndHands"`, `"HandsOnly"`, `"None"` | other: `"Full"` | at once |
-| `Body.CameraOffset` | number | 0.0 | -0.20 to 0.20 (metres) | outside: clamped; NaN: 0.0 | at once |
+| `Body.EyeForward` | number | 0.0 | -0.20 to 0.20 (metres) | outside: clamped; NaN: 0.0 | at once |
 | `Body.RoomScale` | bool | false | | non-bool: false | at once |
-| `Body.Posture` | string | `"Seated"` | `"Seated"`, `"Standing"` | other: `"Seated"` | at once (next frame) |
-| `Body.HeightOffset` | number | 0.0 | -0.50 to 0.50 (metres) | outside: clamped; NaN: 0.0 | at once |
-| `Body.StandingEyeHeight` | number | 0.0 | 0.0, or 1.0 to 2.2 (metres) | other: 0.0 (not calibrated) | written by calibration; read at once |
-| `Body.RealCrouch` | bool | false | | non-bool: false | at once; only in standing mode with a calibration |
-
-The 1.0 to 2.2 m range covers standing eye heights of adults [proposal];
-anything else is treated as "not calibrated".
+| `Body.SeatedEyeRaise` | number | 0.0 | -0.50 to 0.50 (metres) | outside: clamped; NaN: 0.0 | at once; seated mode only |
+| `Body.RealCrouch` | bool | false | | non-bool: false | at once; only in standing mode with a calibration (22 §6) |
 
 ### 15.3 Options page and console
 
-Every key except `Body.StandingEyeHeight` appears on the options page (06
-§5, 14) once 22 settles where v2 settings go (20 §10 item 6); the
-calibration is a command, not a value. Console commands in the `mvr_*`
-family for these keys are the implementation's choice of names; 06 §4
-lists them in its next revision.
+Every key appears on the options page (06 §5, 14) where 20 §10 item 6
+puts v2 settings; the calibration is 22's command (22 §3.3, §12).
+Console commands in the `mvr_*` family for these keys are the
+implementation's choice of names; 06 §4 lists them in its next revision.
 
 ## 16. Inputs while hands are on
 
@@ -1152,7 +1150,7 @@ lists them in its next revision.
 | haptic output (new) | | §14.3 |
 
 One owner per input at a time (20 §5): room-scale writes Move only while
-the player's stick is idle; physical melee and throw add presses to the
+the player's stick is idle; melee and throwing by motion add presses to the
 game actions v1 writes, merged by OR.
 
 ## 17. Threads
@@ -1160,7 +1158,7 @@ game actions v1 writes, merged by OR.
 | Work | Thread |
 |---|---|
 | read controllers and hand poses, publish them with the head pose; all haptic runtime calls | render thread (04 §5.9, §14.3) |
-| take the frame's hand set (with the head pose of that frame), the camera pose (§2.4), the player pointer; compute world targets (§3.1); aim ray (§5), tracker facing (§6), room-scale, height, crouch presses (§11), body sync (§12), health value, haptic event detection | game thread |
+| take the frame's hand set (with the head pose of that frame), the camera pose (§2.4), the player pointer; compute world targets (§3.1); aim ray (§5), tracker heading (§6), room-scale, height, crouch presses (§11), control hand-back (§12), health value, haptic event detection | game thread |
 | edit the player's pose (§4.2), body visibility (§10) | the job thread running the player's final-pose step (§2.3), reading only the game thread's copy for this frame |
 | game rumble levels (§2.9) | whichever thread calls `RumbleSetMotors` [likely the audio thread]; stored as two atomic floats |
 
@@ -1185,22 +1183,23 @@ locking or logging on the render thread or in the job (12 §6).
 | a hand lost or regained (§3.3) | INF | the hand; the reason |
 | hand aiming: the class in use changes | DBG | the weapon type |
 | fire gate overridden for the first time in a session | INF | that firing with a misaligned weapon is permitted |
-| physical throw | DBG | the release speed; whether thrown or cancelled |
+| throw by motion | DBG | the release speed; whether thrown or cancelled |
 | room-scale follow blocked | DBG | the remaining offset |
-| calibration taken | INF | the standing eye height |
 | real crouch press | DBG | crouch or stand; the head height and thresholds |
-| body sync at an episode end | DBG | the episode kind; what was re-synced |
+| control hand-back at an episode end | DBG | the episode kind; what was restored |
+
+The calibration and the play mode are logged by 22 (22 §16).
 | haptic actions created, or bound/unbound | INF / WRN | per hand; that a saved binding lacks them |
 | `DebugOptions`: every 900 frames | VRB | each hand's world target and the hand bone's reached position, their distance; the aim ray start and direction; the head offset `o` of §11.3 |
 
 ## 19. Edge cases
 
-| Situation | Hands, aim, tracker, melee, throw | Body visibility | Camera offset, height | Room-scale, real crouch | Haptics |
+| Situation | Hands, aim, tracker, melee, throw | Body visibility | Eye forward offset, height | Room-scale, real crouch | Haptics |
 |---|---|---|---|---|---|
 | menus, virtual screen (stereo mode 1) | inactive | as set | not applied (screen frames ignore the head, 03 §7) | inactive | game rumble passes (the game may rumble in menus) |
 | loading screen | inactive | n/a | not applied | inactive | none from mod events |
 | cutscene, level fade | inactive | as set (§10.3) | applied when the game asks for a head pose | inactive | game rumble passes |
-| interaction, hiding | inactive (r1) | as set | applied; 0 for hacking and cutting | inactive | hacking pulses |
+| interaction, hiding | inactive (r1) | as set | applied, except the eye forward offset during the interactions of §11.2 | inactive | hacking pulses |
 | death | inactive from health 0 | as set | applied | inactive | death pulse |
 | headset off | as with it on | as set | as set | real crouch: no presses while the headset is not in use (03 §2.3) | continue |
 | controllers lost | §3.3 | unchanged | unchanged | follow continues (it uses the head) | none for that hand |
@@ -1220,7 +1219,7 @@ every row. Names are spec labels.
 | `CharacterRegistry` | 0x12F0C88 | ? | global | pointer | 2.2 |
 | `PlayerGetter` (pattern) | 0x00F6B0 | ? | function | `a1 88 0c 6f 01 8b 40 08` | 2.2 |
 | health fields | character +0x33C, +0x33E, +0x340 | ? | fields | u16, u16, float | 2.2 |
-| `Crouch` / `Uncrouch` | 0x3CAE20 / 0x3CAE90 | ? | functions | `56 8b f1 80` / `56 8b f1 8a`; requested crouch byte `+0x3E3A` | 2.2 |
+| `CharacterRequestCrouch` / `CharacterRequestStand` | 0x3CAE20 / 0x3CAE90 | ? | functions | `56 8b f1 80` / `56 8b f1 8a`; requested crouch byte `+0x3E3A` | 2.2 |
 | `CharacterIkStage` | 0x3C9FB0 | ? | stage function | `CHARACTER_IK_AND_RAGDOLL` | 2.1 |
 | equipment update call | 0x3CA02E | ? | call site | `e8 dd 86 fb ff` (to 0x382710) | 2.1 |
 | final-pose pass call | 0x3CA04B | ? | call site | `e8 a0 b5 ed ff` (to 0x2A55F0) | 2.1 |
@@ -1233,7 +1232,7 @@ every row. Names are spec labels.
 | aim ray call | 0x3CD410 | ? | call site | `e8 fb 4d fb ff` | 2.5 |
 | `CurrentItem` | 0x3829E0 | ? | function | `80 b9 10 15 00 00 00` | 2.5 |
 | weapon type parse | 0x4B5F80 | ? | function | enum of §2.5; type at weapon +0xD4 | 2.5 |
-| fire alignment test | 0x3ABD6C | ? | site | `0f 2f 05 80 67 1c 01 76 11` (the `jbe` at 0x3ABD73) | 2.5, 5.3 |
+| fire alignment test | 0x3ABD6C | ? | site | `0f 2f 05 80 67 1c 01 76 11` | 2.5, 5.3 |
 | `TrackerScan` | 0x431E40 | ? | function | `55 8b ec 83 e4 f0`; facing at tracker +0xF0 / +0xF8 | 2.6 |
 | `SetBodyVelocities` | 0x3EF590 | ? | function | `55 8b ec 83 e4 f0 83 ec 3c` | 2.7 |
 | `RumbleSetMotors` | 0xC09280 | ? | function, vtable slot at 0x11C1840 | `f3 0f 10 44 24 04` | 2.9 |
@@ -1252,16 +1251,17 @@ where a VRB line is needed.
    (`FEMALEFP`), finds every bone of §2.3 by name, and gives their indices.
    Repeat in a space-suit section (`SPACESUITFP`).
 3. Hands on, looking straight ahead with both hands held out: the VRB line
-   shows each hand's world target within 1 cm of the hand bone's reached
-   position. Turning the head leaves the in-game hands where the real
+   shows each hand's world target within 5 mm of the hand bone's reached
+   position (§4.2 item 1). Turning the head leaves the in-game hands where the real
    hands are. Snap turn and recenter do not detach them.
 4. Reach above the head, behind the back and across the chest: the arms
    follow without the elbow flipping; out of reach, the arm is straight
    towards the hand.
 5. Equip the revolver, shotgun, bolt gun, flamethrower: shots (or the
    flame) go where the barrel points with the head turned 60 degrees away;
-   bullet holes at 5 m are within 5 cm of the barrel's line. Firing works
-   with the weapon held low at the hip and high over the head.
+   bullet holes at 5 m are within 5 cm of the barrel's line. With hand
+   aiming, firing works at every hand position relative to the head that
+   the player can reach.
 6. With `Hands.AimFromHand` off but hands on: shots follow the head again.
 7. Raise the tracker with the left grip: it is in the left hand; turning
    the hand turns the tracker's cone; with hands off it faces the body.
@@ -1272,20 +1272,21 @@ where a VRB line is needed.
    keeps the item in hand.
 10. Each `Body.Visible` value: the hidden parts are gone in both eyes, in a
     mirror (07) and in the shadow; other characters are unaffected.
-11. `Body.CameraOffset` +0.15: the view moves forward of the body; the
+11. `Body.EyeForward` +0.15: the view moves forward of the body; the
     head-in-wall fade does not trigger standing in the open.
 12. Room-scale: walk 1 m forward in the play area: the character walks 1 m
     in the level, the view does not move twice; walk into a wall: the body
     stops, the view blacks out after 08 §4's delay; step back: it clears.
-13. Standing, calibrated: standing upright gives the game's normal eye
-    height; crouching to 70 % of the standing height crouches the character
+13. Standing mode, calibrated (22 §6), `Body.RealCrouch` on: standing
+    upright gives the game's normal eye height; crouching to 70 % of the standing height crouches the character
     (log: the press, the heights) and enters a vent; standing inside the
     vent stays crouched; leaving the vent and standing stands.
 14. The requested crouch byte (`+0x3E3A`) follows the game's crouch in
     the log when crouching by the control.
 15. After a cutscene, a ladder, a hiding place, a death and reload: within
     one second hands are back in the controllers, the view is over the
-    body, and the crouch state matches the player's (log: body sync lines).
+    body, and the crouch state matches the player's (log: control
+    hand-back lines).
 16. Wrist health: take damage: the panel's bar and colour change; at one
     fifth it blinks; it is hidden when the wrist faces away.
 17. Haptics: damage, tracker scans, firing and hacking pulse on the
@@ -1304,13 +1305,13 @@ where a VRB line is needed.
    skeleton files under `DATA\ANIM_SYS\SKELE` in `ANIMATION.PAK`, or the
    pose read in game with no animation layer), then fit the palm centre to
    the OpenXR grip definition (§3.1).
-3. **Held item after the edit** (§4.2 item 6): whether the equipment update
-   0x382710 can simply be run again for the player after the edit, or
-   whether the item attachment reads a pose space that can be pointed at
-   the edited pose. Look at 0x382710 and the bone transform query 0x2A2FB0
-   (`thiscall` on the animation component, bone, space, out).
+3. **Held item after the edit** (§4.2 item 6): how the game places a held
+   item on the hand bone, and from which pose. Look at the equipment update
+   0x382710 and the bone transform query 0x2A2FB0 (`thiscall` on the
+   animation component, bone, space, out).
 4. **The game's limb IK** (0x29ED80): which limbs its four call sites
-   serve, and whether they run before `FinalPoseStep` (§4.2 item 7).
+   serve, and when in the frame they run relative to `FinalPoseStep`
+   (§4.2 item 7).
 5. **Weapon transform**: where the drawn weapon's muzzle and barrel axis
    can be read (a candidate is the function at 0x3A07D0 on the weapon; its
    meaning is not verified).
@@ -1333,8 +1334,10 @@ where a VRB line is needed.
     tracker in the left hand, so that §4.2 alone places it.
 12. **Flashlight**: where the player torch's light transform is set (the
     `PlayerTorch` entity), so a hand can drive it.
-13. **Melee duration**: how long the game's melee action owns the arm
-    (the `ACT_PLAYER_MELEE` action), to replace the 0.6 s of §8.2.
+13. **Melee**: how long the game's melee action owns the arm (the
+    `ACT_PLAYER_MELEE` action), to replace the 0.6 s of §8.2; and whether
+    the game's melee hit test follows the arm's animation (then the arm
+    must play it during a swing by motion, §8.2) or the camera or body.
 14. **Crouch eye height**: the game's standing and crouched eye heights
     (or the camera's height change on crouch), for §11.5.
 15. **Scripted player animations** outside the signals of §12.1: how to
@@ -1342,8 +1345,9 @@ where a VRB line is needed.
     (`CMD_PlayAnimation` and its `PlayerAnimDrivenView`, the
     `ACT_PLAYER_*` actions); the mission 4 android encounter of 05 §16 is
     one case.
-16. **Watch part at run time**: how to identify the draw of `RIPLEY_FP`'s
-    `WATCH` part, if the in-game watch is to show health.
+16. **Watch part**: whether the in-game watch (`RIPLEY_FP`'s `WATCH`
+    part, §2.8) could show health instead of the runtime panel of §13.2,
+    and what that would need.
 17. **A verified shot event** for the firing pulse (ammunition decrement
     or the weapon's fire function).
 18. **Hacking steps**: a per-step signal of the hacking device (correct and
@@ -1355,7 +1359,15 @@ where a VRB line is needed.
     `PARKER_FP` and the others use, and whether they have the bones of §2.3.
 21. **Left-handed players**: whether a weapon in the left controller should
     drive the character's right hand (crossing arms) or be unsupported.
-22. **Seated and standing ownership** with 22 (§11.4).
+22. (Resolved in r2: seated and standing play and the calibration are
+    22's, §11.4.)
+23. **Game IK solvers**: whether the game contains general IK solvers
+    (for example in the animation library around the model-space getter
+    0x7B9E80) usable for §4.2; to be identified.
+24. **Screens framed for a fixed eye point** (§11.2): which interaction
+    kinds of 11 §5.3 show a screen the game composes for the body's own
+    eye point. To resolve: with `Body.EyeForward` at +0.2, use each kind
+    and note the screens that are cropped or misaligned.
 
 ## 23. Changes to v1 and v2 documents
 
@@ -1377,22 +1389,21 @@ Not made here; for the next revisions:
   must also carry each hand's tracking-result state (21 §3.3) and the aim
   poses.
 - `03-hmd-and-frames.md` §1 and §2.1: the head pose returned by slot 11 may
-  include the terms of 21 §11.1 (camera offset, height, room-scale shift);
-  in standing mode the recenter keeps the calibrated height instead of the
-  head's (21 §11.4).
+  include the terms of 21 §11.1 (eye forward offset, height, room-scale
+  shift); in standing mode the recenter keeps the calibrated height
+  instead of the head's (22 §6.1).
 - `05-game-patches.md` §3.2: the stereo update also runs room-scale follow,
-  real crouch and body sync (21 §11, §12) when their keys are on.
+  real crouch and the control hand-back (21 §11, §12) when their keys are
+  on.
 - `05-game-patches.md` §7: list the fire alignment patch of 21 §5.3 as a
   v2 optional patch.
 - `06-options-and-config.md` §1: the `Hands` and `Body` sections (21 §15);
   §4: console commands for them and the calibration command.
-- `09-openxr.md` §5.3 and 04 §5.8.4: the vibration action and its calls
-  (21 §14.3); the left grip space also places the wrist panel (21 §13).
+- `04-input.md` §5.8.4 and `09-openxr.md` §5.2: the vibration action and
+  its calls (21 §14.3); the left grip space also places the wrist panel as
+  a quad layer (21 §13).
 - `11-diagnostics.md`: the events of 21 §18.
 - `12-threads-and-robustness.md` §2.2, §3.2: the job-thread work of 21 §17
   and the copy it reads; the audio-thread rumble values.
 - `13-distribution.md`: the message that standing mode needs calibration
-  (21 §11.4).
-- `20-v2-overview.md` §2 and §4: seated and standing height, calibration
-  and real crouch are specified here (21 §11.4, §11.5); 22 should reference
-  these keys or own the mode key only.
+  (22 §6).
