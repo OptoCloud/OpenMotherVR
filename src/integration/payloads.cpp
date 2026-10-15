@@ -112,6 +112,36 @@ void write_sidecar(const std::filesystem::path& file, const FileIdentity& id) no
     if (!ok) ::DeleteFileW(file.c_str());
 }
 
+// Reuses MOTHER.PAK if it is current, else builds it (unless `may_build` is
+// false: another process holds the build lock).
+bool reuse_or_build(HMODULE self, const std::filesystem::path& stock, const std::filesystem::path& target,
+                    const std::filesystem::path& sidecar, const FileIdentity& source, std::int64_t build_stamp,
+                    bool may_build) noexcept {
+    if (up_to_date(target, to_filetime(build_stamp)) && read_sidecar(sidecar) == source) {
+        diag::logf("payload: {} is current", diag::utf8(target));
+        return true;
+    }
+    if (!may_build) {
+        diag::logf("payload: {} is being built by another process and is not ready after 5 s; "
+                   "options page off this session, VR not affected", diag::utf8(target));
+        return false;
+    }
+
+    // Built from the player's own UI.PAK and the embedded patch; no game
+    // files ship with the mod.
+    ::DeleteFileW(sidecar.c_str());
+    if (!build_ui_archive(stock, resource_bytes(self, IDR_UI_PATCH), target)) return false;
+    HANDLE h = ::CreateFileW(target.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr, OPEN_EXISTING,
+                             FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h != INVALID_HANDLE_VALUE) {
+        const FILETIME stamp = to_filetime(build_stamp);
+        ::SetFileTime(h, &stamp, &stamp, &stamp);
+        ::CloseHandle(h);
+    }
+    write_sidecar(sidecar, source);
+    return true;
+}
+
 } // namespace
 
 bool deploy_mother_pak(HMODULE self, const std::filesystem::path& game_dir,
@@ -129,27 +159,26 @@ bool deploy_mother_pak(HMODULE self, const std::filesystem::path& game_dir,
         // The original disables the mod here; we only lose the options page.
         post_message_box("Failed to find UI.PAK!\n[" + diag::utf8(stock) +
                              "]\n\nThe MotherVR options page will be unavailable for this session.",
-                         MB_OK | MB_ICONERROR);
+                         MB_OK | MB_ICONERROR, nullptr, "UI.PAK missing");
         return false;
     }
-    if (up_to_date(target, to_filetime(build_stamp)) && read_sidecar(sidecar) == *source) {
-        diag::logf("payload: {} is current", diag::utf8(target));
-        return true;
+    // When Steam relaunches the game, two processes attach close together
+    // and both come here: one builds, the other waits for it and then
+    // reuses its archive, instead of both writing the same files. 5 s is
+    // well above a rebuild and short enough that a stuck process does not
+    // hold up the game's start noticeably (spec 14 §5.8).
+    HANDLE mutex = ::CreateMutexW(nullptr, FALSE, L"Local\\MotherVR.MotherPak");
+    bool held = false;
+    if (mutex) {
+        const DWORD w = ::WaitForSingleObject(mutex, 5000);
+        held = w == WAIT_OBJECT_0 || w == WAIT_ABANDONED;
     }
-
-    // Built from the player's own UI.PAK and the embedded patch; no game
-    // files ship with the mod.
-    ::DeleteFileW(sidecar.c_str());
-    if (!build_ui_archive(stock, resource_bytes(self, IDR_UI_PATCH), target)) return false;
-    HANDLE h = ::CreateFileW(target.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr, OPEN_EXISTING,
-                             FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h != INVALID_HANDLE_VALUE) {
-        const FILETIME stamp = to_filetime(build_stamp);
-        ::SetFileTime(h, &stamp, &stamp, &stamp);
-        ::CloseHandle(h);
-    }
-    write_sidecar(sidecar, *source);
-    return true;
+    // Without a mutex at all (cannot be created) build as before.
+    const bool may_build = held || !mutex;
+    const bool ok = reuse_or_build(self, stock, target, sidecar, *source, build_stamp, may_build);
+    if (held) ::ReleaseMutex(mutex);
+    if (mutex) ::CloseHandle(mutex);
+    return ok;
 }
 
 bool deploy_openvr_api() noexcept {

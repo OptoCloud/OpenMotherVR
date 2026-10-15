@@ -124,9 +124,31 @@ bool write_pak(const std::filesystem::path& path, std::uint32_t align, const std
         std::memcpy(out.data() + table, &end, 4);
         table += 4;
     }
-    std::ofstream file(path, std::ios::binary | std::ios::trunc);
-    file.write(reinterpret_cast<const char*>(out.data()), static_cast<std::streamsize>(out.size()));
-    return file.good();
+    // Written whole under a temporary name, flushed, then moved over the
+    // archive in one step: the game (or the other process of a Steam
+    // relaunch) never opens a partly written MOTHER.PAK, and a process ended
+    // mid-write leaves the old file, which is then rebuilt (spec 14 §5.8).
+    auto temp = path;
+    temp += L".tmp";
+    HANDLE h = ::CreateFileW(temp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        diag::logf("ui patch: cannot create {} err=0x{:08X}", diag::utf8(temp), ::GetLastError());
+        return false;
+    }
+    DWORD written = 0;
+    bool ok = ::WriteFile(h, out.data(), static_cast<DWORD>(out.size()), &written, nullptr)
+              && written == out.size() && ::FlushFileBuffers(h);
+    DWORD error = ok ? 0 : ::GetLastError();
+    ::CloseHandle(h);
+    if (ok && !::MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        error = ::GetLastError();
+        ok = false;
+    }
+    if (!ok) {
+        diag::logf("ui patch: writing {} failed err=0x{:08X}", diag::utf8(path), error);
+        ::DeleteFileW(temp.c_str());
+    }
+    return ok;
 }
 
 } // namespace
