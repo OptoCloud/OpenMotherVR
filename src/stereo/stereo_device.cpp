@@ -631,12 +631,18 @@ bool __fastcall dev_position_tracked(void*, void*) noexcept { return true; }
 void __fastcall dev_unused(void*, void*) noexcept {}
 
 // [21] RecenterAndGetHeadPose(float out[12]): MotherVR's extra slot. The
-// game's recenter call sites are redirected here from slot 11.
+// game's recenter call sites are redirected here from slot 11. Game thread.
+//
+// A recenter that met an invalid head pose keeps the previous reference
+// (03 section 2.1, 09 section 5.5); the retake is queued here, so the chord,
+// CreateDevice and the game's own recenter sites are all taken again once
+// the headset is worn and tracked.
 float* __fastcall dev_recenter_pose(void* self, void*, float* out) noexcept {
     auto& si = device_of(self);
     guarded("RecenterAndGetHeadPose", [&] {
         if (auto* backend = load_backend(si)) {
             backend->head_yaw_pose(*reinterpret_cast<runtime::Matrix34*>(out), si.world_scale);
+            if (!backend->recenter_taken()) request_recenter();
         }
     });
     return out;
@@ -743,7 +749,8 @@ void create_device_impl(StereoManager* self) {
     if (first && device && load_state(si) == DeviceState::Ready) {
         dev_recenter_pose(&si, nullptr, self->reference_pose);
         // The headset may be lying on the desk at launch: take the
-        // reference again once it is worn.
+        // reference again once it is worn (a pose that was not valid has
+        // queued the retake already).
         if (auto* backend = load_backend(si); backend && !backend->headset_in_use()) request_recenter();
     }
 }

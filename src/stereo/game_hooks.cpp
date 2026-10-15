@@ -278,8 +278,10 @@ void update_running(StereoManager* self, StereoInterface* device) {
     bool handled = false;
     runtime::HmdBackend* backend = load_backend(*device);
     if (u.recenter_request && backend && backend->headset_in_use()) {
-        recenter();
+        // Cleared first: a recenter that meets an invalid head pose queues
+        // the retake again (dev_recenter_pose).
         u.recenter_request = false;
+        recenter();
         u.recentered = true;
         u.screen_replaced = 0;
         handled = true;
