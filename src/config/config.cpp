@@ -8,10 +8,14 @@
 
 #include "config.h"
 
+#include "diag/log.h"
+
 #include <nlohmann/json.hpp>
 
+#include <windows.h>
+
 #include <fstream>
-#include <iomanip>
+#include <format>
 #include <system_error>
 
 namespace mothervr::config {
@@ -80,6 +84,8 @@ Config& mutable_current() noexcept {
 // of it, so keys we do not know are kept.
 json g_document = json::object();
 std::filesystem::path g_config_dir;
+// Where the settings in effect came from, for the settings log line.
+std::string_view g_source = "defaults";
 
 } // namespace
 
@@ -181,7 +187,9 @@ void write_config(json& root, const Config& c) {
     if (auto d = root.find(kKey_DebugOptions); d != root.end() && d->is_object()) root.erase(d);
 
     json& s = object_at(root, kKey_Settings);
-    s[kKey_VRRuntime] = to_string(c.vr_runtime);
+    // Never "Oculus": older tools would start a LibOVR backend from it.
+    // Oculus means OpenXR here (spec 06 §1.1).
+    s[kKey_VRRuntime] = to_string(c.vr_runtime == VRRuntime::Oculus ? VRRuntime::OpenXR : c.vr_runtime);
 
     json& r = object_at(s, kKey_Rendering);
     r[kKey_MirrorViewType]      = to_string(c.rendering.mirror_view_type);
@@ -202,21 +210,64 @@ void write_config(json& root, const Config& c) {
     s[kKey_SkipStartupIntro] = c.debug.skip_startup_intro;
 }
 
-std::optional<json> read_document(const std::filesystem::path& path) {
+// The parsed file, or nullopt with `why` set to the reason it is unusable.
+std::optional<json> read_document(const std::filesystem::path& path, std::string& why) {
     std::ifstream f(path / kFilename, std::ios::binary);
-    if (!f) return std::nullopt;
+    if (!f) {
+        why = std::format("cannot open it (err=0x{:08X})", ::GetLastError());
+        return std::nullopt;
+    }
     try {
+        // Notepad and other Windows editors may save a UTF-8 byte-order
+        // mark; players edit this file by hand, so it must still load.
+        char bom[3] = {};
+        f.read(bom, 3);
+        if (!(f.gcount() == 3 && bom[0] == '\xEF' && bom[1] == '\xBB' && bom[2] == '\xBF')) {
+            f.clear();
+            f.seekg(0);
+        }
         json j;
         f >> j;
         return j;
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        why = e.what();
         return std::nullopt;
     }
+}
+
+// The file written whole under a temporary name, then moved over the old
+// one in one step, so a process ended mid-write (a crash, a Steam
+// relaunch) leaves the old file or the new one, never a partial one. A
+// leftover temporary file is never read and is replaced by the next write.
+bool write_file_atomically(const std::filesystem::path& target, const std::string& text, DWORD& error) {
+    auto temp = target;
+    temp += L".tmp";
+    HANDLE h = ::CreateFileW(temp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        error = ::GetLastError();
+        return false;
+    }
+    DWORD written = 0;
+    bool ok = ::WriteFile(h, text.data(), static_cast<DWORD>(text.size()), &written, nullptr)
+              && written == text.size() && ::FlushFileBuffers(h);
+    error = ok ? 0 : ::GetLastError();
+    ::CloseHandle(h);
+    if (ok && !::MoveFileExW(temp.c_str(), target.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        error = ::GetLastError();
+        ok = false;
+    }
+    if (!ok) ::DeleteFileW(temp.c_str());
+    return ok;
 }
 
 } // namespace
 
 void sanitize(Config& cfg) noexcept {
+    // Oculus means OpenXR (spec 06 §1.1): Meta's PC runtime is an OpenXR
+    // runtime and there is no LibOVR backend, so the runtime choice and the
+    // next write see OpenXR.
+    if (cfg.vr_runtime == VRRuntime::Oculus) cfg.vr_runtime = VRRuntime::OpenXR;
+
     float& scale = cfg.rendering.pixel_scale;
     if (!(scale >= 0.5f && scale <= 4.0f)) scale = 1.0f;
 
@@ -231,44 +282,93 @@ void sanitize(Config& cfg) noexcept {
 }
 
 std::optional<Config> load(const std::filesystem::path& path) {
-    auto doc = read_document(path);
+    std::string why;
+    auto doc = read_document(path, why);
     if (!doc) return std::nullopt;
     Config c = read_config(*doc);
     sanitize(c);
     return c;
 }
 
-void save(const std::filesystem::path& path, const Config& cfg) {
-    json j = g_document;
-    write_config(j, cfg);
-    std::ofstream f(path / kFilename, std::ios::binary | std::ios::trunc);
-    if (!f) return;
-    f << std::setw(4) << j;
+bool save(const std::filesystem::path& path, const Config& cfg) {
+    const auto target = path / kFilename;
+    DWORD error = 0;
+    bool ok = false;
+    try {
+        json j = g_document;
+        write_config(j, cfg);
+        ok = write_file_atomically(target, j.dump(4), error);
+    } catch (const std::exception& e) {
+        diag::logf("config: saving settings to {} failed ({}); the change holds for this session",
+                   diag::utf8(target), e.what());
+        return false;
+    }
+    if (ok) {
+        diag::logf("config: settings saved to {}", diag::utf8(target));
+    } else {
+        diag::logf("config: saving settings to {} failed err=0x{:08X}; the change holds for this session",
+                   diag::utf8(target), error);
+    }
+    return ok;
 }
 
 Config& current() noexcept { return mutable_current(); }
 
 bool initialize(const std::filesystem::path& dir) {
     g_config_dir = dir;
-    if (auto doc = read_document(dir)) {
+    const auto file = dir / kFilename;
+    std::string why;
+    if (auto doc = read_document(dir, why)) {
         mutable_current() = read_config(*doc);
         sanitize(mutable_current());
         g_document = std::move(*doc);
         if (!g_document.is_object()) g_document = json::object();
+        g_source = "file";
         return false;
     }
     mutable_current() = Config{};
     g_document = json::object();
     // No file: the first launch. The caller writes the template (see
     // config.h). A file that is there but does not parse is kept until a
-    // setting changes.
+    // setting changes. An error while checking is not "absent".
     std::error_code ec;
-    return !std::filesystem::exists(dir / kFilename, ec) && !ec;
+    const bool absent = !std::filesystem::exists(file, ec) && !ec;
+    if (absent) {
+        g_source = "defaults, first launch";
+        diag::logf("config: {} absent: first launch, file follows the welcome message", diag::utf8(file));
+    } else {
+        g_source = "defaults, file unusable";
+        diag::logf("config: {} ignored, defaults apply: {}", diag::utf8(file), why);
+    }
+    return absent;
 }
 
 void save_current() {
     if (!g_config_dir.empty())
         save(g_config_dir, current());
+}
+
+std::string_view load_source() noexcept { return g_source; }
+
+std::string describe(const Config& c) {
+    // Key paths as in mothervr.json, so a tester can hold the line against
+    // the player's file.
+    json j = json::object();
+    j["VRRuntime"]                     = to_string(c.vr_runtime);
+    j["Rendering.MirrorViewType"]      = to_string(c.rendering.mirror_view_type);
+    j["Rendering.SymmetricMirrorView"] = c.rendering.symmetric_mirror_view;
+    j["Rendering.PixelScale"]          = c.rendering.pixel_scale;
+    j["Rendering.ClippingBlinders"]    = c.rendering.clipping_blinders;
+    j["Rendering.StereoAntiAliasing"]  = to_string(c.rendering.stereo_aa);
+    j["Input.SnapRotation"]            = c.input.snap_rotation;
+    j["Input.SnapRotationSegments"]    = c.input.snap_rotation_segments;
+    j["Input.VRInputRelativeWalking"]  = c.input.vr_input_relative_walking;
+    j["Input.VRInputStrafing"]         = c.input.vr_input_strafing;
+    j["Input.ToggleGrips"]             = c.input.toggle_grips;
+    j["Input.ToggleCrouch"]            = c.input.toggle_crouch;
+    j["DebugOptions"]                  = c.debug.debug;
+    j["SkipStartupIntro"]              = c.debug.skip_startup_intro;
+    return j.dump();
 }
 
 } // namespace mothervr::config

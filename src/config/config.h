@@ -109,15 +109,20 @@ std::optional<Config> load(const std::filesystem::path& path);
 
 // Write `cfg` to `path` as pretty-printed JSON (4-space indent, as
 // nlohmann's `dump(4)`) in the original's layout. Keys of the file last
-// loaded that we do not know are kept.
+// loaded that we do not know are kept. The file is replaced in one step
+// (written under a temporary name, then moved over it), so it is always
+// either the old or the new file. Logs the outcome; false if it failed, in
+// which case the settings in memory still hold for this session.
 //
 // From: FUN_10014680 @ 0x10014680.
-void save(const std::filesystem::path& path, const Config& cfg);
+bool save(const std::filesystem::path& path, const Config& cfg);
 
 // Brings hand-edited or console-set values into range, in place: a pixel
 // scale outside [0.5, 4] (or not a number) becomes 1.0, and the snap
 // rotation segments are rounded down to one of 2, 3, 4, 6, 12, 24 (1 or
-// less becomes 12). Run after every load and every mvr_* command.
+// less becomes 12). The runtime value Oculus becomes OpenXR (there is no
+// LibOVR backend; Oculus means OpenXR). Run after every load and every
+// mvr_* command.
 // From: the guards in FUN_100202e0 (mvr_pixelscale) and FUN_10020870
 // (the segment cascade).
 void sanitize(Config& cfg) noexcept;
@@ -147,6 +152,14 @@ bool initialize(const std::filesystem::path& dir);
 // No-op if initialize() has not been called yet. Called from the script
 // bridge after any in-game mvr_* console command changes a setting.
 void save_current();
+
+// Where the settings in effect came from at initialize(): "file",
+// "defaults, first launch" or "defaults, file unusable".
+std::string_view load_source() noexcept;
+
+// Every setting under its mothervr.json key path ("Rendering.PixelScale",
+// ...), as one line of JSON for the log.
+std::string describe(const Config& cfg);
 
 // String forms used in the JSON. Parsing also takes the legacy spelling
 // "Disabled" for VRRuntime::None.
