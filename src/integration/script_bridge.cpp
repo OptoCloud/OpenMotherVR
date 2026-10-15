@@ -13,6 +13,7 @@
 #include "script_bridge.h"
 
 #include "config/config.h"
+#include "diag/crash_log.h"
 #include "diag/log.h"
 #include "input/vr_controls.h"
 #include "runtime/vr_detect.h"
@@ -112,6 +113,12 @@ void reset_display_if_changed(const config::Config& cfg) noexcept {
 // menu object `ui`. Corresponds to FUN_10020870.
 
 void push_settings_to_game(void* ui) noexcept {
+    // Menus open (front end, pause, loading screen) after the game has set
+    // up whatever exception handling of its own it installs, and now and
+    // then during play: a cheap moment, on the game thread, to make sure a
+    // crash still reaches the crash record.
+    diag::reassert_crash_log();
+
     if (!ui || !callbacks_ready()) {
         diag::log_line("[script_bridge] push_settings_to_game: callbacks not installed yet");
         return;
