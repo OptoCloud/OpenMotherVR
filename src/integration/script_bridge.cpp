@@ -70,9 +70,12 @@ int ui_runtime_value(config::VRRuntime r) noexcept {
 // The runtime this run drives: None when the chosen one failed to start, the
 // fallback when the stored one was not available. The menu then offers the
 // stored runtime (a retry) and the other one (the way back), where showing
-// the stored choice would hide that VR is not running.
+// the stored choice would hide that VR is not running. A -vrforce* switch
+// overrides the stored runtime for this run (06 section 4.3), so a stored
+// None with -vrforceopenvr shows OpenVR.
 config::VRRuntime running_runtime(const config::Config& cfg) noexcept {
-    if (cfg.vr_runtime == config::VRRuntime::None || stereo::runtime_failed()) return config::VRRuntime::None;
+    const auto requested = runtime::forced_runtime().value_or(cfg.vr_runtime);
+    if (requested == config::VRRuntime::None || stereo::runtime_failed()) return config::VRRuntime::None;
     switch (runtime::last_result().chosen) {
         case runtime::detect_result::Chosen::OpenVR: return config::VRRuntime::OpenVR;
         case runtime::detect_result::Chosen::OpenXR: return config::VRRuntime::OpenXR;
