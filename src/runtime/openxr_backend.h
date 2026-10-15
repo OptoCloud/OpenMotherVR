@@ -33,8 +33,10 @@ namespace mothervr::runtime::openxr {
 // Locate a runtime a 32-bit process can load. The loader in a 32-bit process
 // reads the 32-bit registry view, where runtimes often aren't registered
 // (SteamVR ships steamxr_win32.json but only registers the win64 manifest).
-// If needed this finds the 32-bit sibling of the 64-bit active runtime and
-// exports it via XR_RUNTIME_JSON for the loader.
+// If needed this finds the 32-bit sibling of the 64-bit active runtime.
+// Probing changes nothing in the process: init_system hands the choice to
+// the loader (XR_RUNTIME_JSON and the loader property) once OpenXR is the
+// runtime that starts.
 //
 // Returns the manifest path in use, or empty if no usable runtime exists.
 std::filesystem::path probe() noexcept;

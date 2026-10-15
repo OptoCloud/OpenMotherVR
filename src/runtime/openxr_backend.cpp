@@ -29,14 +29,33 @@ std::filesystem::path active_runtime(REGSAM view) {
                         KEY_READ | view, &key) != ERROR_SUCCESS) {
         return {};
     }
-    wchar_t buf[MAX_PATH] = {};
-    DWORD size = sizeof(buf) - sizeof(wchar_t);
-    DWORD type = 0;
-    const LSTATUS st = ::RegQueryValueExW(key, L"ActiveRuntime", nullptr, &type,
-                                          reinterpret_cast<BYTE*>(buf), &size);
+    // A path of whatever length the registry holds (09 §1): ask for the size
+    // first instead of assuming MAX_PATH.
+    DWORD type = 0, size = 0;
+    LSTATUS st = ::RegQueryValueExW(key, L"ActiveRuntime", nullptr, &type, nullptr, &size);
+    std::wstring value;
+    if (st == ERROR_SUCCESS && (type == REG_SZ || type == REG_EXPAND_SZ) && size > 0) {
+        value.resize(size / sizeof(wchar_t) + 1);   // room for a missing terminator
+        DWORD got = static_cast<DWORD>(value.size() * sizeof(wchar_t));
+        st = ::RegQueryValueExW(key, L"ActiveRuntime", nullptr, &type, reinterpret_cast<BYTE*>(value.data()), &got);
+    }
     ::RegCloseKey(key);
     if (st != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ)) return {};
-    return buf;
+    value.resize(::wcsnlen(value.c_str(), value.size()));
+    // An expandable value names its folder through environment references
+    // (%ProgramFiles%...); the loader expands them, so must we, or the
+    // manifest is not found.
+    if (type == REG_EXPAND_SZ && !value.empty()) {
+        if (const DWORD n = ::ExpandEnvironmentStringsW(value.c_str(), nullptr, 0); n > 0) {
+            std::wstring expanded(n, L'\0');
+            const DWORD m = ::ExpandEnvironmentStringsW(value.c_str(), expanded.data(), n);
+            if (m > 0 && m <= n) {
+                expanded.resize(m - 1);
+                value = std::move(expanded);
+            }
+        }
+    }
+    return value;
 }
 
 // IMAGE_FILE_HEADER.Machine of a PE file, 0 if unreadable.
@@ -110,7 +129,7 @@ void point_loader_at(const std::filesystem::path& manifest) noexcept {
     if (XR_FAILED(xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrInitializeLoaderKHR",
                                         reinterpret_cast<PFN_xrVoidFunction*>(&init_loader))) ||
         !init_loader) {
-        diag::log_line("openxr: loader has no xrInitializeLoaderKHR");
+        diag::log_line("openxr: loader has no xrInitializeLoaderKHR; only XR_RUNTIME_JSON points it at the manifest");
         return;
     }
     const std::string path = diag::utf8(manifest);
@@ -119,7 +138,30 @@ void point_loader_at(const std::filesystem::path& manifest) noexcept {
     props.propertyValueCount = 1;
     props.propertyValues     = &value;
     const XrResult r = init_loader(reinterpret_cast<const XrLoaderInitInfoBaseHeaderKHR*>(&props));
-    if (XR_FAILED(r)) diag::logf("openxr: loader property not set: {}", static_cast<int>(r));
+    // Either outcome is logged (09 §1): this is the first thing to check
+    // when "OpenXR does not start" is reported from an elevated game.
+    if (XR_FAILED(r)) {
+        diag::logf("openxr: loader property not set: {}; only XR_RUNTIME_JSON points the loader at {}",
+                   static_cast<int>(r), path);
+    } else {
+        diag::logf("openxr: loader directed to {} (initialisation property accepted)", path);
+    }
+}
+
+// Hands the chosen manifest to the loader through the environment (this
+// module's CRT copy and the process), only once OpenXR is the runtime that
+// starts: a probe for a runtime the player did not choose must not leave the
+// variable to the game's child processes (01 §5.2). The elevated line goes
+// with it, since only then is the loader property the one that counts.
+void set_runtime_environment(const std::filesystem::path& manifest) noexcept {
+    if (manifest.empty()) return;
+    _wputenv_s(L"XR_RUNTIME_JSON", manifest.c_str());
+    static bool s_elevation_logged = false;
+    if (!s_elevation_logged && process_elevated()) {
+        s_elevation_logged = true;
+        diag::log_line("openxr: the game runs elevated (as administrator); the loader ignores the environment, "
+                       "only its initialisation property points it at the runtime");
+    }
 }
 
 // ---- Session state ------------------------------------------------------------
@@ -568,7 +610,9 @@ std::filesystem::path probe() noexcept {
             const std::filesystem::path set{env};
             std::free(env);
             if (!set.empty()) {
-                diag::logf("openxr: XR_RUNTIME_JSON already set");
+                // The player chose: left as it is, nothing else passed (09 §1).
+                g_manifest.clear();
+                diag::logf("openxr: available: {} (XR_RUNTIME_JSON set by the player)", diag::utf8(set));
                 return set;
             }
         }
@@ -581,29 +625,33 @@ std::filesystem::path probe() noexcept {
         diag::logf("openxr: active runtime 64-bit {}, 32-bit {}",
                    m64.empty() ? "(none)" : diag::utf8(m64), m32.empty() ? "(none)" : diag::utf8(m32));
         std::filesystem::path chosen;
+        const char* rule = "";
         if (usable_from_x86(m64)) {
             chosen = m64;
+            rule = "the 64-bit registration";
         } else {
             for (const auto& m : x86_siblings(m64)) {
                 if (usable_from_x86(m)) {
                     chosen = m;
-                    diag::logf("openxr: using 32-bit sibling {} of active runtime", diag::utf8(m));
+                    rule = "the 32-bit sibling of the 64-bit registration";
                     break;
                 }
             }
         }
-        if (chosen.empty() && usable_from_x86(m32)) chosen = m32;
+        if (chosen.empty() && usable_from_x86(m32)) {
+            chosen = m32;
+            rule = "the 32-bit registration";
+        }
         if (chosen.empty()) {
-            if (m64.empty() && m32.empty()) diag::log_line("openxr: no active runtime registered");
-            else diag::log_line("openxr: no active runtime has a 32-bit build");
+            if (m64.empty() && m32.empty()) diag::log_line("openxr: not available: no active runtime registered");
+            else diag::log_line("openxr: not available: no active runtime has a 32-bit build");
             return {};
         }
-        // Point the loader at the choice: the environment for the loader's
-        // own lookup (this module's CRT and the process), and a loader
-        // property in init_system, which an elevated process also honours.
-        _wputenv_s(L"XR_RUNTIME_JSON", chosen.c_str());
+        diag::logf("openxr: available: {} ({})", diag::utf8(chosen), rule);
+        // Handed to the loader (environment and loader property) only when
+        // OpenXR is the runtime that starts: init_system. Probing alone
+        // changes nothing in the process (01 §5.2).
         g_manifest = chosen;
-        if (process_elevated()) diag::log_line("openxr: the game runs elevated (as administrator)");
         return chosen;
     } catch (const std::exception& e) {
         diag::logf("openxr: probe failed: {}", e.what());
@@ -616,6 +664,7 @@ bool init_system() noexcept {
 
     // Instance with the D3D11 binding, and the per-eye FOV query where the
     // runtime offers it (the FOV is needed before a session can exist).
+    set_runtime_environment(g_manifest);
     point_loader_at(g_manifest);
     std::uint32_t n_ext = 0;
     xrEnumerateInstanceExtensionProperties(nullptr, 0, &n_ext, nullptr);
