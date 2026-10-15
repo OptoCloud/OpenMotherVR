@@ -200,12 +200,18 @@ void remap_actions(ActionTier& t, Action* actions, int count, int index_offset,
             }
             if (clear_flag_40) bind.flags &= ~0x40;
         }
-        if (!found && act.count < kMaxBindings) { // the original does not bounds-check
-            GameBinding& bind = act.bindings[act.count++];
-            bind.code   = virtual_code;
-            bind.device = 0;
-            bind.flags  = appended_flags;
+        if (!found) {
+            // "None" whatever the record count: a full action (six records,
+            // none for the pad) must not keep a pad control remembered from
+            // before the game rebuilt its bindings (spec 04 section 3.2
+            // item 3).
             t.original_code[n] = -1;
+            if (act.count < kMaxBindings) { // the original does not bounds-check
+                GameBinding& bind = act.bindings[act.count++];
+                bind.code   = virtual_code;
+                bind.device = 0;
+                bind.flags  = appended_flags;
+            }
         }
     }
 }
@@ -220,13 +226,16 @@ void remap(ActionTier& t, GameActionMap& map) noexcept {
     std::fill(t.original_code.begin() + t.num_digital + t.num_analog,
               t.original_code.end(), std::int16_t{-1});
 
-    // The original writes a 16-bit -1 into each slot.
+    // The codes are dwords. The original writes a 16-bit -1 into each,
+    // which a 32-bit reader sees as 0x0000FFFF, neither "no control" nor a
+    // pad code; -1 in the whole dword holds whichever width the game reads
+    // (spec 04 section 3.2 item 4).
     const int composites = std::clamp(map.composite_count, 0, 12);
     for (int c = 0; c < composites; ++c) {
         GameComposite& comp = map.composite[c];
         if (comp.keep) continue;
         for (int i = 0; i < comp.count && i < 7; ++i) {
-            *reinterpret_cast<std::int16_t*>(&comp.codes[i]) = -1;
+            comp.codes[i] = 0xFFFFFFFFu;
         }
     }
 }
