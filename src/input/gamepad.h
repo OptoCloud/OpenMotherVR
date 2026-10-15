@@ -73,6 +73,20 @@ bool  pad_button(void* pad, int pad_code) noexcept;
 bool  pad_activity(void* pad) noexcept;
 float pad_axis_value(void* pad, int virtual_code) noexcept;
 
+// The virtual code of analog action `index` of action map `map`, derived
+// from the counts read at the last virtualisation (spec 04 section 3.1: the
+// turn is map 0's analog action 3 whatever the digital count is), or -1
+// before the maps are virtualised or when the map has no such action.
+// Game thread.
+int analog_virtual_code(int map, int index) noexcept;
+
+// The stock left-stick prompt check, answered for virtualised bindings:
+// true when map 0's analog action 0 (move) was on LSTICK_X, or has no pad
+// control at all (before the first virtualisation every action has none,
+// and the stock check answers true without a pad binding). Spec 04
+// section 4.3. Game thread.
+bool move_on_left_stick() noexcept;
+
 // Saves the game's five pad methods and points the vtable slots at ours.
 // `pad_vtable` is the AI.exe vtable address the original patches (one slot
 // past the destructor), `input_manager` the AI.exe global holding the input

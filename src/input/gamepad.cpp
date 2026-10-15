@@ -398,6 +398,21 @@ float pad_axis_value(void* pad, int virtual_code) noexcept {
     return g_game.axis && g_installed.load() ? pad_axis(pad, nullptr, virtual_code, 0) : 0.0f;
 }
 
+int analog_virtual_code(int map, int index) noexcept {
+    if (map < 0 || map >= static_cast<int>(g_tiers.size())) return -1;
+    const ActionTier& t = g_tiers[static_cast<std::size_t>(map)];
+    return index >= 0 && index < t.num_analog ? t.base + t.num_digital + index : -1;
+}
+
+bool move_on_left_stick() noexcept {
+    const ActionTier& t = g_tiers[0];
+    // Before the first virtualisation num_digital is 0 and every entry is
+    // -1, so this reads "none" and answers true, as the stock check does
+    // for an action with no pad binding. From: FUN_10003100.
+    const std::int16_t o = t.original_code[static_cast<std::size_t>(t.num_digital)];
+    return o == -1 || o == 0x12;   // none, or LSTICK_X
+}
+
 bool install(std::uint8_t* pad_vtable, void** input_manager) noexcept {
     g_input_manager = input_manager;
 
