@@ -244,7 +244,7 @@ struct State {
     // Pose-age probe: how many display periods before the frame's own
     // display time the declared (and rendered) views were predicted for.
     // 0 is right; the old loop measured 1. Logged with Dev. Debug Options.
-    std::uint32_t age_frames = 0, age_same = 0, age_one = 0, age_other = 0;
+    std::uint32_t age_frames = 0, age_same = 0, age_one = 0, age_other = 0, age_known = 0;
     double        age_sum    = 0.0;
 } g;
 
@@ -255,20 +255,28 @@ SeqLock<FrameViews> g_views;
 constexpr std::uint32_t kPoseAgeLogFrames = 900;
 
 void count_pose_age(XrTime rendered_for) {
-    const double periods = g.frame_period > 0 && rendered_for != 0
+    // Unknown: no prediction recorded for the views, or no display period.
+    const bool known = g.frame_period > 0 && rendered_for != 0;
+    const double periods = known
                                ? static_cast<double>(g.frame_time - rendered_for) / static_cast<double>(g.frame_period)
-                               : -1.0;
+                               : 0.0;
     const long long whole = std::llround(periods);
-    if (rendered_for != 0 && whole == 0) ++g.age_same;
-    else if (rendered_for != 0 && whole == 1) ++g.age_one;
+    if (known && whole == 0) ++g.age_same;
+    else if (known && whole == 1) ++g.age_one;
     else ++g.age_other;
-    if (periods >= 0.0) g.age_sum += periods;
+    if (known) {
+        g.age_sum += periods;
+        ++g.age_known;
+    }
     if (++g.age_frames < kPoseAgeLogFrames) return;
     if (config::current().debug.debug) {
-        diag::logf("openxr: pose age over {} frames: {} same frame, {} one period early, {} other, mean {:.2f} periods",
-                   g.age_frames, g.age_same, g.age_one, g.age_other, g.age_sum / g.age_frames);
+        // The mean is over the frames whose age is known (11 §4.1).
+        diag::logf("openxr: pose age over {} frames: {} same frame, {} one period early, {} other, "
+                   "mean {:.2f} periods over {} known",
+                   g.age_frames, g.age_same, g.age_one, g.age_other,
+                   g.age_known ? g.age_sum / g.age_known : 0.0, g.age_known);
     }
-    g.age_frames = g.age_same = g.age_one = g.age_other = 0;
+    g.age_frames = g.age_same = g.age_one = g.age_other = g.age_known = 0;
     g.age_sum = 0.0;
 }
 
@@ -765,7 +773,12 @@ session_info init(ID3D11Device* device) noexcept {
         if (SUCCEEDED(dxgi->GetAdapter(&adapter)) && SUCCEEDED(adapter->GetDesc(&desc)) &&
             (desc.AdapterLuid.LowPart != reqs.adapterLuid.LowPart ||
              desc.AdapterLuid.HighPart != reqs.adapterLuid.HighPart)) {
-            diag::log_line("openxr: WARNING game renders on a different GPU than the headset runtime");
+            // Both adapters, so a hybrid-GPU report can be read from the log (11 §2.4).
+            diag::logf("openxr: WARNING game renders on {} (LUID {:08X}:{:08X}), the runtime wants adapter "
+                       "LUID {:08X}:{:08X}; continuing",
+                       diag::utf8(std::filesystem::path{desc.Description}),
+                       static_cast<std::uint32_t>(desc.AdapterLuid.HighPart), desc.AdapterLuid.LowPart,
+                       static_cast<std::uint32_t>(reqs.adapterLuid.HighPart), reqs.adapterLuid.LowPart);
         }
         if (adapter) adapter->Release();
         dxgi->Release();

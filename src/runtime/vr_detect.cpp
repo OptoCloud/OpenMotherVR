@@ -46,22 +46,34 @@ std::filesystem::path openvr_paths_file() {
 }
 
 // Returns the OpenVR runtime path from openvrpaths.vrpath, or empty on any
-// failure (file missing, bad JSON, "runtime" array empty/missing).
-std::filesystem::path read_openvr_runtime_path() noexcept {
+// failure, with `why` saying which (11 §2.3: the log must tell a missing
+// file from one that does not parse or has no runtime entry).
+std::filesystem::path read_openvr_runtime_path(const char*& why) noexcept {
+    why = "";
     try {
         auto path = openvr_paths_file();
         std::error_code ec;
-        if (path.empty() || !std::filesystem::exists(path, ec)) return {};
+        if (path.empty() || !std::filesystem::exists(path, ec)) {
+            why = "no openvrpaths.vrpath (SteamVR not installed or never run)";
+            return {};
+        }
         std::ifstream f(path);
         nlohmann::json j;
-        f >> j;
+        try {
+            f >> j;
+        } catch (...) {
+            why = "openvrpaths.vrpath is not parseable";
+            return {};
+        }
         auto it = j.find("runtime");
-        if (it == j.end() || !it->is_array() || it->empty()) return {};
-        auto first = it->at(0);
-        if (!first.is_string()) return {};
-        const auto utf8 = first.get<std::string>();   // JSON text is UTF-8
+        if (it == j.end() || !it->is_array() || it->empty() || !it->at(0).is_string()) {
+            why = "openvrpaths.vrpath has no runtime entry";
+            return {};
+        }
+        const auto utf8 = it->at(0).get<std::string>();   // JSON text is UTF-8
         return std::filesystem::path{std::u8string(utf8.begin(), utf8.end())};
     } catch (...) {
+        why = "openvrpaths.vrpath could not be read";
         return {};
     }
 }
@@ -107,7 +119,8 @@ detect_result detect() noexcept {
     detect_result r{};
 
     // OpenVR via openvrpaths.vrpath.
-    const auto runtime = read_openvr_runtime_path();
+    const char* why = "";
+    const auto runtime = read_openvr_runtime_path(why);
     if (!runtime.empty()) {
         const auto api_dll = runtime / "bin" / "win32" / "openvr_api.dll";
         std::error_code ec;
@@ -119,7 +132,7 @@ detect_result detect() noexcept {
             diag::logf("vr probe: openvrpaths.vrpath points to {} but no openvr_api.dll there", diag::utf8(runtime));
         }
     } else {
-        diag::log_line("vr probe: openvrpaths.vrpath missing or unparseable");
+        diag::logf("vr probe: OpenVR not available: {}", why);
     }
 
     // Oculus: served by OpenXR, see the top of the file.

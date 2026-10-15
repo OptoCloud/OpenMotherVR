@@ -5,6 +5,7 @@
 
 #include <nlohmann/json.hpp>
 #include <openvr.h>
+#include <windows.h>
 
 #include <array>
 #include <fstream>
@@ -211,10 +212,24 @@ json manifest(const std::vector<std::pair<std::string, json>>& bindings) {
             {"localization", json::array({localization})}};
 }
 
+// False, logged with the Windows error, when the file cannot be written: the
+// caller then falls back to the legacy controller path, and the log must say
+// why (04 §5.8.2, 11 §2.5).
 bool write_json(const std::filesystem::path& path, const json& j) {
     std::ofstream f(path, std::ios::trunc);
+    if (!f) {
+        const DWORD error = ::GetLastError();
+        diag::logf("openvr input: cannot write {} (error {}), using legacy input", diag::utf8(path), error);
+        return false;
+    }
     f << j.dump(2);
-    return f.good();
+    f.flush();
+    if (!f.good()) {
+        const DWORD error = ::GetLastError();
+        diag::logf("openvr input: writing {} failed (error {}), using legacy input", diag::utf8(path), error);
+        return false;
+    }
+    return true;
 }
 
 } // namespace
