@@ -32,6 +32,8 @@ Uninstall
   older log, if present), the mothervr_input folder, any
   mothervr_reflection_*.dds files (developer debug dumps, only made with
   Dev. Debug Options on), and DATA\MOTHER.PAK with DATA\MOTHER.PAK.src.
+  A game that was closed while saving can leave mothervr.json.tmp or
+  DATA\MOTHER.PAK.tmp behind; delete those too.
   Never delete DATA\UI.PAK: it is the game's own file.
 - Steam's "Verify integrity of game files" is not needed and does not
   remove these files.
@@ -52,6 +54,10 @@ Playing
 - An Xbox controller works too.
 - Settings: in game, Options > MotherVR. Or edit mothervr.json while the
   game is closed.
+- VR off (runtime None, or -vrforcenone): the game plays as unmodded,
+  with only the MotherVR options page added, so VR can be turned back
+  on from there. The mod then changes no shaders, window, SSAO, camera
+  or pad behaviour.
 - Launch options (Steam: Properties > General > Launch Options), for
   this run only: -vrforceopenvr (SteamVR), -vrforceopenxr (OpenXR),
   -vrforcenone (no VR), -vrscale <0.5 to 1.5> (world scale). If several
