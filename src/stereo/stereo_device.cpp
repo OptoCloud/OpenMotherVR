@@ -19,13 +19,17 @@
 
 #include <d3d11.h>
 #include <windows.h>
+#include <shellapi.h>
 
 #include <algorithm>
 #include <atomic>
+#include <charconv>
 #include <cstring>
 #include <cwchar>
 #include <memory>
+#include <optional>
 #include <string_view>
+#include <system_error>
 #include <utility>
 
 namespace mothervr::stereo {
@@ -112,14 +116,38 @@ void fail_runtime(StereoInterface& si, runtime::detect_result::Chosen chosen, bo
     runtime::report_init_failure(chosen);
 }
 
-// -vrscale <s>: world scale, 1.0 outside [0.495, 1.505].
+// A decimal number with '.' as the point whatever the locale (shortcuts are
+// shared between players), the whole argument; nullopt otherwise.
+std::optional<float> parse_decimal(const wchar_t* arg) noexcept {
+    char buf[64];
+    std::size_t n = 0;
+    for (; arg[n] != L'\0'; ++n) {
+        if (n == sizeof(buf) || arg[n] > 0x7F) return std::nullopt;
+        buf[n] = static_cast<char>(arg[n]);
+    }
+    float value = 0.0f;
+    const auto [end, ec] = std::from_chars(buf, buf + n, value);
+    if (n == 0 || ec != std::errc{} || end != buf + n) return std::nullopt;
+    return value;
+}
+
+// -vrscale <s>: world scale, 1.0 outside [0.495, 1.505], for a value that is
+// not a number, or with no value. Arguments are split as the shell does and
+// compared whole, case-insensitively; the last -vrscale wins, so a switch
+// added at the end of a shortcut overrides one already in it.
 // From: FUN_1001f700 (the -vrforce* switches are handled by vr_detect).
 float world_scale_from_command_line() noexcept {
-    constexpr std::wstring_view kSwitch = L"-vrscale";
-    const wchar_t* at = std::wcsstr(::GetCommandLineW(), kSwitch.data());
-    if (!at) return 1.0f;
-    const float s = static_cast<float>(std::wcstod(at + kSwitch.size(), nullptr));
-    return (s >= 0.495f && s <= 1.505f) ? s : 1.0f;
+    int argc = 0;
+    wchar_t** argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
+    if (!argv) return 1.0f;
+    float scale = 1.0f;
+    for (int i = 1; i < argc; ++i) {
+        if (::_wcsicmp(argv[i], L"-vrscale") != 0) continue;
+        const std::optional<float> s = i + 1 < argc ? parse_decimal(argv[i + 1]) : std::nullopt;
+        scale = (s && *s >= 0.495f && *s <= 1.505f) ? *s : 1.0f;
+    }
+    ::LocalFree(argv);
+    return scale;
 }
 
 // From: FUN_1001eac0.
