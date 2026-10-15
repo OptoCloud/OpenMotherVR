@@ -5,9 +5,11 @@
 #include "core/render/tuning.h"
 
 #include <algorithm>
+#include <array>
+#include <bit>
 #include <cstring>
-#include <iterator>
 #include <optional>
+#include <span>
 
 namespace omvr::core::render {
 
@@ -15,29 +17,62 @@ namespace {
 
 // ---- The dither pair -------------------------------------------------------------
 
-std::uint32_t mask_of(std::uint32_t dst_tok) { return (dst_tok >> 4) & 0xF; }
-bool mask_mode(std::uint32_t tok) { return (tok & 0x3) == 2 && ((tok >> 2) & 0x3) == 0; }
-bool swizzle_mode(std::uint32_t tok) { return (tok & 0x3) == 2 && ((tok >> 2) & 0x3) == 1; }
-std::uint32_t selector(std::uint32_t tok, int c) { return (tok >> (4 + 2 * c)) & 0x3; }
+// The mul's tokens: opcode, destination (token, register), source 0 (token,
+// register), then the 5-token immediate. Rewritten, source 1 is a 3-token
+// constant-buffer operand.
+constexpr std::size_t   kMulImmediateLength = 10;
+constexpr std::size_t   kMulSrc0            = 3;
+constexpr std::size_t   kMulImmediate       = 5;
+constexpr std::uint32_t kMulCbLength        = 8;
+// dcl_constantBuffer: opcode, operand token, buffer index, register count.
+constexpr std::size_t kDclCbLength   = 4;
+constexpr std::size_t kDclCbIndex    = 2;
+constexpr std::size_t kDclCbRegCount = 3;
+// Each site's program grows by the inserted 10-token mul less the 2 tokens
+// the first mul loses: 8 tokens, 32 bytes.
+constexpr std::size_t kMulShrinkTokens  = kMulImmediateLength - kMulCbLength;
+constexpr std::size_t kSiteGrowthTokens = kMulImmediateLength - kMulShrinkTokens;
+
+std::uint32_t mask_of(std::uint32_t dst_tok) { return (dst_tok >> kComponentShift) & kWriteMaskBits; }
+bool mask_mode(std::uint32_t tok) {
+    return (tok & kComponentCountMask) == kFourComponents && selection_mode(tok) == kSelectMask;
+}
+bool swizzle_mode(std::uint32_t tok) {
+    return (tok & kComponentCountMask) == kFourComponents && selection_mode(tok) == kSelectSwizzle;
+}
+std::uint32_t selector(std::uint32_t tok, std::uint32_t c) {
+    return (tok >> (kComponentShift + kSwizzleBits * c)) & kSwizzleMask;
+}
+
+// The pre-filter: the immediate l(0.001, 0.001) every site multiplies by,
+// two 0.001f words in a row as they lie in the blob.
+consteval std::array<std::uint8_t, 2 * kTokenBytes> two_thousandths() {
+    const auto word = std::bit_cast<std::array<std::uint8_t, kTokenBytes>>(kPoint001);
+    std::array<std::uint8_t, 2 * kTokenBytes> bytes{};
+    std::ranges::copy(word, bytes.begin());
+    std::ranges::copy(word, bytes.begin() + kTokenBytes);
+    return bytes;
+}
+constexpr auto kTwoThousandths = two_thousandths();
 
 // A matched site: the `mul` and the `mad` right after it.
 struct Site {
-    std::size_t mul;        // token index of the mul's opcode
-    std::size_t mad;        // token index of the mad's opcode
-    std::size_t mad_src0;   // the mad's vPos operand
-    std::uint32_t temp;     // rA
+    std::size_t   mul;       // token index of the mul's opcode
+    std::size_t   mad;       // token index of the mad's opcode
+    std::size_t   mad_src0;  // the mad's vPos operand
+    std::uint32_t temp;      // rA
 };
 
 // The `mul rA.xy, vPos.xy.., l(0.001, 0.001, 0, 0)` at t[i], or nothing.
 std::optional<Site> match_mul(const std::uint32_t* t, std::size_t i, std::size_t len) {
     const auto dst = parse_operand(t, i + len, i + 1);
-    const auto a = dst ? parse_operand(t, i + len, dst->at + dst->size) : std::nullopt;
-    const auto b = a ? parse_operand(t, i + len, a->at + a->size) : std::nullopt;
+    const auto a   = dst ? parse_operand(t, i + len, dst->at + dst->size) : std::nullopt;
+    const auto b   = a ? parse_operand(t, i + len, a->at + a->size) : std::nullopt;
     if (!dst || !a || !b || b->at + b->size != i + len) return std::nullopt;
     if (dst->type != kTypeTemp || dst->size != 2 || !mask_mode(t[dst->at])) return std::nullopt;
-    if ((mask_of(t[dst->at]) & 0x3) != 0x3) return std::nullopt;          // writes rA.x and rA.y
+    if ((mask_of(t[dst->at]) & kMaskXY) != kMaskXY) return std::nullopt;  // writes rA.x and rA.y
     if (a->type != kTypeInput || a->size != 2 || !swizzle_mode(t[a->at])) return std::nullopt;
-    if (selector(t[a->at], 0) != 0 || selector(t[a->at], 1) != 1) return std::nullopt;  // vPos.xy..
+    if (selector(t[a->at], 0) != kX || selector(t[a->at], 1) != kY) return std::nullopt;  // vPos.xy..
     if (!is_immediate4(t, *b, kPoint001, kPoint001, 0, 0)) return std::nullopt;
     return Site{i, 0, 0, dst->reg};
 }
@@ -46,24 +81,209 @@ std::optional<Site> match_mul(const std::uint32_t* t, std::size_t i, std::size_t
 // `mad rB, vPos.xxxy, l(0, 0, 0.001, 0.001), -vT.xxxx`.
 bool match_mad(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s) {
     const auto dst = parse_operand(t, i + len, i + 1);
-    const auto a = dst ? parse_operand(t, i + len, dst->at + dst->size) : std::nullopt;
-    const auto b = a ? parse_operand(t, i + len, a->at + a->size) : std::nullopt;
-    const auto c = b ? parse_operand(t, i + len, b->at + b->size) : std::nullopt;
+    const auto a   = dst ? parse_operand(t, i + len, dst->at + dst->size) : std::nullopt;
+    const auto b   = a ? parse_operand(t, i + len, a->at + a->size) : std::nullopt;
+    const auto c   = b ? parse_operand(t, i + len, b->at + b->size) : std::nullopt;
     if (!dst || !a || !b || !c || c->at + c->size != i + len) return false;
-    const std::size_t mul_vpos = s.mul + 3;
+    const std::size_t mul_vpos = s.mul + kMulSrc0;
     if (a->type != kTypeInput || a->size != 2 || a->reg != t[mul_vpos + 1]) return false;
     if (!swizzle_mode(t[a->at])) return false;
-    for (int k = 0; k < 4; ++k)
-        if (selector(t[a->at], k) > 1) return false;                       // reads vPos.x/.y only
+    for (std::uint32_t k = kX; k <= kW; ++k) {
+        if (selector(t[a->at], k) > kY) return false;  // reads vPos.x/.y only
+    }
     if (!is_immediate4(t, *b, 0, 0, kPoint001, kPoint001) || c->type != kTypeInput) return false;
     // The 0.001 scale of rA goes after the mad, so the mad must not write
     // any part of rA the mul wrote.
     if (dst->type == kTypeTemp && dst->reg == s.temp &&
         (!mask_mode(t[dst->at]) || (mask_of(t[dst->at]) & mask_of(t[s.mul + 1])) != 0))
         return false;
-    s.mad = i;
+    s.mad      = i;
     s.mad_src0 = a->at;
     return true;
+}
+
+// ---- The container ---------------------------------------------------------------
+
+std::uint32_t read_u32(std::span<const std::uint8_t> in, std::size_t at) noexcept {
+    std::uint32_t v = 0;
+    std::memcpy(&v, in.data() + at, sizeof(v));
+    return v;
+}
+
+// The program chunk (SHEX or SHDR): where its header starts and its size.
+struct ProgramChunk {
+    std::size_t   offset = 0;
+    std::size_t   bytes  = 0;
+    std::uint32_t chunk_count = 0;
+};
+
+bool is_program_chunk(const std::uint8_t* chunk) noexcept {
+    return std::memcmp(chunk, kProgramChunkSm5.data(), kFourCcBytes) == 0 ||
+           std::memcmp(chunk, kProgramChunkSm4.data(), kFourCcBytes) == 0;
+}
+
+// The container is one this fix understands: its header, a stored checksum
+// equal to ours, a declared size equal to the blob's, chunk offsets inside
+// it, and exactly one program chunk. Returns that chunk.
+std::optional<ProgramChunk> find_program(std::span<const std::uint8_t> in) noexcept {
+    const DxbcChecksum sum = dxbc_checksum(in);
+    if (std::memcmp(sum.data(), in.data() + kChecksumOffset, kChecksumBytes) != 0) return std::nullopt;
+    const std::uint32_t declared = read_u32(in, kTotalSizeOffset);
+    ProgramChunk p;
+    p.chunk_count = read_u32(in, kChunkCountOffset);
+    if (declared != in.size() || kChunkOffsetsOffset + std::size_t(p.chunk_count) * kTokenBytes > in.size())
+        return std::nullopt;
+    for (std::uint32_t c = 0; c < p.chunk_count; ++c) {
+        const std::uint32_t off = read_u32(in, kChunkOffsetsOffset + kTokenBytes * std::size_t(c));
+        if (std::size_t(off) + kChunkHeaderSize > in.size()) return std::nullopt;
+        if (!is_program_chunk(in.data() + off)) continue;
+        if (p.offset) return std::nullopt;
+        const std::uint32_t bytes = read_u32(in, off + kChunkSizeOffset);
+        if (std::size_t(off) + kChunkHeaderSize + bytes > in.size() || bytes % kTokenBytes) return std::nullopt;
+        p.offset = off;
+        p.bytes  = bytes;
+    }
+    if (!p.offset || p.bytes < kProgramHeaderTokens * kTokenBytes) return std::nullopt;
+    return p;
+}
+
+// ---- The program -----------------------------------------------------------------
+
+// The program's dither sites and its cb2 declaration (token index), or
+// nothing when it has no site, no cb2 declaration, or anything unexpected.
+struct Sites {
+    std::vector<Site> found;
+    std::size_t       cb2_decl = 0;
+};
+
+bool is_cb2_declaration(const std::vector<std::uint32_t>& t, std::size_t i, std::uint32_t op, std::size_t len) {
+    return op == kOpDclConstantBuffer && len == kDclCbLength && op_type(t[i + 1]) == kTypeConstantBuffer &&
+           t[i + kDclCbIndex] == kResolutionBuffer;
+}
+
+std::optional<Sites> find_sites(const std::vector<std::uint32_t>& t, std::size_t end) {
+    Sites s;
+    std::optional<Site> pending;  // a matched `mul` waiting for its `mad`
+    for (std::size_t i = kProgramHeaderTokens; i < end;) {
+        const std::uint32_t tok = t[i];
+        const std::uint32_t op  = opcode(tok);
+        std::size_t len = inst_length(tok);
+        if (op == kOpCustomData) {
+            if (i + 1 >= end) return std::nullopt;
+            len = t[i + 1];
+        }
+        if (len == 0 || i + len > end) return std::nullopt;
+
+        std::optional<Site> next;
+        if (is_cb2_declaration(t, i, op, len)) {
+            s.cb2_decl = i;
+        } else if (op == kOpMul && !op_extended(tok) && len == kMulImmediateLength) {
+            next = match_mul(t.data(), i, len);
+        } else if (op == kOpMad && pending && !op_extended(tok)) {
+            if (match_mad(t.data(), i, len, *pending)) s.found.push_back(*pending);
+        }
+        pending = next;  // the pair must be adjacent
+        i += len;
+    }
+    if (s.found.empty() || !s.cb2_decl) return std::nullopt;  // no site, or cb2 would need a declaration
+    return s;
+}
+
+// The program with every site rewritten (see dither_fix.h): per site the
+// 10-token mul becomes an 8-token one and a 10-token scale follows the mad.
+std::vector<std::uint32_t> rewrite(std::vector<std::uint32_t>& t, const Sites& sites) {
+    // cb2 must declare the resolution register.
+    std::uint32_t& registers = t[sites.cb2_decl + kDclCbRegCount];
+    if (registers < kSourceResolution + 1) registers = kSourceResolution + 1;
+
+    std::vector<std::uint32_t> prog;
+    prog.reserve(t.size() + sites.found.size() * kSiteGrowthTokens);
+    const auto copy = [&](std::size_t from, std::size_t to) {
+        prog.insert(prog.end(), t.begin() + static_cast<std::ptrdiff_t>(from),
+                    t.begin() + static_cast<std::ptrdiff_t>(to));
+    };
+    std::size_t from = 0;
+    for (const Site& s : sites.found) {
+        copy(from, s.mul);
+        // mul rA, vPos, cb2[39].zwzz: src1 is 3 tokens in place of 5.
+        prog.push_back(with_length(t[s.mul], kMulCbLength));
+        copy(s.mul + 1, s.mul + kMulImmediate);
+        prog.push_back(swizzled_source(swizzle(kZ, kW, kZ, kZ), kTypeConstantBuffer, kIndex2D));
+        prog.push_back(kResolutionBuffer);
+        prog.push_back(kSourceResolution);
+
+        // mad: src0 vPos -> rA, same swizzle.
+        const std::size_t mad_len = inst_length(t[s.mad]);
+        const std::size_t src0    = prog.size() + (s.mad_src0 - s.mad);
+        copy(s.mad, s.mad + mad_len);
+        prog[src0]     = with_type(prog[src0], kTypeTemp);
+        prog[src0 + 1] = s.temp;
+
+        // mul rA.<mask>, rA.xyzw, l(0.001, 0.001, 0, 0): the mul's own
+        // opcode, destination and immediate, with rA as the source.
+        copy(s.mul, s.mul + kMulSrc0);
+        prog.push_back(swizzled_source(swizzle(kX, kY, kZ, kW), kTypeTemp, kIndex1D));
+        prog.push_back(s.temp);
+        copy(s.mul + kMulImmediate, s.mul + kMulImmediateLength);
+
+        from = s.mad + mad_len;
+    }
+    copy(from, t.size());
+    prog[1] = static_cast<std::uint32_t>(t[1] + (prog.size() - t.size()));
+    return prog;
+}
+
+// The container with `prog` in place of the program chunk's tokens: the
+// bytes up to the program, the program, the chunks after it, whose offsets
+// move by the growth; then the total size, the chunk size and the checksum.
+std::vector<std::uint8_t> reassemble(std::span<const std::uint8_t> in, const ProgramChunk& chunk,
+                                     const std::vector<std::uint32_t>& prog) {
+    const std::size_t prog_bytes = prog.size() * kTokenBytes;
+    const std::size_t grow       = prog_bytes - chunk.bytes;
+    const std::size_t data_at    = chunk.offset + kChunkHeaderSize;
+    std::vector<std::uint8_t> out;
+    out.reserve(in.size() + grow);
+    out.insert(out.end(), in.begin(), in.begin() + static_cast<std::ptrdiff_t>(data_at));
+    out.resize(data_at + prog_bytes);
+    std::memcpy(out.data() + data_at, prog.data(), prog_bytes);
+    out.insert(out.end(), in.begin() + static_cast<std::ptrdiff_t>(data_at + chunk.bytes), in.end());
+
+    const auto put = [&out](std::size_t at, std::size_t v) {
+        const auto u = static_cast<std::uint32_t>(v);
+        std::memcpy(out.data() + at, &u, sizeof(u));
+    };
+    put(kTotalSizeOffset, out.size());
+    put(chunk.offset + kChunkSizeOffset, chunk.bytes + grow);
+    for (std::uint32_t c = 0; c < chunk.chunk_count; ++c) {
+        const std::size_t   entry = kChunkOffsetsOffset + kTokenBytes * std::size_t(c);
+        const std::uint32_t off   = read_u32(in, entry);
+        if (off > chunk.offset) put(entry, std::size_t(off) + grow);
+    }
+    const DxbcChecksum sum = dxbc_checksum(out);
+    std::memcpy(out.data() + kChecksumOffset, sum.data(), kChecksumBytes);
+    return out;
+}
+
+std::vector<std::uint8_t> patch(std::span<const std::uint8_t> in, int& sites) {
+    if (in.size() < kContainerHeaderSize || std::memcmp(in.data(), kDxbcMagic.data(), kDxbcMagicBytes) != 0) return {};
+    // Cheap pre-filter: most shaders have no site, and skipping them avoids
+    // an MD5 of each (about 20 us a shader on the game thread, half the cost
+    // of creating it).
+    if (std::ranges::search(in, kTwoThousandths).empty()) return {};
+
+    const auto chunk = find_program(in);
+    if (!chunk) return {};
+    std::vector<std::uint32_t> t(chunk->bytes / kTokenBytes);
+    std::memcpy(t.data(), in.data() + chunk->offset + kChunkHeaderSize, chunk->bytes);
+    if (((t[0] >> kProgramTypeShift) & kProgramTypeMask) != kPixelShaderProgram) return {};
+    if (t[1] < kProgramHeaderTokens || t[1] > t.size()) return {};
+
+    const auto found = find_sites(t, t[1]);
+    if (!found) return {};
+    const auto prog = rewrite(t, *found);
+    auto out = reassemble(in, *chunk, prog);
+    sites = static_cast<int>(found->found.size());
+    return out;
 }
 
 } // namespace
@@ -71,146 +291,9 @@ bool match_mad(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s) 
 std::vector<std::uint8_t> patch_position_dither(const void* src, std::size_t size, int& sites) noexcept {
     sites = 0;
     try {
-        const auto* in = static_cast<const std::uint8_t*>(src);
-        if (size < 32 || std::memcmp(in, "DXBC", 4) != 0) return {};
-
-        // Cheap pre-filter: every site multiplies by the immediate
-        // l(0.001, 0.001), two 0x3A83126F dwords in a row. Most shaders have
-        // none, and skipping them avoids an MD5 of each (about 20 us a shader
-        // on the game thread, half the cost of creating it).
-        static constexpr std::uint8_t kTwoThousandths[8] = {0x6F, 0x12, 0x83, 0x3A, 0x6F, 0x12, 0x83, 0x3A};
-        if (std::search(in, in + size, std::begin(kTwoThousandths), std::end(kTwoThousandths)) == in + size)
-            return {};
-
-        // The stored checksum must match ours, or we do not understand the blob.
-        std::uint32_t sum[4];
-        dxbc_checksum(in, size, sum);
-        if (std::memcmp(sum, in + 4, 16) != 0) return {};
-
-        std::uint32_t declared = 0, chunk_count = 0;
-        std::memcpy(&declared, in + 24, 4);
-        std::memcpy(&chunk_count, in + 28, 4);
-        if (declared != size || 32 + std::size_t(chunk_count) * 4 > size) return {};
-        std::size_t shex_chunk = 0, shex_bytes = 0;
-        for (std::uint32_t c = 0; c < chunk_count; ++c) {
-            std::uint32_t off = 0;
-            std::memcpy(&off, in + 32 + 4 * std::size_t(c), 4);
-            if (std::size_t(off) + 8 > size) return {};
-            if (std::memcmp(in + off, "SHEX", 4) == 0 || std::memcmp(in + off, "SHDR", 4) == 0) {
-                if (shex_chunk) return {};
-                std::uint32_t bytes = 0;
-                std::memcpy(&bytes, in + off + 4, 4);
-                if (std::size_t(off) + 8 + bytes > size || bytes % 4) return {};
-                shex_chunk = off;
-                shex_bytes = bytes;
-            }
-        }
-        if (!shex_chunk || shex_bytes < 8) return {};
-
-        // The program, as tokens.
-        std::vector<std::uint32_t> t(shex_bytes / 4);
-        std::memcpy(t.data(), in + shex_chunk + 8, shex_bytes);
-        if ((t[0] >> 16 & 0xFFFF) != 0x0000) return {};  // pixel shader program type is 0
-        if (t[1] < 2 || t[1] > t.size()) return {};
-        const std::size_t end = t[1];
-
-        // Pass 1: find the pairs and the cb2 declaration.
-        std::size_t cb2_decl = 0;
-        std::vector<Site> found;
-        std::optional<Site> pending;     // a matched `mul` waiting for its `mad`
-        for (std::size_t i = 2; i < end;) {
-            const std::uint32_t tok = t[i];
-            const std::uint32_t op = opcode(tok);
-            std::size_t len = inst_length(tok);
-            if (op == 0x35 /* customdata */) {
-                if (i + 1 >= end) return {};
-                len = t[i + 1];
-            }
-            if (len == 0 || i + len > end) return {};
-
-            std::optional<Site> next;
-            if (op == kOpDclConstantBuffer && len == 4 && op_type(t[i + 1]) == kTypeConstantBuffer &&
-                t[i + 2] == 2) {
-                cb2_decl = i;
-            } else if (op == kOpMul && !(tok >> 31) && len == 10) {
-                next = match_mul(t.data(), i, len);
-            } else if (op == kOpMad && pending && !(tok >> 31)) {
-                if (match_mad(t.data(), i, len, *pending)) found.push_back(*pending);
-            }
-            pending = next;                // the pair must be adjacent
-            i += len;
-        }
-        if (found.empty() || !cb2_decl) return {};   // no site, or cb2 would need a declaration
-
-        // Pass 2: rewrite. Per site the 10-token mul becomes an 8-token one
-        // and a 10-token scale follows the mad (8 tokens more per site).
-        if (t[cb2_decl + 3] < kSourceResolution + 1) t[cb2_decl + 3] = kSourceResolution + 1;
-        std::vector<std::uint32_t> prog;
-        prog.reserve(t.size() + found.size() * 8);
-        const auto copy = [&](std::size_t from, std::size_t to) {
-            prog.insert(prog.end(), t.begin() + static_cast<std::ptrdiff_t>(from),
-                        t.begin() + static_cast<std::ptrdiff_t>(to));
-        };
-        std::size_t from = 0;
-        for (const Site& s : found) {
-            copy(from, s.mul);
-            // mul rA, vPos, cb2[39].zwzz: src1 is 3 tokens in place of 5.
-            prog.push_back((t[s.mul] & ~(0x7Fu << 24)) | (8u << 24));
-            copy(s.mul + 1, s.mul + 5);
-            const std::uint32_t swizzle_zwzz = (2u << 0) | (3u << 2) | (2u << 4) | (2u << 6);
-            // 4 components, swizzle mode, type cb, 2D, immediate indices.
-            prog.push_back(2u | (1u << 2) | (swizzle_zwzz << 4) | (kTypeConstantBuffer << 12) | (2u << 20));
-            prog.push_back(2);
-            prog.push_back(kSourceResolution);
-
-            // mad: src0 vPos -> rA, same swizzle.
-            const std::size_t mad_len = inst_length(t[s.mad]);
-            const std::size_t src0 = prog.size() + (s.mad_src0 - s.mad);
-            copy(s.mad, s.mad + mad_len);
-            prog[src0] = (prog[src0] & ~(0xFFu << 12)) | (kTypeTemp << 12);
-            prog[src0 + 1] = s.temp;
-
-            // mul rA.<mask>, rA.xyzw, l(0.001, 0.001, 0, 0): the mul's own
-            // opcode, destination and immediate, with rA as the source.
-            const std::uint32_t swizzle_xyzw = (0u << 0) | (1u << 2) | (2u << 4) | (3u << 6);
-            copy(s.mul, s.mul + 3);
-            prog.push_back(2u | (1u << 2) | (swizzle_xyzw << 4) | (kTypeTemp << 12) | (1u << 20));
-            prog.push_back(s.temp);
-            copy(s.mul + 5, s.mul + 10);
-
-            from = s.mad + mad_len;
-        }
-        copy(from, t.size());
-        const std::size_t grow = (prog.size() - t.size()) * 4;
-        prog[1] = static_cast<std::uint32_t>(t[1] + grow / 4);
-
-        // Reassemble the container: the bytes up to the program, the program,
-        // the chunks after it, whose offsets move by `grow`.
-        const std::size_t shex_end = shex_chunk + 8 + shex_bytes;
-        std::vector<std::uint8_t> out;
-        out.reserve(size + grow);
-        out.insert(out.end(), in, in + shex_chunk + 8);
-        const auto* p = reinterpret_cast<const std::uint8_t*>(prog.data());
-        out.insert(out.end(), p, p + prog.size() * 4);
-        out.insert(out.end(), in + shex_end, in + size);
-
-        const auto put = [&out](std::size_t at, std::size_t v) {
-            const auto u = static_cast<std::uint32_t>(v);
-            std::memcpy(out.data() + at, &u, 4);
-        };
-        put(24, out.size());
-        put(shex_chunk + 4, shex_bytes + grow);
-        for (std::uint32_t c = 0; c < chunk_count; ++c) {
-            std::uint32_t off = 0;
-            std::memcpy(&off, in + 32 + 4 * std::size_t(c), 4);
-            if (off > shex_chunk) put(32 + 4 * std::size_t(c), std::size_t(off) + grow);
-        }
-
-        dxbc_checksum(out.data(), out.size(), sum);
-        std::memcpy(out.data() + 4, sum, 16);
-        sites = static_cast<int>(found.size());
-        return out;
+        return patch({static_cast<const std::uint8_t*>(src), size}, sites);
     } catch (...) {
+        // An allocation failed: the original shader is used.
         sites = 0;
         return {};
     }

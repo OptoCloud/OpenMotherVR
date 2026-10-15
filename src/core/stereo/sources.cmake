@@ -17,8 +17,9 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/render_target.h
     ${CMAKE_CURRENT_LIST_DIR}/scene_tracker.cpp
     ${CMAKE_CURRENT_LIST_DIR}/scene_tracker.h
-    ${CMAKE_CURRENT_LIST_DIR}/sensor_start.cpp
     ${CMAKE_CURRENT_LIST_DIR}/sensor_start.h
+    ${CMAKE_CURRENT_LIST_DIR}/snap_turn.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/snap_turn.h
     ${CMAKE_CURRENT_LIST_DIR}/stereo_aa.cpp
     ${CMAKE_CURRENT_LIST_DIR}/stereo_aa.h
     ${CMAKE_CURRENT_LIST_DIR}/stereo_device.cpp

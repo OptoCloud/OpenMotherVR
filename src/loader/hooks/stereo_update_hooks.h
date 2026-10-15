@@ -4,9 +4,11 @@
 
 // The game-side hooks around the stereo device: the per-frame stereo
 // update, placement of the menu screen and the HUD panel, the stereo mode
-// stack and the left-stick prompt check. Every function here replaces a
-// game function at a call site and keeps that function's ABI (noted per
-// function). The hook installer does the patching.
+// stack and the left-stick prompt check (05 §3, §4, §7.11). Every function
+// here replaces a game function at a call site and keeps that function's
+// ABI (noted per function). The hook installer does the patching. Each
+// reads the game into values, calls the stereo logic and writes the result
+// back. Game thread.
 //
 // From: FUN_1001f8a0, FUN_1001fc20, FUN_1001ffd0, FUN_100201e0,
 // FUN_10020220, FUN_10003100. Analysis: dumps/06c_detours_and_patches.md.

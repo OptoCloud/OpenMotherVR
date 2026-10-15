@@ -1,66 +1,95 @@
-// UI quad placement. Analysis: dumps/06c_detours_and_patches.md.
+// UI quad placement (05 §4). Analysis: dumps/06c_detours_and_patches.md.
 
 #include "core/stereo/ui_placement.h"
 
-#include "game/stereo/pov.h" // R: stereo (A3): the view matrix handed in as a value
+#include "core/stereo/tuning.h"
 #include "util/math/matrix.h"
+#include "util/math/vec.h"
 
 #include <cmath>
+#include <cstddef>
 
 namespace omvr::core::stereo {
 
-using game::stereo::view_matrix;
-using util::camera_position;
-using util::identity;
-using Vec3 = util::Vec3;
+namespace {
 
-float* place_virtual_screen(float* out, float, float inv_aspect, float) noexcept {
-    const float* v = view_matrix();
-    identity(out);
-    if (!v) return out;
-    float fx = v[2], fz = v[10];
+using util::Vec3;
+using util::cross;
+using util::scaled;
+
+// Rows of a quad matrix: its right and up axes (scaled to the quad's size),
+// its forward axis and its position.
+constexpr std::size_t kRightRow    = 0;
+constexpr std::size_t kUpRow       = 1;
+constexpr std::size_t kForwardRow  = 2;
+constexpr std::size_t kPositionRow = 3;
+
+// Columns of the view matrix: the camera's right, up and forward axes in
+// world space (rows 0 to 2).
+constexpr std::size_t kViewUpColumn      = 1;
+constexpr std::size_t kViewForwardColumn = 2;
+
+Matrix44 identity_quad() noexcept {
+    Matrix44 m{};
+    util::identity(m.data());
+    return m;
+}
+
+// Writes x, y, z of `row`; the fourth column keeps the identity's value.
+void set_row(Matrix44& m, std::size_t row, const Vec3& v) noexcept {
+    m[row * util::kMatrix4Rows + 0] = v.x;
+    m[row * util::kMatrix4Rows + 1] = v.y;
+    m[row * util::kMatrix4Rows + 2] = v.z;
+}
+
+Vec3 view_axis(const Matrix44& v, std::size_t column) noexcept {
+    return {util::element4(v.data(), 0, column), util::element4(v.data(), 1, column),
+            util::element4(v.data(), 2, column)};
+}
+
+// The camera's forward axis flattened onto the ground plane (x, z), as a
+// unit vector; +Z when the camera looks straight up or down.
+Vec3 level_forward(const Matrix44& v) noexcept {
+    float fx = util::element4(v.data(), 0, kViewForwardColumn);
+    float fz = util::element4(v.data(), 2, kViewForwardColumn);
     const float len = std::sqrt(fx * fx + fz * fz);
-    if (len > 1e-6f) {
+    if (len > kMinForwardLength) {
         fx /= len;
         fz /= len;
     } else {
         fx = 0.0f;
         fz = 1.0f;
     }
-    // Rows: right = up x forward (left-handed), up scaled to the aspect,
-    // forward, position.
-    out[0] = fz;   out[1] = 0.0f;       out[2]  = -fx;
-    out[4] = 0.0f; out[5] = inv_aspect; out[6]  = 0.0f;
-    out[8] = fx;   out[9] = 0.0f;       out[10] = fz;
-    const Vec3 cam = camera_position(v);
-    out[12] = cam.x + fx * 1.5f;
-    out[13] = cam.y;
-    out[14] = cam.z + fz * 1.5f;
+    return {fx, 0.0f, fz};
+}
+
+} // namespace
+
+Matrix44 virtual_screen_quad(const std::optional<Matrix44>& view, float inv_aspect) noexcept {
+    Matrix44 out = identity_quad();
+    if (!view) return out;
+    const Vec3 fwd = level_forward(*view);
+    // Right = up x forward (left-handed), up scaled to the aspect.
+    set_row(out, kRightRow, {fwd.z, 0.0f, -fwd.x});
+    set_row(out, kUpRow, {0.0f, inv_aspect, 0.0f});
+    set_row(out, kForwardRow, fwd);
+    const Vec3 cam = util::camera_position(view->data());
+    set_row(out, kPositionRow,
+            {cam.x + fwd.x * kMenuScreenDistance, cam.y, cam.z + fwd.z * kMenuScreenDistance});
     return out;
 }
 
-// The HUD in 3D: a panel 0.55 m wide, 1 m in front of the eyes, locked to
-// the head. From: FUN_1001ffd0.
-float* place_hud_panel(float* out, float, float inv_aspect, float) noexcept {
-    const float* v = view_matrix();
-    identity(out);
-    if (!v) return out;
-    constexpr float kWidth = 0.55f;
-    const Vec3 up{v[1], v[5], v[9]};
-    const Vec3 fwd{v[2], v[6], v[10]};
-    out[0] = kWidth * (up.y * fwd.z - up.z * fwd.y);
-    out[1] = kWidth * (up.z * fwd.x - up.x * fwd.z);
-    out[2] = kWidth * (up.x * fwd.y - up.y * fwd.x);
-    out[4] = up.x * kWidth * inv_aspect;
-    out[5] = up.y * kWidth * inv_aspect;
-    out[6] = up.z * kWidth * inv_aspect;
-    out[8] = fwd.x;
-    out[9] = fwd.y;
-    out[10] = fwd.z;
-    const Vec3 cam = camera_position(v);
-    out[12] = fwd.x + cam.x;
-    out[13] = fwd.y + cam.y;
-    out[14] = fwd.z + cam.z;
+Matrix44 hud_panel_quad(const std::optional<Matrix44>& view, float inv_aspect) noexcept {
+    Matrix44 out = identity_quad();
+    if (!view) return out;
+    const Vec3 up  = view_axis(*view, kViewUpColumn);
+    const Vec3 fwd = view_axis(*view, kViewForwardColumn);
+    set_row(out, kRightRow, scaled(cross(up, fwd), kHudPanelWidth));
+    set_row(out, kUpRow, {up.x * kHudPanelWidth * inv_aspect, up.y * kHudPanelWidth * inv_aspect,
+                          up.z * kHudPanelWidth * inv_aspect});
+    set_row(out, kForwardRow, fwd);
+    const Vec3 cam = util::camera_position(view->data());
+    set_row(out, kPositionRow, {fwd.x + cam.x, fwd.y + cam.y, fwd.z + cam.z});
     return out;
 }
 

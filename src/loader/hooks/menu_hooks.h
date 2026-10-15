@@ -2,10 +2,12 @@
 
 #include <cstdint>
 
-// The vtable replacements around the menus: the first-person camera
-// tracker, the cutscene and fade watcher, and the menu wrappers that switch
-// to the virtual screen. From: FUN_10020c80..FUN_10020dd0, FUN_10001720,
-// FUN_10001740, FUN_1001f830. Analysis: dumps/06c_detours_and_patches.md.
+// The vtable replacements around the menus (05 §5, §6): the first-person
+// camera tracker, the cutscene and fade watcher, and the menu wrappers that
+// switch to the virtual screen. Each runs the game's own method and tells
+// the stereo logic. Game thread.
+// From: FUN_10020c80..FUN_10020dd0, FUN_10001720, FUN_10001740,
+// FUN_1001f830. Analysis: dumps/06c_detours_and_patches.md.
 namespace omvr::loader::hooks {
 
 // FollowBehavior OnActivate / OnDeactivate(arg). __thiscall, ret 4.

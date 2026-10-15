@@ -4,7 +4,8 @@
 #include <cstdint>
 #include <vector>
 
-// Pixel shader fixes applied when the game creates its shaders.
+// Pixel shader fixes applied when the game creates its shaders (08 §1).
+// Pure; runs on whichever thread creates the shader.
 namespace omvr::core::render {
 
 // Many of the game's pixel shaders (several hundred per level) add an
@@ -18,8 +19,8 @@ namespace omvr::core::render {
 // On a side-by-side stereo target the right eye's x is large, the exp
 // overflows, frc returns NaN and min() turns the lighting factor into 1:
 // surfaces light up in the right eye, more so the wider the target. The fix
-// replaces p with n = p / size, the position
-// relative to the render target, which the game passes to its shaders as
+// replaces p with n = p / size, the position relative to the render target,
+// which the game passes to its shaders as
 // cb2[39] = (W, H, 1/W, 1/H), and keeps the 0.001 factor:
 //
 //   mul rA.xy, vPos.xyxx, cb2[39].zwzz                    ; rA = n

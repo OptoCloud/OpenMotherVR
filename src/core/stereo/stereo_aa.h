@@ -1,12 +1,19 @@
 #pragma once
 
-#include <cstdint>
+#include "core/config/settings.h"
+#include "core/diag/ports/log.h"
+#include "core/stereo/types.h"
 
 namespace omvr::core::stereo {
 
-class StereoDevice;
+// What the stereo output does with the game's AA mode.
+enum class AaAction {
+    Skip     = 0,  // setting off, or Auto above its pixel scale
+    Run      = 1,  // run the AA pass as the game's mode says
+    RunAsT1x = 2,  // SMAA T2x runs as SMAA T1x
+};
 
-// Anti-aliasing in stereo (not in the original).
+// Anti-aliasing in stereo (08 §3).
 //
 // In stereo the game's final post chain takes its own output path: it binds
 // postprocess_stereo_final, sets the head-in-wall fade in PS c36 and draws
@@ -24,25 +31,34 @@ class StereoDevice;
 // game keeps for one eye only (the velocity pass runs for eye 0), so its
 // history would reproject the right eye with the left eye's motion. In
 // stereo T2x therefore runs as SMAA 1x, without the temporal resolve and
-// without projection jitter. Render thread.
-class StereoAa {
+// without projection jitter. Decisions only: the thunks call the game.
+// Render thread.
+class StereoAa final {
 public:
-    explicit StereoAa(StereoDevice& stereo) noexcept : stereo_(stereo) {}
+    // `settings` is the live settings object: StereoAntiAliasing and the
+    // pixel scale are read each frame.
+    StereoAa(const config::Settings& settings, diag::ports::Log& log) noexcept : settings_(settings), log_(log) {}
 
-    // Replaces the full-screen draw of the stereo output path.
-    void final_draw() noexcept;
-    // Replaces the AA pass's call of the SMAA runner.
-    void run_smaa(void* color, void* second, const std::uint8_t* temporal) noexcept;
+    // The stereo output runs the game's AA pass for `mode` instead of its
+    // own full-screen draw: an AA mode is set, and StereoAntiAliasing is on,
+    // or Auto at a pixel scale where the eyes are not already supersampled
+    // (above it the pass costs about 0.6 ms GPU for little gain).
+    bool runs_aa_pass(AaMode mode) const noexcept;
+
+    // The first stereo frame with each AA mode, and each change of what the
+    // mod does with it (AaAction). Once per change only.
+    void log_decision(AaMode mode, bool run) noexcept;
+
+    // The AA pass's SMAA runs spatially (without the temporal resolve, which
+    // also zeroes the next frame's projection jitter) while stereo runs.
+    static bool spatial_smaa(bool temporal, bool stereo_running) noexcept { return temporal && stereo_running; }
 
 private:
-    // The first stereo frame with each AA mode, and each change of what the
-    // mod does with it: run it, run T2x as T1x, or skip it (setting off, or
-    // Auto above its pixel scale). Once per change only.
-    void log_stereo_aa(std::int32_t mode, bool run) noexcept;
-
-    StereoDevice& stereo_;
-    std::int32_t  s_mode = -1;
-    int           s_action = -1;
+    const config::Settings& settings_;
+    diag::ports::Log&       log_;
+    // The last logged mode and action; none before the first.
+    std::int32_t logged_mode_   = -1;
+    int          logged_action_ = -1;
 };
 
 } // namespace omvr::core::stereo

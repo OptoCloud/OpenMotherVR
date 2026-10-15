@@ -1,23 +1,39 @@
 #pragma once
 
+#include "core/diag/ports/log.h"
+#include "core/stereo/types.h"
+#include "game/addresses.h"
 #include "game/layout.h"
 
 #include <cstdint>
 
-// The game's stereo mode stack: mode 0 the 3D world with the HUD panel,
-// mode 1 the virtual screen (menus, videos).
+// The game's stereo mode stack (05 §4.4): mode 0 the 3D world with the HUD
+// panel, mode 1 the virtual screen (menus, videos). Runs what the stereo
+// mode policy decided, through the game's own push, pop and append. Game
+// thread.
 namespace omvr::game::stereo {
 
-// Stereo::PushMode(int) and Stereo::PopMode(), the game's own.
-void game_push_mode(StereoManager* sm, int mode) noexcept;
-void game_pop_mode(StereoManager* sm) noexcept;
+// The manager's mode and its stack, as a value.
+core::stereo::ModeStackState mode_stack_state(const StereoManager& sm) noexcept;
 
-// Leave mode 1 for the world. The game's pop does nothing with an empty
-// stack, which is the state when the game entered mode 1 without a push and
-// there was no storage to raise the count into (sync_mode_stack): push 0
-// through the game instead, which runs its SetMode(0) and appends with its
-// own allocator, then drop that entry so the stack is empty in mode 0.
-void game_pop_to_world(StereoManager* sm) noexcept;
+// Runs `steps` on the stack of `sm` through Stereo::PushMode(int) and
+// Stereo::PopMode(), the game's own. With debug options on, each change of
+// the mode is logged, to follow which menus, videos and loading screens get
+// the screen.
+void apply_mode_steps(const AddressMap& addresses, core::diag::ports::Log& log, StereoManager& sm,
+                      const core::stereo::ModeSteps& steps) noexcept;
+
+// The game's mode-stack append (05 §3.2f), found by the installer and set
+// once at attach, before the stereo update can run; null on a build without
+// it. Read on the game thread.
+struct ModeStackTargets {
+    void* append = nullptr;
+};
+
+// Brings the stack count to the mode as `sync` says (05 §3.2f), appending
+// through `targets` where that is the step.
+core::stereo::StackSyncOutcome apply_stack_sync(const ModeStackTargets& targets, StereoManager& sm,
+                                                core::stereo::StackSync sync) noexcept;
 
 // The game's mode-stack append (spec 05 section 3.2f): thiscall on the
 // stack array at StereoManager +0x68, one `const int*` argument, ret 4;
@@ -26,9 +42,7 @@ void game_pop_to_world(StereoManager* sm) noexcept;
 // the installer found it at its call in StereoPushMode; without it the
 // count is raised only into storage the array already has.
 using ModeStackAppendFn = std::int32_t* (__fastcall*)(void* array, void* edx, const std::int32_t* value);
-void install_mode_stack_append(void* append) noexcept;
-// Null when this build has no address for it. Set at attach, read on the
-// game thread.
-ModeStackAppendFn mode_stack_append() noexcept;
+// This build has the append routine.
+inline bool has_mode_stack_append(const ModeStackTargets& targets) noexcept { return targets.append != nullptr; }
 
 } // namespace omvr::game::stereo

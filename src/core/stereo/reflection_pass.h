@@ -1,11 +1,27 @@
 #pragma once
 
+#include "core/config/settings.h"
+#include "core/diag/ports/log.h"
 #include "core/stereo/ports/keyboard.h"
-#include "game/stereo/pov.h" // R: stereo (A3): the targets stay in the game layer's thunk side
+#include "core/stereo/tuning.h"
+#include "util/sync/once_latch.h"
+
+#include <array>
+#include <cstdint>
 
 namespace omvr::core::stereo {
 
-// Planar reflections (not in the original).
+// What the reflection render call shows of a reflection POV, for the
+// diagnostics (07 §6).
+struct ReflectionPovInfo {
+    const void*   pov;    // identity only, never dereferenced
+    std::uint8_t  flags;  // POV +0x36B
+    int           state;  // the device state, -1 without a device
+    std::int32_t  width;  // its render target's size
+    std::int32_t  height;
+};
+
+// Planar reflections (07).
 //
 // The game renders the floor reflection once, mono, with the flat camera's
 // projection, and the floor shader samples it in screen space over the
@@ -13,25 +29,50 @@ namespace omvr::core::stereo {
 // stereo running, render it per eye into the two halves of its target
 // instead: the reflection view is mirrored in X, so half k rendered with
 // eye k's transform is what the other eye samples. Each render clears the
-// whole target, so the second pass runs with clears skipped.
-// Analysis: dumps/07_reflections_head_pose.md. Render thread.
-class ReflectionPass {
+// whole target, so the second pass runs with clears skipped. Decisions and
+// diagnostics only: the game side renders. Render thread.
+class ReflectionPass final {
 public:
-    ReflectionPass(game::StereoManager& manager, const ports::Keyboard& keyboard) noexcept
-        : manager_(manager), keyboard_(keyboard) {}
+    ReflectionPass(const ports::Keyboard& keyboard, const config::Settings& settings, diag::ports::Log& log) noexcept
+        : keyboard_(keyboard), settings_(settings), log_(log) {}
 
-    // False if the clear could not be gated (its code differs from the
-    // expected build); the fix then stays off.
-    bool install(const game::stereo::ReflectionTargets& targets) noexcept;
+    // Whether the game's clear could be gated (its code is the expected
+    // one); without it the fix stays off. Set once at attach.
+    void set_ready(bool ready) noexcept { ready_ = ready; }
 
-    // Replaces the call of ReflectionPOV render on `pov`.
-    void render(void* pov) noexcept;
+    // Logs each reflection POV and every change of its flags, up to
+    // kReflectionLogLines lines.
+    void note_pov(const ReflectionPovInfo& pov) noexcept;
+
+    // The POV renders per eye: the fix is in, stereo runs, and the POV is
+    // active and renders (`pov_renders`). Otherwise it renders flat, as the
+    // game does.
+    bool per_eye(bool stereo_running, bool pov_renders) const noexcept {
+        return ready_ && stereo_running && pov_renders;
+    }
+
+    // Debug (F10, with debug options on): capture each eye's pass this
+    // time. True on the frame the key goes down. Per-eye frames only.
+    bool take_capture_request() noexcept;
+
+    // After the first per-eye render: logged once.
+    void note_rendered() noexcept;
 
 private:
-    game::StereoManager&               manager_;
-    const ports::Keyboard&             keyboard_;
-    game::stereo::ReflectionTargets    g_reflection{};
-    bool                               g_reflection_ready = false;
+    const ports::Keyboard&  keyboard_;
+    const config::Settings& settings_;
+    diag::ports::Log&       log_;
+    bool                    ready_ = false;
+
+    // The POVs seen so far and their last flags (-1: new).
+    struct SeenPov {
+        const void* pov   = nullptr;
+        int         flags = -1;
+    };
+    std::array<SeenPov, kReflectionPovSlots> seen_{};
+    int             lines_            = 0;
+    bool            capture_key_down_ = false;
+    util::OnceLatch rendered_logged_;
 };
 
 } // namespace omvr::core::stereo

@@ -1,21 +1,30 @@
 #pragma once
 
-#include "core/vr/ports/vr_runtime.h"
-#include "game/layout.h" // R: stereo (A3): the size from value structs, not the game's device
+#include "core/stereo/types.h"
+#include "core/vr/types.h"
 
+// The size and eye layout of the side-by-side stereo render target (03 §4).
+// Pure.
 namespace omvr::core::stereo {
 
-// Both eyes side by side: left half, right half.
-void set_target_size(game::StereoInterface& si, int width, int height) noexcept;
+// The configured pixel scale, capped so the side-by-side target of the
+// runtime's per-eye sizes at scale 1 stays within kMaxTextureSize. PixelScale
+// multiplies the runtime's recommended size, which already includes
+// SteamVR's own resolution setting (03 §10).
+float capped_pixel_scale(float pixel_scale, vr::TextureSize left, vr::TextureSize right) noexcept;
 
-// GetRenderTargetSize(int* w, int* h): both eyes side by side, and the eye
-// viewports.
-//
-// The original asks for half scale until stereo runs. The game sizes its
-// targets from that first answer (the same call picks the display mode) and
-// does not rebuild them when stereo starts, so the eyes stay at half
-// resolution. We use the configured pixel scale from the start; the
-// swapchain is kept windowed so the mode change cannot fail.
-void render_target_size(game::StereoInterface& si, vr::ports::VrRuntime& backend, int* w, int* h);
+// Both eyes side by side: their widths summed, and the taller eye's height
+// so neither eye's image is cut off. (The original took the height of the
+// wider eye.)
+PixelSize side_by_side(vr::TextureSize left, vr::TextureSize right) noexcept;
+
+// Eye 0 the left half, eye 1 the right half.
+EyeViewports eye_viewports(PixelSize target) noexcept;
+
+// Whether the eye layout follows a newly computed size now (03 §4.3): before
+// any texture was configured, or when the texture in use already has that
+// size. Otherwise the layout stays with the texture in use until the game
+// makes one of the new size (it then configures rendering again).
+bool layout_follows(PixelSize size, PixelSize configured) noexcept;
 
 } // namespace omvr::core::stereo

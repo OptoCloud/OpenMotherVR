@@ -6,43 +6,98 @@
 
 #include "game/stereo/stereo_objects.h"
 
-#include "game/addresses.h"
+#include "game/code_address.h"
+#include "game/constants.h"
+#include "util/math/matrix.h"
+
+#include <algorithm>
 
 namespace omvr::game::stereo {
 
 namespace {
 
 // The vtables the game is handed: static storage, they outlive every use.
-void* g_device_vtable[22]{};
-void* g_manager_vtable[3]{};
+DeviceSlots  device_vtable{};
+ManagerSlots manager_vtable{};
+
+// The game's own device functions for the slots the mod leaves to it.
+struct GameDeviceSlots {
+    void* eye_transform;
+    void* fov_aspect;
+    void* eye_scale_offset;
+};
+
+// 02 §3.3: the reference pose starts as "no rotation, no translation" in
+// the device's head pose convention (03 §1), a 3x4 row-major matrix.
+constexpr std::array<float, 12> kNeutralReferencePose = {
+    -1.0f, 0.0f,  0.0f, 0.0f,
+    0.0f,  -1.0f, 0.0f, 0.0f,
+    0.0f,  0.0f,  1.0f, 0.0f,
+};
+// 02 §3.3: position tracking on (+0xA8), at full weight (+0xAC).
+constexpr std::uint8_t kPositionTrackingOn = 1;
+constexpr float        kFullPositionWeight = 1.0f;
+// The device's -vrscale before CreateDevice reads the command line.
+constexpr float kDefaultWorldScale = 1.0f;
+
+void* slot(const StereoInterface& si, DeviceSlot index) noexcept { return si.vtable[std::to_underlying(index)]; }
+
+void build(StereoManager& m, const DeviceSlots& device, const ManagerSlots& manager,
+           const GameDeviceSlots& game) noexcept {
+    device_vtable = device;
+    // The game's own device code for eye transforms and FOV. It reads our
+    // device through the game layout.
+    device_vtable[std::to_underlying(DeviceSlot::GameEyeTransform)]   = game.eye_transform;
+    device_vtable[std::to_underlying(DeviceSlot::GameFovAspect)]      = game.fov_aspect;
+    device_vtable[std::to_underlying(DeviceSlot::GameEyeScaleOffset)] = game.eye_scale_offset;
+    manager_vtable = manager;
+
+    // Manager: the game constructor's values (FUN_10003510), every other
+    // field zero as the manager was value-initialised.
+    m.vtable = manager_vtable.data();
+    util::identity(m.game_matrix);
+    m.game_64 = kSceneVisible;  // the game constructor's value (02 §3.3)
+    m.game_a8 = kPositionTrackingOn;
+    m.fade    = kFullPositionWeight;
+    std::ranges::copy(kNeutralReferencePose, m.reference_pose);
+
+    // Device (FUN_10003640).
+    auto& si       = m.si;
+    si.vtable      = device_vtable.data();
+    si.world_scale = kDefaultWorldScale;
+}
 
 } // namespace
 
-void initialize(StereoManager& g_manager, const DeviceSlots& device, const ManagerSlots& manager) noexcept {
-    for (std::size_t i = 0; i < device.size(); ++i) g_device_vtable[i] = device[i];
-    // The game's own device code for eye transforms and FOV. It reads our
-    // device through the game layout.
-    g_device_vtable[12] = ai_address(AiAddr::GameDeviceEyeTransform);
-    g_device_vtable[13] = ai_address(AiAddr::GameDeviceFovAspect);
-    g_device_vtable[14] = ai_address(AiAddr::GameDeviceEyeScaleOffset);
-    for (std::size_t i = 0; i < manager.size(); ++i) g_manager_vtable[i] = manager[i];
+void initialize(const AddressMap& addresses, StereoManager& m, const DeviceSlots& device,
+                const ManagerSlots& manager) noexcept {
+    build(m, device, manager,
+          {addresses.at(AiAddr::GameDeviceEyeTransform), addresses.at(AiAddr::GameDeviceFovAspect),
+           addresses.at(AiAddr::GameDeviceEyeScaleOffset)});
+}
 
-    // Manager: game defaults (FUN_10003510).
-    auto& m = g_manager;
-    m.vtable = g_manager_vtable;
-    for (int i = 0; i < 4; ++i) m.game_matrix[i * 5] = 1.0f;
-    m.game_64 = 1.0f;
-    m.game_a8 = 1;
-    m.fade    = 1.0f;
-    // Reference pose rows (-1,0,0,0), (0,-1,0,0), (0,0,1,0); the game uses identity.
-    m.reference_pose[0]  = -1.0f;
-    m.reference_pose[5]  = -1.0f;
-    m.reference_pose[10] =  1.0f;
+void describe_as_dk2(StereoInterface& si) noexcept {
+    // The handle seed is zero: the game's ovrHmd handle stays null (02 §4).
+    si.desc.handle          = CodeAddress{static_cast<std::uint32_t>(si.handle_seed)};
+    si.desc.type            = kHmdTypeDk2;
+    si.desc.hmd_caps        = kDk2HmdCaps;
+    si.desc.sensor_caps     = kDk2SensorCaps;
+    si.desc.distortion_caps = kDk2DistortionCaps;
+}
 
-    // Device (FUN_10003640).
-    auto& si = m.si;
-    si.vtable      = g_device_vtable;
-    si.world_scale = 1.0f;
+void start_sensor(StereoInterface& si) noexcept {
+    const abi::NoArgs start = CodeAddress{slot(si, DeviceSlot::StartSensor)};
+    start(&si, nullptr);
+}
+
+std::int32_t* render_target_size(StereoInterface& si, std::int32_t* w, std::int32_t* h) noexcept {
+    const abi::SizeQuery size = CodeAddress{slot(si, DeviceSlot::RenderTargetSize)};
+    return size(&si, nullptr, w, h);
+}
+
+void recenter(StereoManager& m, StereoInterface& si) noexcept {
+    const abi::Pose take = CodeAddress{slot(si, DeviceSlot::RecenterPose)};
+    take(&si, nullptr, m.reference_pose);
 }
 
 } // namespace omvr::game::stereo

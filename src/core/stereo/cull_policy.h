@@ -2,11 +2,11 @@
 
 namespace omvr::core::stereo {
 
-// Object culling in stereo (not in the original). The game's per-object
-// visibility loop (0xa1fd20, run on job threads) tests each object against a
-// distance/LOD limit, the view frustum, and, where its cull context has
-// them, two optional tests. Which POV culls decides which of those exist
-// (POV +0x314 is its render-list group, CreatePOV's second argument):
+// Object culling in stereo (08 §2). The game's per-object visibility loop
+// (0xa1fd20, run on job threads) tests each object against a distance/LOD
+// limit, the view frustum, and, where its cull context has them, two
+// optional tests. Which POV culls decides which of those exist (POV +0x314
+// is its render-list group, CreatePOV's second argument):
 //   group 2, BUILD_MAIN_RENDER_LIST: the main POV, the only one whose +0x310
 //     holds the software occlusion buffer (ctx+0x5c), drawn from the single
 //     centre view. In stereo it drops objects one eye still sees.
@@ -19,6 +19,7 @@ namespace omvr::core::stereo {
 //
 // While the stereo device runs, the distance test passes in every group and
 // the occlusion test passes for the main POV; otherwise the game's tests run.
-inline bool cull_test_passes_in_stereo(bool stereo_running) noexcept { return stereo_running; }
+// Job threads: a direct, inline call.
+constexpr bool cull_test_passes_in_stereo(bool stereo_running) noexcept { return stereo_running; }
 
 } // namespace omvr::core::stereo

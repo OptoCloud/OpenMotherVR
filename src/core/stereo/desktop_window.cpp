@@ -1,31 +1,40 @@
 #include "core/stereo/desktop_window.h"
 
-#include "core/diag/logger.h"
-#include "game/stereo/stereo_objects.h" // R: stereo (A3): the window size as a value
+#include "core/stereo/stereo_device.h"
 
-#include <utility>
+#include <string_view>
 
 namespace omvr::core::stereo {
 
-bool DesktopWindow::headset_attached() const noexcept { return manager_.device != nullptr; }
+namespace {
+
+constexpr std::string_view kFullscreenRefusedLog = "proxy: VR active, fullscreen refused";
+
+} // namespace
+
+std::optional<PixelSize> mirror_back_buffer(PixelSize requested, PixelSize window) noexcept {
+    if (window.width <= 0 || window.height <= 0) return std::nullopt;
+    if (requested.width == 0 || requested.height == 0) return std::nullopt;  // "the window's size": already small
+    if (requested == window) return std::nullopt;
+    return window;
+}
+
+bool DesktopWindow::headset_attached() const noexcept { return stereo_.device_attached(); }
 
 bool DesktopWindow::refuse_fullscreen(bool fullscreen) noexcept {
     if (!fullscreen || !headset_attached()) return false;
-    if (!std::exchange(s_logged, true)) {
-        diag::log_line("proxy: VR active, fullscreen refused");
-    }
+    if (refusal_logged_.first()) log_.line(kFullscreenRefusedLog);
     return true;
 }
 
 bool DesktopWindow::mirror_size(std::uint32_t& width, std::uint32_t& height) noexcept {
-    using UINT = std::uint32_t;
-    const auto* si = game::stereo::load_device(manager_);
-    if (!si || si->mirror_width <= 0 || si->mirror_height <= 0) return false;
-    if (width == 0 || height == 0) return false; // "the window's size": already small
-    if (width == static_cast<UINT>(si->mirror_width) && height == static_cast<UINT>(si->mirror_height))
-        return false;
-    width  = static_cast<UINT>(si->mirror_width);
-    height = static_cast<UINT>(si->mirror_height);
+    const auto window = stereo_.attached_window_size();
+    if (!window) return false;
+    const auto size =
+        mirror_back_buffer({static_cast<std::int32_t>(width), static_cast<std::int32_t>(height)}, *window);
+    if (!size) return false;
+    width  = static_cast<std::uint32_t>(size->width);
+    height = static_cast<std::uint32_t>(size->height);
     return true;
 }
 

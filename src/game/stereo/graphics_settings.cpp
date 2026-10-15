@@ -1,14 +1,23 @@
 #include "game/stereo/graphics_settings.h"
 
-#include "game/addresses.h"
+#include "game/code_address.h"
+
+#include <cstdint>
+#include <utility>
 
 namespace omvr::game::stereo {
 
-void set_graphics_option(int option, const char* value) noexcept {
-    using SetOptionFn = void (__fastcall*)(void* settings, void* edx, int option, const char* value);
-    auto set_option = reinterpret_cast<SetOptionFn>(ai_address(AiAddr::GraphicsSetOption));
-    void* settings  = ai_address(AiAddr::GraphicsSettings);
-    set_option(settings, nullptr, option, value);
+namespace {
+
+using SetOptionFn = void (__fastcall*)(void* settings, void* edx, std::int32_t option, const char* value);
+
+} // namespace
+
+void set_graphics_option(const AddressMap& addresses, core::stereo::GraphicsOption option,
+                         const char* value) noexcept {
+    const SetOptionFn set_option = CodeAddress{addresses.at(AiAddr::GraphicsSetOption)};
+    void* settings                = addresses.at(AiAddr::GraphicsSettings);
+    set_option(settings, nullptr, std::to_underlying(option), value);
 }
 
 } // namespace omvr::game::stereo
