@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its names, wording or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons. Revision: r4 -->
+<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its names, wording or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons; a tester's report on SteamVR with a Steam Frame headset (input while another window has the desktop focus); project decision of r5, with its reason inline (the touchpad scheme's scaled move limited to length 1 as a vector). Revision: r5 -->
 
 # 04 Input
 
@@ -591,7 +591,8 @@ a function that answers that. Listed with the game patches in 05 §7.11.
   = right hand within 0.2 m of the head (5.10); weapon-switch and snap-turn
   deflection > 0.5.
 - Analog outputs must stay within [-1, 1]: a scaled value (5.2) is clamped
-  after scaling, because the game's own pad never delivers more than 1.
+  after scaling, because the game's own pad never delivers more than 1;
+  the scaled touchpad move is limited as a vector to length 1 (5.2).
 - **No input focus**: while the runtime does not give the game input focus
   (the SteamVR dashboard or another overlay has it; OpenXR session not
   `FOCUSED`), every control reads as released / 0, so every VR action value
@@ -623,7 +624,7 @@ Map 0:
 
 | Action | Input |
 |---|---|
-| Move X / Y | L pad x / y (only while the L pad is touched), × 1.1, clamped |
+| Move X / Y | L pad x / y (only while the L pad is touched), × 1.1, then limited to length 1 (below) |
 | Sprint | L pad click |
 | Crouch | L trigger > 0.5 |
 | Aim | R grip (`Input.ToggleGrips`, 5.6) |
@@ -648,6 +649,15 @@ wand controls, and may be tuned: × 1.1 on movement lets a thumb reach full
 walking speed a little inside the rim of the round pad, where it rarely
 rests; × 0.85 on turning keeps smooth turning from the pad, which has no
 spring return, a little below the full rate a stick at its stop gives.
+
+The scaled move is a vector, and it is limited as one: when its length
+(the square root of x² + y²) exceeds 1, both components are divided by
+that length, so the direction is kept and the length is 1; otherwise it is
+unchanged. Clamping each component to [-1, 1] alone is not enough: near
+the rim on a diagonal it leaves a vector longer than 1 (up to about 1.1).
+Project decision of spec r6: the round pad's full deflection is length 1,
+as a stick at its round stop is, so the × 1.1 only moves where full speed
+is reached and never makes a diagonal faster than straight ahead.
 
 Map 1:
 
@@ -1076,7 +1086,7 @@ Map 0:
 
 | Game action | Value |
 |---|---|
-| Move X / Y (analog 0 / 1) | Move; in the touchpad scheme × 1.1, clamped to [-1, 1] |
+| Move X / Y (analog 0 / 1) | Move; in the touchpad scheme × 1.1, then limited to length 1 as a vector (5.2) |
 | Sprint (0x08) | Sprint |
 | Crouch (0x09) | Crouch > 0.5 |
 | Aim (0x0A) | Aim, with `Input.ToggleGrips` (5.6) |
@@ -1196,7 +1206,7 @@ checked from the log without asking the player.
 |---|---|
 | Before the first frame | OpenVR: the slot 5 fallback writes the controls. OpenXR: VR state is zero until the first OpenXR frame begins |
 | Display reset (the game calls CreateDevice again, 02 §6.1, 03) | the runtime and its input set-up are not re-created: no second manifest write, no second OpenXR action set; the pad hooks and remap state are unaffected; the next pad query with a raw code remaps if the game rebuilt its maps |
-| Game window loses OS focus | no change: the runtime, not the desktop window, decides input focus |
+| Game window loses OS focus | VR controls and the gamepad: no change, the runtime, not the desktop window, decides input focus. While a headset is attached the focus loss does not pause the game (03 §9.6). Keyboard and mouse stop reaching the game until its window has the focus again, because Windows sends them only to the foreground window |
 | SteamVR dashboard or another overlay takes input focus | all VR state zero (5.1) while it lasts; the toggled grip states keep their value |
 | Headset taken off | input keeps being read as the runtime reports it (OpenVR keeps delivering controller input; OpenXR as long as the session stays focused). Automatic recenter requests wait until the headset is in use again (8) |
 | OpenXR session leaves `FOCUSED` (`VISIBLE`) | states read inactive: all zero |
@@ -1396,6 +1406,13 @@ Common:
     head-local offsets, which change as the controllers move.
 21. The interact prompt for "look" and hacking shows the left-stick text
     when movement is on the left stick (stock layout).
+22. Wands (touchpad scheme): with the thumb at the rim of the left pad on a
+    diagonal, the player walks no faster than with the thumb at the rim
+    straight ahead; the move values the game receives never form a vector
+    longer than 1.
+23. With a headset attached, click on another desktop window during play:
+    the VR controllers and a real pad keep driving the game; keyboard and
+    mouse do nothing until the game window is clicked again (03 §9.6).
 
 ## 11. Open questions
 

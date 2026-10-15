@@ -1,4 +1,4 @@
-<!-- Provenance: user requirements; in-game observation of the earlier mod's last release on the 2015 build; AI.exe 2015 analysis; 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; in-game observation by the spec side in a headset (per-eye lighting and mirror fixes confirmed; OpenXR stereo confirmed on SteamVR with Index; controls on Index confirmed); measurements by the spec side of render-thread and GPU cost in game (pixel scale, culling, mirror size, anti-aliasing, display resets, shader patching, logging, OpenXR frame loop); user decisions of spec r3 (runtimes None / OpenVR / OpenXR, flat play with runtime None is the unmodded game, "Oculus" means OpenXR), later (OpenVR is the default runtime; the options page is project-authored and built into the player's own UI archive; the project's log format; no other mod named in the spec) and r5 (SteamVR need not be running; invalid head poses; no elevation, registry change or folder rename; settings named by their key; known problems stated as observed effects). Revision: r5 -->
+<!-- Provenance: user requirements; in-game observation of the earlier mod's last release on the 2015 build; AI.exe 2015 analysis; 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; in-game observation by the spec side in a headset (per-eye lighting and mirror fixes confirmed; OpenXR stereo confirmed on SteamVR with Index; controls on Index confirmed); measurements by the spec side of render-thread and GPU cost in game (pixel scale, culling, mirror size, anti-aliasing, display resets, shader patching, logging, OpenXR frame loop); user decisions of spec r3 (runtimes None / OpenVR / OpenXR, flat play with runtime None is the unmodded game, "Oculus" means OpenXR), later (OpenVR is the default runtime; the options page is project-authored and built into the player's own UI archive; the project's log format; no other mod named in the spec) and r5 (SteamVR need not be running; invalid head poses; no elevation, registry change or folder rename; settings named by their key; known problems stated as observed effects); a tester's report on SteamVR with a Steam Frame headset and project decisions of spec r6 (borderless mirror window, focus loss does not pause, the options page shows the runtime this run drives, the headset-not-showing-the-game warning, the crash record). Revision: r6 -->
 
 # 00. Overview
 
@@ -105,9 +105,13 @@ default, or the left eye or both eyes; optionally symmetric (03 §8). The
 window is only a mirror: the game renders to a side-by-side target sized
 for the headset, independent of the window size. The window's back buffer
 has the window's size, not the headset's (03 §9.2); the window stays
-windowed while a headset is in use (fullscreen is refused, 03 §9.4) and is
-shrunk to fit its monitor when the size the game picked would not fit
-(03 §9.3).
+windowed while a headset is in use (fullscreen is refused, 03 §9.4) and
+becomes borderless over its whole monitor when the size the game picked
+would not fit, so it looks as fullscreen did and the menus and the cursor
+line up (03 §9.3). Another application taking the desktop focus (SteamVR,
+a streaming client) does not pause the game while a headset is in use;
+keyboard and mouse then wait until the game window is clicked, the
+controllers keep working (03 §9.6).
 
 ### 2.5 Audio
 
@@ -190,7 +194,14 @@ switches (`-vrforcenone`, `-vrforceopenvr`, `-vrforceopenxr`,
 - When the runtime is installed but fails to start (no headset, runtime
   error), the player is told once with the runtime's error, VR stays off
   for the session, and the game continues on the monitor at its normal
-  resolution, never stuck in stereo (12 §7).
+  resolution, never stuck in stereo (12 §7). The options page then shows
+  runtime None while the stored choice is kept, so the player can retry
+  it or pick the other runtime; an OpenXR failure message also says how to
+  go back to SteamVR (06 §5.2, 13 §5.3).
+- When SteamVR does not show the game in the headset although VR started
+  (its Desktop Game Theatre is the usual cause), the player is warned once,
+  without the game stopping, and told which Steam setting to turn off
+  (03 §6.7, 09 §3.1).
 - If the player's `UI.PAK` is missing or not the expected one, VR works
   without the options page (06, 14).
 - The mod never needs elevation, a registry change or a renamed game
@@ -206,9 +217,10 @@ switches (`-vrforcenone`, `-vrforceopenvr`, `-vrforceopenxr`,
 ### 2.9 Diagnostics
 
 The mod writes `mothervr.log` next to the game: one session per process,
-every decision and failure once, nothing per frame (11). Players send this
-file, and the Windows Event Viewer entry for a crash, with a bug report
-(11 §6, 13).
+every decision and failure once, nothing per frame (11). A crash is
+recorded in the log too (where it happened, the registers and the
+callers), and Windows still records it as without the mod. Players send
+this file with a bug report (11 §6, 13).
 
 ## 3. Platform
 

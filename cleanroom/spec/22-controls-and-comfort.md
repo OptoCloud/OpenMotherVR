@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build. Revision: r1 -->
+<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6). Revision: r2 -->
 
 # 22. Controls and comfort (v2)
 
@@ -934,10 +934,11 @@ v2 features stop with the device.
 
 v1 (11 §1.2) already writes each event with one `WriteFile` to a handle
 opened once, with no buffering in the process; such data is in the
-operating system's cache and survives a crash **of the process**. Two
-cases lose information today: a crash of the whole system (a driver fault
-under GPU load), which loses what the cache had not written to disk; and
-the crash itself, which is not in the log (11 §6: no crash handler). With
+operating system's cache and survives a crash **of the process**, and v1
+records a crash of the process in the log itself (11 §6.1). What is still
+lost is what the cache had not written to disk when the whole system
+crashes (a driver fault under GPU load), and v1's crash record says where
+the crash happened but not what state the mod was in. With
 `Controls.CrashSafeLog` on (read at attach, so it applies from the next
 launch):
 
@@ -955,19 +956,17 @@ launch):
   holds no lock the render thread takes, and is not joined at exit (12 §7:
   no work at process exit).
 
-**Crash event.** An unhandled-exception filter chained after any the game
-or another module installed records one `FTL` event before passing the
-exception on unchanged (the game's own crash behaviour and Windows'
-report stay as they are, 11 §6). It conveys: the exception code; the
-faulting address as module name and RVA (`AI.exe`, the proxy, or another
-module); the thread name (11 §1.4); for an access violation, the address
-read or written; the last v2 and v1 states that help to place the crash
-(device state, stereo mode, interaction kind, whether a menu was open).
-It is rendered into a buffer reserved at attach, without allocation or
-locks, written with one `WriteFile` and flushed. A second exception inside
-the filter is not handled again. A vectored handler is not used: it would
-see every first-chance exception the game handles itself [proposal: only
-unhandled exceptions are crashes].
+**Crash event.** v1's crash record (11 §6.1: an unhandled-exception
+filter that logs the exception, its place, the registers and the callers
+once, then passes the exception to the filter it replaced) stays as it is.
+With the key on, the same filter also records one further event after
+v1's record, then flushes the file before passing the exception on. It
+conveys the last v2 and v1 states that help to place the crash (device
+state, stereo mode, interaction kind, whether a menu was open) and the
+thread name (11 §1.4). It is rendered without allocation, like every
+event, and written with one `WriteFile`. A vectored handler is not used:
+it would see every first-chance exception the game handles itself
+[proposal: only unhandled exceptions are crashes].
 
 **With the key off**, logging is v1's exactly.
 
@@ -1173,8 +1172,8 @@ Not made here; to be applied in a later revision:
   fallback order once OpenXR is the default (11); §5.3: Camera Speed does
   not scale smooth turn (4.5).
 - `11-diagnostics.md` §5.3: the breathing-game state (9.1) and its strings;
-  §6: the crash event and the flush policy with `Controls.CrashSafeLog`
-  (14); §2: the events of 16.
+  §6: the v2 crash event after v1's crash record and the flush policy with
+  `Controls.CrashSafeLog` (14); §2: the events of 16.
 - `12-threads-and-robustness.md` §2.2 and §3.2: the mod's flush thread
   (14), the crossings of 15; §7: the VR-off hotkey.
 - `13-distribution.md` §5.3: the welcome message with OpenXR as default

@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (UI external-call handler and its return size, script invoke methods and their return sizes, menu Open methods, bootup movie call, quit flag getter, display-reset flag, settings handlers named in 02); the stock game's ActionScript menu classes from the player's own UI.PAK (item constructors, option setters, item data replacement, automatic ids, page maps, input-mapper selection, slider snapping); the earlier mod's settings file keys and values, command-line switches and `mvr_*` console commands, kept exactly as compatibility names; compatibility facts about tools that read the same settings file; user requirements (no shipped game archive or mod-derived UI data, v1 fixes, runtime values None / OpenVR / OpenXR, -vrscale is the world scale); user decisions for r3 and r4 (default runtime OpenVR in a fresh file; Oculus means OpenXR; runtime None is the unmodded game with the patch set decided at attach; skip intro only with the archive redirect; settings push also on loading-screen Open; no other mod named; own labels and texts); spec-side decisions for r5 (VR page hidden in the game-over menu; the game's Stereo Mode item greyed in VR; Camera Speed stays active; one rule for command values; -vrscale as a whole argument; no rewrite of the settings file at start-up; reads of values only earlier builds of this project wrote are dropped); answers to Q1, Q2, Q6 (ANSWERS.md). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. Revision: r4 -->
+<!-- Provenance: game analysis of AI.exe 2015 (UI external-call handler and its return size, script invoke methods and their return sizes, menu Open methods, bootup movie call, quit flag getter, display-reset flag, settings handlers named in 02); the stock game's ActionScript menu classes from the player's own UI.PAK (item constructors, option setters, item data replacement, automatic ids, page maps, input-mapper selection, slider snapping); the earlier mod's settings file keys and values, command-line switches and `mvr_*` console commands, kept exactly as compatibility names; compatibility facts about tools that read the same settings file; user requirements (no shipped game archive or mod-derived UI data, v1 fixes, runtime values None / OpenVR / OpenXR, -vrscale is the world scale); user decisions for r3 and r4 (default runtime OpenVR in a fresh file; Oculus means OpenXR; runtime None is the unmodded game with the patch set decided at attach; skip intro only with the archive redirect; settings push also on loading-screen Open; no other mod named; own labels and texts); spec-side decisions for r5 (VR page hidden in the game-over menu; the game's Stereo Mode item greyed in VR; Camera Speed stays active; one rule for command values; -vrscale as a whole argument; no rewrite of the settings file at start-up; reads of values only earlier builds of this project wrote are dropped); answers to Q1, Q2, Q6 (ANSWERS.md). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; a tester's report on SteamVR with a Steam Frame headset (after an OpenXR failure the page offered no visible way back to SteamVR); project decision of r5, with its reason inline (the page shows the runtime this run drives; the stored preference is kept). Revision: r5 -->
 
 # 06 Options and config
 
@@ -101,7 +101,8 @@ The runtime started:
 The availability of each runtime, the preferred one (and whether it was
 forced) and the one chosen are logged (11 §2.3). If the chosen runtime then
 fails to start, the player is told once and the game runs without VR (00
-§2.7, 03, 09).
+§2.7, 03, 09). Neither a fallback nor a failure changes the stored
+`VRRuntime`; the options page shows the runtime this run drives (5.2).
 
 ### 1.2 Value ranges
 
@@ -405,7 +406,7 @@ and its own page (14).
 | Message | Value pushed |
 |---|---|
 | VR running | true when the stereo device was created and its runtime started (02 §6.1); false before that, with runtime None, and after a runtime failure |
-| `VRRuntime` | None 0, OpenXR 1, OpenVR 2 |
+| `VRRuntime` | the runtime this run drives (5.2): None 0, OpenXR 1, OpenVR 2. None after a failure, the started runtime after a fallback; never read back into the stored setting |
 | `DebugOptions` | on / off |
 | `SkipStartupIntro` | on / off |
 | `Rendering.MirrorViewType` | 0 both eyes, 1 right, 2 left |
@@ -530,7 +531,7 @@ The page offers one control per setting below.
 
 | Setting | What the control must do | Command sent on change (4.2) |
 |---|---|---|
-| `VRRuntime` | show the stored runtime (None, OpenXR, OpenVR, which players know as SteamVR) and let the player choose another; choosing one quits the game (4.5), so the page makes that clear before the choice takes effect | `mvr_vrruntime 0` / `1` / `2` |
+| `VRRuntime` | show the runtime this run drives (None, OpenXR, OpenVR, which players know as SteamVR; see below) and let the player choose another; choosing one quits the game (4.5), so the page makes that clear before the choice takes effect | `mvr_vrruntime 0` / `1` / `2` |
 | `Rendering.MirrorViewType` | choose both eyes, right eye or left eye | `mvr_mirrorview <0..2>` |
 | `Rendering.SymmetricMirrorView` | on/off | `mvr_mirrorviewsym <0/1>` |
 | `Rendering.PixelScale` | choose a value from 0.5 to 4.0 in multiples of 0.1 and show the current value with one decimal | `mvr_pixelscale <value>` |
@@ -545,6 +546,25 @@ The page offers one control per setting below.
 `Input.VRInputRelativeWalking`, `Input.VRInputStrafing` and
 `Input.ToggleCrouch` have no effect in v1 and get no visible control (their
 commands and pushes stay valid).
+
+**The runtime shown is the one this run drives**, not the stored
+preference (project decision of spec r6):
+
+| This run | Runtime shown |
+|---|---|
+| the stored or forced runtime started | that runtime |
+| the preferred runtime was not available and another one started (1.1) | the one that started |
+| the chosen runtime failed to start, or failed later and detached (01 §5.3, 09 §7) | None |
+| no runtime chosen (None stored or forced, or nothing available) | None |
+
+The stored `VRRuntime` is not rewritten by any of these: a restart tries
+the stored preference again. Why: a page that showed the stored runtime
+after a failure would claim that runtime is running and offer only the
+other choices; showing None tells the player VR is off and offers both
+the stored runtime (a retry, through a restart) and the other one (the
+way back, for example to SteamVR after OpenXR failed). Choosing any value
+other than the one shown stores it and quits (4.2, 4.5), including the
+value already stored.
 
 Values and sending:
 
@@ -844,10 +864,14 @@ Checks that show an implementation is correct. "Log" means `mothervr.log`
     changed.
 11. Turn clipping blinders off in the pause menu and push the head into a
     wall: no blackout, without leaving the menu or restarting.
-12. With runtime None (or a runtime that failed), Options shows the VR
-    page with the runtime None (or the stored runtime), its rendering and
-    input controls are greyed, and the runtime can still be changed in the
-    front end.
+12. With runtime None, or a runtime that failed to start, Options shows
+    the VR page with the runtime None, its rendering and input controls are
+    greyed, and the runtime can still be changed in the front end. After an
+    OpenXR failure, `mothervr.json` still says `"OpenXR"`; choosing OpenXR
+    on the page quits and the next launch tries OpenXR again, choosing
+    SteamVR quits and the next launch runs OpenVR. With `"OpenXR"` stored
+    and no usable OpenXR runtime (fallback to OpenVR), the page shows
+    OpenVR.
 13. `DebugOptions` on: the front-end Campaign page shows Select Level;
     Load Game shows Trigger Debug Checkpoint in the pause menu; off hides
     both; the log gains the gated diagnostics (1.3).

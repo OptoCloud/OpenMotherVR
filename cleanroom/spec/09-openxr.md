@@ -1,4 +1,4 @@
-<!-- Provenance: AI.exe 2015 analysis (order of StereoInit, the render-target size query, D3D11 device creation and device slot 3, 01 §2.1, 02 §6; the game's quit flag); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; OpenXR 1.0 specification and the XR_KHR_D3D11_enable, XR_EPIC_view_configuration_fov and XR_OCULUS_audio_device_guid extensions; the OpenXR loader's Windows registry convention; observation by the spec side on the test machine (SteamVR registers only a 64-bit runtime manifest and installs a 32-bit sibling); in-game testing and test logs by the spec side on SteamVR's OpenXR runtime (SteamVR/OpenXR 2.17.10) with a Valve Index headset and controllers (session creation, FOV fallback, frame boundary with pose age 0, recentering); performance measurements by the spec side (frame boundary placement, controller latency, a frame loop that rendered with views one period old); user requirements; project decisions, each with its reason inline. Revision: r3 -->
+<!-- Provenance: AI.exe 2015 analysis (order of StereoInit, the render-target size query, D3D11 device creation and device slot 3, 01 §2.1, 02 §6; the game's quit flag); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; OpenXR 1.0 specification and the XR_KHR_D3D11_enable, XR_EPIC_view_configuration_fov, XR_OCULUS_audio_device_guid, XR_KHR_loader_init and XR_EXT_loader_init_properties extensions, and the OpenXR registry (symbolic names of XrResult values); the OpenXR loader's Windows registry convention and its documented handling of elevated processes; observation by the spec side on the test machine (SteamVR registers only a 64-bit runtime manifest and installs a 32-bit sibling); in-game testing and test logs by the spec side on SteamVR's OpenXR runtime (SteamVR/OpenXR 2.17.10) with a Valve Index headset and controllers (session creation, FOV fallback, frame boundary with pose age 0, recentering); performance measurements by the spec side (frame boundary placement, controller latency, a frame loop that rendered with views one period old); user requirements; a tester's report on SteamVR with a Steam Frame headset (XR_ERROR_RUNTIME_UNAVAILABLE at instance creation, an empty failure text, no visible way back to SteamVR, the game not shown in the headset with Desktop Game Theatre on); project decisions, each with its reason inline (r4: runtime discovery prefers the 64-bit view's runtime, the not-shown check). Revision: r4 -->
 
 # 09: Running the stereo device on OpenXR
 
@@ -30,7 +30,8 @@ library built for x86. The loader looks for the active runtime under
 `HKLM\SOFTWARE\Khronos\OpenXR\1`, value `ActiveRuntime` (a path to the
 runtime's JSON manifest), in the registry view of the process, which for a
 32-bit process is the 32-bit view (`WOW6432Node`). The environment
-variable `XR_RUNTIME_JSON`, when set, overrides the registry. [sure]
+variable `XR_RUNTIME_JSON`, when set, overrides the registry, except in an
+elevated process, where the loader ignores the environment. [sure]
 
 Observed: SteamVR registers its runtime only in the 64-bit view
 (`...\SteamVR\steamxr_win64.json`). The loader in a 32-bit process then finds
@@ -40,20 +41,42 @@ relative to the manifest) is an x86 DLL. Meta's runtime follows the same
 pattern with `oculus_openxr_64.json` / `oculus_openxr_32.json`. [sure for
 SteamVR, likely for Meta]
 
+When the player makes a runtime active (SteamVR's "set as OpenXR runtime",
+and most other runtimes' equivalent), only the 64-bit view is written
+[likely for most runtimes, sure for SteamVR]. A 32-bit view entry that
+differs from the 64-bit one is therefore usually left over from a runtime
+used earlier. Reported by a tester on SteamVR with a Steam Frame headset:
+with OpenXR selected, instance creation failed with
+`XR_ERROR_RUNTIME_UNAVAILABLE` (-51) while SteamVR, the active runtime, has
+a usable x86 build; a 32-bit entry that the loader took in preference to
+it is the likely cause. [likely]
+
 **Required result.** When the runtime is first chosen (06 §1: when the
 stereo device is first created, never at DLL attach, 01 §2.2), the mod
 decides whether OpenXR is available, and if it is, the loader in this
-process loads an x86 runtime library. A manifest is **usable** when the
-file exists, parses as JSON, has a string `runtime.library_path`, and that
-library (resolved relative to the manifest's folder when relative) is a PE
-file whose `IMAGE_FILE_HEADER.Machine` is 0x014C (x86).
+process loads an x86 build of the runtime the player made active. A
+manifest is **usable** when the file exists, parses as JSON, has a string
+`runtime.library_path`, and that library (resolved relative to the
+manifest's folder when relative) is a PE file whose
+`IMAGE_FILE_HEADER.Machine` is 0x014C (x86).
+
+Both views' `ActiveRuntime` values are read (a `REG_SZ` or `REG_EXPAND_SZ`
+path of whatever length the registry returns; either may be absent). The
+manifest chosen:
 
 | Situation | Result |
 |---|---|
-| `XR_RUNTIME_JSON` is set and not empty | the player chose: it is left as it is and OpenXR counts as available |
-| the 32-bit registry view's `ActiveRuntime` (a `REG_SZ` or `REG_EXPAND_SZ` path of whatever length the registry returns) names a usable manifest | OpenXR is available; nothing else is needed, the loader finds it |
-| only the 64-bit view's `ActiveRuntime` is set, and an x86 manifest exists in the same folder as that 64-bit one | `XR_RUNTIME_JSON` is set for this process to the full path of a usable x86 sibling; OpenXR is available |
-| no registration in either view, or no usable x86 sibling | OpenXR is not available. When OpenXR was preferred but not forced, another available runtime may be chosen instead (06 §1); when forced, there is no VR |
+| `XR_RUNTIME_JSON` is set and not empty | the player chose: it is left as it is, nothing else is passed to the loader, and OpenXR counts as available |
+| the 64-bit view names a manifest that is itself usable (its library is x86) | that manifest |
+| the 64-bit view names a manifest that is not usable, and a usable x86 sibling of it exists in the same folder | that sibling |
+| neither of the above, and the 32-bit view names a usable manifest | the 32-bit view's manifest |
+| none of the above (no registration in either view, or nothing usable) | OpenXR is not available. When OpenXR was preferred but not forced, another available runtime may be chosen instead (06 §1); when forced, there is no VR |
+
+Why this order (project decision): the 64-bit view is the one the player's
+last "make active" wrote, so its runtime is the one the player expects to
+run; the 32-bit view is only a fallback for a runtime that registers
+itself for 32-bit processes and has no 64-bit entry, or whose 64-bit entry
+has no x86 build.
 
 Finding the sibling: it must find at least SteamVR's `steamxr_win32.json`
 next to `steamxr_win64.json` and Meta's `oculus_openxr_32.json` next to
@@ -63,13 +86,32 @@ next to `steamxr_win64.json` and Meta's `oculus_openxr_32.json` next to
 ranked is the implementation's choice, as long as only usable manifests
 are taken.
 
-`XR_RUNTIME_JSON` must be set where the loader reads it: the process
-environment, and also the C runtime's own copy of the environment when the
-loader is linked statically against a C runtime that keeps one.
+**Handing the choice to the loader.** The loader must load the chosen
+manifest (not the 32-bit view's entry) whether or not the process is
+elevated. So the chosen manifest's full path is given to the loader in two
+ways:
 
-Logged (11 §2.3): each manifest examined with the library it resolves to
-and that library's PE machine, the sibling chosen, or why none was usable.
-This is the first thing to check when "OpenXR does not start" is reported.
+- as `XR_RUNTIME_JSON` in the environment the loader reads: the process
+  environment, and also the C runtime's own copy of the environment when
+  the loader is linked statically against a C runtime that keeps one;
+- as the loader property `XR_RUNTIME_JSON` through the loader's
+  initialisation (`xrInitializeLoaderKHR` of `XR_KHR_loader_init`, with an
+  `XrLoaderInitInfoPropertiesEXT` of `XR_EXT_loader_init_properties`),
+  because the loader honours its properties in an elevated process, where
+  it ignores the environment. The OpenXR specification requires
+  `xrInitializeLoaderKHR` to be called before any other loader call except
+  `xrGetInstanceProcAddr` (which is how it is obtained), so it precedes
+  `xrEnumerateInstanceExtensionProperties` and `xrCreateInstance`. A loader
+  that does not offer it, or refuses the property, is logged and start-up
+  continues with the environment alone.
+
+Logged (11 §2.3): both views' `ActiveRuntime` values (or that a view has
+none); each manifest examined with the library it resolves to and that
+library's PE machine; the manifest chosen and which rule chose it, or why
+none was usable; whether the loader property was accepted; and, once, that
+the process is elevated when it is (an elevated game is the case where the
+environment alone would not reach the loader). This is the first thing to
+check when "OpenXR does not start" is reported.
 
 ## 2. Creation: the session must wait for the game's device
 
@@ -104,8 +146,9 @@ size (step 2) then. So the work is split by what must be known when:
 | render-target size (step 2) | answered from the recommended size: `w`, `h` = `recommendedImageRectWidth/Height` of view 0, used for both eyes, then 03 §4.1 (cap and effective pixel scale included) |
 | configure rendering (step 4), until a session exists | the session (`xrCreateSession` with the game's device), its spaces (§6.1), the environment blend mode, the swapchain format list, and the input action set (04 §5.8.4). A configure after a session exists creates nothing |
 
-Dependencies the OpenXR API imposes, and nothing more: everything needs the
-instance; the system and everything after it need `xrGetSystem`;
+Dependencies the OpenXR API imposes, and nothing more: the loader
+initialisation of §1 comes before every other loader call (the
+specification requires it); everything else needs the instance; the system and everything after it need `xrGetSystem`;
 `xrGetD3D11GraphicsRequirementsKHR` must be called before `xrCreateSession`
 (the extension requires it); reference spaces, `xrEnumerateSwapchainFormats`
 and attaching the action set need the session. The audio endpoint ID needs
@@ -160,7 +203,11 @@ called for a session that may no longer run.
 | session state `LOSS_PENDING`, or `XrEventDataInstanceLossPending` | not running and lost for the rest of this run (logged) |
 | `XrEventDataInteractionProfileChanged` | re-read the controller profile (04 §5.8.4) |
 | `XrEventDataReferenceSpaceChangePending` | re-anchor the base space before the next frame's poses are located (§6.3) |
-| other states (`IDLE`, `SYNCHRONIZED`, `VISIBLE`, `FOCUSED`) | nothing; frames continue while running (input focus is 04's) |
+| other states (`IDLE`, `SYNCHRONIZED`, `VISIBLE`, `FOCUSED`) | nothing beyond the log entry below and the visibility check of §3.1; frames continue while running (input focus is 04's) |
+
+Every session state change, whatever the state, is logged with the new
+state (11 §2.4): the sequence of states is what shows whether, and how far,
+the runtime brought the game into the headset.
 
 While the session is not running (before `READY`, after `STOPPING`, or
 lost), and from the moment exit is requested, every VR controller input the
@@ -177,6 +224,30 @@ runtime (§2.3). At process exit nothing is called: ending a session or
 destroying an instance there would run under the loader lock and can
 deadlock on runtime threads; the runtime handles a process that exits with
 a session open.
+
+### 3.1 A running session the runtime never shows
+
+A session that is running but never reaches `VISIBLE` or `FOCUSED` is not
+shown in the headset: the game is submitting frames that the runtime does
+not display. With SteamVR the usual cause is its Desktop Game Theatre,
+which shows the game's desktop window on a flat screen in the headset
+instead of the game's own frames (reported by a tester on SteamVR with a
+Steam Frame headset; the same cause as OpenVR's check in 03 §6.7).
+
+Required: if a session has been running for 10 s (since its
+`xrBeginSession` succeeded) and has not reached `VISIBLE` or `FOCUSED` at
+any point since, the mod logs it with the current state (11 §2.4) and shows
+the headset-not-showing-the-game warning of 13 §5.3 once per process. A
+session that reaches `VISIBLE` or `FOCUSED` within the 10 s is never
+reported, even if it leaves those states later (taking the headset off,
+the dashboard). 10 s is a project decision: long enough for a runtime to
+finish showing its own loading or transition screens after the session
+begins, short enough that the player learns the cause while still
+wondering why the headset shows no game.
+
+How the 10 s are measured is the implementation's choice (a monotonic
+clock); the warning must block neither the render thread nor the game
+thread: it is shown without waiting for the player (13 §5.2).
 
 ## 4. FOV and recommended size
 
@@ -483,6 +554,7 @@ recenter in practice moves the game's forward to where the player faces.
 | session stopping | nothing submitted until it is ready again; stereo and mirror continue |
 | session exiting | the game quits (§3) |
 | session or instance lost | VR stops for this run; the game continues in stereo on the mirror (§3) |
+| a running session not shown in the headset within 10 s (§3.1) | logged; the player is warned once, without blocking; nothing else changes |
 | no interaction profile bound | no VR input; gamepad, keyboard and mouse keep working |
 
 "Told once" is one message (13 owns messages to the player; wording,
@@ -490,15 +562,30 @@ icon and buttons are the implementation's). It must convey, each for its
 reason:
 
 - that OpenXR could not be started, so the player knows which part failed;
-- the failing step with the runtime's result text (`xrResultToString`) and
-  number, for diagnosis by the player or in a bug report;
+- the failing step with the result's text and number, for diagnosis by
+  the player or in a bug report. The text is never empty: the runtime's
+  own text (`xrResultToString`) when an instance exists, otherwise (a
+  failure of `xrCreateInstance` or of a call before it) the result's
+  symbolic name as the OpenXR registry defines it, for example
+  `XR_ERROR_RUNTIME_UNAVAILABLE`, because `xrResultToString` needs an
+  instance; a value the registry does not define is named as unknown;
 - that the game now runs with VR disabled, so the player knows why the
   game is flat;
 - that a restart is needed to try again, because the runtime is not
-  retried in this run.
+  retried in this run; the stored runtime choice is kept, so a restart
+  retries OpenXR (06 §5.2);
+- how to go back to SteamVR: choosing SteamVR (runtime OpenVR) on the
+  options page, or starting the game with `-vrforceopenvr` (01 §5.1),
+  because a player who switched to OpenXR and cannot start it otherwise
+  has no obvious way back;
+- for `XR_ERROR_RUNTIME_UNAVAILABLE` (-51) also: that no usable 32-bit
+  OpenXR runtime could be loaded, and that `mothervr.log` lists the
+  runtimes that were tried (§1), because that result means the loader
+  found or loaded no runtime it could use, which the player can only
+  diagnose from the log.
 
 Every failing OpenXR call whose failure ends or degrades VR is logged with
-its result (11 §2.4).
+its result (11 §2.4), with the same never-empty text.
 
 ## 8. OpenXR without a stereo device: the flat game on a virtual screen
 
@@ -570,9 +657,10 @@ sites, its installer) and have not been verified against a 2020 `AI.exe`.
 On SteamVR's OpenXR runtime with the headset worn, runtime set to OpenXR;
 log content as in 11.
 
-1. Discovery: with only SteamVR's 64-bit registration, the log shows the
-   64-bit manifest, the `steamxr_win32.json` sibling resolving to an x86
-   library (machine 0x014C), and OpenXR chosen.
+1. Discovery: with only SteamVR's 64-bit registration, the log shows both
+   registry views' values (the 32-bit one absent), the 64-bit manifest,
+   the `steamxr_win32.json` sibling resolving to an x86 library (machine
+   0x014C), the loader property accepted, and OpenXR chosen.
 2. Start-up: the log shows the runtime name and version, the system name,
    2688 x 2688 per eye (Index), that the FOV was not reported and the
    provisional tangent of about 1.2 is used; then the session created on
@@ -605,6 +693,28 @@ log content as in 11.
     game show no NaN pose; a recenter requested meanwhile happens once
     tracking is back. Look straight down and recenter: the heading does
     not change.
+12. Leftover 32-bit registration: with SteamVR active (64-bit view) and
+    the 32-bit view's `ActiveRuntime` set by hand to another runtime's
+    manifest (test only): the log shows both values and SteamVR's
+    `steamxr_win32.json` chosen, and OpenXR starts on SteamVR.
+13. Elevated: start the game as administrator with the setup of check 12:
+    the log says once that the process is elevated, and OpenXR still
+    starts on SteamVR (the loader property, not the environment, reached
+    the loader).
+14. Failure text: with no usable 32-bit runtime reachable and OpenXR
+    forced in a way that reaches `xrCreateInstance` (for example
+    `XR_RUNTIME_JSON` pointing at a manifest whose library cannot load):
+    the message and the log give the result's symbolic name (never an
+    empty text) and its number; the message says how to go back to
+    SteamVR, and for -51 that no usable 32-bit runtime was loaded and that
+    the log lists what was tried. The options page then shows runtime
+    None (06 §5.2).
+15. Not shown: with Steam's "Use Desktop Game Theatre while SteamVR is
+    active" on for the game and SteamVR running, start with OpenXR: if the
+    session runs but stays below `VISIBLE` for 10 s, the log shows every
+    state change and one not-visible event with the state, and one
+    warning appears without stopping the game. With the setting off, no
+    such event or warning.
 
 ## 12. Open questions
 
@@ -634,3 +744,8 @@ log content as in 11.
    failed).
 5. **Invalid-pose behaviour (§5.5)** is specified but not yet observed in
    game; acceptance 11 is to be run.
+6. **How SteamVR's Desktop Game Theatre affects an OpenXR session** is
+   not observed by the spec side: whether the session is created and runs
+   but stays below `VISIBLE` (what §3.1 detects), or whether creation
+   fails instead. To resolve: run acceptance 15 and read the session
+   states in the log.

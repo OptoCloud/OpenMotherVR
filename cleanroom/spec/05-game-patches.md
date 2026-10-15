@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build, every original byte below re-read from the binary for r3), required behaviour restated from observing the earlier mod in game, in-game observation by the spec side in a headset (head tracking, stereo, menus, HUD, loading screens confirmed), measurements in game by the spec side (render-target rebuild stall, per-menu-open freeze of an earlier build), user requirements (automatic recenter on headset-on and gameplay start, no 0.2 s freeze on every menu open), project decisions (snap-turn threshold and repeat, each with its reason inline), AI.exe 2015 analysis of the mode-stack container (answer to Q5, ANSWERS.md), a head-in-wall blackout in the mission 4 android scene noted in another mod's analysis (acceptance item and open question only). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. Revision: r4 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build, every original byte below re-read from the binary for r3), required behaviour restated from observing the earlier mod in game, in-game observation by the spec side in a headset (head tracking, stereo, menus, HUD, loading screens confirmed), measurements in game by the spec side (render-target rebuild stall, per-menu-open freeze of an earlier build), user requirements (automatic recenter on headset-on and gameplay start, no 0.2 s freeze on every menu open), project decisions (snap-turn threshold and repeat, each with its reason inline), AI.exe 2015 analysis of the mode-stack container (answer to Q5, ANSWERS.md), a head-in-wall blackout in the mission 4 android scene noted in another mod's analysis (acceptance item and open question only). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; a tester's report on SteamVR with a Steam Frame headset (a view sliding after snap-turn steps); project decision of r5 (the stereo-mode and snap-turn diagnostics of 11 §4.5 behind DebugOptions). Revision: r5 -->
 
 # 05: Changes to game behaviour
 
@@ -191,7 +191,8 @@ so `segments` steps make a full turn (24: 15°, 12: 30°, 6: 60°, 4: 90°, 3:
 120°, 2: 180°); `segments` is `SnapRotationSegments` (one of 24, 12, 6, 4,
 3, 2; default 12, giving 30° steps; `06` §1). The step must not be derived
 with integer division anywhere (that turns 180° for 3 segments); see `04`
-§6. Timing uses a monotonic clock.
+§6. Timing uses a monotonic clock. With `DebugOptions` on, the camera is
+traced for 600 ms after each step (11 §4.5).
 
 Why: smooth yaw from a stick in VR causes motion sickness; the yaw field is
 the game's own first-person heading, so turning through it keeps movement,
@@ -410,6 +411,10 @@ up.
 Why: the game's menus push and pop unevenly (nested screens, pops on resume
 without a matching push); with the stack as written the game could stay in
 the virtual screen during gameplay or show a menu in mode 0.
+
+With `DebugOptions` on, each push or pop the mod performs that changes the
+current mode is logged with the mode before and after (11 §4.5), so a log
+shows which menus, videos and loading screens are on the virtual screen.
 
 **Two stray stack operations are removed:**
 

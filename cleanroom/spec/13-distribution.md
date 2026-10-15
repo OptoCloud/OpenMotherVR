@@ -1,4 +1,4 @@
-<!-- Provenance: in-game observation on the 2015 Steam build with SteamVR and a Valve Index (files that appear next to the game and when, the log shared by the two processes of a Steam relaunch, message boxes and what the game does while they are open); Windows documentation (DllMain and the loader lock, file sharing modes, version resources, PE headers and imports); OpenVR public documentation (`VR_InitInternal2` error codes including 117, the x86 `openvr_api.dll` redistributable of the public SDK, SteamVR Input action manifests); the requirements of 03 §6.4, 06 §3, 10, 11, 12 and 14 that this document gathers from the player's side; the project's own release packaging and player guide; user decisions (default runtime OpenVR in a fresh `mothervr.json`, no game files shipped, UI archive built as in 14-ui-resources.md, message wording is the implementation's own, the mod never needs elevation). Revision: r2 -->
+<!-- Provenance: in-game observation on the 2015 Steam build with SteamVR and a Valve Index (files that appear next to the game and when, the log shared by the two processes of a Steam relaunch, message boxes and what the game does while they are open); Windows documentation (DllMain and the loader lock, file sharing modes, version resources, PE headers and imports); OpenVR public documentation (`VR_InitInternal2` error codes including 117, the x86 `openvr_api.dll` redistributable of the public SDK, SteamVR Input action manifests); the requirements of 03 §6.4, 06 §3, 10, 11, 12 and 14 that this document gathers from the player's side; the project's own release packaging and player guide; user decisions (default runtime OpenVR in a fresh `mothervr.json`, no game files shipped, UI archive built as in 14-ui-resources.md, message wording is the implementation's own, the mod never needs elevation); a tester's report on SteamVR with a Steam Frame headset (an OpenXR failure message with an empty result text and no way back to SteamVR; the game not shown in the headset with Desktop Game Theatre on); project decisions of r3, each with its reason inline (the OpenXR failure message's added facts; the non-blocking headset-not-showing-the-game warning). Revision: r3 -->
 
 # 13. Distribution: what the player installs, files, messages, uninstall
 
@@ -230,6 +230,13 @@ in front of the game window when the failure is detected; the game then
 continues (flat after a runtime failure). An attach-time message and a
 later one may be on screen at the same time; that is acceptable.
 
+The headset-not-showing-the-game warning arises while VR is running, on
+the render thread's side of the frame loop (03 §6.7, 09 §3.1). It must
+not block: neither the render thread nor the game thread waits for the
+player to close it, so frames keep reaching the runtime and the game keeps
+running while it is open (a box shown from a thread of its own meets
+this).
+
 ### 5.3 The messages
 
 | Message | Trigger | Must convey (unordered) | Shown |
@@ -239,7 +246,8 @@ later one may be on screen at the same time; that is acceptable.
 | `UI.PAK` missing | the build is supported and `DATA\UI.PAK` does not exist when the UI archive is to be produced (14 §5.9) | the full path that was expected; that this is the game's own file and the installation needs repair; that the mod's options page is not available | every launch while the file is missing (14 §5.9) |
 | UI archive unusable | `DATA\UI.PAK` exists but the UI archive cannot be produced: it is not a valid archive or is damaged, it is a version the mod does not know, the mod's changes do not fit it, or the archive cannot be written (14 §5.9) | that VR works; that the mod's options page is not available; that settings can be changed in `mothervr.json`; the kind of cause (game archive not recognised, or the archive could not be written) | once per distinct `UI.PAK` (14 §5.9) |
 | Runtime failure, SteamVR | OpenVR was chosen and could not start (01 §5.3, 03 §6.4): SteamVR could not be started, no headset appeared within the bounded wait (about 10 s), a requested interface is not served (§3.2), or the runtime returned an error. SteamVR not running when the game starts is not a failure: initialisation may start it, and no process check is made | that SteamVR could not be started; the runtime's own error text, or that it is unknown; the numeric error code; that VR is off and the game continues flat until it is restarted. When the code is 117 (`VRInitError_Init_AnotherAppLaunching`) also: that SteamVR's Desktop Game Theatre is the usual cause, and that Steam's game setting "Use Desktop Game Theatre while SteamVR is active" (Steam's own label) must be off | each launch on which it occurs |
-| Runtime failure, OpenXR | OpenXR was chosen and failed to start, including when no session can be created with the game's device (09 §7) | as for SteamVR, naming OpenXR, with the OpenXR result text and code | each launch on which it occurs |
+| Runtime failure, OpenXR | OpenXR was chosen and failed to start, including when no session can be created with the game's device (09 §7) | that OpenXR could not be started; the failing step; the result's text, never empty (the runtime's own text when an instance exists, else the result's symbolic name from the OpenXR registry, for example `XR_ERROR_RUNTIME_UNAVAILABLE`); the numeric result; that VR is off and the game continues flat until it is restarted, and that a restart tries OpenXR again; how to go back to SteamVR: choose SteamVR (runtime OpenVR) on the `MotherVR` page of the Options menu, or start the game with `-vrforceopenvr`. When the result is `XR_ERROR_RUNTIME_UNAVAILABLE` (-51) also: that no usable 32-bit OpenXR runtime could be loaded, and that `mothervr.log` lists the runtimes that were tried | each launch on which it occurs |
+| Headset not showing the game | VR started, but the runtime does not show the game in the headset: with OpenVR, about 3 s of frames after the first submission the compositor's scene application is another process (03 §6.7); with OpenXR, a running session has not reached `VISIBLE` or `FOCUSED` 10 s after it began (09 §3.1) | that the runtime (naming SteamVR, or OpenXR) is not showing the game in the headset; with OpenVR, the executable name of the process it shows instead when known; that SteamVR's Desktop Game Theatre is the usual cause; that Steam's game setting "Use Desktop Game Theatre while SteamVR is active" (Steam's own label) must be turned off in the game's Steam properties. A warning: VR stays on and the game continues | at most once per process; each launch on which it occurs. Shown without blocking (§5.2) |
 | Audio redirect failed | the OpenXR runtime reports the headset's own audio output device and the mod cannot move the game's audio to it (10) | that game audio could not be moved to the headset; the error code; that audio stays on the Windows default device | each launch on which it occurs |
 
 No message is shown when the preflight fails on a supported build, when no
@@ -308,7 +316,12 @@ zip and of `d3d11.dll`, one per line as `<hash>  <name>`.
 The package never contains game files (`UI.PAK`, `MOTHER.PAK`, movies,
 `AI.exe`, shader caches), files from other mods, or a separate
 `openvr_api.dll`. The player guide must list every file of §2 and §6 and
-be updated whenever a setting, a control or a written file changes.
+be updated whenever a setting, a control or a written file changes. Its
+troubleshooting part must tell the player to turn off Steam's "Use Desktop
+Game Theatre while SteamVR is active" for the game, because with it on
+SteamVR does not show the game in the headset (03 §6.7) or does not start
+(error 117, 03 §6.4), and how to go back to SteamVR after OpenXR fails
+(the options page or `-vrforceopenvr`, 09 §7).
 
 ## 9. Acceptance
 
@@ -346,7 +359,11 @@ be updated whenever a setting, a control or a written file changes.
 11. **Runtime failure message.** With SteamVR unable to start (for example
     no headset connected): one error message naming SteamVR with an error
     code; after it closes the game runs flat; no further message on a
-    display reset.
+    display reset. With OpenXR forced and no usable 32-bit OpenXR runtime
+    reachable: one message whose result text is not empty, which names the
+    way back to SteamVR (the options page or `-vrforceopenvr`), and, for
+    -51, says that no usable 32-bit runtime could be loaded and that the
+    log lists what was tried.
 12. **Unwritable directory.** With the game directory and `DATA` made
     read-only for the user, and no files of §2 present: the game starts and
     runs; no elevation is requested; log events appear in a debugger output
@@ -359,6 +376,12 @@ be updated whenever a setting, a control or a written file changes.
     the 51 exports; Explorer's Details tab shows the version of the release.
 15. **Package.** The release zip has exactly the four files of §8, and the
     hashes in `SHA256SUMS.txt` match.
+16. **Headset not showing the game.** With Steam's "Use Desktop Game
+    Theatre while SteamVR is active" on for the game and runtime OpenVR:
+    within a few seconds of the first frames one warning appears, naming
+    Desktop Game Theatre and the Steam setting; while it is open the
+    mirror keeps updating and the game keeps running. With the setting
+    off, no warning.
 
 ## 10. Open questions
 

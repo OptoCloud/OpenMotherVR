@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (device methods 3 to 16, relative head pose, render-target size query, render-target rebuild flag, renderer accessors, order of renderer initialisation); OpenVR, DXGI, Win32 and LibOVR 0.4 public API semantics (fullscreen transitions, window placement, interface versions, DK2 descriptor values); observation in game by the spec side on SteamVR with a Valve Index (full resolution from the start, eye layout tied to the created texture, windowed swapchain, mirror back buffer at window size, mirror window fitted to the monitor, recenter when worn and when gameplay starts, running start with pose age 0 over 600 frames, render-target sizes up to 13440x6720 and the 16384 texture limit, pixel-scale changes applied in the same run through the rebuild flag, head motion moving the camera correctly); performance measurements in game (mirror and back-buffer cost, controller latency); answers to implementation questions Q1, Q3, Q4 (ANSWERS.md); user requirements and project decisions (SteamVR need not be running, invalid poses, bounded start-up waits). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. Revision: r4 -->
+<!-- Provenance: game analysis of AI.exe 2015 (device methods 3 to 16, relative head pose, render-target size query, render-target rebuild flag, renderer accessors, order of renderer initialisation); OpenVR, DXGI, Win32 and LibOVR 0.4 public API semantics (fullscreen transitions, window placement, interface versions, DK2 descriptor values); observation in game by the spec side on SteamVR with a Valve Index (full resolution from the start, eye layout tied to the created texture, windowed swapchain, mirror back buffer at window size, mirror window fitted to the monitor, recenter when worn and when gameplay starts, running start with pose age 0 over 600 frames, render-target sizes up to 13440x6720 and the 16384 texture limit, pixel-scale changes applied in the same run through the rebuild flag, head motion moving the camera correctly); performance measurements in game (mirror and back-buffer cost, controller latency); answers to implementation questions Q1, Q3, Q4 (ANSWERS.md); user requirements and project decisions (SteamVR need not be running, invalid poses, bounded start-up waits). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; AI.exe 2015 analysis by the spec side for r5 (the game's window procedure: focus loss in fullscreen mode posts the pause event and releases the mouse buttons; deactivation releases the cursor clip and clears the keyboard state); OpenVR public API (IVRApplications, the scene application's process id); a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus; the game not shown in the headset with Desktop Game Theatre on); observation in test builds (a shrunk mirror window put the menus and cursor off centre); project decisions of r5, each with its reason inline (a mirror window that does not fit becomes borderless over its monitor, replacing the r4 shrink-and-centre decision; focus loss is not passed to the game while a headset is attached; the scene-application check after about 3 s). Revision: r5 -->
 
 # 03 - Head tracking, projection, render targets, frames, virtual screen, mirror
 
@@ -396,6 +396,9 @@ true, so the game's present step leaves presenting to slot 6 (02 §6.8).
 | slot 5 (render thread) | if no controller state was handed to the game since the last slot 5 (before the first frame, or a frame that submitted nothing), read the controllers now (04 §5.9); refresh eye offsets (§5); this frame is **head-tracked** if the "head pose requested" flag is set, otherwise it is a **screen frame** |
 | slot 6 (render thread) | if no stereo texture is known yet, skip to the mirror. Head-tracked: hide the virtual-screen overlay if it is visible, then `IVRCompositor::Submit(Eye_Left, ...)` and `Submit(Eye_Right, ...)`. Screen frame: §7. Then `IVRCompositor::WaitGetPoses(nullptr, 0, nullptr, 0)`; then read the controllers and hand them to the game (04 §5.9); then draw the mirror (§8); then `IDXGISwapChain::Present(0, 0)` on the game's swapchain (accessor, 02 §8); then clear the "head pose requested" flag |
 
+With `DebugOptions` on, each change between screen frames and head-tracked
+frames is logged once per change, on either runtime (11 §4.5).
+
 The order inside slot 6 is required where the API or the game needs it:
 both submits before `WaitGetPoses` (the compositor takes the frame, then
 paces the next one: the running start of §6.3); the controllers after
@@ -450,7 +453,7 @@ must meet these requirements (the runtime chosen per 06 §1, logged per
 | the loader | `openvr_api.dll`, x86, from a public OpenVR SDK release that serves the interface versions below: the copy deployed next to the game (13), else `<root>\bin\win32\openvr_api.dll`. Exports used, all `cdecl`: `VR_InitInternal2`, `VR_ShutdownInternal`, `VR_GetGenericInterface`, `VR_GetVRInitErrorAsEnglishDescription`; any missing is a failure |
 | DLL search path | while the loader loads and while `VR_InitInternal2` runs, `<root>\bin\win32` is on the DLL search path, because the loader loads `vrclient.dll` and its dependencies from there (without it the result is `VRInitError_Init_VRClientDLLNotFound`, 102); the previous search path is restored afterwards. When `vrclient.dll` or one of its dependencies cannot be loaded, the log identifies which file is missing |
 | SteamVR need not be running | `VR_InitInternal2(&err, VRApplication_Scene, nullptr)` starts SteamVR if it is not running; the mod makes no check for a SteamVR process beforehand. An init error (including no headset, such as `VRInitError_Init_HmdNotFound`) is a failure, reported with the runtime's English description and the error number |
-| interface versions | `IVRSystem_017`, `IVRCompositor_021` and `IVROverlay_016` (OpenVR SDK 1.0.10), or later versions of the same interfaces when the implementation is built against a later SDK; every call used here exists in all of them. Obtained with `VR_GetGenericInterface`. A missing interface is a start-up failure with the OpenVR error code and says which interface was missing. The versions obtained are logged once |
+| interface versions | `IVRSystem_017`, `IVRCompositor_021` and `IVROverlay_016` (OpenVR SDK 1.0.10), or later versions of the same interfaces when the implementation is built against a later SDK; every call used here exists in all of them. Obtained with `VR_GetGenericInterface`. A missing interface is a start-up failure with the OpenVR error code and says which interface was missing. The versions obtained are logged once. `IVRApplications` (any version that has `GetCurrentSceneProcessId`) is also requested, for the check of §6.7 only; its absence is logged and is not a failure |
 | bounded wait | on a cold start SteamVR may serve the compositor (and report the headset) only some seconds after `VR_InitInternal2` returns. Waiting for the compositor interface and then for a valid headset pose (`bPoseIsValid` of the headset's pose from `WaitGetPoses`) is bounded to about 10 s in total (project decision: long enough for a cold SteamVR start on current PCs, short enough that the game does not appear hung). No compositor within the bound is a failure; no valid pose within it is not (§1 covers invalid poses, and the reference is then queued, §2.1) |
 | logged once | the recommended per-eye size and the IPD (right eye X minus left eye X of `GetEyeToHeadTransform`) |
 | on success | the descriptor and EyeFov filled (§3.2), device state 1, the device attached at manager +0x04, the reference taken (§2.2) |
@@ -495,7 +498,35 @@ Nothing in this document changes when the headset is taken off or the
 runtime shows its dashboard: frames keep being submitted and paced by
 `WaitGetPoses`, the reference pose is kept, and the game keeps running.
 (Controller state while the game lacks input focus is 04's.) The game window
-losing desktop focus changes nothing either.
+losing desktop focus must not pause the game or stop frames either (§9.6).
+
+### 6.7 The headset shows another application (OpenVR)
+
+SteamVR shows one scene application in the headset at a time. When it is
+not the game, the frames the game submits never reach the headset, though
+start-up succeeded and nothing fails. Reported by a tester on SteamVR with
+a Steam Frame headset: with Steam's Desktop Game Theatre on for the game,
+SteamVR showed the game's desktop window on a flat screen in the headset
+and the game's own frames went nowhere. (When the Theatre is still
+starting as the game initialises, start-up fails with error 117 instead,
+§6.4.)
+
+Required: once, after about 3 s of frames following the first submission
+(project decision: SteamVR has settled which application it shows by
+then, and the player is still looking for the cause), the mod compares the
+process the compositor reports as its current scene application
+(`IVRApplications::GetCurrentSceneProcessId`) with the game's own process:
+
+| Result | Required |
+|---|---|
+| the game's process | logged once (11 §2.4) |
+| another process, or none (0) | logged once with that process's id and, when it can be read, its executable's file name (11 §2.4); the headset-not-showing-the-game warning of 13 §5.3 is shown once per process, naming that executable when known. Nothing else changes: frames keep being submitted |
+| the interface `IVRApplications` is not available | the check is skipped and that is logged; this is not a start-up failure, because the check is advisory |
+
+The warning must block neither the render thread nor the game thread
+(13 §5.2): the frame loop keeps submitting while it is open, so the game
+appears in the headset as soon as the player fixes the cause. The check is
+made once per process; it is not repeated after a display reset.
 
 ## 7. The virtual screen for screen frames
 
@@ -668,32 +699,48 @@ scaling. [sure]
 ### 9.3 The mirror window must fit the monitor
 
 The game sizes its window for the display mode it picked (the monitor's full
-resolution, or the stereo size). Forced windowed, a client area of the
-monitor's size plus a title bar and borders runs past the screen
-(project decision, ANSWERS r4: such a window is shrunk and centred).
+resolution, or the stereo size) and gives it a title bar and borders. Forced
+windowed, a client area of the monitor's size plus a title bar and borders
+runs past the screen.
+
+Game fact [likely, from the observed result]: while its display mode is
+fullscreen, the game ignores changes of its window's size, and it keeps
+that mode under VR because only the swapchain is forced windowed. A window
+shrunk to fit the monitor therefore had a client area smaller than the
+size the game kept using for its UI and mouse, and the menus and the
+cursor appeared off centre (observed in test builds). So a window that does not fit is not shrunk; it
+becomes borderless and covers its monitor, which gives a client area of
+the monitor's size, as fullscreen would have (project decision of spec r6,
+replacing the shrink-and-centre decision of ANSWERS r4).
+
 Required, after the game's swapchain is first created and after every
 successful `ResizeBuffers` on it, while a headset is attached and the
 swapchain is windowed, for its output window:
 
-- **Area**: the monitor the window is on (the nearest one if none); its work area if the
-  window has a title bar (so the title bar and the taskbar stay visible),
-  else the whole monitor.
-- **Left alone**: a window that already fits the area (including one the
+- **Area it must fit**: the monitor the window is on (the nearest one if
+  none); its work area if the window has a title bar (so the title bar and
+  the taskbar stay visible), else the whole monitor.
+- **Left alone**: a window that already fits that area (including one the
   player sized), a maximised or minimised window, and any window whose
-  size or monitor cannot be read or whose client area is empty.
-- **Otherwise**: the window is shrunk so that it fits the area, its client
-  area keeping its aspect and being as large as fits, and centred in the
-  area.
+  size or monitor cannot be read.
+- **Otherwise**: the window has no caption, no sizing frame and no
+  system-menu, minimise or maximise buttons (those window styles removed,
+  with the window's ANSI style functions, because the game's window class
+  is ANSI), and it covers the whole monitor it is on (not the work area),
+  so its client area is the monitor's size.
 - **Applied without blocking**: the window belongs to the game thread, and
-  this runs on the render thread, which the game thread may be waiting on,
-  so the move must not wait for the game thread (`SetWindowPos` with
-  `SWP_ASYNCWINDOWPOS`); it changes neither the Z order nor activation.
-- **Logged** once per change, with the old and the new window size
-  (11 §2.2).
+  this runs on whichever thread changes the swapchain, which the game
+  thread may be waiting on, so the change must not wait for the game
+  thread (`SetWindowPos` with `SWP_ASYNCWINDOWPOS`, and `SWP_FRAMECHANGED`
+  so the removed frame takes effect); it changes neither the Z order nor
+  activation.
+- **Logged** once per change, with the old window size and the new
+  borderless size (11 §2.2).
 
-The window's new client size then reaches the game through its own window
-handling; the back buffer stays at the recorded size and DXGI scales it to
-the client area.
+Re-checking after every `ResizeBuffers` is harmless: a window made
+borderless over its monitor fits the whole-monitor area and is left alone,
+and so is one the player sized to fit. The back buffer stays at the
+recorded size and DXGI scales it to the client area.
 
 ### 9.4 Fullscreen is refused
 
@@ -723,6 +770,60 @@ stays a working mirror.
 The game's own `Present` calls pass through, with the game's sync interval,
 except on the OpenXR path without a stereo device (09 §8). While stereo runs
 the game does not call `Present` itself; slot 6 does, with `(0, 0)` (§6.2).
+
+### 9.6 Desktop focus does not pause the game
+
+Game facts (AI.exe 2015, the game's window procedure, verified by the spec
+side):
+
+- on `WM_KILLFOCUS` while its display mode is fullscreen, the game posts
+  the system event that opens its pause menu and releases its mouse
+  buttons;
+- on `WM_ACTIVATE` with the window becoming inactive, it releases its
+  cursor clip and clears its keyboard state.
+
+Under VR the game keeps its fullscreen display mode while the swapchain is
+forced windowed (§9.2, §9.4), so the first rule applies whenever any other
+window takes the desktop focus. The desktop window is only a mirror in VR,
+and SteamVR, its dashboard or a streaming client for a wireless headset
+take the focus on their own: a tester's game paused, or stayed at a
+loading screen, until the window was clicked (reported on SteamVR with a
+Steam Frame headset).
+
+Required, while a headset is attached (as defined at the top of §9):
+
+- **Focus loss is not passed to the game.** The game's window is
+  subclassed (its window procedure replaced by one of the mod's that
+  passes every other message on to the game's procedure, so the game's
+  own handling is otherwise unchanged; set and chained with the ANSI
+  window functions, because the game's window class is ANSI, and a
+  Unicode replacement would change how text messages reach the game).
+  `WM_KILLFOCUS` reaching that window while a headset is attached is not
+  passed on; it is answered as handled. So the game neither opens its
+  pause menu nor drops its mouse buttons when another window takes the
+  focus.
+- **Activation still is.** `WM_ACTIVATE` and every other message reach the
+  game as before, so it still releases its cursor clip when another
+  window becomes active (the cursor is free on the desktop) and clears its
+  keyboard state (no key stays held).
+- **Logged**: each swallowed focus loss, with the executable file name of
+  the process that owns the foreground window at that moment (and its
+  process id), so a log shows which application took the focus (11 §2.2).
+  Once, that the subclass is in place.
+- **When**: the subclass is installed when the game's swapchain is created
+  with a headset attached (its output window is the game's window), at most
+  once per process. Without a headset attached (runtime None, or a runtime
+  that failed before the swapchain exists) the window is not subclassed and
+  focus loss pauses the game as in the unmodded game. A headset that
+  detaches later (09 §7) makes focus loss reach the game again.
+- **Thread**: the window procedure runs on the game thread, which owns the
+  window; it reads only whether a headset is attached (a value another
+  thread may change, read without tearing, 12 §3).
+
+What the player still sees: keyboard and mouse input stops reaching the
+game while another window has the focus, because Windows sends them only
+to the foreground window; the gamepad and the VR controllers keep working,
+because the game reads them by polling, not through window messages.
 
 ## 10. Pixel scale and the runtime's supersampling
 
@@ -820,10 +921,13 @@ Checks with OpenVR (SteamVR) unless noted; the log content is that of 11
    length look right.
 9. Desktop window: with the game set to fullscreen at the monitor's
    resolution, the log shows that the swapchain was forced windowed, the
-   back-buffer size used equal to the window size, and the window shrunk
-   with its old and new size; the window sits centred on the monitor inside the
-   work area with its title bar visible. A window resized by the player to
-   fit is not moved again.
+   back-buffer size used equal to the window size, and the window made
+   borderless with its old size and the monitor's size; the window has no
+   title bar or borders and covers the whole monitor; the menus and the
+   mouse cursor line up with the picture (a click lands on the item under
+   the cursor). A change of pixel scale (a `ResizeBuffers`) does not move or
+   restyle it again, and a window resized by the player to fit is not
+   moved again.
 10. Turning on the game's fullscreen option while stereo runs: the log shows
     the refusal once; the window stays a working mirror. Alt+Enter
     does nothing.
@@ -846,6 +950,20 @@ Checks with OpenVR (SteamVR) unless noted; the log content is that of 11
     does not change until tracking returns, then the recenter happens once.
     Recentering while looking straight up or down keeps the previous
     forward direction.
+16. Steam's "Use Desktop Game Theatre while SteamVR is active" on for the
+    game, SteamVR already running so start-up succeeds: about 3 s after
+    the first frames the log names the process SteamVR shows instead of
+    the game, and one warning appears naming Desktop Game Theatre and the
+    Steam setting; the game keeps running while it is open. With the
+    setting off: the log says the headset shows the game, and no warning.
+17. Focus: in gameplay with the headset on, click on another window on the
+    desktop (or open SteamVR's desktop window, or let a streaming client
+    take the focus): the game does not pause, and a loading screen
+    started before it completes on its own; the log shows the focus loss
+    with the other application's executable. Keyboard and mouse do not
+    reach the game until its window is clicked again; the VR controllers
+    and a gamepad keep working throughout. With runtime None, the same
+    click pauses the game as unmodded.
 
 ## 14. Open questions
 
@@ -854,16 +972,21 @@ Checks with OpenVR (SteamVR) unless noted; the log content is that of 11
    size query call, the D3D11 creation call, the rebuild test and the
    reset-orientation method have no 2020 address. To resolve: find the
    2015 byte patterns of 01 §4 in the 2020 binary.
-2. **Game reaction to the fullscreen refusal** (§9.4): whether the video
+2. **The game ignoring window size changes in its fullscreen mode**
+   (§9.3) is inferred from the result seen in test builds, not traced in
+   the game's code. Nothing in the required behaviour depends on the
+   mechanism: a borderless window over the monitor has the client size the
+   game keeps. To resolve: trace the game's `WM_SIZE` handling.
+3. **Game reaction to the fullscreen refusal** (§9.4): whether the video
    options keep showing "Fullscreen" and whether the game retries. To
    resolve: turn fullscreen on at start and while stereo runs and read the
    options page and the log.
-3. **What the game has bound at pixel-shader slot 0 when slot 6 runs in a
+4. **What the game has bound at pixel-shader slot 0 when slot 6 runs in a
    screen frame** (§8.1). If it is always the 1280x720 UI target, sampling
    it would give a sharper flat menu on the desktop than the virtual-screen
    region. To
    resolve: capture a menu frame and inspect the bound resource at slot 6.
-4. **Which game code consumes slot 13's vertical FOV and aspect** (§3.2):
+5. **Which game code consumes slot 13's vertical FOV and aspect** (§3.2):
    symmetric frusta are required on the assumption that such code expects
    a centred frustum. To resolve: trace the callers of the slot 13 wrapper
    (RVA 0x5B86C0).

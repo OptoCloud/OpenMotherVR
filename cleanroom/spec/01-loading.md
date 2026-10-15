@@ -1,4 +1,4 @@
-<!-- Provenance: AI.exe 2015 analysis (PE headers, imports, code at each listed RVA; every patch-site and preflight byte in this revision re-read from the installed Steam 2015 AI.exe, timestamp 0x54E3199D); Windows 11 load tests in the game directory; SysWOW64\d3d11.dll export table; the built proxy's import and export tables; Windows' built-in application compatibility database (its entry for AI.EXE); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; this project's own design decisions for v1 (preflight, runtime probing and fallback, deferred message boxes, display-reset re-entry); orderings are stated only where §2.6 gives a game, Windows or runtime reason; in-game runs on the 2015 build with SteamVR and Index; user decision on flat play with runtime None (answer to Q6, ANSWERS.md); user decision that the UI archive is built as defined in 14-ui-resources.md. Revision: r4 -->
+<!-- Provenance: AI.exe 2015 analysis (PE headers, imports, code at each listed RVA; every patch-site and preflight byte in this revision re-read from the installed Steam 2015 AI.exe, timestamp 0x54E3199D); Windows 11 load tests in the game directory; SysWOW64\d3d11.dll export table; the built proxy's import and export tables; Windows' built-in application compatibility database (its entry for AI.EXE); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; this project's own design decisions for v1 (preflight, runtime probing and fallback, deferred message boxes, display-reset re-entry); orderings are stated only where §2.6 gives a game, Windows or runtime reason; in-game runs on the 2015 build with SteamVR and Index; user decision on flat play with runtime None (answer to Q6, ANSWERS.md); user decision that the UI archive is built as defined in 14-ui-resources.md; AI.exe 2015 analysis by the spec side for r5 (the five pointer-table slots that also hold ScriptEventTap's address); a tester's report on SteamVR with a Steam Frame headset (OpenXR not starting from a leftover 32-bit registration, Desktop Game Theatre, a crash without a record); project decisions of r5, each with its reason inline (runtime discovery order, the options page shows the runtime this run drives, the crash record's filter installed at attach). Revision: r5 -->
 
 # 01. Loading, build identification, runtime selection and AI.exe addresses
 
@@ -214,6 +214,11 @@ Allowed, and required to happen here:
   here. How the archive is built, validated and when it is rebuilt is in
   `14-ui-resources.md`.
 - Compute absolute addresses from the actual image base (§3.3).
+- Install the crash record's unhandled-exception filter
+  (`11-diagnostics.md` §6), whatever the build and the patch set, so a
+  crash at any later point, including one before the first frame, is
+  recorded in the log. Installing it takes no lock and loads nothing, so
+  it is safe under the loader lock.
 - Decide which attach-time message boxes this run shows
   (`13-distribution.md` §5.2) and arrange for them to be shown: never under
   the loader lock, in front of the game window, and before the game's
@@ -414,11 +419,16 @@ Later events:
   is saved and `QuitRequested` is set to 1 so the game exits; the new
   runtime and its patch set apply from the next launch. Nothing is
   unpatched or repatched in the running process.
-- **Headset taken off, focus loss, runtime exit:** 03 and 09.
+- **Headset taken off, runtime exit:** 03 and 09. **Desktop focus loss**
+  of the game window while a headset is attached: 03 §9.6.
 - **Script event tap.** The game's scripts pass debug strings to a retail
   no-op method (`ScriptEventTap`, §4.6). The mod detours its entry
   (§2.5.2) for diagnostics only; what it derives and logs is defined in
-  `11-diagnostics.md`. v1 behaviour does not depend on it.
+  `11-diagnostics.md`. v1 behaviour does not depend on it. The code at
+  that address is shared with other functions of identical body that the
+  game calls with arguments that are not strings (11 §5.1), so the detour
+  reads its argument as a string only when it points into the game's
+  image (11 §5.2).
 
 ## 3. Build identification
 
@@ -618,7 +628,7 @@ compares the two with a 2-byte `cmp reg, eax`. The listed address is that
 | `UiPakPathPtr` | 0x124F748 | 0x125F978 | data | Pointer (VA 0x13E3C34 in 2015) to the string `data\ui.pak`, the UI archive the game opens | 06, 14 |
 | `ShowBootupPush` | 0x441AED | 0x452C9D | site | In a front-end method: `68 78 e2 2f 01` (`push` VA of the string `ShowBootup`), then `8b ce` (`mov ecx,esi`) and a `call` → 0x42AAD0, which invokes that ActionScript function (with 1 and one more argument; thiscall, ret 0xC) and starts the intro sequence | 06 |
 | `QuitRequested` | 0x17DA920 | 0x17EAAD0 | data | Byte: the game's exit request flag (getter RVA 0x614760, setter RVA 0x614770; set for example right after a fatal start-up `MessageBoxA` at RVA 0x613F38). Setting it to 1 makes the game exit; the mod relies on this after a runtime change (§2.7) [likely] | 06 |
-| `ScriptEventTap` | 0xA1BCC0 | ? | function | The game's script event dispatch: a retail no-op that the game's scripts pass debug strings to: `8b c1 c2 04 00` (`mov eax, ecx; ret 4`), thiscall (const char*), ret 4; 683 call sites [sure]. Debug-only diagnostic site, detoured at its entry (§2.5.2) | 01, 11 |
+| `ScriptEventTap` | 0xA1BCC0 | ? | function | The game's script event dispatch: a retail no-op that the game's scripts pass debug strings to: `8b c1 c2 04 00` (`mov eax, ecx; ret 4`), thiscall (const char*), ret 4; 683 call sites [sure]. The same address also fills five slots of pointer tables in `.rdata` [sure, counted in the 2015 binary]: identical functions folded into one body, which the game calls through those tables with arguments that are not strings [likely]. Debug-only diagnostic site, detoured at its entry (§2.5.2) | 01, 11 |
 | `AudioReopenOutput` | 0x831B00 | 0x8473D0 | function | Re-initialises the game's audio output device: cdecl, no arguments; starts `c6 05 61 97 bf 01 01` (sets a byte flag) then calls the device open. Called once, after the mod redirects audio to the headset's endpoint (10) | 10 |
 
 ### 4.7 Planar reflections and render fixes
@@ -723,10 +733,14 @@ each result:
   path without the DLL).
 - **OpenXR is available** when a runtime usable from a 32-bit process is
   found as `09-openxr.md` §1 defines (in short: a non-empty
-  `XR_RUNTIME_JSON` wins; else the 32-bit registry view's `ActiveRuntime`
-  under `HKLM\SOFTWARE\Khronos\OpenXR\1` whose library is x86; else a
-  32-bit sibling manifest of the 64-bit view's active runtime, which the mod
-  then sets as `XR_RUNTIME_JSON` for the process).
+  `XR_RUNTIME_JSON` wins; else an x86 build of the runtime the 64-bit
+  registry view's `ActiveRuntime` under `HKLM\SOFTWARE\Khronos\OpenXR\1`
+  names, that manifest itself when its library is x86, else a 32-bit
+  sibling manifest of it; only when that yields nothing, the 32-bit view's
+  entry when its library is x86. Both views' values are logged. The mod
+  hands its choice to the loader both as `XR_RUNTIME_JSON` for the process
+  and as a loader initialisation property, because an elevated process's
+  loader ignores the environment).
 - LibOVR (the Oculus PC SDK) is never probed or used.
 
 The choice, in order:
@@ -759,6 +773,18 @@ DLL search path while `openvr_api.dll` loads and `VR_InitInternal2` runs.
 A failure detected later, when the game configures rendering (OpenXR
 session creation needs the game's device, 09 §2), follows the same row and
 detaches the device there.
+
+Neither a fallback nor a failure rewrites the stored runtime: `VRRuntime`
+keeps the player's preference, so the next launch tries it again. The
+options page shows the runtime this run actually drives (None after a
+failure, the fallback runtime after a fallback), so the player can see
+that VR is not running on the preferred runtime and choose again (06
+§5.2).
+
+A runtime that started can still fail to reach the headset: SteamVR's
+Desktop Game Theatre shows the game's desktop window instead of its
+frames. That is detected after start-up and the player is warned without
+blocking (03 §6.7 for OpenVR, 09 §3.1 for OpenXR); the run continues.
 
 ## 6. Acceptance
 
@@ -794,12 +820,14 @@ directory (`13-distribution.md` §4).
    unavailable, chosen None, no box, and the game runs flat.
 8. **Fallback.** With `VRRuntime` `"OpenXR"`, no OpenXR runtime usable from
    32-bit, and SteamVR installed, no switch: the log shows the fallback to
-   OpenVR and VR starts.
+   OpenVR and VR starts; the options page shows OpenVR, and `mothervr.json`
+   still says `"OpenXR"`.
 9. **Runtime failure box.** With SteamVR installed but its server unable to
    start (for example the headset unplugged, or another VR app launching):
    one runtime-failure message naming SteamVR, the runtime's error text and
    its code;
-   the game continues flat after it is closed.
+   the game continues flat after it is closed. The options page then shows
+   runtime None, and `mothervr.json` still says `"OpenVR"`.
 10. **Display reset.** Changing the resolution in the game's video options
     in VR: the log shows a second stereo device creation call with no second
     runtime start and no box; VR continues.
