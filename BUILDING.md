@@ -81,8 +81,12 @@ should be removed once the reconstruction is verified.
   CRT, so the deployed DLL needs no runtime DLLs.
 - `res/openvr_api.dll`, Valve's OpenVR loader 1.0.10, which the DLL
   embeds. It is in Git LFS; without LFS, fetch it with
-  `pwsh scripts/fetch_openvr_api.ps1` (configure stops with a message if the
-  file is only an LFS pointer).
+  `pwsh scripts/fetch_openvr_api.ps1`. `CMakeLists.txt` pins the SDK release
+  and the file's SHA-256 (`OPENVR_API_RELEASE`, `OPENVR_API_SHA256`); configure
+  stops with a message when the file is missing, an LFS pointer, not an x86
+  DLL, or another file. The fetch script reads both values from there and
+  discards a download that does not match. To move to another loader
+  release, change the two values together.
 
 ### Build
 
@@ -113,10 +117,20 @@ CI (`.github/workflows/ci.yml`) runs on every push to `master` and every pull
 request: it checks that no game files are tracked and that commit subjects
 follow Conventional Commits (`scripts/check_repo.sh`), then builds with
 `-DMOTHERVR_WERROR=ON` (warnings are errors; off by default locally), checks
-the DLL (`scripts/check_dll.ps1`: x86, no import of `d3d11.dll` or the MSVC
-runtime, the D3D11 exports present) and uploads the packaged folder as a
-workflow artifact. The build itself is `.github/workflows/build.yml`, shared
-with the release workflow.
+the DLL (`scripts/check_dll.ps1 <dll> -Version <version>`: x86; exactly the
+51 exports of the system `d3d11.dll`; imports only from allowed system DLLs,
+never `d3d11.dll`, `dxgi.dll`, the OpenVR or OpenXR loader or a C/C++
+runtime; the version resource carries the version built) and uploads the
+packaged folder and the symbols as workflow artifacts. A failed check
+stops the job before packaging. The build itself is
+`.github/workflows/build.yml`, shared with the release workflow.
+
+Release builds also write `d3d11.pdb` next to the DLL (`/Z7`, `/DEBUG` with
+`/OPT:REF /OPT:ICF`, so the code is the same as without symbols). It never
+goes into the player zip; `scripts/package.ps1` puts it in
+`OpenMotherVR-<version>-symbols/` and `-symbols.zip`, and each release keeps
+it as an asset, so a crash offset inside `d3d11.dll` from `mothervr.log` can
+be mapped to source with that release's PDB.
 
 `-DMOTHERVR_VERSION=1.2.3` stamps a version into the DLL's version resource
 (Properties > Details in Explorer); local builds are `0.0.0-dev`.
@@ -171,8 +185,10 @@ The release workflow then:
   or has no release notes file;
 - builds the DLL with the tag's version stamped in and runs the DLL checks;
 - packages `OpenMotherVR-<version>.zip` (`d3d11.dll`, `README.txt`,
-  `LICENSE.txt`, `THIRD_PARTY_LICENSES.txt`) and `SHA256SUMS.txt`;
-- signs a build provenance attestation for the zip and the DLL;
+  `LICENSE.txt`, `THIRD_PARTY_LICENSES.txt`), the symbols zip
+  `OpenMotherVR-<version>-symbols.zip` (`d3d11.pdb`) and `SHA256SUMS.txt`
+  (both zips and the DLL);
+- signs a build provenance attestation for the zips and the DLL;
 - creates the GitHub release with the notes file as its description.
 
 If the workflow fails after the tag is pushed, fix the problem on `master`,
