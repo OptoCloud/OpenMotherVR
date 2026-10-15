@@ -20,15 +20,6 @@ constexpr std::uint8_t kCmpEaxEax[2] = {0x39, 0xC0};
 
 } // namespace
 
-bool stereo_mode_tests_match(std::uint8_t* ai_base, integration::AIVersion version) noexcept {
-    for (std::uint32_t rva : inline_sites(version).stereo_mode_tests) {
-        const std::uint8_t* p = ai_base + rva;
-        // 3B /r with mod=11, r/m=eax: `cmp reg, eax`.
-        if (p[0] != 0x3B || (p[1] & 0xC7) != 0xC0) return false;
-    }
-    return true;
-}
-
 bool force_stereo_mode_tests(std::uint8_t* ai_base, integration::AIVersion version) noexcept {
     for (std::uint32_t rva : inline_sites(version).stereo_mode_tests) {
         if (!write_bytes(ai_base + rva, kCmpEaxEax, sizeof(kCmpEaxEax))) return false;

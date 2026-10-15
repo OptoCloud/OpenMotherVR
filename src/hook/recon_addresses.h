@@ -86,8 +86,11 @@ struct InlineSites {
     // The second `call IsMoveOnLeftStick`, which the original addresses as
     // DAT_10066db8 + 0xEC (dumps/06c_detours_and_patches.md, db8).
     std::uint32_t left_stick_prompt_call_2;
-    // Low byte of the disp32 at UiMouseWidthLoad/UiMouseHeightLoad + 4: the
-    // 1280x720 UI reference size, 0x10 bytes past the backbuffer size.
+    // Low byte of the disp32 at UiMouseWidthLoad/UiMouseHeightLoad + 4 as
+    // the game has it: the back-buffer width and height. The patch adds
+    // 0x10, the 1280x720 UI reference size, so it is written only over this
+    // byte: another value means the reference size may not sit 0x10 past.
+    // Image bases are 64 KB aligned, so relocation leaves this byte alone.
     std::uint8_t ui_mouse_width_disp_lo;
     std::uint8_t ui_mouse_height_disp_lo;
 };
@@ -96,16 +99,16 @@ inline constexpr InlineSites kInlineSites2015 = {
     .stereo_mode_tests = {0x000336B6, 0x0060FD58, 0x0060FE50, 0x0060FEBD,
                           0x0060FF15, 0x00611740, 0x0061378A, 0x00613C80},
     .left_stick_prompt_call_2 = 0x0042D18C,
-    .ui_mouse_width_disp_lo   = 0xEC,
-    .ui_mouse_height_disp_lo  = 0xF0,
+    .ui_mouse_width_disp_lo   = 0xDC,
+    .ui_mouse_height_disp_lo  = 0xE0,
 };
 
 inline constexpr InlineSites kInlineSites2020 = {
     .stereo_mode_tests = {0x00042F96, 0x00562238, 0x00562330, 0x0056239D,
                           0x005623F5, 0x00563C10, 0x00565C5A, 0x00566150},
     .left_stick_prompt_call_2 = 0x0043E2DC,
-    .ui_mouse_width_disp_lo   = 0x9C,
-    .ui_mouse_height_disp_lo  = 0xA0,
+    .ui_mouse_width_disp_lo   = 0x8C,
+    .ui_mouse_height_disp_lo  = 0x90,
 };
 
 inline const InlineSites& inline_sites(integration::AIVersion version) noexcept {

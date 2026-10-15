@@ -7,11 +7,9 @@
 namespace mothervr::hook {
 
 // The eight "Stereo Mode == Rift" tests in AI.exe's stereo/render path
-// (RVAs in InlineSites::stereo_mode_tests, recon_addresses.h).
+// (RVAs in InlineSites::stereo_mode_tests, recon_addresses.h). The hook
+// installer's preflight checks each holds the game's `cmp reg, eax`.
 //
-// True if every site still holds the game's `cmp reg, eax`.
-bool stereo_mode_tests_match(std::uint8_t* ai_base, integration::AIVersion version) noexcept;
-
 // Rewrite each test as `cmp eax, eax` so it always passes and the game takes
 // its LibOVR stereo path, which our stereo manager stands in for. Returns
 // false if a write failed.

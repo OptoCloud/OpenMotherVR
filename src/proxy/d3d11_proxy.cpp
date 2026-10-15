@@ -8,6 +8,7 @@
 
 #include "d3d11_proxy.h"
 #include "../diag/log.h"
+#include "../hook/hook_installer.h"
 #include "../hook/memory_patch.h"
 #include "../integration/dialogs.h"
 #include "../stereo/present.h"
@@ -492,6 +493,12 @@ extern "C" __declspec(dllexport) HRESULT WINAPI D3D11CreateDeviceAndSwapChain(
     if (!fn) {
         mothervr::diag::log_line("proxy: forward attempted with NULL real ptr");
         return E_FAIL;
+    }
+    // Runtime None is the unmodded game: no swapchain change and no wrapper
+    // on the device or the swapchain (no shader fix, no window changes).
+    if (mothervr::hook::ui_set_only()) {
+        return fn(pAdapter, DriverType, Software, Flags, pFeatureLevels, FeatureLevels, SDKVersion,
+                  pSwapChainDesc, ppSwapChain, ppDevice, pFeatureLevel, ppImmediateContext);
     }
     // With a headset attached the back buffer is both eyes side by side at
     // the headset's resolution, far past any display mode: keep the game
