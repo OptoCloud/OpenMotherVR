@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cstring>
+#include <exception>
 #include <format>
 #include <optional>
 #include <string_view>
@@ -31,7 +32,7 @@ struct Frame {
 class Connection {
 public:
     // Opens the first pipe Discord listens on. False: Discord not running.
-    bool open() noexcept {
+    bool open() {
         for (int i = 0; i < kPipeCount; ++i) {
             const std::wstring name = std::format(L"\\\\.\\pipe\\discord-ipc-{}", i);
             HANDLE h = ::CreateFileW(name.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0,
@@ -47,7 +48,7 @@ public:
     void close() noexcept { pipe_.reset(); }
     bool is_open() const noexcept { return pipe_.valid(); }
 
-    bool write(std::uint32_t op, std::string_view payload) noexcept {
+    bool write(std::uint32_t op, std::string_view payload) {
         std::vector<char> buf(8 + payload.size());
         const auto len = static_cast<std::uint32_t>(payload.size());
         std::memcpy(buf.data(), &op, 4);
@@ -56,7 +57,7 @@ public:
         return write_all(buf.data(), buf.size());
     }
 
-    std::optional<Frame> read() noexcept {
+    std::optional<Frame> read() {
         std::uint32_t header[2]{};
         if (!read_all(header, sizeof(header)) || header[1] > kMaxFrame) return std::nullopt;
         Frame f{header[0], std::string(header[1], '\0')};
@@ -104,8 +105,11 @@ std::string set_activity(const Activity& a, unsigned nonce) {
 
 // Reads frames until the reply to our last write: answers pings, and gives
 // up on a close or a broken pipe. The reply's "evt" is "ERROR" when Discord
-// refused the command; its message is returned in `error`.
-bool await_reply(Connection& c, std::string& error) noexcept {
+// refused the command; its message is returned in `error`. Every field is
+// checked for its type before it is read: Discord sends "evt": null on a
+// successful reply, and nlohmann's value() throws on a null. May throw
+// (allocation); the worker catches it.
+bool await_reply(Connection& c, std::string& error) {
     for (;;) {
         auto f = c.read();
         if (!f || f->op == kOpClose) return false;
@@ -115,8 +119,16 @@ bool await_reply(Connection& c, std::string& error) noexcept {
         }
         if (f->op != kOpFrame) continue;
         const json reply = json::parse(f->payload, nullptr, false);
-        if (!reply.is_discarded() && reply.value("evt", "") == "ERROR")
-            error = reply.contains("data") ? reply["data"].value("message", "error") : "error";
+        if (!reply.is_object()) return true;
+        const auto evt = reply.find("evt");
+        if (evt == reply.end() || !evt->is_string() || evt->get_ref<const std::string&>() != "ERROR")
+            return true;
+        error           = "error";
+        const auto data = reply.find("data");
+        if (data != reply.end() && data->is_object()) {
+            const auto message = data->find("message");
+            if (message != data->end() && message->is_string()) error = message->get<std::string>();
+        }
         return true;
     }
 }
@@ -180,8 +192,13 @@ void Presence::run() noexcept {
                     logf(*log_, "discord: activity refused: {}", error);
                 sent = now;
             }
-        } catch (...) {
+        } catch (const std::exception& e) {
             // Allocation or JSON failure: drop the connection and retry later.
+            logf(*log_, "discord: {}; reconnecting later", e.what());
+            conn.close();
+            std::this_thread::sleep_for(kRetryPeriod);
+            continue;
+        } catch (...) {
             conn.close();
             std::this_thread::sleep_for(kRetryPeriod);
             continue;
