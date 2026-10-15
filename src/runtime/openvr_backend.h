@@ -21,7 +21,9 @@ bool init(const std::filesystem::path& runtime_root) noexcept;
 void shutdown() noexcept;
 
 // VR_GetGenericInterface after a successful init(), e.g. with
-// vr::IVRCompositor_Version. Null if the runtime does not serve it.
-void* generic_interface(const char* version) noexcept;
+// vr::IVRCompositor_Version. Null if the runtime does not serve it; then
+// `error`, when given, receives the EVRInitError it returned, so a start-up
+// failure can report the runtime's own code (03 §6.4).
+void* generic_interface(const char* version, int* error = nullptr) noexcept;
 
 } // namespace mothervr::runtime::openvr

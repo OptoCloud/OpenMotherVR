@@ -67,6 +67,10 @@ constexpr vr::HmdMatrix34_t kIdentity34{{{1.0f, 0.0f, 0.0f, 0.0f},
                                           {0.0f, 1.0f, 0.0f, 0.0f},
                                           {0.0f, 0.0f, 1.0f, 0.0f}}};
 
+// Start-up wait for the compositor and then a valid headset pose, in total
+// (03 §6.4): a cold SteamVR start serves them some seconds after init.
+constexpr ULONGLONG kStartupWaitMs = 10'000;
+
 // Below this horizontal length of the head's forward axis the heading is
 // undefined (looking straight up or down); the previous yaw is kept (03 §2.1).
 constexpr float kMinForwardLength = 1e-4f;
@@ -168,30 +172,44 @@ private:
 bool OpenVrHmd::init() {
     if (!openvr::init(last_result().openvr_runtime_path)) return false;
 
-    system_ = static_cast<vr::IVRSystem*>(openvr::generic_interface(vr::IVRSystem_Version));
-    overlay_ = static_cast<vr::IVROverlay*>(openvr::generic_interface(vr::IVROverlay_Version));
-    // The original spins until the compositor is up; bound the wait.
-    for (int i = 0; i < 200 && !compositor_; ++i) {
-        compositor_ = static_cast<vr::IVRCompositor*>(openvr::generic_interface(vr::IVRCompositor_Version));
-        if (!compositor_) ::Sleep(50);
+    // The original spins until the compositor is up. One bound covers the
+    // compositor and the first valid pose together (03 §6.4).
+    const ULONGLONG deadline = ::GetTickCount64() + kStartupWaitMs;
+    int system_err = 0, overlay_err = 0, compositor_err = 0;
+    system_ = static_cast<vr::IVRSystem*>(openvr::generic_interface(vr::IVRSystem_Version, &system_err));
+    overlay_ = static_cast<vr::IVROverlay*>(openvr::generic_interface(vr::IVROverlay_Version, &overlay_err));
+    for (;;) {
+        compositor_ = static_cast<vr::IVRCompositor*>(
+            openvr::generic_interface(vr::IVRCompositor_Version, &compositor_err));
+        if (compositor_ || ::GetTickCount64() >= deadline) break;
+        ::Sleep(50);
     }
-    if (!system_ || !compositor_ || !overlay_) {
-        diag::logf("openvr: missing interface (system={} compositor={} overlay={})",
-                   static_cast<void*>(system_), static_cast<void*>(compositor_),
-                   static_cast<void*>(overlay_));
-        set_init_failure("SteamVR did not provide the compositor or overlay interface", 0);
+    // A missing interface is a start-up failure that names the interface and
+    // carries the runtime's error code (03 §6.4, 13 §5.3).
+    const auto missing = [](const char* version, int err) {
+        diag::logf("openvr: runtime lacks interface {} (error {})", version, err);
+        set_init_failure(std::format("SteamVR does not provide {}", version), err);
         openvr::shutdown();
         return false;
-    }
+    };
+    if (!system_) return missing(vr::IVRSystem_Version, system_err);
+    if (!compositor_) return missing(vr::IVRCompositor_Version, compositor_err);
+    if (!overlay_) return missing(vr::IVROverlay_Version, overlay_err);
+    diag::logf("openvr: interfaces {}, {}, {}", vr::IVRSystem_Version, vr::IVRCompositor_Version,
+               vr::IVROverlay_Version);
 
-    // Wait until the HMD pose is populated.
-    for (int i = 0; i < 200; ++i) {
-        compositor_->WaitGetPoses(poses_, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
-        const auto& m = hmd_matrix().m;
-        if (m[0][0] + m[0][1] + m[0][2] != 0.0f) break;
+    // Wait, within the same bound, for a valid headset pose. None in time is
+    // not a failure: slot 11 then returns the neutral pose and the first
+    // reference is queued until the headset is in use.
+    bool pose_valid = false;
+    while (!pose_valid && ::GetTickCount64() < deadline) {
+        const auto err = compositor_->WaitGetPoses(poses_, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
+        pose_valid = poses_[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid;
+        // A failing call may return at once; do not spin on it.
+        if (!pose_valid && err != vr::VRCompositorError_None) ::Sleep(10);
     }
     tracking_origin_ = compositor_->GetTrackingSpace();
-    diag::log_line("openvr: compositor ready");
+    diag::logf("openvr: compositor ready, headset pose {}", pose_valid ? "valid" : "not yet valid");
     actions_.init(diag::module_directory() / "mothervr_input");
     return true;
 }
@@ -449,7 +467,12 @@ void OpenVrHmd::submit_frame(ID3D11Texture2D* side_by_side) {
 // Render thread, once.
 void OpenVrHmd::check_scene_app() {
     auto* apps = static_cast<vr::IVRApplications*>(openvr::generic_interface(vr::IVRApplications_Version));
-    if (!apps) return;
+    if (!apps) {
+        // Advisory check only; say why no warning can come (03 §6.7).
+        diag::logf("openvr: no {}: cannot check which application the headset shows; VR is otherwise unaffected",
+                   vr::IVRApplications_Version);
+        return;
+    }
     const DWORD scene = apps->GetCurrentSceneProcessId();
     const DWORD self  = ::GetCurrentProcessId();
     if (scene == self) {

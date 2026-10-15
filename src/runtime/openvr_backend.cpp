@@ -47,7 +47,11 @@ template <class T>
 bool resolve(T& slot, const char* name) {
     slot = util::proc<T>(g_dll, name);
     if (!slot) {
-        diag::logf("openvr: GetProcAddress({}) failed", name);
+        const DWORD error = ::GetLastError();
+        diag::logf("openvr: GetProcAddress({}) failed err={}", name, error);
+        // Not a runtime error: name the missing export and give the Windows
+        // code, so the message does not read "unknown error, 0" (13 §5.3).
+        set_init_failure(std::string{"openvr_api.dll has no export "} + name, static_cast<int>(error));
         return false;
     }
     return true;
@@ -182,10 +186,12 @@ bool init(const std::filesystem::path& runtime_root) noexcept {
     return true;
 }
 
-void* generic_interface(const char* version) noexcept {
+void* generic_interface(const char* version, int* error) noexcept {
+    if (error) *error = vr::VRInitError_Init_NotInitialized;
     if (!g_VR_GetGenericInterface) return nullptr;
     vr::EVRInitError err = vr::VRInitError_None;
     void* p = g_VR_GetGenericInterface(version, &err);
+    if (error) *error = static_cast<int>(err);
     return err == vr::VRInitError_None ? p : nullptr;
 }
 
