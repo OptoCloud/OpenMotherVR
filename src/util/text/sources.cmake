@@ -1,5 +1,5 @@
 # Sources of src/util/text/; each directory lists its own files.
-target_sources(mothervr PRIVATE
+target_sources(omvr_util PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/ascii.h
     ${CMAKE_CURRENT_LIST_DIR}/command_line_split.cpp
     ${CMAKE_CURRENT_LIST_DIR}/command_line_split.h

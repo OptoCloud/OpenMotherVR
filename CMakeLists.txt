@@ -29,6 +29,8 @@ configure_file(src/loader/version.rc.in "${CMAKE_CURRENT_BINARY_DIR}/version.rc"
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+# compile_commands.json for clang-tidy (Ninja and Makefile generators).
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Static CRT: matches the original MotherVR and means the deployed
 # d3d11.dll has no external runtime dependency.
@@ -111,10 +113,38 @@ if(NOT _inc_names STREQUAL _def_names)
                         "exports.\n.inc: ${_inc_names}\n.def: ${_def_names}")
 endif()
 
+# Build settings every project target shares (STYLEGUIDE 1): warnings,
+# conformance, UTF-8 sources, the Windows header switches, and /WX with
+# MOTHERVR_WERROR. Linked PRIVATE so they do not leak to consumers.
+add_library(omvr_options INTERFACE)
+target_include_directories(omvr_options INTERFACE src)
+if(MSVC)
+    target_compile_options(omvr_options INTERFACE
+        $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive- /Zc:__cplusplus /utf-8 /EHsc>
+        $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<BOOL:${MOTHERVR_WERROR}>>:/WX>)
+    target_compile_definitions(omvr_options INTERFACE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+    # Release builds keep debug info in the objects (/Z7), so parallel
+    # compiles share no PDB and the DLL's d3d11.pdb covers the libraries too.
+    target_compile_options(omvr_options INTERFACE "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Z7>")
+endif()
+
+# The layers below the composition root that need neither the game nor
+# Windows (STYLEGUIDE 2.1) build as static libraries, so the unit tests
+# link them without the DLL: util (standard library only) and core (logic
+# behind its ports).
+add_library(omvr_util STATIC)
+add_library(omvr_core STATIC)
+target_link_libraries(omvr_util PRIVATE omvr_options)
+target_link_libraries(omvr_core PUBLIC omvr_util nlohmann_json::nlohmann_json PRIVATE omvr_options)
+
+# The DLL: the platform adapters, the game interface and the loader. The
+# forwarders and the exported entry are compiled into it (not a library),
+# so nothing the .def names can be dropped by the linker.
 add_library(mothervr SHARED "${CMAKE_CURRENT_BINARY_DIR}/version.rc")
 
 # Each source directory lists its own files (src/**/sources.cmake), in the
-# order of the layers: util, platform, game, core, loader.
+# order of the layers: util, platform, game, core, loader. util and core
+# list theirs into omvr_util and omvr_core, the rest into mothervr.
 set(MOTHERVR_SOURCE_DIRS
     util/base util/binary util/hash util/math util/sync util/text
     platform/win32 platform/win32/input platform/win32/patching platform/win32/window
@@ -129,25 +159,21 @@ foreach(_dir IN LISTS MOTHERVR_SOURCE_DIRS)
 endforeach()
 
 if(MSVC)
-    target_compile_options(mothervr PRIVATE
-        $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive- /Zc:__cplusplus /utf-8 /EHsc>
-        $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<BOOL:${MOTHERVR_WERROR}>>:/WX>)
-    target_compile_definitions(mothervr PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-
     # Release builds also write d3d11.pdb, kept with each release (not in
     # the player zip) so a crash offset inside the proxy from the log can be
-    # mapped to source. /Z7 keeps the debug info in the objects, so parallel
-    # compiles share no PDB. /DEBUG turns off the linker's REF and ICF
-    # defaults; turning them back on keeps the shipped code what it would be
-    # without symbols. /PDBALTPATH names only the file in the DLL's debug
-    # directory, not the build machine's path.
-    target_compile_options(mothervr PRIVATE "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Z7>")
+    # mapped to source. /DEBUG turns off the linker's REF and ICF defaults;
+    # turning them back on keeps the shipped code what it would be without
+    # symbols. /PDBALTPATH names only the file in the DLL's debug directory,
+    # not the build machine's path.
     target_link_options(mothervr PRIVATE "$<$<CONFIG:Release>:/DEBUG;/OPT:REF;/OPT:ICF;/PDBALTPATH:%_PDB%>")
 endif()
 
-target_include_directories(mothervr PRIVATE src ${OPENVR_INCLUDE_DIR})
+target_include_directories(mothervr PRIVATE ${OPENVR_INCLUDE_DIR})
 
 target_link_libraries(mothervr PRIVATE
+    omvr_options
+    omvr_core
+    omvr_util
     nlohmann_json::nlohmann_json
     OpenXR::openxr_loader
     minhook::minhook

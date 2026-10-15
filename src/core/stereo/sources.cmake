@@ -1,5 +1,5 @@
 # Sources of src/core/stereo/; each directory lists its own files.
-target_sources(mothervr PRIVATE
+target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/blinders.cpp
     ${CMAKE_CURRENT_LIST_DIR}/blinders.h
     ${CMAKE_CURRENT_LIST_DIR}/cull_policy.h

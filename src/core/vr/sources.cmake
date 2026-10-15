@@ -1,5 +1,5 @@
 # Sources of src/core/vr/; each directory lists its own files.
-target_sources(mothervr PRIVATE
+target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/fov.cpp
     ${CMAKE_CURRENT_LIST_DIR}/fov.h
     ${CMAKE_CURRENT_LIST_DIR}/hand_offsets.h

@@ -1,5 +1,5 @@
 # Sources of src/core/input/; each directory lists its own files.
-target_sources(mothervr PRIVATE
+target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/action_tiers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/action_tiers.h
     ${CMAKE_CURRENT_LIST_DIR}/control_mapper.cpp
