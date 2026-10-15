@@ -8,9 +8,23 @@
 
 #include <windows.h>
 
+#include <atomic>
+
 namespace mothervr::hook {
 
+void pin_this_module() noexcept {
+    static std::atomic<bool> s_pinned{false};
+    if (s_pinned.exchange(true)) return;
+    HMODULE self = nullptr;
+    if (!::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                              reinterpret_cast<LPCWSTR>(&pin_this_module), &self)) {
+        diag::logf("[hook] cannot pin the mod's module: error {}", ::GetLastError());
+    }
+}
+
 bool write_bytes(void* dst, const void* src, std::size_t n) noexcept {
+    // Before the first write that could leave game code pointing into us.
+    pin_this_module();
     const HANDLE self = ::GetCurrentProcess();
     DWORD old = 0;
     if (!::VirtualProtectEx(self, dst, n, PAGE_EXECUTE_READWRITE, &old)) {

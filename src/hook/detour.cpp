@@ -1,6 +1,7 @@
 #include "detour.h"
 
 #include "diag/log.h"
+#include "memory_patch.h"
 
 #include <MinHook.h>
 
@@ -27,6 +28,7 @@ bool detour(std::uint8_t* target, const void* replacement, std::span<const std::
         diag::logf("[hook] {}: MinHook failed to initialise, not detoured", name);
         return false;
     }
+    pin_this_module();   // the detour jumps into this DLL from now on
     void* trampoline = nullptr;
     MH_STATUS status = MH_CreateHook(target, const_cast<void*>(replacement), &trampoline);
     if (status != MH_OK) {

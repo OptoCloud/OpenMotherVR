@@ -8,6 +8,7 @@
 
 #include "d3d11_proxy.h"
 #include "../diag/log.h"
+#include "../hook/memory_patch.h"
 #include "../integration/dialogs.h"
 #include "../stereo/present.h"
 #include "../stereo/stereo_device.h"
@@ -238,6 +239,8 @@ LRESULT CALLBACK game_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 void keep_focus_while_vr(HWND hwnd) noexcept {
     if (!hwnd || g_game_wndproc || !mothervr::stereo::manager().device) return;
+    // The window procedure points into this DLL for the rest of the process.
+    mothervr::hook::pin_this_module();
     g_game_wndproc = reinterpret_cast<WNDPROC>(
         ::SetWindowLongPtrA(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&game_wndproc)));
     if (g_game_wndproc) diag::log_line("proxy: focus loss no longer pauses the game");
@@ -278,6 +281,8 @@ void* patch_vtable_slot(void** slot, void* replacement) noexcept {
                              ::GetLastError());
         return nullptr;
     }
+    // From here the slot points into this DLL for the rest of the process.
+    mothervr::hook::pin_this_module();
     void* prev = *slot;
     *slot = replacement;
     DWORD ignore = 0;

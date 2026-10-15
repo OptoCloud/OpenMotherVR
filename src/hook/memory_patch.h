@@ -24,4 +24,11 @@ bool write_bytes(void* dst, const void* src, std::size_t n) noexcept;
 // copies inside FUN_1001d6f0.
 bool write_dword(void* dst, std::uint32_t value) noexcept;
 
+// Keep this DLL loaded for the rest of the process. Once a patch, vtable
+// slot, detour or window procedure points into it, game code would call
+// into unmapped memory after a FreeLibrary, so everything that installs one
+// pins the module first. Idempotent and safe under the loader lock (the
+// loader's lock is re-entrant for the thread that holds it).
+void pin_this_module() noexcept;
+
 } // namespace mothervr::hook
