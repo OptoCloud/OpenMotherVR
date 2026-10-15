@@ -102,6 +102,44 @@ void game_pop_mode(StereoManager* sm) noexcept {
     log_mode_change(before, sm->mode);
 }
 
+// Leave mode 1 for the world. The game's pop does nothing with an empty
+// stack, which is the state when the game entered mode 1 without a push and
+// there was no storage to raise the count into (sync_mode_stack): push 0
+// through the game instead, which runs its SetMode(0) and appends with its
+// own allocator, then drop that entry so the stack is empty in mode 0.
+void game_pop_to_world(StereoManager* sm) noexcept {
+    game_pop_mode(sm);
+    if (sm->mode == 1 && sm->stack_top == 0) {
+        game_push_mode(sm, 0);
+        sm->stack_top = 0;
+    }
+}
+
+// Rule f: at the end of each update the stack count equals the mode, after
+// unbalanced game pushes and pops. Lowering writes the count. Raising does
+// not, because when the game entered mode 1 without a push the array may
+// have no storage (data null, capacity 0) and a count of 1 over it makes
+// the game's next pop read element 0 through null. The game's append
+// routine, which allocates, is not in the address tables; until it is, the
+// count is raised only into storage the game already has, else left as it
+// is (game_pop_to_world still gets back to mode 0) and that is logged once.
+void sync_mode_stack(StereoManager& m) noexcept {
+    if (m.mode >= 0 && m.stack_top > m.mode) {
+        m.stack_top = m.mode;
+    } else if (m.mode == 1 && m.stack_top == 0) {
+        if (m.stack_data && m.stack_capacity >= 1) {
+            m.stack_data[0] = 1;
+            m.stack_top = 1;
+        } else {
+            static bool s_logged = false;
+            if (!std::exchange(s_logged, true)) {
+                diag::log_line("[stereo] mode 1 entered without a push and the mode stack has no storage; "
+                               "count left at 0");
+            }
+        }
+    }
+}
+
 template <class T = void>
 T* field_ptr(std::uint8_t* base, std::ptrdiff_t off) noexcept {
     return *reinterpret_cast<T**>(base + off);
@@ -264,9 +302,10 @@ void update_running(StereoManager* self, StereoInterface* device) {
         }
     }
 
+    sync_mode_stack(*self);
+
     // Scene visibility (+0x64): never black during cutscenes and fades,
     // black while a loading screen is up.
-    self->stack_top = self->mode;
     if (g_cutscene_or_fade) {
         if (self->mode != 1) self->game_64 = 1.0f;
         if (!g_follow_active) {
@@ -360,7 +399,7 @@ void __fastcall push_mode(StereoManager* self, void*, int mode) noexcept {
 }
 
 void __fastcall pop_mode(StereoManager* self, void*) noexcept {
-    if (self->mode == 1) game_pop_mode(self);
+    if (self->mode == 1) game_pop_to_world(self);
 }
 
 // The control prompts ask whether movement is on the left stick; the game's
@@ -671,7 +710,7 @@ void enter_screen_mode() noexcept {
 }
 
 void leave_screen_mode() noexcept {
-    if (sm().mode == 1) game_pop_mode(&sm());
+    if (sm().mode == 1) game_pop_to_world(&sm());
 }
 
 } // namespace

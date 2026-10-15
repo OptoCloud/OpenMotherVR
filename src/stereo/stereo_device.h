@@ -150,9 +150,12 @@ struct StereoManager {
     float            game_matrix[16];     // +0x020
     std::int32_t     mode;                // +0x060
     float            game_64;             // +0x064  scene visibility
-    std::uint8_t     game_68[4];          // +0x068
-    std::int32_t     stack_top;           // +0x06C  game: mode-stack top, kept equal to mode
-    std::uint8_t     game_70[8];          // +0x070
+    // The game's mode stack, a growable int array: it starts with no
+    // storage and only the game's append routine allocates it.
+    std::int32_t*    stack_data;          // +0x068
+    std::int32_t     stack_top;           // +0x06C  count, kept equal to mode
+    std::int32_t     stack_capacity;      // +0x070
+    std::uint8_t     game_74[4];          // +0x074
     float            reference_pose[12];  // +0x078  recenter pose, 3x4
     std::uint8_t     game_a8;             // +0x0A8
     std::uint8_t     game_a9[3];
@@ -160,7 +163,9 @@ struct StereoManager {
     StereoInterface  si;                  // +0x0B0
 };
 static_assert(offsetof(StereoManager, mode) == 0x60);
+static_assert(offsetof(StereoManager, stack_data) == 0x68);
 static_assert(offsetof(StereoManager, stack_top) == 0x6C);
+static_assert(offsetof(StereoManager, stack_capacity) == 0x70);
 static_assert(offsetof(StereoManager, reference_pose) == 0x78);
 static_assert(offsetof(StereoManager, fade) == 0xAC);
 static_assert(offsetof(StereoManager, si) == 0xB0);
