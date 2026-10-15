@@ -62,6 +62,15 @@ HRESULT install() noexcept {
     return result;
 }
 
+// The reopen function's entry as verified on the 2015 build:
+// `mov byte [flag], 1` (C6 05 <abs32> 01), then `call` (E8) the engine's
+// "initialised" getter. Anything else is not the function this table entry
+// names (another build, or the unverified 2020 address), and calling it
+// would run arbitrary game code.
+bool reopen_entry_matches(const std::uint8_t* p) noexcept {
+    return p[0] == 0xC6 && p[1] == 0x05 && p[6] == 0x01 && p[7] == 0xE8;
+}
+
 } // namespace
 
 void redirect_to(std::wstring endpoint_id) noexcept {
@@ -69,15 +78,24 @@ void redirect_to(std::wstring endpoint_id) noexcept {
     g_endpoint = std::move(endpoint_id);
     if (const HRESULT hr = install(); FAILED(hr)) {
         g_activate = nullptr;
+        diag::logf("audio: game output stays on the default device: redirect failed hr=0x{:08X}",
+                   static_cast<unsigned>(hr));
         diag::message_box(std::format("Failed to hook Audio!\n[0x{:X}]", static_cast<unsigned>(hr)),
-                          MB_OK | MB_ICONERROR);
+                          MB_OK | MB_ICONERROR, "audio failed");
         return;
     }
     diag::log_line("audio: game output redirected to the headset");
 
-    // The game reopens its audio output, now through the hook.
-    if (auto* reopen = hook::ai_address(hook::AiAddr::AudioReopenOutput))
-        reinterpret_cast<void(__cdecl*)()>(reopen)();
+    // The game reopens its audio output, now through the hook. Its address
+    // is in the table for both builds; an RVA of 0 (unknown) gives the image
+    // base, whose bytes ("MZ") do not match.
+    std::uint8_t* reopen = hook::ai_address(hook::AiAddr::AudioReopenOutput);
+    if (!reopen || !reopen_entry_matches(reopen)) {
+        diag::log_line("audio: output reopen not available (entry bytes differ); "
+                       "switch happens at the game's next reopen");
+        return;
+    }
+    reinterpret_cast<void(__cdecl*)()>(reopen)();
 }
 
 } // namespace mothervr::audio
