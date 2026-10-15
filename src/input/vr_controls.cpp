@@ -9,6 +9,7 @@
 #include "config/config.h"
 #include "gamepad.h"
 
+#include <atomic>
 #include <cmath>
 
 namespace mothervr::input {
@@ -180,7 +181,18 @@ constexpr const char* kIndexHelp[] = {
     "Pause Menu\tLeft Trackpad Press",
 };
 
-std::span<const char* const> g_help = kTouchpadHelp;
+// The help set is chosen on the render thread (set_control_scheme) and read
+// on the game thread when a menu opens (control_help). One pointer to a
+// whole set crosses, so a reader never pairs one set's entries with another
+// set's count (spec 04 section 3.6).
+struct HelpSet {
+    std::span<const char* const> lines;
+};
+const HelpSet kTouchpadSet{kTouchpadHelp};
+const HelpSet kThumbstickSet{kThumbstickHelp};
+const HelpSet kIndexSet{kIndexHelp};
+
+std::atomic<const HelpSet*> g_help{&kTouchpadSet};
 
 void set_glyph_scheme(bool touchpad) noexcept {
     if (touchpad) {
@@ -205,11 +217,14 @@ void set_glyph_scheme(bool touchpad) noexcept {
 
 void set_control_scheme(ControlScheme scheme) noexcept {
     set_glyph_scheme(scheme == ControlScheme::Touchpad);
-    g_help = scheme == ControlScheme::Touchpad ? std::span<const char* const>(kTouchpadHelp)
-           : scheme == ControlScheme::Index    ? std::span<const char* const>(kIndexHelp)
-                                               : std::span<const char* const>(kThumbstickHelp);
+    g_help.store(scheme == ControlScheme::Touchpad ? &kTouchpadSet
+               : scheme == ControlScheme::Index    ? &kIndexSet
+                                                   : &kThumbstickSet,
+                 std::memory_order_release);
 }
 
-std::span<const char* const> control_help() noexcept { return g_help; }
+std::span<const char* const> control_help() noexcept {
+    return g_help.load(std::memory_order_acquire)->lines;
+}
 
 } // namespace mothervr::input

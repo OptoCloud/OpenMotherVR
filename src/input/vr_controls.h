@@ -47,7 +47,8 @@ void write_controls(const Controls& c, bool right_hand_near_head) noexcept;
 enum class ControlScheme { Touchpad, Thumbstick, Index };
 void set_control_scheme(ControlScheme scheme) noexcept;
 
-// The controls help lines, "Action\tControl" (the original's text).
+// The controls help lines, "Action\tControl" (the original's text). Read on
+// the game thread; set_control_scheme (render thread) swaps the whole set.
 std::span<const char* const> control_help() noexcept;
 
 } // namespace mothervr::input

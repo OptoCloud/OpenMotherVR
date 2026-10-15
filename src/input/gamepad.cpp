@@ -129,8 +129,11 @@ std::atomic<bool> g_installed{false};
 
 // Original: the std::vector<std::string> at DAT_100686d4, built by
 // FUN_10001090. Literals here, so the pointers handed to the game stay valid
-// whatever set_glyph does later.
-std::array<const char*, 24> g_glyphs = {
+// whatever set_glyph does later. Atomic: the render thread picks the glyph
+// set (set_glyph) while the game thread reads names, and a reader must get
+// one whole pointer, the old or the new (spec 04 section 3.6). The strings
+// themselves never change, so relaxed ordering is enough.
+std::array<std::atomic<const char*>, 24> g_glyphs = {
     "A", "B", "X", "Y", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
     "BACK", "START", "LB", "RB", "LT_BUTTON", "RT_BUTTON", "LSTICK_BUTTON",
     "RSTICK_BUTTON", "LT", "RT", "LSTICK_X", "LSTICK_Y", "RSTICK_X", "RSTICK_Y",
@@ -301,7 +304,7 @@ const char* __fastcall pad_control_name(void* self, void* /*edx*/, std::uint32_t
     const int o = original_code(code);
     if (!g_vr_glyphs) return g_game.name(self, nullptr, static_cast<std::uint16_t>(o));
     if (o < 0 || static_cast<std::size_t>(o) >= g_glyphs.size()) return "VR_MENU"; // original throws past the end
-    return g_glyphs[o];
+    return g_glyphs[static_cast<std::size_t>(o)].load(std::memory_order_relaxed);
 }
 
 // bool HasActivity(): the game uses it to pick the active input device.
@@ -352,7 +355,7 @@ void note_vr_activity() noexcept { g_vr_activity.store(true); }
 
 void set_glyph(int pad_code, const char* name) noexcept {
     if (name && pad_code >= 0 && static_cast<std::size_t>(pad_code) < g_glyphs.size()) {
-        g_glyphs[pad_code] = name;
+        g_glyphs[static_cast<std::size_t>(pad_code)].store(name, std::memory_order_relaxed);
     }
 }
 

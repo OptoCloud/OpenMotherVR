@@ -49,7 +49,8 @@ void note_vr_activity() noexcept;
 // Initially the game's pad names ("A", "B", ...); backends override some
 // with "VR_*" ids that the modded UI maps to controller images. The game
 // keeps the pointer it is handed, so `name` must be a string literal (or
-// otherwise live for the whole process).
+// otherwise live for the whole process). Called on the render thread and
+// read on the game thread: each name is swapped as one pointer.
 void set_glyph(int pad_code, const char* name) noexcept;
 
 // The game's input devices, read from its input manager: the pad, keyboard
