@@ -24,10 +24,10 @@ namespace omvr::core::stereo {
 namespace {
 
 using game::DeviceState;
-using game::StereoInterface;
-using game::StereoManager;
 using game::load_backend;
 using game::load_pose_fetched;
+using game::StereoInterface;
+using game::StereoManager;
 using game::store_backend;
 using game::stereo::load_device;
 using game::stereo::load_state;
@@ -99,17 +99,17 @@ PixelSize configured_size(const StereoInterface& si) noexcept {
 game::Recti recti_of(const PixelRect& r) noexcept { return {r.x, r.y, r.width, r.height}; }
 
 void set_target_size(StereoInterface& si, PixelSize size) noexcept {
-    si.rt_width  = size.width;
-    si.rt_height = size.height;
+    si.rt_width             = size.width;
+    si.rt_height            = size.height;
     const EyeViewports eyes = eye_viewports(size);
-    si.viewport[0] = recti_of(eyes[0]);
-    si.viewport[1] = recti_of(eyes[1]);
+    si.viewport[0]          = recti_of(eyes[0]);
+    si.viewport[1]          = recti_of(eyes[1]);
 }
 
 MirrorView mirror_view_of(const StereoInterface& si, const config::RenderingSettings& rendering) noexcept {
-    return {.texture      = target_size(si),
-            .window       = {si.mirror_width, si.mirror_height},
-            .real_fov     = {tangents_of(si.desc.default_eye_fov[0]), tangents_of(si.desc.default_eye_fov[1])},
+    return {.texture  = target_size(si),
+            .window   = {si.mirror_width, si.mirror_height},
+            .real_fov = {tangents_of(si.desc.default_eye_fov[0]), tangents_of(si.desc.default_eye_fov[1])},
             .rendered_fov = {tangents_of(si.desc.max_eye_fov[0]), tangents_of(si.desc.max_eye_fov[1])},
             .type         = rendering.mirror_view_type,
             .symmetric    = rendering.symmetric_mirror_view};
@@ -175,8 +175,8 @@ void StereoDevice::init_device(StereoInterface& si) noexcept {
     si.hmd         = nullptr;
     si.rt_width = si.rt_height = 0;
 
-    const Chosen chosen     = runtimes_.last_result().chosen;
-    const auto   runtime_id = runtime_id_of(chosen);
+    const Chosen chosen   = runtimes_.last_result().chosen;
+    const auto runtime_id = runtime_id_of(chosen);
     if (!runtime_id) {
         diag::ports::logf(log_, kNoDeviceLog, vr::to_string(chosen));
         return;
@@ -200,7 +200,8 @@ void StereoDevice::init_device(StereoInterface& si) noexcept {
 }
 
 bool StereoDevice::configure_rendering(StereoInterface& si, std::optional<PixelSize> texture_size,
-                                       vr::GpuDevice device, vr::GpuContext context, ports::DesktopMirror& mirror) {
+                                       vr::GpuDevice device, vr::GpuContext context,
+                                       ports::DesktopMirror& mirror) {
     auto& t0    = si.eye_texture[0];
     t0.api      = game::kEyeTextureApiD3d11;
     t0.size     = {si.rt_width, si.rt_height};
@@ -213,8 +214,8 @@ bool StereoDevice::configure_rendering(StereoInterface& si, std::optional<PixelS
         set_target_size(si, *texture_size);
         si.configured_width  = si.rt_width;
         si.configured_height = si.rt_height;
-        t0.size     = {si.rt_width, si.rt_height};
-        t0.viewport = si.viewport[0];
+        t0.size              = {si.rt_width, si.rt_height};
+        t0.viewport          = si.viewport[0];
     }
     si.eye_texture[1]          = t0;
     si.eye_texture[1].viewport = si.viewport[1];
@@ -250,9 +251,9 @@ void StereoDevice::begin_frame(StereoInterface& si) {
 }
 
 PixelSize StereoDevice::render_target_size(StereoInterface& si, vr::ports::VrRuntime& runtime) {
-    const float scale = capped_pixel_scale(settings_.rendering.pixel_scale,
-                                           runtime.eye_texture_size(kLeftEye, kNativeScale),
-                                           runtime.eye_texture_size(kRightEye, kNativeScale));
+    const float scale =
+        capped_pixel_scale(settings_.rendering.pixel_scale, runtime.eye_texture_size(kLeftEye, kNativeScale),
+                           runtime.eye_texture_size(kRightEye, kNativeScale));
     const PixelSize size =
         side_by_side(runtime.eye_texture_size(kLeftEye, scale), runtime.eye_texture_size(kRightEye, scale));
     if (layout_follows(size, configured_size(si))) set_target_size(si, size);
@@ -284,7 +285,8 @@ void StereoDevice::create_device(StereoManager& self) {
         // The headset may be lying on the desk at launch: take the
         // reference again once it is worn (a pose that was not valid has
         // queued the retake already).
-        if (auto* runtime = load_backend(si); runtime && !runtime->headset_in_use()) update_.request_recenter();
+        if (auto* runtime = load_backend(si); runtime && !runtime->headset_in_use())
+            update_.request_recenter();
     }
 }
 

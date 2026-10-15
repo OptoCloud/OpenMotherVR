@@ -25,8 +25,8 @@ namespace omvr::core::input {
 // FUN_10003050 (layout of the original's is in the analysis doc; ours need
 // not match).
 struct ActionTier {
-    std::array<std::uint8_t, game::kMaxDigitalActions> digital{};   // VR state of digital action k
-    std::array<float, game::kMaxAnalogActions>         analog{};    // VR value of analog action j
+    std::array<std::uint8_t, game::kMaxDigitalActions> digital{}; // VR state of digital action k
+    std::array<float, game::kMaxAnalogActions> analog{};          // VR value of analog action j
     int base        = 0;
     int num_digital = 0;
     int num_analog  = 0;
@@ -38,7 +38,7 @@ struct ActionTier {
 // The three tiers: [0] player map, [1] UI map, [2] a third map VR never
 // writes (its pad bindings are still virtualised and pass through).
 inline constexpr std::size_t kTierCount = game::kActionMapCount;
-using ActionTiers = std::array<ActionTier, kTierCount>;
+using ActionTiers                       = std::array<ActionTier, kTierCount>;
 
 // A code the replaced pad methods treat as a virtual code: at or above the
 // first tier's base, outside the game's pad codes (04 §3.1).

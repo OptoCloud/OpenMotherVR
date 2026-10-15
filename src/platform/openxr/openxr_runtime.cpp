@@ -50,16 +50,16 @@ using core::vr::TextureSize;
 using core::vr::to_game_pose;
 using core::vr::to_game_velocity;
 using util::Matrix34;
-using util::pose_matrix;
 using util::Pose;
+using util::pose_matrix;
 using util::Vec3;
 
-constexpr std::string_view kLogTangents       = "openxr: render tangents v={:.3f} h={:.3f}{}";
-constexpr std::string_view kLogSession        = "openxr: session {}";
+constexpr std::string_view kLogTangents = "openxr: render tangents v={:.3f} h={:.3f}{}";
+constexpr std::string_view kLogSession  = "openxr: session {}";
 constexpr std::string_view kLogRecenterSkipped =
     "openxr: recenter skipped: head not tracked, the previous reference stays";
-constexpr std::string_view kLogFrameKind      = "[diag] frames now {}";
-constexpr std::string_view kLogHandsPrefix    = "openxr: hands (head-local m, +x right +y up -z fwd):";
+constexpr std::string_view kLogFrameKind   = "[diag] frames now {}";
+constexpr std::string_view kLogHandsPrefix = "openxr: hands (head-local m, +x right +y up -z fwd):";
 
 // OpenXR's forward axis (09 §5.2: the screen sits along the reference's
 // forward direction).
@@ -94,7 +94,11 @@ input::Controls map_controls(const ControllerState& s) noexcept {
 class OpenXrRuntime final : public core::vr::ports::VrRuntime {
 public:
     explicit OpenXrRuntime(const OpenXrRuntimeDeps& deps) noexcept
-        : log_(deps.log), xr_(deps.session), controls_(deps.controls), audio_(deps.audio), signals_(deps.signals) {}
+        : log_(deps.log),
+          xr_(deps.session),
+          controls_(deps.controls),
+          audio_(deps.audio),
+          signals_(deps.signals) {}
 
     // Ends the session and destroys the instance. Only reached through the
     // stereo device's explicit teardown, never at process exit.
@@ -103,8 +107,10 @@ public:
     bool init() override {
         if (!xr_.init_system()) return false;
         const auto& info = xr_.system_info();
-        if (info.has_fov) set_fov(info.fov);
-        else set_default_fov();
+        if (info.has_fov)
+            set_fov(info.fov);
+        else
+            set_default_fov();
         audio_.redirect_to(info.audio_output);
         return true;
     }
@@ -112,9 +118,9 @@ public:
     void headset_desc(HeadsetDesc& desc) override {
         for (std::size_t e = 0; e < kEyeCount; ++e) desc.default_eye_fov[e] = eye_fov_[e];
         desc.max_eye_fov[0] = desc.max_eye_fov[1] = core::vr::symmetric_tangents(render_);
-        const auto& info = xr_.system_info();
-        desc.product_name = info.system_name;
-        desc.manufacturer = info.runtime_name;
+        const auto& info                          = xr_.system_info();
+        desc.product_name                         = info.system_name;
+        desc.manufacturer                         = info.runtime_name;
         logf(log_, kLogTangents, render_.vertical, render_.horizontal, fov_known_ ? "" : " (provisional)");
     }
 
@@ -150,7 +156,7 @@ public:
     // display time; submit_frame declares exactly these (09 §5.3).
     void head_pose(Matrix34& out, float world_scale) override {
         const FrameViews v = xr_.views();
-        render_views_.store(v);   // what the game renders this frame with
+        render_views_.store(v); // what the game renders this frame with
         head_read_.store(true, std::memory_order_relaxed);
         out = game_pose(v.head, world_scale);
     }
@@ -210,8 +216,10 @@ public:
 
         const FrameViews rendered = render_views_.load();
         head_read_.store(false, std::memory_order_relaxed);
-        if (!cinema_ && rendered.valid) present_eyes(texture, extent, rendered);
-        else present_screen(texture, extent);
+        if (!cinema_ && rendered.valid)
+            present_eyes(texture, extent, rendered);
+        else
+            present_screen(texture, extent);
 
         // Ends this frame (copies, flush, xrEndFrame), then blocks until the
         // runtime wants the next one and begins it: a running start, as
@@ -224,8 +232,10 @@ public:
         // begun (session not running, lost) nothing was synced: the game
         // sees every VR control released, never the last synced state
         // (04 §5.12, 09 §3).
-        if (begun) write_controls();
-        else controls_.write(input::Controls{}, false);
+        if (begun)
+            write_controls();
+        else
+            controls_.write(input::Controls{}, false);
     }
 
     void register_control_hints() override { controls_.set_scheme(input::ControlScheme::Thumbstick); }
@@ -243,14 +253,14 @@ public:
     bool headset_in_use() override {
         if (!xr_.running()) return false;
         const FrameViews v = xr_.views();
-        if (!v.valid || !v.head_valid) return false;   // a recenter needs a tracked head (09 §6.2)
+        if (!v.valid || !v.head_valid) return false; // a recenter needs a tracked head (09 §6.2)
         return core::vr::is_upright(core::vr::up_y_of(v.head.orientation));
     }
 
 private:
     // The size of the side-by-side texture and of each eye's half.
     struct TextureExtent {
-        std::uint32_t height = 0;
+        std::uint32_t height     = 0;
         std::uint32_t half_width = 0;
     };
 
@@ -293,7 +303,7 @@ private:
         images.rendered_for = rendered.display_time;
         const FovAngles fov = core::vr::symmetric_angles(render_);
         for (std::size_t e = 0; e < kEyeCount; ++e) {
-            const auto left = static_cast<std::uint32_t>(e) * extent.half_width;
+            const auto left   = static_cast<std::uint32_t>(e) * extent.half_width;
             images.texture[e] = texture;
             images.region[e]  = {left, 0, left + extent.half_width, extent.height};
             images.view[e]    = {rendered.eyes[e].pose, fov};
@@ -306,14 +316,16 @@ private:
     // where the head was facing at the last recenter (03 §7, 09 §5.2).
     void present_screen(core::vr::GpuTexture texture, TextureExtent extent) {
         xr_.clear_eye_images();
-        xr_.set_screen_image(texture, {0, extent.height * core::vr::kScreenTopQuarters / core::vr::kScreenHeightQuarters,
-                                       extent.half_width,
-                                       extent.height * core::vr::kScreenBottomQuarters / core::vr::kScreenHeightQuarters});
+        xr_.set_screen_image(
+            texture, {0, extent.height * core::vr::kScreenTopQuarters / core::vr::kScreenHeightQuarters,
+                      extent.half_width,
+                      extent.height * core::vr::kScreenBottomQuarters / core::vr::kScreenHeightQuarters});
         const Pose yaw_ref = yaw_ref_.load();
-        const auto& q = yaw_ref.orientation;
+        const auto& q      = yaw_ref.orientation;
         const Vec3 forward = util::rotate(q, kForward);
-        xr_.set_screen_pose({q, {yaw_ref.position.x + forward.x * kCinemaDistance, yaw_ref.position.y,
-                                 yaw_ref.position.z + forward.z * kCinemaDistance}},
+        xr_.set_screen_pose({q,
+                             {yaw_ref.position.x + forward.x * kCinemaDistance, yaw_ref.position.y,
+                              yaw_ref.position.z + forward.z * kCinemaDistance}},
                             kCinemaWidth);
     }
 
@@ -358,48 +370,48 @@ private:
         const input::Controls c = map_controls(s);
         // The right hand near the head turns Interact into the flashlight
         // (04 §5.10).
-        const auto& R = s[Hand::Right];
-        const Pose head = xr_.views().head;
+        const auto& R        = s[Hand::Right];
+        const Pose head      = xr_.views().head;
         const bool near_head = R.grip_valid && input::near_head(R.grip.position, head.position);
         controls_.write(c, near_head);
     }
 
     void set_fov(const std::array<FovAngles, kEyeCount>& fov) {
         for (std::size_t e = 0; e < kEyeCount; ++e) eye_fov_[e] = core::vr::tangents_from_angles(fov[e]);
-        render_ = core::vr::render_tangents(eye_fov_[0], eye_fov_[1]);
+        render_    = core::vr::render_tangents(eye_fov_[0], eye_fov_[1]);
         fov_known_ = true;
     }
 
     // The provisional FOV until the runtime reports one (09 §4.2).
     void set_default_fov() {
         for (auto& f : eye_fov_) f = {kDefaultTangent, kDefaultTangent, kDefaultTangent, kDefaultTangent};
-        render_ = {kDefaultTangent, kDefaultTangent};
+        render_    = {kDefaultTangent, kDefaultTangent};
         fov_known_ = false;
     }
 
-    core::diag::ports::Log&           log_;
-    Session&                          xr_;
+    core::diag::ports::Log& log_;
+    Session& xr_;
     core::input::ports::ControlsSink& controls_;
-    core::vr::ports::HeadsetAudio&    audio_;
-    core::ui::ports::GameSignals&     signals_;
-    bool session_ = false;
-    bool cinema_ = true;
+    core::vr::ports::HeadsetAudio& audio_;
+    core::ui::ports::GameSignals& signals_;
+    bool session_       = false;
+    bool cinema_        = true;
     bool glyphs_chosen_ = false;
-    bool fov_known_ = false;
+    bool fov_known_     = false;
     FovTangents eye_fov_[kEyeCount]{};
     RenderTangents render_{kDefaultTangent, kDefaultTangent};
     // Render thread: each eye's offset from the head, kept while the views
     // have no valid positions.
     Vec3 eye_offset_[kEyeCount] = {{-kDefaultEyeX, 0, 0}, {kDefaultEyeX, 0, 0}};
-    float yaw_ = 0.0f;   // game thread: the latest reference's heading
-    bool recenter_taken_ = true;   // game thread: the last head_yaw_pose took a new one
+    float yaw_                  = 0.0f; // game thread: the latest reference's heading
+    bool recenter_taken_        = true; // game thread: the last head_yaw_pose took a new one
     // Written on the game thread (head_pose, head_yaw_pose), read on the
     // render thread (submit_frame).
     util::SeqLock<FrameViews> render_views_;
-    util::SeqLock<Pose>       yaw_ref_;
+    util::SeqLock<Pose> yaw_ref_;
     // head_pose ran since the last submit_frame: render_views_ is this frame's.
-    std::atomic<bool>         head_read_{false};
-    util::FramePeriod         hand_log_{core::diag::kDebugLogPeriodFrames};   // render thread
+    std::atomic<bool> head_read_{false};
+    util::FramePeriod hand_log_{core::diag::kDebugLogPeriodFrames}; // render thread
 };
 
 } // namespace

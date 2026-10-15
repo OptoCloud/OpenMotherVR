@@ -5,9 +5,9 @@
 namespace omvr::platform::win32 {
 
 void FileLogSink::open(const std::filesystem::path& file) noexcept {
-    HANDLE h = ::CreateFileW(file.c_str(), FILE_APPEND_DATA,
-                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                             nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    HANDLE h =
+        ::CreateFileW(file.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                      nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h == INVALID_HANDLE_VALUE) return;
     // Append-only: each AI launch spawns multiple processes (Steam launcher,
     // then the game) and both run our DllMain. Truncating here would erase

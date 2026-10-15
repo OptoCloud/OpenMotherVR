@@ -6,7 +6,9 @@ namespace omvr::game::stereo {
 
 namespace {
 
-std::uint32_t hash_at(const AddressMap& addresses, AiAddr slot) noexcept { return read_u32(addresses.at(slot)); }
+std::uint32_t hash_at(const AddressMap& addresses, AiAddr slot) noexcept {
+    return read_u32(addresses.at(slot));
+}
 
 } // namespace
 

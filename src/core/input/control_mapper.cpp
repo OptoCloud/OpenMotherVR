@@ -23,11 +23,11 @@ namespace {
 // written to the tiers (04 §5.8.5). Pure values.
 struct GameActions {
     float move_x = 0, move_y = 0;
-    float turn = 0;
-    bool  next_weapon = false, prev_weapon = false;
-    bool  flashlight = false;
-    bool  confirm = false;
-    bool  aim = false, tracker = false;
+    float turn       = 0;
+    bool next_weapon = false, prev_weapon = false;
+    bool flashlight = false;
+    bool confirm    = false;
+    bool aim = false, tracker = false;
 };
 
 // 04 §5.8.5 Turn: with snap rotation a touchpad turn needs a click; sticks
@@ -51,21 +51,22 @@ Vec2 move_value(const Controls& c) noexcept {
     return move;
 }
 
-GameActions game_actions(const Controls& c, bool near_head, bool snap_rotation, bool aim, bool tracker) noexcept {
+GameActions game_actions(const Controls& c, bool near_head, bool snap_rotation, bool aim,
+                         bool tracker) noexcept {
     const TouchpadRegions stick = decode_touchpad(c.turn, false);
     GameActions a;
     const Vec2 move = move_value(c);
-    a.move_x = move.x;
-    a.move_y = move.y;
-    a.turn   = turn_value(c, stick, snap_rotation);
+    a.move_x        = move.x;
+    a.move_y        = move.y;
+    a.turn          = turn_value(c, stick, snap_rotation);
     // Sticks also select weapons up and down (04 §5.3).
     const bool weapon_stick = !c.touchpad_scheme && !stick.horizontal;
-    a.next_weapon = weapon_stick && c.turn.y > kWeaponStickDeflection;
-    a.prev_weapon = weapon_stick && c.turn.y < -kWeaponStickDeflection;
-    a.flashlight  = c.flashlight || (c.interact && near_head);
-    a.confirm     = c.interact || (c.touchpad_scheme && c.sprint);
-    a.aim         = aim;
-    a.tracker     = tracker;
+    a.next_weapon           = weapon_stick && c.turn.y > kWeaponStickDeflection;
+    a.prev_weapon           = weapon_stick && c.turn.y < -kWeaponStickDeflection;
+    a.flashlight            = c.flashlight || (c.interact && near_head);
+    a.confirm               = c.interact || (c.touchpad_scheme && c.sprint);
+    a.aim                   = aim;
+    a.tracker               = tracker;
     return a;
 }
 
@@ -94,7 +95,7 @@ public:
 
 private:
     ActionTier& tier_;
-    bool        active_ = false;
+    bool active_ = false;
 };
 
 // Player map (names from the controls help, 04 §2.4).
@@ -157,8 +158,8 @@ void ControlMapper::GripToggles::update(bool grip_r, bool grip_l, bool toggle) n
 void ControlMapper::write(const Controls& c, bool near_head) noexcept {
     const bool toggle = settings_.toggle_grips;
     grips_.update(c.grip_r, c.grip_l, toggle);
-    const bool aim     = toggle ? grips_.aim() : c.grip_r;
-    const bool tracker = toggle ? grips_.tracker() : c.grip_l && !c.radial;
+    const bool aim            = toggle ? grips_.aim() : c.grip_r;
+    const bool tracker        = toggle ? grips_.tracker() : c.grip_l && !c.radial;
     const GameActions actions = game_actions(c, near_head, settings_.snap_rotation, aim, tracker);
 
     auto& tiers = pad_.tiers();

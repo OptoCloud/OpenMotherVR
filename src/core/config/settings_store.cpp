@@ -66,8 +66,8 @@ util::Result<void> SettingsStore::save(const std::filesystem::path& dir, const S
         write_config(j, cfg);
         written = files_.write_atomically(target, j.dump(kSettingsJsonIndent));
     } catch (const std::exception& e) {
-        logf(log_, "config: saving settings to {} failed ({}); the change holds for this session", path_text(target),
-             e.what());
+        logf(log_, "config: saving settings to {} failed ({}); the change holds for this session",
+             path_text(target), e.what());
         return std::unexpected(util::Error{0, kSerializeFailed});
     }
     if (written) {
@@ -81,7 +81,7 @@ util::Result<void> SettingsStore::save(const std::filesystem::path& dir, const S
 
 bool SettingsStore::initialize(const std::filesystem::path& dir) {
     config_dir_ = dir;
-    auto doc = read_document(dir);
+    auto doc    = read_document(dir);
     if (!doc) return use_defaults(dir / kSettingsFileName, doc.error());
     current_ = read_config(*doc);
     sanitize(current_);
@@ -92,7 +92,7 @@ bool SettingsStore::initialize(const std::filesystem::path& dir) {
 }
 
 bool SettingsStore::use_defaults(const std::filesystem::path& file, std::string_view why) {
-    current_ = Settings{};
+    current_  = Settings{};
     document_ = json::object();
     // No file: the first launch. The caller writes the template (see
     // settings_store.h). A file that is there but does not parse is kept

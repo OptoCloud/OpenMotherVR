@@ -8,7 +8,7 @@ namespace omvr::core::vr {
 // Why the chosen runtime failed to start: the runtime's error text and code,
 // for the player-facing message (03 §6.4, 13 §5.3).
 struct InitFailure {
-    std::string  what;
+    std::string what;
     std::int32_t code = 0;
 };
 

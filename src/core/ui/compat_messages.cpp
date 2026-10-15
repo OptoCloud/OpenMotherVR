@@ -8,7 +8,8 @@ namespace omvr::core::ui {
 
 namespace {
 
-constexpr std::string_view kDisabled = "MotherVR will now start with VR disabled. Restart the game to try again.";
+constexpr std::string_view kDisabled =
+    "MotherVR will now start with VR disabled. Restart the game to try again.";
 constexpr std::string_view kUnknownError = "unknown error";
 
 std::string_view or_unknown(std::string_view what) noexcept { return what.empty() ? kUnknownError : what; }

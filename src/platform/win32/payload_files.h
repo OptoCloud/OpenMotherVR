@@ -20,15 +20,20 @@ public:
     ArchiveFiles(void* module, int openvr_api_id, int ui_patch_id, core::diag::ports::Log& log) noexcept
         : module_(module), openvr_api_id_(openvr_api_id), ui_patch_id_(ui_patch_id), log_(log) {}
 
-    std::optional<core::ui::ports::FileIdentity> identity(const std::filesystem::path& path) noexcept override;
+    std::optional<core::ui::ports::FileIdentity> identity(
+        const std::filesystem::path& path) noexcept override;
     util::Result<std::vector<std::byte>> read(const std::filesystem::path& path) override;
-    util::Result<void> write_atomically(const std::filesystem::path& path, std::span<const std::byte> data) override;
+    util::Result<void> write_atomically(const std::filesystem::path& path,
+                                        std::span<const std::byte> data) override;
     bool stamped(const std::filesystem::path& path, core::ui::ports::FileTime stamp) noexcept override;
     void stamp(const std::filesystem::path& path, core::ui::ports::FileTime stamp) noexcept override;
-    std::optional<core::ui::ports::FileIdentity> read_sidecar(const std::filesystem::path& path) noexcept override;
-    void write_sidecar(const std::filesystem::path& path, const core::ui::ports::FileIdentity& id) noexcept override;
+    std::optional<core::ui::ports::FileIdentity> read_sidecar(
+        const std::filesystem::path& path) noexcept override;
+    void write_sidecar(const std::filesystem::path& path,
+                       const core::ui::ports::FileIdentity& id) noexcept override;
     void remove(const std::filesystem::path& path) noexcept override;
-    core::ui::ports::LockState lock(std::wstring_view name, std::chrono::milliseconds timeout) noexcept override;
+    core::ui::ports::LockState lock(std::wstring_view name,
+                                    std::chrono::milliseconds timeout) noexcept override;
     void unlock() noexcept override;
     std::span<const std::byte> payload(core::ui::ports::ResourceId id) noexcept override;
 
@@ -43,13 +48,14 @@ public:
 
 private:
     // Writes resource `id` to `target` and stamps it with `build_stamp`.
-    bool write_resource(int id, const std::filesystem::path& target, core::ui::ports::FileTime build_stamp) noexcept;
+    bool write_resource(int id, const std::filesystem::path& target,
+                        core::ui::ports::FileTime build_stamp) noexcept;
 
-    void*                   module_;
-    int                     openvr_api_id_;
-    int                     ui_patch_id_;
+    void* module_;
+    int openvr_api_id_;
+    int ui_patch_id_;
     core::diag::ports::Log& log_;
-    NamedMutex              mutex_;
+    NamedMutex mutex_;
 };
 
 } // namespace omvr::platform::win32

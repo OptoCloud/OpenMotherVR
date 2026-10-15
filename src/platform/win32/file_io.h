@@ -27,7 +27,8 @@ public:
 // never a partial one. A leftover temporary file is never read and is
 // replaced by the next write. The error's context is "create" when the
 // temporary file could not be created, "write" for a later failure.
-util::Result<void> write_file_atomically(const std::filesystem::path& target, std::span<const std::byte> data) noexcept;
+util::Result<void> write_file_atomically(const std::filesystem::path& target,
+                                         std::span<const std::byte> data) noexcept;
 
 // The temporary file write_file_atomically writes `target` through.
 std::filesystem::path temporary_path_for(const std::filesystem::path& target);

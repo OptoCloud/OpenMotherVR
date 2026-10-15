@@ -41,8 +41,8 @@ public:
 
 private:
     const StereoDevice& stereo_;
-    diag::ports::Log&   log_;
-    util::OnceLatch     refusal_logged_;
+    diag::ports::Log& log_;
+    util::OnceLatch refusal_logged_;
 };
 
 } // namespace omvr::core::stereo

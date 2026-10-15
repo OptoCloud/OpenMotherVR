@@ -29,7 +29,8 @@ void pin_this_module(core::diag::ports::Log& log) noexcept;
 // VirtualProtect-swap a single pointer slot (a COM vtable entry). Returns
 // the previous slot value (so the caller can call through it), or null
 // after logging `method` when the slot cannot be written.
-void* replace_pointer(void** slot, void* replacement, const char* method, core::diag::ports::Log& log) noexcept;
+void* replace_pointer(void** slot, void* replacement, const char* method,
+                      core::diag::ports::Log& log) noexcept;
 
 // Executable memory for code the mod generates: allocate_code returns
 // `size` writable bytes (null on failure); seal_code makes them read-only

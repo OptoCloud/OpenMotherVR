@@ -30,10 +30,11 @@ std::string_view module_of(const void* address, std::uintptr_t& base, wchar_t (&
     name[kNoModule.size()] = '\0';
     const std::string_view unknown{name, kNoModule.size()};
     HMODULE m = nullptr;
-    if (!::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                              static_cast<LPCWSTR>(address), &m))
+    if (!::GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            static_cast<LPCWSTR>(address), &m))
         return unknown;
-    base = reinterpret_cast<std::uintptr_t>(m);
+    base          = reinterpret_cast<std::uintptr_t>(m);
     const DWORD n = ::GetModuleFileNameW(m, path, MAX_PATH);
     if (n == 0 || n >= MAX_PATH) return unknown;
     const wchar_t* file = path;
@@ -62,13 +63,13 @@ void CrashRecorder::record(std::format_string<Args...> fmt, Args&&... args) noex
 }
 
 void CrashRecorder::write_record(const EXCEPTION_POINTERS& info) noexcept {
-    const EXCEPTION_RECORD& r = *info.ExceptionRecord;
-    const CONTEXT& c = *info.ContextRecord;
-    std::uintptr_t base = 0;
+    const EXCEPTION_RECORD& r   = *info.ExceptionRecord;
+    const CONTEXT& c            = *info.ContextRecord;
+    std::uintptr_t base         = 0;
     const std::string_view name = module_of(r.ExceptionAddress, base, path_, name_);
-    const auto at = reinterpret_cast<std::uintptr_t>(r.ExceptionAddress);
-    record("crash: exception 0x{:08X} at 0x{:08X} ({}+0x{:X}), thread {}", static_cast<unsigned>(r.ExceptionCode),
-           at, name, base ? at - base : at, ::GetCurrentThreadId());
+    const auto at               = reinterpret_cast<std::uintptr_t>(r.ExceptionAddress);
+    record("crash: exception 0x{:08X} at 0x{:08X} ({}+0x{:X}), thread {}",
+           static_cast<unsigned>(r.ExceptionCode), at, name, base ? at - base : at, ::GetCurrentThreadId());
     // An access violation's parameters: the kind of access and the address.
     if (r.ExceptionCode == EXCEPTION_ACCESS_VIOLATION && r.NumberParameters >= 2) {
         record("crash: {} of 0x{:08X}", access_kind(r.ExceptionInformation[0]),
@@ -76,8 +77,10 @@ void CrashRecorder::write_record(const EXCEPTION_POINTERS& info) noexcept {
     }
     // EIP too: it differs from the exception address for a fault raised
     // inside a called system routine, a breakpoint or a single step.
-    record("crash: eax={:08X} ebx={:08X} ecx={:08X} edx={:08X} esi={:08X} edi={:08X} ebp={:08X} esp={:08X} eip={:08X}",
-           c.Eax, c.Ebx, c.Ecx, c.Edx, c.Esi, c.Edi, c.Ebp, c.Esp, c.Eip);
+    record(
+        "crash: eax={:08X} ebx={:08X} ecx={:08X} edx={:08X} esi={:08X} edi={:08X} ebp={:08X} esp={:08X} "
+        "eip={:08X}",
+        c.Eax, c.Ebx, c.Ecx, c.Edx, c.Esi, c.Edi, c.Ebp, c.Esp, c.Eip);
     write_stack(info);
 }
 
@@ -85,11 +88,11 @@ void CrashRecorder::write_record(const EXCEPTION_POINTERS& info) noexcept {
 // within this thread's committed stack.
 void CrashRecorder::write_stack(const EXCEPTION_POINTERS& info) noexcept {
     const auto* stack = reinterpret_cast<const std::uintptr_t*>(info.ContextRecord->Esp);
-    const auto* tib = reinterpret_cast<const NT_TIB*>(::NtCurrentTeb());
-    const auto* top = static_cast<const std::uintptr_t*>(tib->StackBase);
+    const auto* tib   = reinterpret_cast<const NT_TIB*>(::NtCurrentTeb());
+    const auto* top   = static_cast<const std::uintptr_t*>(tib->StackBase);
     for (int i = 0; i < kCrashStackWords && stack + i < top && stack >= tib->StackLimit; ++i) {
-        const std::uintptr_t value = stack[i];
-        std::uintptr_t mod = 0;
+        const std::uintptr_t value      = stack[i];
+        std::uintptr_t mod              = 0;
         const std::string_view mod_name = module_of(reinterpret_cast<const void*>(value), mod, path_, name_);
         if (mod) {
             record("crash: [esp+0x{:02X}] {}+0x{:X}", i * static_cast<int>(sizeof(std::uintptr_t)), mod_name,
@@ -116,8 +119,7 @@ long CrashRecorder::on_crash(EXCEPTION_POINTERS* info) noexcept {
         // chain: the next filter still sees the original exception.
         __try {
             write_record(*info);
-        } __except (EXCEPTION_EXECUTE_HANDLER) {
-        }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
     }
     return chain(info);
 }
@@ -138,7 +140,8 @@ void CrashRecorder::reassert(Filter ours) noexcept {
     const std::string_view owner =
         current ? module_of(reinterpret_cast<const void*>(current), base, path, name) : kNoFilter;
     core::diag::ports::logf(
-        log_, "crash: the unhandled-exception filter was replaced (by 0x{:08X}, {}+0x{:X}); ours is back on top{}",
+        log_,
+        "crash: the unhandled-exception filter was replaced (by 0x{:08X}, {}+0x{:X}); ours is back on top{}",
         address, owner, base ? address - base : 0, current ? " and runs it after the record" : "");
 }
 

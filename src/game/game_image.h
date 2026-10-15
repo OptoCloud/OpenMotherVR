@@ -11,11 +11,11 @@ namespace omvr::game {
 // The running AI.exe as the installer sees it: where it is loaded, how big
 // its image is, which build it is, and that build's addresses.
 struct GameImage {
-    std::uint8_t*      base;
-    std::uint32_t      image_size;
-    GameBuild          version;
+    std::uint8_t* base;
+    std::uint32_t image_size;
+    GameBuild version;
     const InlineSites& sites;
-    const AddressMap&  addresses;
+    const AddressMap& addresses;
 
     // The address of a named table slot.
     std::uint8_t* at(AiAddr slot) const noexcept { return addresses.at(slot); }

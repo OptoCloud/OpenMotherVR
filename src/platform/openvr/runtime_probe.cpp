@@ -19,16 +19,17 @@ namespace {
 using core::diag::ports::logf;
 using win32::utf8;
 
-constexpr std::string_view kLogFound       = "vr probe: OpenVR runtime at {}";
-constexpr std::string_view kLogNoLoader    = "vr probe: openvrpaths.vrpath points to {} but no openvr_api.dll there";
+constexpr std::string_view kLogFound = "vr probe: OpenVR runtime at {}";
+constexpr std::string_view kLogNoLoader =
+    "vr probe: openvrpaths.vrpath points to {} but no openvr_api.dll there";
 constexpr std::string_view kLogUnavailable = "vr probe: OpenVR not available: {}";
 
 // Why no runtime path came out of openvrpaths.vrpath (11 §2.3: the log must
 // tell a missing file from one that does not parse or has no runtime entry).
-constexpr const char* kWhyNoFile     = "no openvrpaths.vrpath (SteamVR not installed or never run)";
-constexpr const char* kWhyNotParsed  = "openvrpaths.vrpath is not parseable";
-constexpr const char* kWhyNoRuntime  = "openvrpaths.vrpath has no runtime entry";
-constexpr const char* kWhyNotRead    = "openvrpaths.vrpath could not be read";
+constexpr const char* kWhyNoFile    = "no openvrpaths.vrpath (SteamVR not installed or never run)";
+constexpr const char* kWhyNotParsed = "openvrpaths.vrpath is not parseable";
+constexpr const char* kWhyNoRuntime = "openvrpaths.vrpath has no runtime entry";
+constexpr const char* kWhyNotRead   = "openvrpaths.vrpath could not be read";
 
 // %LOCALAPPDATA%, or empty when it is not set.
 std::wstring local_app_data() {
@@ -64,7 +65,7 @@ std::filesystem::path runtime_entry(const std::filesystem::path& file, const cha
         why = kWhyNoRuntime;
         return {};
     }
-    const auto text = it->at(0).get<std::string>();   // JSON text is UTF-8
+    const auto text = it->at(0).get<std::string>(); // JSON text is UTF-8
     return std::filesystem::path{std::u8string(text.begin(), text.end())};
 }
 
@@ -90,7 +91,7 @@ std::filesystem::path read_openvr_runtime_path(const char*& why) noexcept {
 
 core::vr::ports::ProbeResult RuntimeProbe::probe() {
     core::vr::ports::ProbeResult result;
-    const char* why = "";
+    const char* why    = "";
     const auto runtime = read_openvr_runtime_path(why);
     if (runtime.empty()) {
         logf(log_, kLogUnavailable, why);

@@ -24,7 +24,7 @@ constexpr std::string_view kLogCreated = "openxr: swapchain {}x{} fmt={} images=
 // so no allocation (12 §6.1).
 struct WantedFormats {
     std::array<DXGI_FORMAT, 2> formats{};
-    std::size_t                count = 0;
+    std::size_t count = 0;
 };
 
 WantedFormats wanted_formats(DXGI_FORMAT src) noexcept {
@@ -37,8 +37,7 @@ WantedFormats wanted_formats(DXGI_FORMAT src) noexcept {
         case DXGI_FORMAT_B8G8R8A8_UNORM:
         case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
             return {{DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, DXGI_FORMAT_B8G8R8A8_UNORM}, 2};
-        default:
-            return {{src}, 1};
+        default: return {{src}, 1};
     }
 }
 
@@ -59,8 +58,8 @@ DXGI_FORMAT Session::Impl::pick_format(DXGI_FORMAT src) {
 void Session::Impl::destroy_chain(Swapchain& sc) {
     sc.handle.reset();
     const ChainResults results = sc.results;
-    sc = {};
-    sc.results = results;
+    sc                         = {};
+    sc.results                 = results;
 }
 
 // A single-sample colour chain the game's images are copied into. Retried
@@ -77,16 +76,17 @@ bool Session::Impl::create_chain(Swapchain& sc, DXGI_FORMAT format, std::uint32_
     ci.mipCount    = 1;
     if (!check_frame(xrCreateSwapchain(state.session.get(), &ci, sc.handle.put()), "xrCreateSwapchain",
                      sc.results.create)) {
-        sc.handle.release();   // nothing was created
+        sc.handle.release(); // nothing was created
         return false;
     }
 
     std::uint32_t n = 0;
     xrEnumerateSwapchainImages(sc.handle.get(), 0, &n, nullptr);
     sc.images.assign(n, {XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR});
-    if (!check_frame(xrEnumerateSwapchainImages(sc.handle.get(), n, &n,
-                                                reinterpret_cast<XrSwapchainImageBaseHeader*>(sc.images.data())),
-                     "xrEnumerateSwapchainImages", sc.results.images)) {
+    if (!check_frame(
+            xrEnumerateSwapchainImages(sc.handle.get(), n, &n,
+                                       reinterpret_cast<XrSwapchainImageBaseHeader*>(sc.images.data())),
+            "xrEnumerateSwapchainImages", sc.results.images)) {
         destroy_chain(sc);
         return false;
     }
@@ -114,10 +114,10 @@ bool Session::Impl::ensure_chain(Swapchain& sc, DXGI_FORMAT src_format, std::uin
 
 // Copy `src` (region `box`) into the next image of `sc`.
 bool Session::Impl::copy_into(Swapchain& sc, ID3D11Texture2D* src, D3D11_BOX box) {
-    box.right  = (std::min)(box.right,  box.left + sc.width);
+    box.right  = (std::min)(box.right, box.left + sc.width);
     box.bottom = (std::min)(box.bottom, box.top + sc.height);
-    box.front = 0;
-    box.back  = 1;
+    box.front  = 0;
+    box.back   = 1;
 
     std::uint32_t index = 0;
     XrSwapchainImageAcquireInfo ai{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
@@ -126,14 +126,14 @@ bool Session::Impl::copy_into(Swapchain& sc, ID3D11Texture2D* src, D3D11_BOX box
         return false;
     }
     XrSwapchainImageWaitInfo wi{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-    wi.timeout = XR_INFINITE_DURATION;
+    wi.timeout        = XR_INFINITE_DURATION;
     const XrResult wr = xrWaitSwapchainImage(sc.handle.get(), &wi);
     // A timeout is a success code but leaves the image unwritten.
     const bool waited = check_frame(wr, "xrWaitSwapchainImage", sc.results.wait) && wr != XR_TIMEOUT_EXPIRED;
     if (waited) state.context->CopySubresourceRegion(sc.images[index].texture, 0, 0, 0, 0, src, 0, &box);
     XrSwapchainImageReleaseInfo ri{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-    const bool released = check_frame(xrReleaseSwapchainImage(sc.handle.get(), &ri), "xrReleaseSwapchainImage",
-                                      sc.results.release);
+    const bool released = check_frame(xrReleaseSwapchainImage(sc.handle.get(), &ri),
+                                      "xrReleaseSwapchainImage", sc.results.release);
     // An image that was not written must not be shown: the frame then ends
     // with no layer (09 §5.2).
     return waited && released;

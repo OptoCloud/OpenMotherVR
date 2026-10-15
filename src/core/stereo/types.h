@@ -79,32 +79,32 @@ using game::kSceneVisible;
 // the top, then optionally push a mode. The game side runs the steps in
 // that order through the game's own push and pop (game/stereo/mode_stack).
 struct ModeSteps {
-    bool                      pop_to_world = false;
-    bool                      pop          = false;
+    bool pop_to_world = false;
+    bool pop          = false;
     std::optional<StereoMode> push;
 };
 
 // The mode stack as the game holds it (StereoManager +0x60, +0x68..+0x70).
 struct ModeStackState {
-    StereoMode   mode        = StereoMode::World;
-    std::int32_t count       = 0;
-    std::int32_t capacity    = 0;
-    bool         has_storage = false;  // the array has a data pointer
+    StereoMode mode       = StereoMode::World;
+    std::int32_t count    = 0;
+    std::int32_t capacity = 0;
+    bool has_storage      = false; // the array has a data pointer
 };
 
 // How the end of an update brings the stack count to the mode (05 §3.2f).
 enum class StackSync {
-    None,          // already equal
-    Lower,         // write the count down to the mode
-    Append,        // append mode 1 through the game's routine
-    WriteInPlace,  // no routine: write 1 into storage the array already has
-    NoStorage,     // no routine and no storage: leave the count (logged once)
+    None,         // already equal
+    Lower,        // write the count down to the mode
+    Append,       // append mode 1 through the game's routine
+    WriteInPlace, // no routine: write 1 into storage the array already has
+    NoStorage,    // no routine and no storage: leave the count (logged once)
 };
 
 // How a sync the game side carried out went.
 enum class StackSyncOutcome {
     Done,
-    AppendFailed,  // the game's append failed to allocate; count put back to 0
+    AppendFailed, // the game's append failed to allocate; count put back to 0
     NoStorage,
 };
 

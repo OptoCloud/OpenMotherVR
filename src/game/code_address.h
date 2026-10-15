@@ -46,7 +46,7 @@ public:
 
     template <class T>
         requires std::is_pointer_v<T>
-    operator T() const noexcept {  // NOLINT(google-explicit-constructor): the point of the type
+    operator T() const noexcept { // NOLINT(google-explicit-constructor): the point of the type
         return reinterpret_cast<T>(static_cast<std::uintptr_t>(va_));
     }
 

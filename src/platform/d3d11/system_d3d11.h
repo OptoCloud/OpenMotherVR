@@ -13,9 +13,10 @@ namespace omvr::platform::d3d11 {
 // placeholders have the same calling convention and stack layout.
 using CreateDeviceAndSwapChainFn = long(__stdcall*)(void* adapter, unsigned int driver_type, void* software,
                                                     unsigned int flags, const void* feature_levels,
-                                                    unsigned int feature_level_count, unsigned int sdk_version,
-                                                    const void* swapchain_desc, void** swapchain, void** device,
-                                                    void* feature_level, void** immediate_context);
+                                                    unsigned int feature_level_count,
+                                                    unsigned int sdk_version, const void* swapchain_desc,
+                                                    void** swapchain, void** device, void* feature_level,
+                                                    void** immediate_context);
 
 // The real System32\d3d11.dll (SysWOW64 for this 32-bit process).
 class SystemD3d11 {
@@ -29,18 +30,21 @@ public:
     //
     // Returns true if LoadLibraryEx and GetProcAddress succeeded and the
     // returned handle is not our own DLL (see the implementation).
-    bool load(std::span<void*> forward, std::span<const char* const> names, core::diag::ports::Log& log) noexcept;
+    bool load(std::span<void*> forward, std::span<const char* const> names,
+              core::diag::ports::Log& log) noexcept;
 
     // Free the real d3d11.dll. Called from DLL_PROCESS_DETACH on FreeLibrary
     // (not at process exit).
     void shutdown() noexcept;
 
     // The real implementation. Null until load() succeeds.
-    CreateDeviceAndSwapChainFn create_device_and_swapchain() const noexcept { return create_device_and_swapchain_; }
+    CreateDeviceAndSwapChainFn create_device_and_swapchain() const noexcept {
+        return create_device_and_swapchain_;
+    }
 
 private:
-    HINSTANCE__*               self_        = nullptr;  // this DLL's HMODULE
-    HINSTANCE__*               real_module_ = nullptr;  // owned: freed by shutdown()
+    HINSTANCE__* self_                                      = nullptr; // this DLL's HMODULE
+    HINSTANCE__* real_module_                               = nullptr; // owned: freed by shutdown()
     CreateDeviceAndSwapChainFn create_device_and_swapchain_ = nullptr;
 };
 

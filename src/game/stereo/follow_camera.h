@@ -11,10 +11,10 @@
 namespace omvr::game::stereo {
 
 // FollowBehavior fields. The look byte is game::kFollowLookEnabledOffset.
-inline constexpr std::ptrdiff_t kFollowYaw       = 0x204;  // +-1 = +-180 degrees
-inline constexpr std::ptrdiff_t kFollowYawMirror = 0x1FC;  // the yaw the camera has reached
-inline constexpr std::ptrdiff_t kFollowRootPos   = 0x1C0;  // character root, world x y z
-inline constexpr std::ptrdiff_t kFollowHeadPos   = 0x1CC;  // "Head1" bone, world x y z
+inline constexpr std::ptrdiff_t kFollowYaw       = 0x204; // +-1 = +-180 degrees
+inline constexpr std::ptrdiff_t kFollowYawMirror = 0x1FC; // the yaw the camera has reached
+inline constexpr std::ptrdiff_t kFollowRootPos   = 0x1C0; // character root, world x y z
+inline constexpr std::ptrdiff_t kFollowHeadPos   = 0x1CC; // "Head1" bone, world x y z
 
 // The active first-person camera, none while no FollowBehavior is active:
 // the object may be freed once deactivated (a level unload), so it is
@@ -48,7 +48,7 @@ public:
 
 private:
     void* object_ = nullptr;
-    bool  active_ = false;
+    bool active_  = false;
 };
 
 } // namespace omvr::game::stereo

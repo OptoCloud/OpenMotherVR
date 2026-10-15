@@ -13,7 +13,8 @@ namespace {
 
 // IMMDevice::Activate: the headset's device instead of the one the game
 // opens. Called by COM on the game's audio threads.
-HRESULT __stdcall hook_activate(IMMDevice* self, REFIID iid, DWORD clsctx, PROPVARIANT* params, void** out) noexcept {
+HRESULT __stdcall hook_activate(IMMDevice* self, REFIID iid, DWORD clsctx, PROPVARIANT* params,
+                                void** out) noexcept {
     return context().headset_audio.redirect().activate(self, iid, clsctx, params, out);
 }
 

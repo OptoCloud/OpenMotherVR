@@ -19,12 +19,12 @@ constexpr std::string_view kLogBindingsRejected   = "openxr input: bindings for 
 constexpr std::string_view kLogActionSpaceFailed  = "openxr input: xrCreateActionSpace failed: {}";
 constexpr std::string_view kLogGripNotLocated =
     "openxr input: {} grip not located: locate {} flags 0x{:X}; pose action {} active {}; trigger active {}";
-constexpr std::string_view kLogActionSetFailed    = "openxr input: xrCreateActionSet failed";
-constexpr std::string_view kLogAttachFailed       = "openxr input: xrAttachSessionActionSets failed: {}";
-constexpr std::string_view kLogAttached           = "openxr input: actions attached";
-constexpr std::string_view kLogSync               = "openxr input: xrSyncActions -> {}";
-constexpr std::string_view kLogNoProfile          = "openxr input: no controller profile bound";
-constexpr std::string_view kLogProfile            = "openxr input: controller profile {}";
+constexpr std::string_view kLogActionSetFailed = "openxr input: xrCreateActionSet failed";
+constexpr std::string_view kLogAttachFailed    = "openxr input: xrAttachSessionActionSets failed: {}";
+constexpr std::string_view kLogAttached        = "openxr input: actions attached";
+constexpr std::string_view kLogSync            = "openxr input: xrSyncActions -> {}";
+constexpr std::string_view kLogNoProfile       = "openxr input: no controller profile bound";
+constexpr std::string_view kLogProfile         = "openxr input: controller profile {}";
 
 // The interaction profile of the Vive wands, the one touchpad family.
 constexpr const char* kViveProfile = "htc/vive_controller";
@@ -46,7 +46,7 @@ bool Input::make_action(XrAction& out, XrActionType type, const char* name, cons
     strncpy_s(ci.localizedActionName, localized, _TRUNCATE);
     ci.countSubactionPaths = static_cast<std::uint32_t>(hand_path_.size());
     ci.subactionPaths      = hand_path_.data();
-    const XrResult r = xrCreateAction(set_.get(), &ci, &out);
+    const XrResult r       = xrCreateAction(set_.get(), &ci, &out);
     if (XR_FAILED(r)) logf(log_, kLogCreateActionFailed, name, static_cast<int>(r));
     return XR_SUCCEEDED(r);
 }
@@ -54,27 +54,27 @@ bool Input::make_action(XrAction& out, XrActionType type, const char* name, cons
 // The actions of 04 §5.8.4, in this order; the first failure stops.
 bool Input::make_actions() noexcept {
     Actions& a = actions_;
-    return make_action(a.grip_pose,   XR_ACTION_TYPE_POSE_INPUT,     "grip_pose",   "Hand pose") &&
-           make_action(a.trigger,     XR_ACTION_TYPE_FLOAT_INPUT,    "trigger",     "Trigger") &&
-           make_action(a.squeeze,     XR_ACTION_TYPE_FLOAT_INPUT,    "squeeze",     "Grip") &&
-           make_action(a.stick,       XR_ACTION_TYPE_VECTOR2F_INPUT, "stick",       "Thumbstick") &&
-           make_action(a.stick_click, XR_ACTION_TYPE_BOOLEAN_INPUT,  "stick_click", "Thumbstick click") &&
-           make_action(a.primary,     XR_ACTION_TYPE_BOOLEAN_INPUT,  "primary",     "A / X") &&
-           make_action(a.secondary,   XR_ACTION_TYPE_BOOLEAN_INPUT,  "secondary",   "B / Y") &&
-           make_action(a.menu,        XR_ACTION_TYPE_BOOLEAN_INPUT,  "menu",        "Menu");
+    return make_action(a.grip_pose, XR_ACTION_TYPE_POSE_INPUT, "grip_pose", "Hand pose") &&
+           make_action(a.trigger, XR_ACTION_TYPE_FLOAT_INPUT, "trigger", "Trigger") &&
+           make_action(a.squeeze, XR_ACTION_TYPE_FLOAT_INPUT, "squeeze", "Grip") &&
+           make_action(a.stick, XR_ACTION_TYPE_VECTOR2F_INPUT, "stick", "Thumbstick") &&
+           make_action(a.stick_click, XR_ACTION_TYPE_BOOLEAN_INPUT, "stick_click", "Thumbstick click") &&
+           make_action(a.primary, XR_ACTION_TYPE_BOOLEAN_INPUT, "primary", "A / X") &&
+           make_action(a.secondary, XR_ACTION_TYPE_BOOLEAN_INPUT, "secondary", "B / Y") &&
+           make_action(a.menu, XR_ACTION_TYPE_BOOLEAN_INPUT, "menu", "Menu");
 }
 
 void Input::suggest(const char* profile, const std::vector<Bind>& binds) noexcept {
     std::vector<XrActionSuggestedBinding> list;
     for (const auto& b : binds) {
-        if (b.left)  list.push_back({*b.action, path((std::string("/user/hand/left/")  + b.left).c_str())});
+        if (b.left) list.push_back({*b.action, path((std::string("/user/hand/left/") + b.left).c_str())});
         if (b.right) list.push_back({*b.action, path((std::string("/user/hand/right/") + b.right).c_str())});
     }
     XrInteractionProfileSuggestedBinding s{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
     s.interactionProfile     = path(profile);
     s.countSuggestedBindings = static_cast<std::uint32_t>(list.size());
     s.suggestedBindings      = list.data();
-    const XrResult r = xrSuggestInteractionProfileBindings(instance_, &s);
+    const XrResult r         = xrSuggestInteractionProfileBindings(instance_, &s);
     if (XR_FAILED(r)) logf(log_, kLogBindingsRejected, profile, static_cast<int>(r));
 }
 
@@ -90,50 +90,55 @@ void Input::suggest_all() noexcept {
         return v;
     };
 
-    suggest("/interaction_profiles/oculus/touch_controller", with_common({
-        {&a.trigger,     "input/trigger/value",    "input/trigger/value"},
-        {&a.squeeze,     "input/squeeze/value",    "input/squeeze/value"},
-        {&a.stick,       "input/thumbstick",       "input/thumbstick"},
-        {&a.stick_click, "input/thumbstick/click", "input/thumbstick/click"},
-        {&a.primary,     "input/x/click",          "input/a/click"},
-        {&a.secondary,   "input/y/click",          "input/b/click"},
-        {&a.menu,        "input/menu/click",       nullptr},
-    }));
+    suggest("/interaction_profiles/oculus/touch_controller",
+            with_common({
+                {&a.trigger, "input/trigger/value", "input/trigger/value"},
+                {&a.squeeze, "input/squeeze/value", "input/squeeze/value"},
+                {&a.stick, "input/thumbstick", "input/thumbstick"},
+                {&a.stick_click, "input/thumbstick/click", "input/thumbstick/click"},
+                {&a.primary, "input/x/click", "input/a/click"},
+                {&a.secondary, "input/y/click", "input/b/click"},
+                {&a.menu, "input/menu/click", nullptr},
+            }));
 
     // Index has no menu button; the left trackpad press stands in for it.
-    suggest("/interaction_profiles/valve/index_controller", with_common({
-        {&a.trigger,     "input/trigger/value",    "input/trigger/value"},
-        {&a.squeeze,     "input/squeeze/value",    "input/squeeze/value"},
-        {&a.stick,       "input/thumbstick",       "input/thumbstick"},
-        {&a.stick_click, "input/thumbstick/click", "input/thumbstick/click"},
-        {&a.primary,     "input/a/click",          "input/a/click"},
-        {&a.secondary,   "input/b/click",          "input/b/click"},
-        {&a.menu,        "input/trackpad/force",   nullptr},
-    }));
+    suggest("/interaction_profiles/valve/index_controller",
+            with_common({
+                {&a.trigger, "input/trigger/value", "input/trigger/value"},
+                {&a.squeeze, "input/squeeze/value", "input/squeeze/value"},
+                {&a.stick, "input/thumbstick", "input/thumbstick"},
+                {&a.stick_click, "input/thumbstick/click", "input/thumbstick/click"},
+                {&a.primary, "input/a/click", "input/a/click"},
+                {&a.secondary, "input/b/click", "input/b/click"},
+                {&a.menu, "input/trackpad/force", nullptr},
+            }));
 
     // Vive wands: the touchpad is the stick; face buttons come from touchpad
     // regions in the game mapping (ControllerFamily::Touchpad).
-    suggest("/interaction_profiles/htc/vive_controller", with_common({
-        {&a.trigger,     "input/trigger/value",  "input/trigger/value"},
-        {&a.squeeze,     "input/squeeze/click",  "input/squeeze/click"},
-        {&a.stick,       "input/trackpad",       "input/trackpad"},
-        {&a.stick_click, "input/trackpad/click", "input/trackpad/click"},
-        {&a.menu,        "input/menu/click",     "input/menu/click"},
-    }));
+    suggest("/interaction_profiles/htc/vive_controller",
+            with_common({
+                {&a.trigger, "input/trigger/value", "input/trigger/value"},
+                {&a.squeeze, "input/squeeze/click", "input/squeeze/click"},
+                {&a.stick, "input/trackpad", "input/trackpad"},
+                {&a.stick_click, "input/trackpad/click", "input/trackpad/click"},
+                {&a.menu, "input/menu/click", "input/menu/click"},
+            }));
 
-    suggest("/interaction_profiles/microsoft/motion_controller", with_common({
-        {&a.trigger,     "input/trigger/value",    "input/trigger/value"},
-        {&a.squeeze,     "input/squeeze/click",    "input/squeeze/click"},
-        {&a.stick,       "input/thumbstick",       "input/thumbstick"},
-        {&a.stick_click, "input/thumbstick/click", "input/thumbstick/click"},
-        {&a.primary,     "input/trackpad/click",   "input/trackpad/click"},
-        {&a.menu,        "input/menu/click",       "input/menu/click"},
-    }));
+    suggest("/interaction_profiles/microsoft/motion_controller",
+            with_common({
+                {&a.trigger, "input/trigger/value", "input/trigger/value"},
+                {&a.squeeze, "input/squeeze/click", "input/squeeze/click"},
+                {&a.stick, "input/thumbstick", "input/thumbstick"},
+                {&a.stick_click, "input/thumbstick/click", "input/thumbstick/click"},
+                {&a.primary, "input/trackpad/click", "input/trackpad/click"},
+                {&a.menu, "input/menu/click", "input/menu/click"},
+            }));
 
-    suggest("/interaction_profiles/khr/simple_controller", with_common({
-        {&a.trigger, "input/select/click", "input/select/click"},
-        {&a.menu,    "input/menu/click",   "input/menu/click"},
-    }));
+    suggest("/interaction_profiles/khr/simple_controller",
+            with_common({
+                {&a.trigger, "input/select/click", "input/select/click"},
+                {&a.menu, "input/menu/click", "input/menu/click"},
+            }));
 }
 
 XrSpace Input::make_action_space(XrAction action, XrPath hand) noexcept {
@@ -141,7 +146,7 @@ XrSpace Input::make_action_space(XrAction action, XrPath hand) noexcept {
     ci.action            = action;
     ci.subactionPath     = hand;
     ci.poseInActionSpace = kIdentityPose;
-    XrSpace s = XR_NULL_HANDLE;
+    XrSpace s            = XR_NULL_HANDLE;
     if (const XrResult r = xrCreateActionSpace(session_, &ci, &s); XR_FAILED(r))
         logf(log_, kLogActionSpaceFailed, static_cast<int>(r));
     return s;
@@ -182,14 +187,15 @@ Vec2 Input::get_vec2(XrAction a, int hand, bool& active) noexcept {
 void Input::log_untracked_grip(int hand, XrResult located, XrSpaceLocationFlags flags) noexcept {
     XrActionStatePose pose{XR_TYPE_ACTION_STATE_POSE};
     const XrActionStateGetInfo gi = get_info(actions_.grip_pose, hand);
-    const XrResult pose_result = xrGetActionStatePose(session_, &gi, &pose);
+    const XrResult pose_result    = xrGetActionStatePose(session_, &gi, &pose);
     XrActionStateFloat trigger{XR_TYPE_ACTION_STATE_FLOAT};
     const XrActionStateGetInfo ti = get_info(actions_.trigger, hand);
     xrGetActionStateFloat(session_, &ti, &trigger);
-    const GripOutcome outcome{XR_FAILED(located), flags, pose.isActive != XR_FALSE, trigger.isActive != XR_FALSE};
+    const GripOutcome outcome{XR_FAILED(located), flags, pose.isActive != XR_FALSE,
+                              trigger.isActive != XR_FALSE};
     if (!grip_logged_[static_cast<std::size_t>(hand)].changed(outcome)) return;
-    logf(log_, kLogGripNotLocated, hand_name(hand), static_cast<int>(located), flags, static_cast<int>(pose_result),
-         outcome.pose_active, outcome.trigger_active);
+    logf(log_, kLogGripNotLocated, hand_name(hand), static_cast<int>(located), flags,
+         static_cast<int>(pose_result), outcome.pose_active, outcome.trigger_active);
 }
 
 // The grip pose and, chained in the same call, its linear velocity (free:
@@ -198,7 +204,8 @@ void Input::log_untracked_grip(int hand, XrResult located, XrSpaceLocationFlags 
 void Input::locate_grip(int hand, XrSpace space, XrSpace base, XrTime t, HandState& s) noexcept {
     XrSpaceVelocity vel{XR_TYPE_SPACE_VELOCITY};
     XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION, &vel};
-    const XrResult r = space == XR_NULL_HANDLE ? XR_ERROR_HANDLE_INVALID : xrLocateSpace(space, base, t, &loc);
+    const XrResult r =
+        space == XR_NULL_HANDLE ? XR_ERROR_HANDLE_INVALID : xrLocateSpace(space, base, t, &loc);
     if (XR_FAILED(r) || (loc.locationFlags & kOrientationAndPosition) != kOrientationAndPosition) {
         log_untracked_grip(hand, r, loc.locationFlags);
         return;
@@ -249,7 +256,7 @@ bool Input::create(XrInstance instance, XrSession session) noexcept {
 
 void Input::destroy() noexcept {
     for (auto& s : grip_space_) s.reset();
-    set_.reset();   // destroys its actions too
+    set_.reset(); // destroys its actions too
     actions_ = {};
     state_   = {};
     session_ = XR_NULL_HANDLE;
@@ -258,7 +265,7 @@ void Input::destroy() noexcept {
 HandState Input::read_hand(int hand, XrSpace base, XrTime t) noexcept {
     const Actions& a = actions_;
     HandState s{};
-    bool any = false;
+    bool any      = false;
     s.trigger     = get_float(a.trigger, hand, any);
     s.squeeze     = get_float(a.squeeze, hand, any);
     s.stick       = get_vec2(a.stick, hand, any);
@@ -267,7 +274,7 @@ HandState Input::read_hand(int hand, XrSpace base, XrTime t) noexcept {
     s.secondary   = get_bool(a.secondary, hand, any);
     s.menu        = get_bool(a.menu, hand, any);
     locate_grip(hand, grip_space_[static_cast<std::size_t>(hand)].get(), base, t, s);
-    s.active      = any || s.grip_valid;
+    s.active = any || s.grip_valid;
     return s;
 }
 
@@ -286,7 +293,7 @@ void Input::sync(XrTime time, XrSpace base) noexcept {
         logf(log_, kLogSync, static_cast<int>(synced));
     }
     if (XR_FAILED(synced)) {
-        state_.hands = {};   // nothing this frame, rather than last frame's poses
+        state_.hands = {}; // nothing this frame, rather than last frame's poses
         return;
     }
     for (std::size_t h = 0; h < state_.hands.size(); ++h) {
@@ -304,9 +311,10 @@ void Input::on_interaction_profile_changed() noexcept {
         return;
     }
     char name[XR_MAX_PATH_LENGTH] = {};
-    std::uint32_t n = 0;
+    std::uint32_t n               = 0;
     xrPathToString(instance_, ps.interactionProfile, sizeof(name), &n, name);
-    state_.family = std::strstr(name, kViveProfile) ? ControllerFamily::Touchpad : ControllerFamily::Thumbstick;
+    state_.family =
+        std::strstr(name, kViveProfile) ? ControllerFamily::Touchpad : ControllerFamily::Thumbstick;
     logf(log_, kLogProfile, name);
 }
 

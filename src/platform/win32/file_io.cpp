@@ -65,7 +65,8 @@ util::Result<void> write_file_atomically(const std::filesystem::path& target,
             // The error is captured before the handle is closed.
             if (!write_whole(file, data)) result = std::unexpected(last_error(kWriteFailed));
         }
-        if (result && !::MoveFileExW(temp.c_str(), target.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        if (result &&
+            !::MoveFileExW(temp.c_str(), target.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
             result = std::unexpected(last_error(kWriteFailed));
         if (!result) ::DeleteFileW(temp.c_str());
         return result;

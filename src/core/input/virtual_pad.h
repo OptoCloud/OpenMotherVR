@@ -15,8 +15,8 @@ namespace omvr::core::input {
 // Which of map 0's pad and keyboard devices exist (04 §4.2): the prompt
 // switch writes through them only when they do.
 enum class PlayerDevices {
-    NoManager,   // the game has not created its input manager
-    Missing,     // the manager exists; the pad or the keyboard entry is null
+    NoManager, // the game has not created its input manager
+    Missing,   // the manager exists; the pad or the keyboard entry is null
     Both,
 };
 
@@ -33,7 +33,7 @@ enum class DeviceSwitch {
 };
 
 struct ActivityResult {
-    bool         any = false;   // the merged HasActivity answer
+    bool any             = false; // the merged HasActivity answer
     DeviceSwitch devices = DeviceSwitch::None;
 };
 
@@ -123,20 +123,20 @@ public:
 private:
     void log_remap() noexcept;
 
-    const Glyphs&     glyphs_;
+    const Glyphs& glyphs_;
     diag::ports::Log& log_;
-    ActionTiers       tiers_ = make_tiers();
+    ActionTiers tiers_ = make_tiers();
     // Original: DAT_10066bc0 (initially 1), DAT_10068639, DAT_1006af7c.
     // Game thread, except vr_activity_ (set on the render thread).
-    bool              vr_glyphs_ = true;
+    bool vr_glyphs_ = true;
     std::atomic<bool> vr_activity_{false};
-    bool              device_pulse_ = false;
+    bool device_pulse_ = false;
     // False when the mod's UI archive is not in use this run: the stock
     // movies register no VR glyph ids, so a VR name would show no button at
     // all (spec 04 section 4.2). Set at attach, read on the game thread.
     std::atomic<bool> vr_glyphs_allowed_{true};
     std::atomic<bool> installed_{false};
-    util::OnceLatch   remap_logged_;
+    util::OnceLatch remap_logged_;
 };
 
 } // namespace omvr::core::input

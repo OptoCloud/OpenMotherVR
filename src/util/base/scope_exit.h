@@ -10,10 +10,10 @@ template <class Fn>
 class [[nodiscard]] ScopeExit {
 public:
     explicit ScopeExit(Fn fn) noexcept : fn_(std::move(fn)) {}
-    ScopeExit(const ScopeExit&) = delete;
+    ScopeExit(const ScopeExit&)            = delete;
     ScopeExit& operator=(const ScopeExit&) = delete;
-    ScopeExit(ScopeExit&&) = delete;
-    ScopeExit& operator=(ScopeExit&&) = delete;
+    ScopeExit(ScopeExit&&)                 = delete;
+    ScopeExit& operator=(ScopeExit&&)      = delete;
     ~ScopeExit() noexcept {
         if (active_) fn_();
     }
@@ -21,7 +21,7 @@ public:
     void release() noexcept { active_ = false; }
 
 private:
-    Fn   fn_;
+    Fn fn_;
     bool active_ = true;
 };
 

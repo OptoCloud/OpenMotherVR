@@ -30,15 +30,15 @@ bool install_inline_hook(void* target, const void* replacement, void** trampolin
         ports::logf(log, kInitFailedLog, name);
         return false;
     }
-    pin_this_module(log);  // the detour jumps into this DLL from now on
-    void* created = nullptr;
+    pin_this_module(log); // the detour jumps into this DLL from now on
+    void* created    = nullptr;
     MH_STATUS status = MH_CreateHook(target, const_cast<void*>(replacement), &created);
     if (status != MH_OK) {
         ports::logf(log, kCreateFailedLog, name, MH_StatusToString(status));
         return false;
     }
-    *trampoline = created;  // live before the first call can arrive
-    status = MH_EnableHook(target);
+    *trampoline = created; // live before the first call can arrive
+    status      = MH_EnableHook(target);
     if (status != MH_OK) {
         ports::logf(log, kEnableFailedLog, name, MH_StatusToString(status));
         MH_RemoveHook(target);

@@ -20,9 +20,9 @@ namespace omvr::platform::d3d11 {
 // owned by the mirror and released only by it.
 struct MirrorObjects {
     ID3D11VertexShader*& vs;
-    ID3D11PixelShader*&  ps;
-    ID3D11Buffer*&       cb_screen;  // screen frames
-    ID3D11Buffer*&       cb;         // head-tracked frames
+    ID3D11PixelShader*& ps;
+    ID3D11Buffer*& cb_screen; // screen frames
+    ID3D11Buffer*& cb;        // head-tracked frames
     ID3D11SamplerState*& sampler;
 };
 
@@ -50,10 +50,10 @@ private:
     bool ready() const noexcept;
     void release() noexcept;
 
-    MirrorObjects                    objects_;
+    MirrorObjects objects_;
     ID3D11ShaderResourceView* const* source_;
-    core::diag::ports::Log&          log_;
-    util::OnceLatch                  no_output_logged_;
+    core::diag::ports::Log& log_;
+    util::OnceLatch no_output_logged_;
 };
 
 } // namespace omvr::platform::d3d11

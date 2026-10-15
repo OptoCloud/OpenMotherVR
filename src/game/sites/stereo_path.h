@@ -24,11 +24,11 @@ bool force_stereo_mode(const GameImage& g, Patcher& patcher) noexcept;
 // The replacements step 7 installs, and the vtables of the objects it hands
 // to the game.
 struct StereoDeviceHooks {
-    stereo::DeviceSlots  device;
+    stereo::DeviceSlots device;
     stereo::ManagerSlots manager;
-    const void*          create_device;
-    const void*          get_hmd_resolution;
-    const void*          get_render_target_size;
+    const void* create_device;
+    const void* get_hmd_resolution;
+    const void* get_render_target_size;
 };
 
 // 7: the game's hidden LibOVR stereo path gets our manager `m` and device

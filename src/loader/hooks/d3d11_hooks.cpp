@@ -32,12 +32,12 @@ using platform::d3d11::kPresentVtblIndex;
 using platform::d3d11::kResizeBuffersVtblIndex;
 using platform::d3d11::kSetFullscreenStateVtblIndex;
 
-constexpr std::string_view kFirstPresentLog   = "present #1";
-constexpr std::string_view kResizeLog         = "ResizeBuffers count={} {}x{} fmt={} flags=0x{:X}";
-constexpr std::string_view kResizeMirrorLog   = "ResizeBuffers: mirror back buffer {}x{}";
-constexpr std::string_view kPixelShaderLog    = "proxy: CreatePixelShader hooked (shader fixes)";
-constexpr std::string_view kPresentHookedLog  = "proxy: Present hooked, original=0x{:08X}";
-constexpr std::string_view kResizeHookedLog   = "proxy: ResizeBuffers hooked, original=0x{:08X}";
+constexpr std::string_view kFirstPresentLog  = "present #1";
+constexpr std::string_view kResizeLog        = "ResizeBuffers count={} {}x{} fmt={} flags=0x{:X}";
+constexpr std::string_view kResizeMirrorLog  = "ResizeBuffers: mirror back buffer {}x{}";
+constexpr std::string_view kPixelShaderLog   = "proxy: CreatePixelShader hooked (shader fixes)";
+constexpr std::string_view kPresentHookedLog = "proxy: Present hooked, original=0x{:08X}";
+constexpr std::string_view kResizeHookedLog  = "proxy: ResizeBuffers hooked, original=0x{:08X}";
 
 // The vtable methods replaced, as the system declares them (__stdcall, this
 // first).
@@ -46,8 +46,8 @@ using ResizeBuffersFn      = HRESULT(__stdcall*)(void* self, UINT buffer_count, 
                                                  DXGI_FORMAT format, UINT swapchain_flags);
 using SetFullscreenStateFn = HRESULT(__stdcall*)(void* self, BOOL fullscreen, void* target);
 // ID3D11Device* this, bytecode, size, ID3D11ClassLinkage*, ID3D11PixelShader** out.
-using CreatePixelShaderFn  = HRESULT(__stdcall*)(void* self, const void* code, SIZE_T size, void* linkage,
-                                                 void** out);
+using CreatePixelShaderFn = HRESULT(__stdcall*)(void* self, const void* code, SIZE_T size, void* linkage,
+                                                void** out);
 
 // The system's method saved from a slot, as its type. The one cast from
 // the untyped slot values.
@@ -80,7 +80,7 @@ HRESULT __stdcall hook_set_fullscreen_state(void* self, BOOL fullscreen, void* t
 }
 
 HRESULT __stdcall hook_present(void* self, UINT sync_interval, UINT flags) noexcept {
-    auto& ctx = context();
+    auto& ctx          = context();
     const auto present = system_method<PresentFn>(ctx.targets.present);
     if (!is_game_swapchain(self)) return present(self, sync_interval, flags);
 
@@ -103,8 +103,8 @@ HRESULT __stdcall hook_present(void* self, UINT sync_interval, UINT flags) noexc
     return present(self, vr_paced ? 0 : sync_interval, flags);
 }
 
-HRESULT __stdcall hook_resize_buffers(void* self, UINT buffer_count, UINT width, UINT height, DXGI_FORMAT format,
-                                      UINT swapchain_flags) noexcept {
+HRESULT __stdcall hook_resize_buffers(void* self, UINT buffer_count, UINT width, UINT height,
+                                      DXGI_FORMAT format, UINT swapchain_flags) noexcept {
     auto& ctx = context();
     if (is_game_swapchain(self)) {
         ports::logf(ctx.log, kResizeLog, buffer_count, width, height, static_cast<unsigned>(format),
@@ -114,10 +114,11 @@ HRESULT __stdcall hook_resize_buffers(void* self, UINT buffer_count, UINT width,
         ctx.targets.present_count.store(0, std::memory_order_relaxed);
         if (ctx.window.mirror_size(width, height)) ports::logf(ctx.log, kResizeMirrorLog, width, height);
     }
-    const HRESULT hr = system_method<ResizeBuffersFn>(ctx.targets.resize_buffers)(self, buffer_count, width, height,
-                                                                                    format, swapchain_flags);
+    const HRESULT hr = system_method<ResizeBuffersFn>(ctx.targets.resize_buffers)(
+        self, buffer_count, width, height, format, swapchain_flags);
     if (SUCCEEDED(hr) && is_game_swapchain(self)) {
-        platform::d3d11::fit_game_window(static_cast<IDXGISwapChain*>(self), ctx.window.headset_attached(), ctx.log);
+        platform::d3d11::fit_game_window(static_cast<IDXGISwapChain*>(self), ctx.window.headset_attached(),
+                                         ctx.log);
     }
     return hr;
 }
@@ -129,11 +130,11 @@ HRESULT __stdcall hook_resize_buffers(void* self, UINT buffer_count, UINT width,
 
 HRESULT __stdcall hook_create_pixel_shader(void* self, const void* code, SIZE_T size, void* linkage,
                                            void** out) noexcept {
-    auto& ctx = context();
-    const auto create = system_method<CreatePixelShaderFn>(ctx.targets.create_pixel_shader);
-    auto& stats = ctx.shader_fixes;
-    const int total = stats.count_created();
-    int sites = 0;
+    auto& ctx          = context();
+    const auto create  = system_method<CreatePixelShaderFn>(ctx.targets.create_pixel_shader);
+    auto& stats        = ctx.shader_fixes;
+    const int total    = stats.count_created();
+    int sites          = 0;
     const auto patched = core::render::patch_position_dither(code, size, sites);
     if (!patched.empty()) {
         const HRESULT hr = create(self, patched.data(), patched.size(), linkage, out);
@@ -178,7 +179,7 @@ void install_swapchain_hooks(void* swapchain) noexcept {
     bool expected = false;
     if (!ctx.targets.swapchain_hooks_installed.compare_exchange_strong(expected, true)) return;
 
-    auto* sc = static_cast<IDXGISwapChain*>(swapchain);
+    auto* sc      = static_cast<IDXGISwapChain*>(swapchain);
     const bool vr = ctx.window.headset_attached();
     platform::d3d11::log_swapchain_desc(sc, ctx.log);
     platform::d3d11::fit_game_window(sc, vr, ctx.log);
@@ -202,8 +203,8 @@ void install_swapchain_hooks(void* swapchain) noexcept {
                                   "SetFullscreenState", ctx.log)) {
         ctx.targets.set_fullscreen = prev;
     }
-    if (auto* prev = replace_slot(vtbl, kResizeBuffersVtblIndex, slot_value(&hook_resize_buffers), "ResizeBuffers",
-                                  ctx.log)) {
+    if (auto* prev = replace_slot(vtbl, kResizeBuffersVtblIndex, slot_value(&hook_resize_buffers),
+                                  "ResizeBuffers", ctx.log)) {
         ctx.targets.resize_buffers = prev;
         ports::logf(ctx.log, kResizeHookedLog, reinterpret_cast<std::uintptr_t>(prev));
     }

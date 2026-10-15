@@ -37,7 +37,7 @@ const ActionTier& tier_for(const ActionTiers& tiers, int code) noexcept { return
 
 int stock_code(const ActionTiers& tiers, int code) noexcept {
     const ActionTier& t = tier_for(tiers, code);
-    const int k = code - t.base;
+    const int k         = code - t.base;
     return in_range(k, static_cast<int>(t.stock_code.size())) ? t.stock_code[static_cast<std::size_t>(k)]
                                                               : game::kNoPadControl;
 }

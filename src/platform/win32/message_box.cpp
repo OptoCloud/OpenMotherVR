@@ -19,7 +19,8 @@ std::wstring wide(std::string_view text) {
 // The log line that carries the box's text. The kind names the message for
 // a tester searching the log; a box without one keeps the plain prefix.
 std::string log_line_for(std::string_view text, const char* kind) {
-    std::string line = kind ? std::string{"message box ("}.append(kind).append("): ") : std::string{"message box: "};
+    std::string line =
+        kind ? std::string{"message box ("}.append(kind).append("): ") : std::string{"message box: "};
     return line.append(text);
 }
 
@@ -31,9 +32,10 @@ int message_box(core::diag::ports::Log& log, std::string_view text, unsigned typ
         log.line(log_line_for(text, kind));
         // Kept alive past GetLastError: freeing it could overwrite the error.
         const std::wstring body = wide(text);
-        const int pressed = ::MessageBoxW(nullptr, body.c_str(), caption, type);
+        const int pressed       = ::MessageBoxW(nullptr, body.c_str(), caption, type);
         // The text is in the log already; record that the player never saw it.
-        if (pressed == 0) core::diag::ports::logf(log, "message box could not be shown err=0x{:08X}", ::GetLastError());
+        if (pressed == 0)
+            core::diag::ports::logf(log, "message box could not be shown err=0x{:08X}", ::GetLastError());
         return pressed;
     } catch (...) {
         log.line("message box could not be shown: out of memory");

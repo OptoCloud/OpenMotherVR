@@ -13,9 +13,9 @@ namespace omvr::core::stereo {
 
 namespace {
 
-using util::Vec3;
 using util::cross;
 using util::scaled;
+using util::Vec3;
 
 // Rows of a quad matrix: its right and up axes (scaled to the quad's size),
 // its forward axis and its position.
@@ -50,8 +50,8 @@ Vec3 view_axis(const Matrix44& v, std::size_t column) noexcept {
 // The camera's forward axis flattened onto the ground plane (x, z), as a
 // unit vector; +Z when the camera looks straight up or down.
 Vec3 level_forward(const Matrix44& v) noexcept {
-    float fx = util::element4(v.data(), 0, kViewForwardColumn);
-    float fz = util::element4(v.data(), 2, kViewForwardColumn);
+    float fx        = util::element4(v.data(), 0, kViewForwardColumn);
+    float fz        = util::element4(v.data(), 2, kViewForwardColumn);
     const float len = std::sqrt(fx * fx + fz * fz);
     if (len > kMinForwardLength) {
         fx /= len;
@@ -85,8 +85,9 @@ Matrix44 hud_panel_quad(const std::optional<Matrix44>& view, float inv_aspect) n
     const Vec3 up  = view_axis(*view, kViewUpColumn);
     const Vec3 fwd = view_axis(*view, kViewForwardColumn);
     set_row(out, kRightRow, scaled(cross(up, fwd), kHudPanelWidth));
-    set_row(out, kUpRow, {up.x * kHudPanelWidth * inv_aspect, up.y * kHudPanelWidth * inv_aspect,
-                          up.z * kHudPanelWidth * inv_aspect});
+    set_row(out, kUpRow,
+            {up.x * kHudPanelWidth * inv_aspect, up.y * kHudPanelWidth * inv_aspect,
+             up.z * kHudPanelWidth * inv_aspect});
     set_row(out, kForwardRow, fwd);
     const Vec3 cam = util::camera_position(view->data());
     set_row(out, kPositionRow, {fwd.x + cam.x, fwd.y + cam.y, fwd.z + cam.z});

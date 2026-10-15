@@ -33,12 +33,10 @@ R guarded(const char* where, R fallback, Fn&& fn) noexcept {
                 throw;
             } catch (const std::exception& e) {
                 what = e.what();
-            } catch (...) {
-            }
+            } catch (...) {}
             try {
                 core::diag::ports::logf(context().log, kCaughtExceptionLog, where, what);
-            } catch (...) {
-            }
+            } catch (...) {}
         }
         return fallback;
     }

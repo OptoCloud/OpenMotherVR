@@ -43,13 +43,13 @@ enum class CommandEffect {
 };
 
 struct SettingRow {
-    Section          section;
+    Section section;
     std::string_view key;  // in its section
     std::string_view path; // the key path in the log ("Rendering.PixelScale")
-    Field            field;
+    Field field;
     std::string_view command = {}; // "mvr_..." or empty
-    CommandRule      rule    = CommandRule::None;
-    CommandEffect    effect  = CommandEffect::None;
+    CommandRule rule         = CommandRule::None;
+    CommandEffect effect     = CommandEffect::None;
 };
 
 // Every setting, in the order the original's file lists them.
@@ -76,9 +76,9 @@ int snap_segments(int segments) noexcept;
 std::string_view to_string(VRRuntime r) noexcept;
 std::string_view to_string(MirrorViewType m) noexcept;
 std::string_view to_string(StereoAA a) noexcept;
-std::optional<VRRuntime>      parse_vr_runtime(std::string_view s) noexcept;
+std::optional<VRRuntime> parse_vr_runtime(std::string_view s) noexcept;
 std::optional<MirrorViewType> parse_mirror_view_type(std::string_view s) noexcept;
-std::optional<StereoAA>       parse_stereo_aa(std::string_view s) noexcept;
+std::optional<StereoAA> parse_stereo_aa(std::string_view s) noexcept;
 
 // The string parser and the last value of each enum the file stores.
 template <class E>
@@ -91,7 +91,9 @@ struct EnumTraits<VRRuntime> {
 template <>
 struct EnumTraits<MirrorViewType> {
     static constexpr MirrorViewType kLast = MirrorViewType::LeftEye;
-    static std::optional<MirrorViewType> parse(std::string_view s) noexcept { return parse_mirror_view_type(s); }
+    static std::optional<MirrorViewType> parse(std::string_view s) noexcept {
+        return parse_mirror_view_type(s);
+    }
 };
 template <>
 struct EnumTraits<StereoAA> {

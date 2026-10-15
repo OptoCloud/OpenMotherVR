@@ -79,18 +79,18 @@ const HelpSet kIndexSet{kIndexHelp};
 // function is bound to (04 §2.4: A interact, B radial, X reload, Y
 // flashlight, BACK map, START pause, LB tracker, RB aim).
 void set_touchpad_glyphs(Glyphs& glyphs) noexcept {
-    glyphs.set_glyph(game::kPadA, kGlyphTouchpadDown);       // interact
-    glyphs.set_glyph(game::kPadB, kGlyphTouchpadCentre);     // radial
-    glyphs.set_glyph(game::kPadX, kGlyphTouchpadUp);         // reload
-    glyphs.set_glyph(game::kPadY, kStockPadNames[game::kPadY]);    // no flashlight button: the stock name
-    glyphs.set_glyph(game::kPadBack, kGlyphMenu);            // map
+    glyphs.set_glyph(game::kPadA, kGlyphTouchpadDown);          // interact
+    glyphs.set_glyph(game::kPadB, kGlyphTouchpadCentre);        // radial
+    glyphs.set_glyph(game::kPadX, kGlyphTouchpadUp);            // reload
+    glyphs.set_glyph(game::kPadY, kStockPadNames[game::kPadY]); // no flashlight button: the stock name
+    glyphs.set_glyph(game::kPadBack, kGlyphMenu);               // map
 }
 
 void set_thumbstick_glyphs(Glyphs& glyphs) noexcept {
     glyphs.set_glyph(game::kPadA, kGlyphA);
     glyphs.set_glyph(game::kPadB, kGlyphRightStick);
     glyphs.set_glyph(game::kPadX, kGlyphB);
-    glyphs.set_glyph(game::kPadY, kGlyphY);                  // flashlight
+    glyphs.set_glyph(game::kPadY, kGlyphY); // flashlight
     glyphs.set_glyph(game::kPadBack, kGlyphX);
 }
 
@@ -100,9 +100,9 @@ void set_glyph_scheme(Glyphs& glyphs, bool touchpad) noexcept {
     } else {
         set_thumbstick_glyphs(glyphs);
     }
-    glyphs.set_glyph(game::kPadStart, kGlyphMenu);           // pause
-    glyphs.set_glyph(game::kPadLB, kGlyphLeftGrip);          // motion tracker
-    glyphs.set_glyph(game::kPadRB, kGlyphRightGrip);         // aim
+    glyphs.set_glyph(game::kPadStart, kGlyphMenu);   // pause
+    glyphs.set_glyph(game::kPadLB, kGlyphLeftGrip);  // motion tracker
+    glyphs.set_glyph(game::kPadRB, kGlyphRightGrip); // aim
 }
 
 const HelpSet& help_set(ControlScheme scheme) noexcept {

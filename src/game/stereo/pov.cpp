@@ -18,9 +18,9 @@ namespace {
 
 using core::stereo::Matrix44;
 
-using RenderFn  = void (__fastcall*)(void* pov, void* edx);
-using ApplyFn   = void (__fastcall*)(void* manager, void* edx, std::int32_t eye, float* view, float* proj);
-using FrustumFn = void (__fastcall*)(void* pov, void* edx);
+using RenderFn  = void(__fastcall*)(void* pov, void* edx);
+using ApplyFn   = void(__fastcall*)(void* manager, void* edx, std::int32_t eye, float* view, float* proj);
+using FrustumFn = void(__fastcall*)(void* pov, void* edx);
 
 // Bytes of one 4x4 float matrix.
 constexpr std::size_t kMatrixBytes = sizeof(Matrix44);
@@ -39,14 +39,14 @@ void* eye_owner(const ReflectionTargets& targets) noexcept { return *targets.ren
 // reflection-plane side effects (07 §4.2).
 void setup_eye(const ReflectionTargets& targets, StereoManager& manager, std::uint8_t* pov,
                std::int32_t eye) noexcept {
-    const ApplyFn   apply   = CodeAddress{targets.apply_eye_transform};
-    const FrustumFn frustum = CodeAddress{targets.update_frustum};
+    const ApplyFn apply               = CodeAddress{targets.apply_eye_transform};
+    const FrustumFn frustum           = CodeAddress{targets.update_frustum};
     field<std::int32_t>(pov, kPovEye) = eye;
     apply(&manager, nullptr, eye, &field<float>(pov, kPovView), &field<float>(pov, kPovProj));
     frustum(pov, nullptr);
-    const float* proj    = &field<float>(pov, kPovProj);
-    const float  x_scale = util::element4(proj, 0, 0);
-    const float  y_scale = util::element4(proj, 1, 1);
+    const float* proj             = &field<float>(pov, kPovProj);
+    const float x_scale           = util::element4(proj, 0, 0);
+    const float y_scale           = util::element4(proj, 1, 1);
     field<float>(pov, kPovAspect) = y_scale / x_scale;
     field<float>(pov, kPovFov)    = 2.0f * std::atan(1.0f / y_scale);
     std::memcpy(pov + kPovProjCopy, proj, kMatrixBytes);
@@ -56,10 +56,10 @@ void setup_eye(const ReflectionTargets& targets, StereoManager& manager, std::ui
 // What a per-eye render changes on the POV and the renderer, to put back.
 struct CentreState {
     std::array<std::uint8_t, kCentreBytes> matrices;
-    float        fov;
-    float        aspect;
+    float fov;
+    float aspect;
     std::int32_t eye;
-    void*        owner;
+    void* owner;
     std::int32_t renderer_eye;
 };
 
@@ -85,7 +85,7 @@ void restore_centre(std::uint8_t* pov, const CentreState& s) noexcept {
 } // namespace
 
 std::optional<Matrix44> view_matrix(const AddressMap& addresses) noexcept {
-    void* manager = pointer_at(addresses.at(AiAddr::PovManagerPtr));
+    void* manager     = pointer_at(addresses.at(AiAddr::PovManagerPtr));
     const float* view = manager ? field_ptr<float>(manager, kPovManagerMainView) : nullptr;
     if (!view) return std::nullopt;
     Matrix44 m;
@@ -106,7 +106,9 @@ bool pov_renders(const void* pov) noexcept {
 
 std::int32_t pov_target_width(const void* pov) noexcept { return field<std::int32_t>(pov, kPovTargetWidth); }
 
-std::int32_t pov_target_height(const void* pov) noexcept { return field<std::int32_t>(pov, kPovTargetHeight); }
+std::int32_t pov_target_height(const void* pov) noexcept {
+    return field<std::int32_t>(pov, kPovTargetHeight);
+}
 
 void render_reflection_flat(const ReflectionTargets& targets, void* pov) noexcept {
     const RenderFn render = CodeAddress{targets.render};
@@ -115,12 +117,12 @@ void render_reflection_flat(const ReflectionTargets& targets, void* pov) noexcep
 
 void render_reflection_per_eye(const ReflectionTargets& targets, StereoManager& manager, void* pov,
                                AfterEyePass after_eye) noexcept {
-    auto* p = static_cast<std::uint8_t*>(pov);
+    auto* p                  = static_cast<std::uint8_t*>(pov);
     const CentreState centre = save_centre(targets, p);
     for (std::int32_t eye = 0; eye < kEyes; ++eye) {
         std::memcpy(p, centre.matrices.data(), kPassInputBytes);
         setup_eye(targets, manager, p, eye);
-        set_skip_clears(eye == 1);  // keep the first half (07 §4.3)
+        set_skip_clears(eye == 1); // keep the first half (07 §4.3)
         render_reflection_flat(targets, pov);
         set_skip_clears(false);
         if (after_eye) after_eye(eye);

@@ -18,12 +18,15 @@ namespace omvr::platform::win32 {
 class DialogThread final : public core::ui::ports::Dialogs {
 public:
     // `caption` is the title of every box; it must live for the process.
-    DialogThread(const wchar_t* caption, core::diag::ports::Log& log) noexcept : caption_(caption), log_(log) {}
+    DialogThread(const wchar_t* caption, core::diag::ports::Log& log) noexcept
+        : caption_(caption), log_(log) {}
 
     void post(std::string text, core::ui::ports::DialogKind kind, std::move_only_function<void()> then,
               std::string_view label) noexcept override;
-    void show_async(std::string text, core::ui::ports::DialogKind kind, std::string_view label) noexcept override;
-    int show_now(std::string_view text, core::ui::ports::DialogKind kind, std::string_view label) noexcept override;
+    void show_async(std::string text, core::ui::ports::DialogKind kind,
+                    std::string_view label) noexcept override;
+    int show_now(std::string_view text, core::ui::ports::DialogKind kind,
+                 std::string_view label) noexcept override;
     // The game's D3D11CreateDeviceAndSwapChain waits here, so the game does
     // not start rendering under a box. Never call it under the loader lock.
     void wait_posted() noexcept override;
@@ -50,14 +53,14 @@ private:
     // Logs the text of a box the player will not see.
     void log_not_shown(const Posted& p, unsigned long error) noexcept;
 
-    const wchar_t*          caption_;
+    const wchar_t* caption_;
     core::diag::ports::Log& log_;
     // Filled under the loader lock and read by the dialog thread only after
     // CreateThread, so it needs no lock of its own.
     std::vector<Posted> posted_;
     // The dialog thread (a HANDLE), published for wait_posted on the game's
     // threads; never closed, it is waited on for the process's lifetime.
-    std::atomic<void*>  thread_{nullptr};
+    std::atomic<void*> thread_{nullptr};
 };
 
 } // namespace omvr::platform::win32

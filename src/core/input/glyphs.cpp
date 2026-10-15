@@ -6,7 +6,8 @@ namespace omvr::core::input {
 
 // Constructed before any thread reads the names: plain relaxed stores.
 Glyphs::Glyphs() noexcept {
-    for (std::size_t i = 0; i < names_.size(); ++i) names_[i].store(kStockPadNames[i], std::memory_order_relaxed);
+    for (std::size_t i = 0; i < names_.size(); ++i)
+        names_[i].store(kStockPadNames[i], std::memory_order_relaxed);
 }
 
 void Glyphs::set_glyph(int pad_code, const char* name) noexcept {

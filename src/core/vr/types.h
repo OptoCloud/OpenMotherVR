@@ -43,10 +43,10 @@ struct TextureBounds {
 // symmetric FOV the game renders, and names for the log. The names point
 // into storage the runtime keeps for the session.
 struct HeadsetDesc {
-    const char*  product_name = nullptr;
-    const char*  manufacturer = nullptr;
-    FovTangents  default_eye_fov[kEyeCount]{};
-    FovTangents  max_eye_fov[kEyeCount]{};
+    const char* product_name = nullptr;
+    const char* manufacturer = nullptr;
+    FovTangents default_eye_fov[kEyeCount]{};
+    FovTangents max_eye_fov[kEyeCount]{};
 };
 
 } // namespace omvr::core::vr

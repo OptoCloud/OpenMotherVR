@@ -7,8 +7,8 @@ namespace omvr::core::vr {
 // A heading about +Y in radians, and whether it was kept from before
 // because the forward axis had no horizontal direction.
 struct Heading {
-    float yaw_rad  = 0.0f;
-    bool  vertical = false;
+    float yaw_rad = 0.0f;
+    bool vertical = false;
 };
 
 // The heading of a forward axis given by its horizontal components (x, z).

@@ -21,22 +21,22 @@ Controls common_controls(const HandInput& left, const HandInput& right) noexcept
 } // namespace
 
 Controls touchpad_controls(const HandInput& left, const HandInput& right) noexcept {
-    Controls c = common_controls(left, right);
+    Controls c        = common_controls(left, right);
     c.touchpad_scheme = true;
     if (left.stick_touched) c.move = left.stick;
     if (right.stick_touched) c.turn = right.stick;
-    c.turn_engaged = right.stick_click;
+    c.turn_engaged                = right.stick_click;
     const TouchpadRegions regions = decode_touchpad(right.stick, right.stick_click);
-    c.interact = regions.interact;
-    c.reload   = regions.reload;
-    c.radial   = regions.radial;
-    c.map      = left.menu;
-    c.pause    = right.menu;
+    c.interact                    = regions.interact;
+    c.reload                      = regions.reload;
+    c.radial                      = regions.radial;
+    c.map                         = left.menu;
+    c.pause                       = right.menu;
     return c;
 }
 
 Controls thumbstick_controls(const HandInput& left, const HandInput& right) noexcept {
-    Controls c = common_controls(left, right);
+    Controls c   = common_controls(left, right);
     c.move       = left.stick;
     c.turn       = right.stick;
     c.radial     = right.stick_click;

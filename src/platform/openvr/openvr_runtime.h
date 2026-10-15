@@ -11,22 +11,22 @@
 
 namespace omvr::core::vr {
 class RuntimeFailure;
-}
+} // namespace omvr::core::vr
 namespace omvr::platform::win32 {
 class ArchiveFiles;
-}
+} // namespace omvr::platform::win32
 
 namespace omvr::platform::openvr {
 
 // What the OpenVR runtime uses from the rest of the mod.
 struct OpenVrRuntimeDeps {
-    core::diag::ports::Log&              log;
-    const core::diag::ports::Clock&      clock;      // the start-up wait (03 §6.4)
-    core::vr::RuntimeFailure&            failure;    // why the start failed, for the player
-    win32::ArchiveFiles&                 payloads;   // deploys the embedded openvr_api.dll
-    core::input::ports::ControlsSink&    controls;
-    core::ui::ports::Dialogs&            dialogs;
-    std::filesystem::path                runtime_root;   // as the runtime probe found it
+    core::diag::ports::Log& log;
+    const core::diag::ports::Clock& clock; // the start-up wait (03 §6.4)
+    core::vr::RuntimeFailure& failure;     // why the start failed, for the player
+    win32::ArchiveFiles& payloads;         // deploys the embedded openvr_api.dll
+    core::input::ports::ControlsSink& controls;
+    core::ui::ports::Dialogs& dialogs;
+    std::filesystem::path runtime_root; // as the runtime probe found it
 };
 
 // MotherVR::OpenVR, the OpenVR runtime behind the stereo device.

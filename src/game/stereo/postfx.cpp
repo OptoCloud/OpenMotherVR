@@ -9,10 +9,10 @@ namespace omvr::game::stereo {
 
 namespace {
 
-using DrawFn    = void (__cdecl*)();
-using PostFxFn  = void* (__cdecl*)();
-using AaPassFn  = void (__fastcall*)(void* postfx, void* edx);
-using SmaaFn    = void (__cdecl*)(void* color, void* second, const std::uint8_t* temporal);
+using DrawFn   = void(__cdecl*)();
+using PostFxFn = void*(__cdecl*)();
+using AaPassFn = void(__fastcall*)(void* postfx, void* edx);
+using SmaaFn   = void(__cdecl*)(void* color, void* second, const std::uint8_t* temporal);
 
 } // namespace
 
@@ -31,14 +31,15 @@ AaMode aa_mode(const void* postfx) noexcept {
 }
 
 void run_aa_pass_full_screen(const StereoAaTargets& targets, void* postfx) noexcept {
-    const AaPassFn aa_pass = CodeAddress{targets.aa_pass};
-    auto& mesh_draw = field<std::uint8_t>(postfx, kPostFxMeshDraw);
+    const AaPassFn aa_pass             = CodeAddress{targets.aa_pass};
+    auto& mesh_draw                    = field<std::uint8_t>(postfx, kPostFxMeshDraw);
     const std::uint8_t saved_mesh_draw = std::exchange(mesh_draw, std::uint8_t{0});
     aa_pass(postfx, nullptr);
     mesh_draw = saved_mesh_draw;
 }
 
-void call_smaa(const StereoAaTargets& targets, void* color, void* second, const std::uint8_t* temporal) noexcept {
+void call_smaa(const StereoAaTargets& targets, void* color, void* second,
+               const std::uint8_t* temporal) noexcept {
     const SmaaFn smaa = CodeAddress{targets.smaa};
     smaa(color, second, temporal);
 }

@@ -14,7 +14,8 @@ HeadTracking head_tracking(bool valid, bool position_ok) noexcept;
 
 // Updates the held pose from a located one: the orientation when it is
 // valid, the position only when the orientation and the position both are.
-void hold_pose(util::Pose& held, const util::Pose& located, bool orientation_valid, bool position_valid) noexcept;
+void hold_pose(util::Pose& held, const util::Pose& located, bool orientation_valid,
+               bool position_valid) noexcept;
 
 // The same on row-major 3x4 matrices (rotation in columns 0..2, position in
 // column 3).

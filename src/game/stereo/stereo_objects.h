@@ -59,28 +59,28 @@ using ManagerSlots = std::array<void*, kManagerSlotCount>;
 // mod's replacements are __fastcall(self, edx, ...) with the same stack
 // arguments, so the callee pops what the game expects.
 namespace abi {
-using Release            = void (__fastcall*)(void* self, void* edx, unsigned flags);         // ret 4
-using NoArgs             = void (__fastcall*)(void* self, void* edx);                         // ret 0
-using BoolNoArgs         = bool (__fastcall*)(void* self, void* edx);                         // ret 0, AL
-using ConfigureRendering = bool (__fastcall*)(void* self, void* edx, void* stereo_rt);        // ret 4, AL
-using EyeRender          = void (__fastcall*)(void* self, void* edx, int eye);                // ret 4
-using Pose               = float* (__fastcall*)(void* self, void* edx, float* out);           // ret 4, EAX
-using EyeViewport        = void (__fastcall*)(void* self, void* edx, int eye, int half_width, int height,
-                                       int* left, int* top, int* right, int* bottom);  // ret 0x1C
-using SizeQuery          = int* (__fastcall*)(void* self, void* edx, int* w, int* h);         // ret 8
-using DisplayName        = char* (__fastcall*)(void* self, void* edx, char* buf, int size);  // ret 8, EAX
-using OnEvent            = void (__fastcall*)(StereoManager* self, void* edx, const std::int32_t* event);  // ret 4
-using OnEvent2           = bool (__fastcall*)(void* self, void* edx, const void* setting, int value);   // ret 8
-using CreateDevice       = void (__fastcall*)(StereoManager* self, void* edx, int enable);      // ret 4
-using ManagerSizeQuery   = int* (__fastcall*)(StereoManager* self, void* edx, int* w, int* h);  // ret 8
+using Release            = void(__fastcall*)(void* self, void* edx, unsigned flags);  // ret 4
+using NoArgs             = void(__fastcall*)(void* self, void* edx);                  // ret 0
+using BoolNoArgs         = bool(__fastcall*)(void* self, void* edx);                  // ret 0, AL
+using ConfigureRendering = bool(__fastcall*)(void* self, void* edx, void* stereo_rt); // ret 4, AL
+using EyeRender          = void(__fastcall*)(void* self, void* edx, int eye);         // ret 4
+using Pose               = float*(__fastcall*)(void* self, void* edx, float* out);    // ret 4, EAX
+using EyeViewport  = void(__fastcall*)(void* self, void* edx, int eye, int half_width, int height, int* left,
+                                       int* top, int* right, int* bottom);           // ret 0x1C
+using SizeQuery    = int*(__fastcall*)(void* self, void* edx, int* w, int* h);       // ret 8
+using DisplayName  = char*(__fastcall*)(void* self, void* edx, char* buf, int size); // ret 8, EAX
+using OnEvent      = void(__fastcall*)(StereoManager* self, void* edx, const std::int32_t* event); // ret 4
+using OnEvent2     = bool(__fastcall*)(void* self, void* edx, const void* setting, int value);     // ret 8
+using CreateDevice = void(__fastcall*)(StereoManager* self, void* edx, int enable);                // ret 4
+using ManagerSizeQuery = int*(__fastcall*)(StereoManager * self, void* edx, int* w, int* h);       // ret 8
 // The manager's per-frame update and its mode stack (05 §3, §4.4).
-using Update   = int (__fastcall*)(StereoManager* self, void* edx, float dt);      // ret 4
-using PushMode = void (__fastcall*)(StereoManager* self, void* edx, int mode);     // ret 4
-using PopMode  = void (__fastcall*)(StereoManager* self, void* edx);               // ret 0
+using Update   = int(__fastcall*)(StereoManager* self, void* edx, float dt);  // ret 4
+using PushMode = void(__fastcall*)(StereoManager* self, void* edx, int mode); // ret 4
+using PopMode  = void(__fastcall*)(StereoManager* self, void* edx);           // ret 0
 // Matrix44* BuildUiQuad(Matrix44* out, float size, float inv_aspect, float
 // dist), __cdecl: the caller copies the result through the returned
 // pointer (05 §4.1).
-using BuildUiQuad = float* (__cdecl*)(float* out, float size, float inv_aspect, float dist);
+using BuildUiQuad = float*(__cdecl*)(float* out, float size, float inv_aspect, float dist);
 } // namespace abi
 
 // The device state is read on the game's job threads (the cull hooks) and

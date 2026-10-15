@@ -18,9 +18,10 @@ using core::stereo::StereoMode;
 
 // The game's methods these replace (05 §5, §6): thiscall, as
 // __fastcall(self, edx, ...).
-using FollowFn  = int (__fastcall*)(void* self, void* edx, void* arg);  // ret 4
-using MenuFn    = void (__fastcall*)(void* self, void* edx);            // ret 0
-using MessageFn = int (__fastcall*)(void* self, void* edx, const std::uint32_t* msg, int a, int b, int c);  // ret 0x10
+using FollowFn  = int(__fastcall*)(void* self, void* edx, void* arg); // ret 4
+using MenuFn    = void(__fastcall*)(void* self, void* edx);           // ret 0
+using MessageFn = int(__fastcall*)(void* self, void* edx, const std::uint32_t* msg, int a, int b,
+                                   int c); // ret 0x10
 
 static_assert(std::is_convertible_v<decltype(&follow_on_activate), FollowFn>);
 static_assert(std::is_convertible_v<decltype(&follow_on_deactivate), FollowFn>);
@@ -72,7 +73,7 @@ int __fastcall follow_on_deactivate(void* self, void*, void* arg) noexcept {
     auto& ctx = context();
     ctx.follow.on_deactivate_begin();
     const FollowFn deactivate = game::CodeAddress{ctx.targets.game_side.follow_on_deactivate};
-    const int r = deactivate(self, nullptr, arg);
+    const int r               = deactivate(self, nullptr, arg);
     ctx.follow.on_deactivate_end(self);
     return r;
 }
@@ -81,7 +82,7 @@ int __fastcall follow_on_deactivate(void* self, void*, void* arg) noexcept {
 // From: FUN_1001f830 (naked in the original, reading the caller's frame;
 // we read our own first argument).
 int __fastcall ui_on_message(void* self, void*, const std::uint32_t* msg, int a, int b, int c) noexcept {
-    auto& ctx = context();
+    auto& ctx              = context();
     const std::uint32_t id = msg ? *msg : 0;
     ctx.scene.on_message(id, game::stereo::scene_messages(ctx.addresses));
     const MessageFn on_message = game::CodeAddress{ctx.targets.game_side.ui_on_message};

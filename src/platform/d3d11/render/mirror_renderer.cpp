@@ -20,7 +20,8 @@ using win32::ComPtr;
 
 #include "platform/d3d11/render/shaders/mirror_shaders.inc"
 
-constexpr std::string_view kNoOutputLog = "[stereo] desktop mirror: the game has no output bound at end of frame";
+constexpr std::string_view kNoOutputLog =
+    "[stereo] desktop mirror: the game has no output bound at end of frame";
 constexpr std::string_view kCreateFailedLog =
     "[stereo] desktop mirror off: creating its {} failed (0x{:08X}); the window shows black, VR not affected";
 
@@ -58,13 +59,14 @@ D3D11_SAMPLER_DESC bilinear_clamp() noexcept {
 void cover_target(ID3D11DeviceContext* ctx, ID3D11RenderTargetView* rtv) noexcept {
     ID3D11Resource* raw_res = nullptr;
     rtv->GetResource(&raw_res);
-    const auto res = ComPtr<ID3D11Resource>::adopt(raw_res);
+    const auto res           = ComPtr<ID3D11Resource>::adopt(raw_res);
     ID3D11Texture2D* raw_tex = nullptr;
     if (!res || FAILED(res->QueryInterface(IID_PPV_ARGS(&raw_tex)))) return;
     const auto tex = ComPtr<ID3D11Texture2D>::adopt(raw_tex);
     D3D11_TEXTURE2D_DESC td{};
     tex->GetDesc(&td);
-    const D3D11_VIEWPORT vp{0.0f, 0.0f, static_cast<float>(td.Width), static_cast<float>(td.Height), 0.0f, 1.0f};
+    const D3D11_VIEWPORT vp{0.0f, 0.0f, static_cast<float>(td.Width), static_cast<float>(td.Height),
+                            0.0f, 1.0f};
     ctx->RSSetViewports(1, &vp);
 }
 
@@ -87,12 +89,13 @@ void MirrorRenderer::create(core::vr::GpuDevice gpu_device, const MirrorConstant
     ID3D11Device* device = to_d3d(gpu_device);
     release();
     std::string_view what = "vertex shader";
-    HRESULT hr = device->CreateVertexShader(kMirrorVS, sizeof(kMirrorVS), nullptr, &objects_.vs);
+    HRESULT hr            = device->CreateVertexShader(kMirrorVS, sizeof(kMirrorVS), nullptr, &objects_.vs);
     if (SUCCEEDED(hr)) {
         what = "pixel shader";
         hr   = device->CreatePixelShader(kMirrorPS, sizeof(kMirrorPS), nullptr, &objects_.ps);
     }
-    const D3D11_BUFFER_DESC cb_desc{sizeof(MirrorConstants), D3D11_USAGE_DEFAULT, D3D11_BIND_CONSTANT_BUFFER, 0, 0, 0};
+    const D3D11_BUFFER_DESC cb_desc{
+        sizeof(MirrorConstants), D3D11_USAGE_DEFAULT, D3D11_BIND_CONSTANT_BUFFER, 0, 0, 0};
     if (SUCCEEDED(hr)) {
         what = "constant buffer";
         // The eyes' constants: the caller's (core::stereo::mirror_constants).
@@ -105,9 +108,9 @@ void MirrorRenderer::create(core::vr::GpuDevice gpu_device, const MirrorConstant
         hr = device->CreateBuffer(&cb_desc, &data, &objects_.cb_screen);
     }
     if (SUCCEEDED(hr)) {
-        what = "sampler";
+        what                       = "sampler";
         const D3D11_SAMPLER_DESC s = bilinear_clamp();
-        hr = device->CreateSamplerState(&s, &objects_.sampler);
+        hr                         = device->CreateSamplerState(&s, &objects_.sampler);
     }
     if (FAILED(hr) || !ready()) {
         release();
@@ -116,7 +119,7 @@ void MirrorRenderer::create(core::vr::GpuDevice gpu_device, const MirrorConstant
 }
 
 void MirrorRenderer::draw(core::vr::GpuContext context, bool head_tracked) noexcept {
-    ID3D11DeviceContext* ctx = to_d3d(context);
+    ID3D11DeviceContext* ctx        = to_d3d(context);
     ID3D11RenderTargetView* raw_rtv = nullptr;
     ctx->OMGetRenderTargets(1, &raw_rtv, nullptr);
     const auto rtv = ComPtr<ID3D11RenderTargetView>::adopt(raw_rtv);

@@ -42,7 +42,7 @@ TEST_CASE("crc32 gives the zlib known answers") {
 TEST_CASE("md5_block of the padded empty message is MD5(\"\")") {
     std::uint32_t state[4] = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476};
     std::array<std::uint8_t, 64> block{};
-    block[0] = 0x80;  // the pad; length 0 bits
+    block[0] = 0x80; // the pad; length 0 bits
     util::md5_block(state, block.data());
     // d41d8cd98f00b204e9800998ecf8427e as little-endian words.
     CHECK(state[0] == 0xD98C1DD4u);
@@ -103,8 +103,9 @@ TEST_CASE("split_command_line splits on spaces and tabs and honours quotes") {
 
 TEST_CASE("ASCII case-insensitive compare") {
     CHECK(util::equals_ignoring_ascii_case(std::wstring_view{L"-VRScale"}, std::wstring_view{L"-vrscale"}));
-    CHECK_FALSE(util::equals_ignoring_ascii_case(std::wstring_view{L"-vrscal"}, std::wstring_view{L"-vrscale"}));
-    CHECK(util::ascii_lower(L'É') == L'É');  // only ASCII letters fold
+    CHECK_FALSE(
+        util::equals_ignoring_ascii_case(std::wstring_view{L"-vrscal"}, std::wstring_view{L"-vrscale"}));
+    CHECK(util::ascii_lower(L'É') == L'É'); // only ASCII letters fold
 }
 
 TEST_CASE("Reader reads little-endian values and stops at the end") {
@@ -113,9 +114,9 @@ TEST_CASE("Reader reads little-endian values and stops at the end") {
     util::Reader r(data);
     CHECK(r.get<std::uint32_t>() == 0x12345678u);
     CHECK(r.ok());
-    CHECK(r.get<std::uint16_t>() == 0u);  // only one byte left
+    CHECK(r.get<std::uint16_t>() == 0u); // only one byte left
     CHECK_FALSE(r.ok());
-    CHECK(r.bytes(1).empty());  // stays failed
+    CHECK(r.bytes(1).empty()); // stays failed
 }
 
 TEST_CASE("put_u32_at writes little-endian in place; align_up rounds up") {
@@ -162,7 +163,7 @@ TEST_CASE("SeqLock hands a value over whole") {
 }
 
 TEST_CASE("vector maths") {
-    const float half = std::numbers::pi_v<float> / 4.0f;  // a quarter turn about +Y
+    const float half = std::numbers::pi_v<float> / 4.0f; // a quarter turn about +Y
     const util::Quat yaw90{0, std::sin(half), 0, std::cos(half)};
     const util::Vec3 r = util::rotate(yaw90, {0, 0, -1});
     CHECK(r.x == doctest::Approx(-1.0f));
@@ -209,9 +210,9 @@ TEST_CASE("4x4 identity and the camera position of a rigid view matrix") {
     CHECK(v[15] == 1.0f);
     // Row 3 is the view translation; with no rotation the camera sits at
     // its negation.
-    v[12] = 2.0f;
-    v[13] = -3.0f;
-    v[14] = 4.0f;
+    v[12]                = 2.0f;
+    v[13]                = -3.0f;
+    v[14]                = 4.0f;
     const util::Vec3 cam = util::camera_position(v.data());
     CHECK(cam.x == -2.0f);
     CHECK(cam.y == 3.0f);

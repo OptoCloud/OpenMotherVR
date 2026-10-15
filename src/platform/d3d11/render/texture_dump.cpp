@@ -34,13 +34,13 @@ void write_value(std::ofstream& out, const T& value) {
 // A CPU-readable single-sample copy of mip 0 of `desc`'s texture.
 D3D11_TEXTURE2D_DESC staging_desc_of(const D3D11_TEXTURE2D_DESC& desc) noexcept {
     D3D11_TEXTURE2D_DESC staging = desc;
-    staging.MipLevels      = 1;
-    staging.ArraySize      = 1;
-    staging.SampleDesc     = {1, 0};
-    staging.Usage          = D3D11_USAGE_STAGING;
-    staging.BindFlags      = 0;
-    staging.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    staging.MiscFlags      = 0;
+    staging.MipLevels            = 1;
+    staging.ArraySize            = 1;
+    staging.SampleDesc           = {1, 0};
+    staging.Usage                = D3D11_USAGE_STAGING;
+    staging.BindFlags            = 0;
+    staging.CPUAccessFlags       = D3D11_CPU_ACCESS_READ;
+    staging.MiscFlags            = 0;
     return staging;
 }
 
@@ -69,7 +69,7 @@ bool copy_and_write(ID3D11DeviceContext* ctx, ID3D11Device* device, ID3D11Textur
                     const D3D11_TEXTURE2D_DESC& desc, const std::filesystem::path& target) {
     if (desc.SampleDesc.Count != 1) return false;
     const D3D11_TEXTURE2D_DESC staging_desc = staging_desc_of(desc);
-    ID3D11Texture2D* raw_staging = nullptr;
+    ID3D11Texture2D* raw_staging            = nullptr;
     if (FAILED(device->CreateTexture2D(&staging_desc, nullptr, &raw_staging))) return false;
     const auto staging = ComPtr<ID3D11Texture2D>::adopt(raw_staging);
     ctx->CopySubresourceRegion(staging.get(), 0, 0, 0, 0, src, 0, nullptr);
@@ -124,7 +124,7 @@ void dump_bound_target(ID3D11DeviceContext* ctx, int pass, core::diag::ports::Lo
         core::diag::ports::logf(log, kNoTargetLog, pass);
         return;
     }
-    const auto rtv = ComPtr<ID3D11RenderTargetView>::adopt(raw_rtv);
+    const auto rtv          = ComPtr<ID3D11RenderTargetView>::adopt(raw_rtv);
     ID3D11Resource* raw_res = nullptr;
     rtv->GetResource(&raw_res);
     const auto res = ComPtr<ID3D11Resource>::adopt(raw_res);

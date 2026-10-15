@@ -13,9 +13,9 @@ constexpr std::uint32_t kPolynomial = 0xEDB88320u;
 constexpr std::uint32_t kPreset     = 0xFFFFFFFFu;
 constexpr std::uint32_t kFinalXor   = 0xFFFFFFFFu;
 
-constexpr std::size_t   kByteValues  = 256;
-constexpr int           kBitsPerByte = 8;
-constexpr std::uint32_t kLowByte     = 0xFFu;
+constexpr std::size_t kByteValues = 256;
+constexpr int kBitsPerByte        = 8;
+constexpr std::uint32_t kLowByte  = 0xFFu;
 
 // The remainder of one byte value, one bit at a time.
 constexpr std::uint32_t byte_remainder(std::uint32_t value) noexcept {

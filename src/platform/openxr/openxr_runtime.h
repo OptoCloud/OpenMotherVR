@@ -14,11 +14,11 @@ class Session;
 
 // What the OpenXR runtime uses from the rest of the mod.
 struct OpenXrRuntimeDeps {
-    core::diag::ports::Log&           log;
-    Session&                          session;
+    core::diag::ports::Log& log;
+    Session& session;
     core::input::ports::ControlsSink& controls;
-    core::vr::ports::HeadsetAudio&    audio;
-    core::ui::ports::GameSignals&     signals;   // the runtime's quit request
+    core::vr::ports::HeadsetAudio& audio;
+    core::ui::ports::GameSignals& signals; // the runtime's quit request
 };
 
 // The stereo device on any OpenXR runtime (Meta / Quest Link, SteamVR, WMR,

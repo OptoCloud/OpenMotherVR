@@ -18,18 +18,20 @@ namespace {
 
 using core::diag::ports::logf;
 
-constexpr std::string_view kLogNoInput        = "openvr input: IVRInput unavailable, using legacy input";
-constexpr std::string_view kLogManifestFailed = "openvr input: SetActionManifestPath failed ({}), using legacy input";
-constexpr std::string_view kLogReady          = "openvr input: SteamVR Input with {} actions + 2 hand poses, manifest {}";
-constexpr std::string_view kLogException      = "openvr input: {}";
+constexpr std::string_view kLogNoInput = "openvr input: IVRInput unavailable, using legacy input";
+constexpr std::string_view kLogManifestFailed =
+    "openvr input: SetActionManifestPath failed ({}), using legacy input";
+constexpr std::string_view kLogReady =
+    "openvr input: SteamVR Input with {} actions + 2 hand poses, manifest {}";
+constexpr std::string_view kLogException = "openvr input: {}";
 constexpr std::string_view kLogPosesUnbound =
     "openvr input: hand pose actions unbound; a custom SteamVR binding for this game "
     "from an older version lacks them (reset it to the default binding)";
 
 // The rows of a 3x4 pose, and the axes of a vector.
-constexpr int kPoseRows = 3;
+constexpr int kPoseRows    = 3;
 constexpr int kPoseColumns = 4;
-constexpr int kAxes = 3;
+constexpr int kAxes        = 3;
 
 } // namespace
 
@@ -38,13 +40,15 @@ constexpr int kAxes = 3;
 bool Actions::digital(Action a) noexcept {
     vr::InputDigitalActionData_t d{};
     return input_->GetDigitalActionData(handles_[index(a)], &d, sizeof(d), vr::k_ulInvalidInputValueHandle) ==
-               vr::VRInputError_None && d.bActive && d.bState;
+               vr::VRInputError_None &&
+           d.bActive && d.bState;
 }
 
 Actions::Analog Actions::analog(Action a) noexcept {
     vr::InputAnalogActionData_t d{};
     if (input_->GetAnalogActionData(handles_[index(a)], &d, sizeof(d), vr::k_ulInvalidInputValueHandle) !=
-        vr::VRInputError_None || !d.bActive) {
+            vr::VRInputError_None ||
+        !d.bActive) {
         return {};
     }
     return {d.x, d.y};
@@ -78,7 +82,7 @@ bool Actions::init(ApiLoader& api, const std::filesystem::path& dir) noexcept {
             log_.line(kLogNoInput);
             return false;
         }
-        auto* input = static_cast<vr::IVRInput*>(*served);
+        auto* input              = static_cast<vr::IVRInput*>(*served);
         const auto manifest_path = dir / kManifestFileName;
         if (!write_files(dir, manifest_path)) return false;
 
@@ -107,26 +111,26 @@ Controls Actions::poll() noexcept {
 
     const auto move = analog(Action::Move);
     const auto turn = analog(Action::Turn);
-    c.move = {move.x, move.y};
-    c.turn = {turn.x, turn.y};
-    c.trigger_l = analog(Action::Crouch).x;
-    c.trigger_r = analog(Action::Fire).x;
-    c.grip_l = digital(Action::Tracker);
-    c.grip_r = digital(Action::Aim);
-    c.sprint = digital(Action::Sprint);
-    c.interact = digital(Action::Interact);
-    c.reload = digital(Action::Reload);
-    c.radial = digital(Action::Radial);
-    c.map = digital(Action::Map);
-    c.flashlight = digital(Action::Flashlight);
-    c.pause = digital(Action::Pause);
+    c.move          = {move.x, move.y};
+    c.turn          = {turn.x, turn.y};
+    c.trigger_l     = analog(Action::Crouch).x;
+    c.trigger_r     = analog(Action::Fire).x;
+    c.grip_l        = digital(Action::Tracker);
+    c.grip_r        = digital(Action::Aim);
+    c.sprint        = digital(Action::Sprint);
+    c.interact      = digital(Action::Interact);
+    c.reload        = digital(Action::Reload);
+    c.radial        = digital(Action::Radial);
+    c.map           = digital(Action::Map);
+    c.flashlight    = digital(Action::Flashlight);
+    c.pause         = digital(Action::Pause);
 
     // A bound turn_engage (touchpad click) means the touchpad scheme.
     vr::InputDigitalActionData_t engage{};
     input_->GetDigitalActionData(handles_[index(Action::TurnEngage)], &engage, sizeof(engage),
                                  vr::k_ulInvalidInputValueHandle);
     c.touchpad_scheme = engage.bActive;
-    c.turn_engaged = !engage.bActive || engage.bState;
+    c.turn_engaged    = !engage.bActive || engage.bState;
     return c;
 }
 
@@ -136,9 +140,9 @@ std::array<HandPose, core::vr::kHandCount> Actions::hand_poses(int origin) noexc
     bool unbound = false;
     for (std::size_t h = 0; h < out.size(); ++h) {
         vr::InputPoseActionData_t d{};
-        if (input_->GetPoseActionDataForNextFrame(pose_handles_[h], static_cast<vr::ETrackingUniverseOrigin>(origin),
-                                                  &d, sizeof(d), vr::k_ulInvalidInputValueHandle) !=
-            vr::VRInputError_None) {
+        if (input_->GetPoseActionDataForNextFrame(
+                pose_handles_[h], static_cast<vr::ETrackingUniverseOrigin>(origin), &d, sizeof(d),
+                vr::k_ulInvalidInputValueHandle) != vr::VRInputError_None) {
             continue;
         }
         if (!d.bActive) {

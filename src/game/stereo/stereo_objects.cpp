@@ -17,7 +17,7 @@ namespace omvr::game::stereo {
 namespace {
 
 // The vtables the game is handed: static storage, they outlive every use.
-DeviceSlots  device_vtable{};
+DeviceSlots device_vtable{};
 ManagerSlots manager_vtable{};
 
 // The game's own device functions for the slots the mod leaves to it.
@@ -30,17 +30,17 @@ struct GameDeviceSlots {
 // 02 §3.3: the reference pose starts as "no rotation, no translation" in
 // the device's head pose convention (03 §1), a 3x4 row-major matrix.
 constexpr std::array<float, 12> kNeutralReferencePose = {
-    -1.0f, 0.0f,  0.0f, 0.0f,
-    0.0f,  -1.0f, 0.0f, 0.0f,
-    0.0f,  0.0f,  1.0f, 0.0f,
+    -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
 };
 // 02 §3.3: position tracking on (+0xA8), at full weight (+0xAC).
 constexpr std::uint8_t kPositionTrackingOn = 1;
-constexpr float        kFullPositionWeight = 1.0f;
+constexpr float kFullPositionWeight        = 1.0f;
 // The device's -vrscale before CreateDevice reads the command line.
 constexpr float kDefaultWorldScale = 1.0f;
 
-void* slot(const StereoInterface& si, DeviceSlot index) noexcept { return si.vtable[std::to_underlying(index)]; }
+void* slot(const StereoInterface& si, DeviceSlot index) noexcept {
+    return si.vtable[std::to_underlying(index)];
+}
 
 void build(StereoManager& m, const DeviceSlots& device, const ManagerSlots& manager,
            const GameDeviceSlots& game) noexcept {
@@ -50,13 +50,13 @@ void build(StereoManager& m, const DeviceSlots& device, const ManagerSlots& mana
     device_vtable[std::to_underlying(DeviceSlot::GameEyeTransform)]   = game.eye_transform;
     device_vtable[std::to_underlying(DeviceSlot::GameFovAspect)]      = game.fov_aspect;
     device_vtable[std::to_underlying(DeviceSlot::GameEyeScaleOffset)] = game.eye_scale_offset;
-    manager_vtable = manager;
+    manager_vtable                                                    = manager;
 
     // Manager: the game constructor's values (FUN_10003510), every other
     // field zero as the manager was value-initialised.
     m.vtable = manager_vtable.data();
     util::identity(m.game_matrix);
-    m.game_64 = kSceneVisible;  // the game constructor's value (02 §3.3)
+    m.game_64 = kSceneVisible; // the game constructor's value (02 §3.3)
     m.game_a8 = kPositionTrackingOn;
     m.fade    = kFullPositionWeight;
     std::ranges::copy(kNeutralReferencePose, m.reference_pose);

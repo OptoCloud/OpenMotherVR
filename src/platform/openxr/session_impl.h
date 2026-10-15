@@ -81,60 +81,60 @@ struct Session::Impl {
     void locate_head(XrTime t);
     void log_ipd_once();
 
-    core::diag::ports::Log&         log;
+    core::diag::ports::Log& log;
     const core::diag::ports::Clock& clock;
-    core::ui::ports::Dialogs&       dialogs;
-    core::vr::RuntimeFailure&       failure;
+    core::ui::ports::Dialogs& dialogs;
+    core::vr::RuntimeFailure& failure;
 
     // Everything a teardown resets. The handles are destroyed explicitly in
     // teardown(), in the order 09 §3 needs, before the reset.
     struct State {
-        InstanceOwner  instance;
-        XrSystemId     system   = XR_NULL_SYSTEM_ID;
-        SessionOwner   session;
-        SpaceOwner     local;     // runtime's LOCAL origin
-        SpaceOwner     seated;    // LOCAL re-anchored by recenter()
-        SpaceOwner     view;
+        InstanceOwner instance;
+        XrSystemId system = XR_NULL_SYSTEM_ID;
+        SessionOwner session;
+        SpaceOwner local;  // runtime's LOCAL origin
+        SpaceOwner seated; // LOCAL re-anchored by recenter()
+        SpaceOwner view;
         XrSessionState session_state = XR_SESSION_STATE_UNKNOWN;
-        bool           running  = false;
-        bool           lost     = false;
+        bool running                 = false;
+        bool lost                    = false;
         XrEnvironmentBlendMode blend = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
         std::vector<std::int64_t> formats;
         std::array<XrViewConfigurationView, core::vr::kEyeCount> config_views{};
         // The frame begun by the last frame() and not yet ended.
-        bool           frame_begun   = false;
-        bool           should_render = false;
-        XrTime         frame_time    = 0; // its predictedDisplayTime
-        XrDuration     frame_period  = 0; // its predictedDisplayPeriod
-        bool           recenter_pending = true; // anchor once tracking is up
-        bool           exit_requested = false;
+        bool frame_begun        = false;
+        bool should_render      = false;
+        XrTime frame_time       = 0;    // its predictedDisplayTime
+        XrDuration frame_period = 0;    // its predictedDisplayPeriod
+        bool recenter_pending   = true; // anchor once tracking is up
+        bool exit_requested     = false;
 
-        ComPtr<ID3D11Device>        device;
+        ComPtr<ID3D11Device> device;
         ComPtr<ID3D11DeviceContext> context;
 
         std::array<Swapchain, core::vr::kEyeCount> eye_chain{};
-        Swapchain                                  screen_chain{};
+        Swapchain screen_chain{};
 
-        EyeImages        eye_images{};
-        bool             eye_images_set = false;
-        FrameViews       views{};    // the begun frame's views (render thread's copy)
+        EyeImages eye_images{};
+        bool eye_images_set = false;
+        FrameViews views{}; // the begun frame's views (render thread's copy)
         // The stereo texture the screen shows, set with each submitted frame;
         // not owned (the game's).
         ID3D11Texture2D* screen_image = nullptr;
-        TextureRegion    screen_region{};
-        bool             screen_pose_set = false;
-        util::Pose       screen_pose{};
-        float            screen_width = 0.0f;
-        SystemInfo       info{};
-        bool             ipd_logged = false;
+        TextureRegion screen_region{};
+        bool screen_pose_set = false;
+        util::Pose screen_pose{};
+        float screen_width = 0.0f;
+        SystemInfo info{};
+        bool ipd_logged = false;
 
         // The last valid head and eye positions in the base space (09 §5.5):
         // what is published while tracking is lost. Neutral before any: the
         // identity head, the eyes half an average IPD to each side.
-        util::Pose                                     last_head{};
-        std::array<util::Vec3, core::vr::kEyeCount>    last_eye_pos{{{-core::vr::kDefaultEyeX, 0.0f, 0.0f},
-                                                                    {core::vr::kDefaultEyeX, 0.0f, 0.0f}}};
-        float                                          anchor_yaw = 0.0f;   // the base space's yaw at the latest anchor
+        util::Pose last_head{};
+        std::array<util::Vec3, core::vr::kEyeCount> last_eye_pos{
+            {{-core::vr::kDefaultEyeX, 0.0f, 0.0f}, {core::vr::kDefaultEyeX, 0.0f, 0.0f}}};
+        float anchor_yaw = 0.0f; // the base space's yaw at the latest anchor
 
         // The per-frame calls' last results, logged on change (11 §3).
         XrResult wait_result  = XR_SUCCESS;

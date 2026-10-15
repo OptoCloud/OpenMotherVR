@@ -22,12 +22,13 @@ bool detour(std::uint8_t* target, const void* replacement, std::span<const std::
             void** trampoline, const char* name, core::diag::ports::Log& log) noexcept;
 
 template <class Fn, class Replacement>
-bool detour(std::uint8_t* target, Replacement replacement, std::span<const std::uint8_t> expected, Fn& trampoline,
-            const char* name, core::diag::ports::Log& log) noexcept {
-    static_assert(std::is_convertible_v<Replacement, Fn>, "the replacement must have the game function's signature");
+bool detour(std::uint8_t* target, Replacement replacement, std::span<const std::uint8_t> expected,
+            Fn& trampoline, const char* name, core::diag::ports::Log& log) noexcept {
+    static_assert(std::is_convertible_v<Replacement, Fn>,
+                  "the replacement must have the game function's signature");
     static_assert(std::is_pointer_v<Fn> && std::is_function_v<std::remove_pointer_t<Fn>>);
-    return detour(target, reinterpret_cast<const void*>(replacement), expected, reinterpret_cast<void**>(&trampoline),
-                  name, log);
+    return detour(target, reinterpret_cast<const void*>(replacement), expected,
+                  reinterpret_cast<void**>(&trampoline), name, log);
 }
 
 } // namespace omvr::game

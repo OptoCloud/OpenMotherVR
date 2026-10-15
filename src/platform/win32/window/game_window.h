@@ -34,6 +34,7 @@ void subclass_game_window(void* hwnd, WindowProc replacement, WindowProc& game_p
                           core::diag::ports::Log& log) noexcept;
 
 // Calls the game's own window procedure `game_proc`.
-long call_window_proc(WindowProc game_proc, HWND__* hwnd, unsigned int msg, unsigned int wp, long lp) noexcept;
+long call_window_proc(WindowProc game_proc, HWND__* hwnd, unsigned int msg, unsigned int wp,
+                      long lp) noexcept;
 
 } // namespace omvr::platform::win32

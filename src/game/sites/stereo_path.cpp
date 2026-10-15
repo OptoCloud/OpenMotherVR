@@ -30,7 +30,7 @@ constexpr std::array<std::uint8_t, 2> kCmpEaxEax = {x86::kCmpRm32R32, x86::kModR
 
 // The hand-off (02 §3.1): `push 0xb0; ...; call new; ...; call ctor`
 // becomes `mov eax, &manager; jmp short` to the store of the result.
-constexpr std::size_t kHandOffJumpSite = x86::kMovEaxImm32Size;
+constexpr std::size_t kHandOffJumpSite                             = x86::kMovEaxImm32Size;
 constexpr std::array<std::uint8_t, x86::kJmpRel8Size> kJumpToStore = {
     x86::kJmpRel8,
     static_cast<std::uint8_t>(kStereoAllocStoreOffset - (x86::kMovEaxImm32Size + x86::kJmpRel8Size))};
@@ -75,9 +75,11 @@ bool force_stereo_mode(const GameImage& g, Patcher& p) noexcept {
     return true;
 }
 
-bool install_stereo_device(const GameImage& g, Patcher& p, StereoManager& m, const StereoDeviceHooks& hooks) noexcept {
+bool install_stereo_device(const GameImage& g, Patcher& p, StereoManager& m,
+                           const StereoDeviceHooks& hooks) noexcept {
     stereo::initialize(g.addresses, m, hooks.device, hooks.manager);
-    const bool ok = hand_off_manager(g, p, m) && point_recenter_sites(g, p) && redirect_manager_calls(g, p, hooks);
+    const bool ok =
+        hand_off_manager(g, p, m) && point_recenter_sites(g, p) && redirect_manager_calls(g, p, hooks);
     if (ok) ports::logf(p.log(), kHandedOverLog, static_cast<void*>(&m));
     return ok;
 }

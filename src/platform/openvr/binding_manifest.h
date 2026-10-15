@@ -18,8 +18,20 @@ namespace omvr::platform::openvr {
 
 // The semantic game actions, in manifest order.
 enum class Action : std::size_t {
-    Move, Turn, TurnEngage, Sprint, Crouch, Fire, Aim, Tracker,
-    Interact, Reload, Radial, Flashlight, Map, Pause,
+    Move,
+    Turn,
+    TurnEngage,
+    Sprint,
+    Crouch,
+    Fire,
+    Aim,
+    Tracker,
+    Interact,
+    Reload,
+    Radial,
+    Flashlight,
+    Map,
+    Pause,
     Count
 };
 
@@ -52,11 +64,13 @@ inline constexpr std::array kActions = {
     ActionDef{Action::Pause, "pause", Kind::Boolean, "Pause"},
 };
 static_assert(kActions.size() == static_cast<std::size_t>(Action::Count));
-static_assert([] {
-    for (std::size_t i = 0; i < kActions.size(); ++i)
-        if (static_cast<std::size_t>(kActions[i].id) != i) return false;
-    return true;
-}(), "kActions must be in Action order");
+static_assert(
+    [] {
+        for (std::size_t i = 0; i < kActions.size(); ++i)
+            if (static_cast<std::size_t>(kActions[i].id) != i) return false;
+        return true;
+    }(),
+    "kActions must be in Action order");
 
 // The hands' grip poses: one pose action per hand, so neither depends on
 // which controller SteamVR thinks is which (restrict-to-device unused).

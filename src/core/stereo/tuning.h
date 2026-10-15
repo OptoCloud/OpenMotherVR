@@ -49,7 +49,7 @@ inline constexpr int kScreenReplaceFrames = 2;
 // The fade counts as clear at or above this, and a fade that starts is
 // held off this long in stereo.
 inline constexpr float kFadeClear = 0.99999f;
-inline constexpr auto  kFadeGrace = std::chrono::milliseconds(600);
+inline constexpr auto kFadeGrace  = std::chrono::milliseconds(600);
 
 // ---- Render target (03 §4) -------------------------------------------------
 
@@ -73,6 +73,6 @@ inline constexpr std::array<float, 4> kScreenMirrorSource = {0.0f, 0.25f, 0.5f, 
 // Reflection POVs whose flags are followed in the log, and the most lines
 // that diagnostic writes in a run.
 inline constexpr std::size_t kReflectionPovSlots = 8;
-inline constexpr int         kReflectionLogLines = 60;
+inline constexpr int kReflectionLogLines         = 60;
 
 } // namespace omvr::core::stereo

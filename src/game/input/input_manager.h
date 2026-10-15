@@ -16,18 +16,18 @@ namespace omvr::game::input {
 
 // ---- The game's pad methods (all __thiscall; __fastcall with an unused EDX) ----
 
-using IsDownFn   = bool        (__fastcall*)(void* self, void* edx, int code);
-using ValueFn    = float       (__fastcall*)(void* self, void* edx, int code);
-using AxisFn     = float       (__fastcall*)(void* self, void* edx, int code, int negate);
-using NameFn     = const char* (__fastcall*)(void* self, void* edx, std::uint32_t code);
-using ActivityFn = bool        (__fastcall*)(void* self, void* edx);
+using IsDownFn   = bool(__fastcall*)(void* self, void* edx, int code);
+using ValueFn    = float(__fastcall*)(void* self, void* edx, int code);
+using AxisFn     = float(__fastcall*)(void* self, void* edx, int code, int negate);
+using NameFn     = const char*(__fastcall*)(void* self, void* edx, std::uint32_t code);
+using ActivityFn = bool(__fastcall*)(void* self, void* edx);
 
 // The stock pad methods behind the five replaced vtable slots (04 §2.3).
 struct StockPad {
-    IsDownFn   is_down  = nullptr;
-    ValueFn    value    = nullptr;
-    AxisFn     axis     = nullptr;
-    NameFn     name     = nullptr;
+    IsDownFn is_down    = nullptr;
+    ValueFn value       = nullptr;
+    AxisFn axis         = nullptr;
+    NameFn name         = nullptr;
     ActivityFn activity = nullptr;
 };
 

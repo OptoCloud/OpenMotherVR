@@ -42,7 +42,8 @@ void SettingsPush::push_runtime_and_debug(ports::UiHandle ui) noexcept {
     const config::Settings& cfg = deps_.settings;
     // Whether the VR runtime object exists and its session is live.
     deps_.vars.set_bool(ui, script::kOptionsEnabled, deps_.runtime.session_active());
-    deps_.vars.set_int(ui, script::kRuntime, std::to_underlying(ui_runtime_value(running_runtime(cfg, deps_.runtime))));
+    deps_.vars.set_int(ui, script::kRuntime,
+                       std::to_underlying(ui_runtime_value(running_runtime(cfg, deps_.runtime))));
     deps_.vars.set_int(ui, script::kDebug, cfg.debug.debug ? 1 : 0);
     deps_.vars.set_bool(ui, script::kSkipIntro, cfg.debug.skip_startup_intro);
 }

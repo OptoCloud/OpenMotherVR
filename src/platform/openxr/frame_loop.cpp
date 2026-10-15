@@ -18,7 +18,8 @@ using core::vr::kDefaultScreenDistance;
 using core::vr::kDefaultScreenWidth;
 
 constexpr std::string_view kLogPoseAge =
-    "openxr: pose age over {} frames: {} same frame, {} one period early, {} other, mean {:.2f} periods over {} known";
+    "openxr: pose age over {} frames: {} same frame, {} one period early, {} other, mean {:.2f} periods over "
+    "{} known";
 constexpr std::string_view kLogIpd = "openxr: IPD {:.4f} m";
 
 D3D11_BOX to_box(const TextureRegion& r) noexcept { return {r.left, r.top, 0, r.right, r.bottom, 1}; }
@@ -38,7 +39,7 @@ struct Session::Impl::FrameLayers {
 // copied (09 §5.2).
 const XrCompositionLayerBaseHeader* Session::Impl::projection_layer(FrameLayers& layers) {
     const EyeImages& images = state.eye_images;
-    bool ok = true;
+    bool ok                 = true;
     for (std::size_t i = 0; i < core::vr::kEyeCount && ok; ++i) {
         ID3D11Texture2D* tex = d3d11::to_d3d(images.texture[i]);
         if (!tex) {
@@ -47,14 +48,16 @@ const XrCompositionLayerBaseHeader* Session::Impl::projection_layer(FrameLayers&
         }
         D3D11_TEXTURE2D_DESC d{};
         tex->GetDesc(&d);
-        const D3D11_BOX box = to_box(images.region[i]);
-        Swapchain& chain = state.eye_chain[i];
-        ok = ensure_chain(chain, d.Format, box.right - box.left, box.bottom - box.top) && copy_into(chain, tex, box);
-        auto& view = layers.views[i];
-        view.pose = to_xr(images.view[i].pose);
-        view.fov  = to_xr(images.view[i].fov);
+        const D3D11_BOX box     = to_box(images.region[i]);
+        Swapchain& chain        = state.eye_chain[i];
+        ok                      = ensure_chain(chain, d.Format, box.right - box.left, box.bottom - box.top) &&
+                                  copy_into(chain, tex, box);
+        auto& view              = layers.views[i];
+        view.pose               = to_xr(images.view[i].pose);
+        view.fov                = to_xr(images.view[i].fov);
         view.subImage.swapchain = chain.handle.get();
-        view.subImage.imageRect = {{0, 0}, {static_cast<std::int32_t>(chain.width), static_cast<std::int32_t>(chain.height)}};
+        view.subImage.imageRect = {
+            {0, 0}, {static_cast<std::int32_t>(chain.width), static_cast<std::int32_t>(chain.height)}};
     }
     if (!ok) return nullptr;
     layers.proj.space     = state.seated.get();
@@ -72,9 +75,10 @@ const XrCompositionLayerBaseHeader* Session::Impl::projection_layer(FrameLayers&
 // Virtual screen: a region of the given image, or else the finished back
 // buffer, on a world-locked quad (09 §5.2, §8). Null when there is nothing
 // to show or it could not be copied.
-const XrCompositionLayerBaseHeader* Session::Impl::screen_layer(FrameLayers& layers, IDXGISwapChain* swapchain) {
+const XrCompositionLayerBaseHeader* Session::Impl::screen_layer(FrameLayers& layers,
+                                                                IDXGISwapChain* swapchain) {
     ID3D11Texture2D* src = state.screen_image;
-    D3D11_BOX box = to_box(state.screen_region);
+    D3D11_BOX box        = to_box(state.screen_region);
     ComPtr<ID3D11Texture2D> back;
     if (!src && swapchain && SUCCEEDED(swapchain->GetBuffer(0, IID_PPV_ARGS(back.GetAddressOf())))) {
         D3D11_TEXTURE2D_DESC d{};
@@ -91,12 +95,12 @@ const XrCompositionLayerBaseHeader* Session::Impl::screen_layer(FrameLayers& lay
         !copy_into(state.screen_chain, src, box)) {
         return nullptr;
     }
-    const float width = state.screen_pose_set ? state.screen_width : kDefaultScreenWidth;
+    const float width            = state.screen_pose_set ? state.screen_width : kDefaultScreenWidth;
     XrCompositionLayerQuad& quad = layers.quad;
-    quad.space         = state.seated.get();
-    quad.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-    quad.subImage.swapchain = state.screen_chain.handle.get();
-    quad.subImage.imageRect = {{0, 0}, {static_cast<std::int32_t>(w), static_cast<std::int32_t>(h)}};
+    quad.space                   = state.seated.get();
+    quad.eyeVisibility           = XR_EYE_VISIBILITY_BOTH;
+    quad.subImage.swapchain      = state.screen_chain.handle.get();
+    quad.subImage.imageRect      = {{0, 0}, {static_cast<std::int32_t>(w), static_cast<std::int32_t>(h)}};
     quad.pose = state.screen_pose_set ? to_xr(state.screen_pose)
                                       : XrPosef{kIdentityPose.orientation, {0, 0, -kDefaultScreenDistance}};
     quad.size = {width, width * static_cast<float>(h) / static_cast<float>(w)};
@@ -108,7 +112,7 @@ const XrCompositionLayerBaseHeader* Session::Impl::screen_layer(FrameLayers& lay
 // copies, Flush, then xrEndFrame (09 §5.3; dumps/12_perf_review.md, P7).
 void Session::Impl::end_frame(IDXGISwapChain* swapchain) {
     state.frame_begun = false;
-    const XrTime t = state.frame_time;
+    const XrTime t    = state.frame_time;
 
     FrameLayers layers;
     const XrCompositionLayerBaseHeader* layer = nullptr;
@@ -135,7 +139,7 @@ void Session::Impl::end_frame(IDXGISwapChain* swapchain) {
 void Session::Impl::read_hands(XrTime t) {
     input.sync(t, state.seated.get());
     for (std::size_t h = 0; h < core::vr::kHandCount; ++h) {
-        const auto& s = input.state().hands[h];
+        const auto& s        = input.state().hands[h];
         state.views.hands[h] = {s.grip, s.grip_velocity, s.grip_valid, s.grip_valid && s.grip_velocity_valid};
     }
 }
@@ -149,22 +153,23 @@ void Session::Impl::read_hands(XrTime t) {
 void Session::Impl::locate_views(XrTime t) {
     XrViewLocateInfo li{XR_TYPE_VIEW_LOCATE_INFO};
     li.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-    li.displayTime = t;
-    li.space       = state.seated.get();
+    li.displayTime           = t;
+    li.space                 = state.seated.get();
     XrViewState vs{XR_TYPE_VIEW_STATE};
     std::array<XrView, core::vr::kEyeCount> xv{{{XR_TYPE_VIEW}, {XR_TYPE_VIEW}}};
-    std::uint32_t nv = 0;
-    const bool located =
-        XR_SUCCEEDED(xrLocateViews(state.session.get(), &li, &vs, static_cast<std::uint32_t>(xv.size()), &nv,
-                                   xv.data())) &&
-        nv == xv.size() && all_finite(from_xr(xv[0].pose)) && all_finite(from_xr(xv[1].pose));
-    FrameViews& views = state.views;
-    views.valid = located && (vs.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT);
+    std::uint32_t nv   = 0;
+    const bool located = XR_SUCCEEDED(xrLocateViews(state.session.get(), &li, &vs,
+                                                    static_cast<std::uint32_t>(xv.size()), &nv, xv.data())) &&
+                         nv == xv.size() && all_finite(from_xr(xv[0].pose)) &&
+                         all_finite(from_xr(xv[1].pose));
+    FrameViews& views  = state.views;
+    views.valid        = located && (vs.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT);
     views.eye_positions_valid = views.valid && (vs.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT);
     if (!views.valid) return;
     for (std::size_t i = 0; i < core::vr::kEyeCount; ++i) {
         views.eyes[i] = {from_xr(xv[i].pose), from_xr(xv[i].fov)};
-        core::vr::hold_position(state.last_eye_pos[i], views.eyes[i].pose.position, views.eye_positions_valid);
+        core::vr::hold_position(state.last_eye_pos[i], views.eyes[i].pose.position,
+                                views.eye_positions_valid);
     }
 }
 
@@ -176,14 +181,15 @@ void Session::Impl::locate_head(XrTime t) {
     const XrSpaceLocationFlags hf = locate_flags(state.view.get(), state.seated.get(), t, head);
     core::vr::hold_pose(state.last_head, head, (hf & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0,
                         (hf & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0);
-    state.views.head = state.last_head;
+    state.views.head       = state.last_head;
     state.views.head_valid = (hf & kOrientationAndPosition) == kOrientationAndPosition;
 }
 
 void Session::Impl::log_ipd_once() {
     if (!state.views.eye_positions_valid || state.ipd_logged) return;
     const Vec3 a = state.views.eyes[0].pose.position, b = state.views.eyes[1].pose.position;
-    logf(log, kLogIpd, std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y) + (b.z - a.z) * (b.z - a.z)));
+    logf(log, kLogIpd,
+         std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y) + (b.z - a.z) * (b.z - a.z)));
     state.ipd_logged = true;
 }
 
@@ -192,10 +198,12 @@ void Session::Impl::log_ipd_once() {
 bool Session::Impl::begin_frame() {
     XrFrameWaitInfo wi{XR_TYPE_FRAME_WAIT_INFO};
     XrFrameState fs{XR_TYPE_FRAME_STATE};
-    if (!check_frame(xrWaitFrame(state.session.get(), &wi, &fs), "xrWaitFrame", state.wait_result)) return false;
+    if (!check_frame(xrWaitFrame(state.session.get(), &wi, &fs), "xrWaitFrame", state.wait_result))
+        return false;
     XrFrameBeginInfo bi{XR_TYPE_FRAME_BEGIN_INFO};
-    if (!check_frame(xrBeginFrame(state.session.get(), &bi), "xrBeginFrame", state.begin_result)) return false;
-    const XrTime t = fs.predictedDisplayTime;
+    if (!check_frame(xrBeginFrame(state.session.get(), &bi), "xrBeginFrame", state.begin_result))
+        return false;
+    const XrTime t      = fs.predictedDisplayTime;
     state.frame_begun   = true;
     state.should_render = fs.shouldRender != XR_FALSE;
     state.frame_time    = t;

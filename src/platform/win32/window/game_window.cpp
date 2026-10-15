@@ -42,7 +42,7 @@ void fit_window(void* wnd, ports::Log& log) noexcept {
     MONITORINFO mi{sizeof(mi)};
     if (!::GetMonitorInfoW(::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi)) return;
 
-    const LONG style = ::GetWindowLongA(hwnd, GWL_STYLE);
+    const LONG style  = ::GetWindowLongA(hwnd, GWL_STYLE);
     const bool framed = (style & WS_CAPTION) == WS_CAPTION;
     if (fits(window, framed ? mi.rcWork : mi.rcMonitor)) return;
 
@@ -59,7 +59,7 @@ void fit_window(void* wnd, ports::Log& log) noexcept {
 void log_focus_loss(ports::Log& log) noexcept {
     DWORD pid = 0;
     ::GetWindowThreadProcessId(::GetForegroundWindow(), &pid);
-    wchar_t name[MAX_PATH] = L"?";  // what the log shows when the process cannot be opened
+    wchar_t name[MAX_PATH] = L"?"; // what the log shows when the process cannot be opened
     if (HANDLE process = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid)) {
         const util::ScopeExit close{[process] { ::CloseHandle(process); }};
         DWORD size = MAX_PATH;
@@ -68,7 +68,8 @@ void log_focus_loss(ports::Log& log) noexcept {
     ports::logf(log, kFocusTakenLog, pid, utf8(std::filesystem::path{name}.filename()));
 }
 
-void subclass_game_window(void* window, WindowProc replacement, WindowProc& game_proc, ports::Log& log) noexcept {
+void subclass_game_window(void* window, WindowProc replacement, WindowProc& game_proc,
+                          ports::Log& log) noexcept {
     const auto hwnd = static_cast<HWND>(window);
     if (!hwnd || game_proc) return;
     // The window procedure points into this DLL for the rest of the process.
@@ -78,7 +79,8 @@ void subclass_game_window(void* window, WindowProc replacement, WindowProc& game
     if (game_proc) log.line(kSubclassedLog);
 }
 
-long call_window_proc(WindowProc game_proc, HWND__* hwnd, unsigned int msg, unsigned int wp, long lp) noexcept {
+long call_window_proc(WindowProc game_proc, HWND__* hwnd, unsigned int msg, unsigned int wp,
+                      long lp) noexcept {
     return ::CallWindowProcA(game_proc, hwnd, msg, wp, lp);
 }
 

@@ -12,7 +12,7 @@ struct Unit {
     constexpr Unit() noexcept = default;
     explicit constexpr Unit(float v) noexcept : value(v) {}
 
-    friend constexpr bool operator==(Unit, Unit) noexcept = default;
+    friend constexpr bool operator==(Unit, Unit) noexcept  = default;
     friend constexpr auto operator<=>(Unit, Unit) noexcept = default;
 };
 

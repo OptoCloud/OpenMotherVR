@@ -51,7 +51,8 @@ void FollowCamera::trace_snap(core::diag::ports::Log& log, steady_clock::time_po
     const auto since = now - step;
     if (since > core::stereo::kSnapTraceTime) return;
     const float dx = field<float>(object_, kFollowHeadPos) - field<float>(object_, kFollowRootPos);
-    const float dz = field<float>(object_, kFollowHeadPos + kPosZ) - field<float>(object_, kFollowRootPos + kPosZ);
+    const float dz =
+        field<float>(object_, kFollowHeadPos + kPosZ) - field<float>(object_, kFollowRootPos + kPosZ);
     const auto since_ms = std::chrono::duration_cast<std::chrono::milliseconds>(since).count();
     core::diag::ports::logf(log, kSnapTraceLog, since_ms, field<float>(object_, kFollowYawMirror),
                             field<float>(object_, kFollowYaw), std::hypot(dx, dz), dx, dz,

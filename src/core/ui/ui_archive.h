@@ -39,8 +39,8 @@ private:
                         std::int64_t build_stamp, bool may_build) noexcept;
 
     ports::ArchiveFiles& files_;
-    ports::Dialogs&      dialogs_;
-    diag::ports::Log&    log_;
+    ports::Dialogs& dialogs_;
+    diag::ports::Log& log_;
 };
 
 } // namespace omvr::core::ui

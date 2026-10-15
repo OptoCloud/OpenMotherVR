@@ -15,7 +15,7 @@ constexpr std::wstring_view kWorldScaleSwitch = L"-vrscale";
 
 struct RuntimeSwitch {
     std::wstring_view name;
-    VRRuntime         runtime;
+    VRRuntime runtime;
 };
 
 // Oculus headsets run through OpenXR (spec 06 §1.1). Matched whole and

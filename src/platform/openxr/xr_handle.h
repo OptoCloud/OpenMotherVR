@@ -22,7 +22,7 @@ public:
         if (this != &o) reset(std::exchange(o.h_, Handle{XR_NULL_HANDLE}));
         return *this;
     }
-    XrOwner(const XrOwner&) = delete;
+    XrOwner(const XrOwner&)            = delete;
     XrOwner& operator=(const XrOwner&) = delete;
 
     Handle get() const noexcept { return h_; }

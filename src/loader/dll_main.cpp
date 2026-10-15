@@ -30,9 +30,9 @@ namespace {
 namespace diag = omvr::core::diag;
 
 // The lines that mark a process's session in the shared log (spec 11 §1).
-constexpr std::string_view kAttachLine        = "== MotherVR attach ==";
-constexpr std::string_view kDetachExitLine    = "== MotherVR detach == (process exit)";
-constexpr std::string_view kDetachUnloadLine  = "== MotherVR detach == (unload)";
+constexpr std::string_view kAttachLine       = "== MotherVR attach ==";
+constexpr std::string_view kDetachExitLine   = "== MotherVR detach == (process exit)";
+constexpr std::string_view kDetachUnloadLine = "== MotherVR detach == (unload)";
 
 void on_attach(HINSTANCE self) noexcept {
     auto& ctx = omvr::loader::create_context(self);
@@ -70,10 +70,7 @@ BOOL APIENTRY DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
             ::DisableThreadLibraryCalls(hinst);
             on_attach(hinst);
             return TRUE;
-        case DLL_PROCESS_DETACH:
-            on_detach(reserved != nullptr);
-            return TRUE;
-        default:
-            return TRUE;
+        case DLL_PROCESS_DETACH: on_detach(reserved != nullptr); return TRUE;
+        default: return TRUE;
     }
 }

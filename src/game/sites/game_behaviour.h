@@ -12,15 +12,15 @@ namespace omvr::game::sites {
 // The AI.exe methods behind the vtable slots step 8 replaces, which the
 // replacements call or wrap.
 struct GameSideOriginals {
-    void* follow_on_activate   = nullptr;  // FollowBehavior vtable slot 0 (original)
-    void* follow_on_deactivate = nullptr;  // slot 1
-    void* ui_on_message        = nullptr;  // UI entity vtable slot 2 (original)
-    void* menu_close           = nullptr;  // front-end menu slot 2
-    void* pause_open           = nullptr;  // pause menu slot 0
-    void* pause_close          = nullptr;  // pause menu slot 2
-    void* loading_open         = nullptr;  // loading screen slot 0
-    void* loading_close        = nullptr;  // loading screen slot 2
-    void* attract_open         = nullptr;  // attract/title screen slot 0
+    void* follow_on_activate   = nullptr; // FollowBehavior vtable slot 0 (original)
+    void* follow_on_deactivate = nullptr; // slot 1
+    void* ui_on_message        = nullptr; // UI entity vtable slot 2 (original)
+    void* menu_close           = nullptr; // front-end menu slot 2
+    void* pause_open           = nullptr; // pause menu slot 0
+    void* pause_close          = nullptr; // pause menu slot 2
+    void* loading_open         = nullptr; // loading screen slot 0
+    void* loading_close        = nullptr; // loading screen slot 2
+    void* attract_open         = nullptr; // attract/title screen slot 0
 };
 
 // The replacements step 8 installs.
@@ -58,7 +58,7 @@ inline constexpr int kBytePatchSites = 12;
 
 // 05 §7.5: `jbe rel32` into the DK2-era camera correction, as the game has
 // it; the preflight checks it, and the patch's `jmp` keeps its target.
-inline constexpr std::uint32_t kCameraCorrectionRel    = 0x32B;
-inline constexpr auto          kCameraCorrectionBranch = x86::jbe_rel32(kCameraCorrectionRel);
+inline constexpr std::uint32_t kCameraCorrectionRel = 0x32B;
+inline constexpr auto kCameraCorrectionBranch       = x86::jbe_rel32(kCameraCorrectionRel);
 
 } // namespace omvr::game::sites

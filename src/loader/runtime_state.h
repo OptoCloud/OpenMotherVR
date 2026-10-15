@@ -21,7 +21,7 @@ public:
     bool session_active() const noexcept override;
 
 private:
-    core::vr::RuntimeDetector&        detector_;
+    core::vr::RuntimeDetector& detector_;
     const core::stereo::StereoDevice& stereo_;
     const core::config::ports::LaunchSwitches& launch_;
 };

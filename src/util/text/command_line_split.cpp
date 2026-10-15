@@ -21,7 +21,7 @@ std::vector<std::wstring_view> split_command_line(std::wstring_view cmd) {
         const std::size_t start = i;
         while (i < cmd.size() && (quoted ? cmd[i] != kQuote : !is_separator(cmd[i]))) ++i;
         tokens.push_back(cmd.substr(start, i - start));
-        if (quoted && i < cmd.size()) ++i;   // the closing quote
+        if (quoted && i < cmd.size()) ++i; // the closing quote
     }
     return tokens;
 }

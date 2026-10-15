@@ -30,9 +30,9 @@ public:
     platform::audio::EndpointRedirect& redirect() noexcept { return redirect_; }
 
 private:
-    core::ui::ports::Dialogs&         dialogs_;
-    core::diag::ports::Log&           log_;
-    const game::AddressMap&           addresses_;
+    core::ui::ports::Dialogs& dialogs_;
+    core::diag::ports::Log& log_;
+    const game::AddressMap& addresses_;
     platform::audio::EndpointRedirect redirect_;
 };
 

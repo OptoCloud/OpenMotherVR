@@ -25,15 +25,16 @@ const void* vr_swapchain_desc(const void* game_desc, DXGI_SWAP_CHAIN_DESC& desc)
     namespace entry = omvr::loader::entry;
     if (!game_desc || !entry::headset_attached()) return game_desc;
     const void* chosen = game_desc;
-    desc = *static_cast<const DXGI_SWAP_CHAIN_DESC*>(game_desc);
+    desc               = *static_cast<const DXGI_SWAP_CHAIN_DESC*>(game_desc);
     if (!desc.Windowed) {
         desc.Windowed = TRUE;
-        chosen = &desc;
+        chosen        = &desc;
         entry::log().line(kForcedWindowedLog);
     }
     if (entry::mirror_size(desc.BufferDesc.Width, desc.BufferDesc.Height)) {
         chosen = &desc;
-        omvr::core::diag::ports::logf(entry::log(), kMirrorBufferLog, desc.BufferDesc.Width, desc.BufferDesc.Height);
+        omvr::core::diag::ports::logf(entry::log(), kMirrorBufferLog, desc.BufferDesc.Width,
+                                      desc.BufferDesc.Height);
     }
     return chosen;
 }
@@ -77,8 +78,8 @@ extern "C" __declspec(dllexport) HRESULT WINAPI D3D11CreateDeviceAndSwapChain(
     }
     DXGI_SWAP_CHAIN_DESC desc{};
     const void* chosen_desc = vr_swapchain_desc(swapchain_desc, desc);
-    const HRESULT hr = real(adapter, driver_type, software, flags, feature_levels, feature_level_count, sdk_version,
-                            chosen_desc, swapchain, device, feature_level, immediate_context);
+    const HRESULT hr = real(adapter, driver_type, software, flags, feature_levels, feature_level_count,
+                            sdk_version, chosen_desc, swapchain, device, feature_level, immediate_context);
     if (SUCCEEDED(hr) && device && *device) omvr::loader::hooks::install_device_hooks(*device);
     if (SUCCEEDED(hr) && swapchain && *swapchain) omvr::loader::hooks::install_swapchain_hooks(*swapchain);
     return hr;

@@ -12,7 +12,7 @@
 
 namespace vr {
 class IVRInput;
-}
+} // namespace vr
 
 // VR controller input through SteamVR Input (IVRInput): the action
 // manifest and default bindings (binding_manifest.h), registered, and read
@@ -27,9 +27,9 @@ using Controls = core::input::Controls;
 
 // A hand's grip pose as SteamVR reports it: runtime convention, unscaled.
 struct HandPose {
-    float m[3][4]{};          // row-major, m[r][3] = position, metres
-    float velocity[3]{};      // metres per second
-    bool  valid = false;
+    float m[3][4]{};     // row-major, m[r][3] = position, metres
+    float velocity[3]{}; // metres per second
+    bool valid = false;
 };
 
 // Render thread, after init.
@@ -53,17 +53,17 @@ private:
     struct Analog {
         float x = 0, y = 0;
     };
-    bool   digital(Action a) noexcept;
+    bool digital(Action a) noexcept;
     Analog analog(Action a) noexcept;
-    bool   write_files(const std::filesystem::path& dir, const std::filesystem::path& manifest_path);
-    void   register_actions(vr::IVRInput* input);
-    void   report_unbound_poses() noexcept;
+    bool write_files(const std::filesystem::path& dir, const std::filesystem::path& manifest_path);
+    void register_actions(vr::IVRInput* input);
+    void report_unbound_poses() noexcept;
 
     core::diag::ports::Log& log_;
-    vr::IVRInput* input_ = nullptr;   // set once init() succeeds
-    std::uint64_t set_   = 0;         // VRActionSetHandle_t
-    std::array<std::uint64_t, static_cast<std::size_t>(Action::Count)> handles_{};  // VRActionHandle_t
-    std::array<std::uint64_t, core::vr::kHandCount> pose_handles_{};  // hand_left, hand_right
+    vr::IVRInput* input_ = nullptr;                                                // set once init() succeeds
+    std::uint64_t set_   = 0;                                                      // VRActionSetHandle_t
+    std::array<std::uint64_t, static_cast<std::size_t>(Action::Count)> handles_{}; // VRActionHandle_t
+    std::array<std::uint64_t, core::vr::kHandCount> pose_handles_{};               // hand_left, hand_right
     bool unbound_logged_ = false;
 };
 

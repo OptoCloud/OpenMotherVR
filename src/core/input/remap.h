@@ -54,8 +54,8 @@ concept ActionMap = requires(M m) {
 
 // How one kind of action (digital or analog) is virtualised.
 struct RemapKind {
-    bool         clear_composite_flag;  // 04 §3.2 item 5
-    std::uint8_t appended_flags;        // 04 §3.2 item 3
+    bool clear_composite_flag;   // 04 §3.2 item 5
+    std::uint8_t appended_flags; // 04 §3.2 item 3
 };
 inline constexpr RemapKind kRemapDigital{true, kAppendedFlagsDigital};
 inline constexpr RemapKind kRemapAnalog{false, kAppendedFlagsAnalog};
@@ -68,7 +68,8 @@ inline constexpr auto kNoPadControl16 = static_cast<std::int16_t>(game::kNoPadCo
 // Returns false when the action has no pad binding among its first
 // min(count, 6) records.
 template <BoundAction Action>
-bool virtualise_pad_bindings(ActionTier& t, Action& act, int n, std::int16_t virtual_code, RemapKind kind) noexcept {
+bool virtualise_pad_bindings(ActionTier& t, Action& act, int n, std::int16_t virtual_code,
+                             RemapKind kind) noexcept {
     bool found = false;
     for (int b = 0; b < act.count && b < kMaxBindings; ++b) {
         auto& bind = act.bindings[b];
@@ -77,12 +78,13 @@ bool virtualise_pad_bindings(ActionTier& t, Action& act, int n, std::int16_t vir
             bind.code = kNoPadControl16;
         } else {
             found = true;
-            if (!is_virtual_code(bind.code)) {   // signed: -1 counts as not yet virtual
+            if (!is_virtual_code(bind.code)) { // signed: -1 counts as not yet virtual
                 t.stock_code[static_cast<std::size_t>(n)] = bind.code;
-                bind.code = virtual_code;
+                bind.code                                 = virtual_code;
             }
         }
-        if (kind.clear_composite_flag) bind.flags = static_cast<std::uint8_t>(bind.flags & ~game::kBindingCompositeRef);
+        if (kind.clear_composite_flag)
+            bind.flags = static_cast<std::uint8_t>(bind.flags & ~game::kBindingCompositeRef);
     }
     return found;
 }
@@ -92,9 +94,10 @@ bool virtualise_pad_bindings(ActionTier& t, Action& act, int n, std::int16_t vir
 // remembered from before the game rebuilt its bindings (spec 04 section 3.2
 // item 3); a record carrying the virtual code is appended where one fits.
 template <BoundAction Action>
-void append_pad_binding(ActionTier& t, Action& act, int n, std::int16_t virtual_code, RemapKind kind) noexcept {
+void append_pad_binding(ActionTier& t, Action& act, int n, std::int16_t virtual_code,
+                        RemapKind kind) noexcept {
     t.stock_code[static_cast<std::size_t>(n)] = kNoPadControl16;
-    if (act.count >= kMaxBindings) return;   // a seventh record would overwrite the entry (04 §2.4)
+    if (act.count >= kMaxBindings) return; // a seventh record would overwrite the entry (04 §2.4)
     auto& bind  = act.bindings[act.count++];
     bind.code   = virtual_code;
     bind.device = game::kBindingDevicePad;
@@ -108,7 +111,7 @@ void append_pad_binding(ActionTier& t, Action& act, int n, std::int16_t virtual_
 template <BoundAction Action>
 void remap_actions(ActionTier& t, Action* actions, int count, int index_offset, RemapKind kind) noexcept {
     for (int i = 0; i < count; ++i) {
-        const int n = index_offset + i;
+        const int n             = index_offset + i;
         const auto virtual_code = static_cast<std::int16_t>(t.base + n);
         if (!virtualise_pad_bindings(t, actions[i], n, virtual_code, kind)) {
             append_pad_binding(t, actions[i], n, virtual_code, kind);
@@ -125,7 +128,8 @@ void blank_composites(Map& map) noexcept {
     for (int c = 0; c < composites; ++c) {
         auto& comp = map.composite[c];
         if (comp.keep) continue;
-        for (int i = 0; i < comp.count && i < game::kCompositeCodes; ++i) comp.codes[i] = game::kNoCompositeCode;
+        for (int i = 0; i < comp.count && i < game::kCompositeCodes; ++i)
+            comp.codes[i] = game::kNoCompositeCode;
     }
 }
 

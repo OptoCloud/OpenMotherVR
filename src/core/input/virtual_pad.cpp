@@ -17,8 +17,7 @@ namespace omvr::core::input {
 
 namespace {
 
-constexpr std::string_view kRemapLog =
-    "[input] action maps virtualised: digital/analog {}/{} {}/{} {}/{}";
+constexpr std::string_view kRemapLog = "[input] action maps virtualised: digital/analog {}/{} {}/{} {}/{}";
 constexpr std::string_view kStockGlyphsLog =
     "[input] no mod UI archive: button prompts keep the game's pad glyphs";
 
@@ -33,8 +32,8 @@ void VirtualPad::log_remap() noexcept {
 // bool IsDown(int code). From: FUN_10008d50 (ret 4).
 bool VirtualPad::merge_down(int code, bool stock_down) const noexcept {
     const ActionTier& t = tier_for(tiers_, code);
-    const int k = code - t.base;
-    const bool vr_down = k >= 0 && k < t.num_digital && t.digital[static_cast<std::size_t>(k)] != 0;
+    const int k         = code - t.base;
+    const bool vr_down  = k >= 0 && k < t.num_digital && t.digital[static_cast<std::size_t>(k)] != 0;
     return stock_down || vr_down;
 }
 
@@ -78,11 +77,11 @@ ActivityResult VirtualPad::on_activity(bool stock_activity, PlayerDevices device
         // Without both devices the mode still changes and the prompts pick
         // it up at the game's next device change.
         if (devices == PlayerDevices::Both) {
-            device_pulse_   = true;
+            device_pulse_  = true;
             result.devices = DeviceSwitch::PulseKeyboard;
         }
     } else if (device_pulse_) {
-        device_pulse_   = false;
+        device_pulse_  = false;
         result.devices = DeviceSwitch::RestorePad;
     }
     return result;

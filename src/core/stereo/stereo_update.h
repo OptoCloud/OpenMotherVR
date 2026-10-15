@@ -14,21 +14,21 @@ namespace omvr::core::stereo {
 struct UpdateInput {
     std::chrono::steady_clock::time_point now{};
     // The game has a pad device; the pad fields are read only then.
-    bool  pad          = false;
-    bool  lb           = false;
-    bool  rb           = false;
-    bool  r3           = false;
-    bool  pad_activity = false;
-    float turn         = 0.0f;  // the turn axis, -1..1
+    bool pad          = false;
+    bool lb           = false;
+    bool rb           = false;
+    bool r3           = false;
+    bool pad_activity = false;
+    float turn        = 0.0f; // the turn axis, -1..1
     // The game has a keyboard and a mouse; their fields are read only then.
     bool keyboard_and_mouse    = false;
     bool ctrl                  = false;
     bool alt                   = false;
     bool key_or_mouse_activity = false;
     // A first-person camera is active, and its target yaw in half turns.
-    bool  follow_active = false;
-    float follow_yaw    = 0.0f;
-    StereoMode mode = StereoMode::World;
+    bool follow_active = false;
+    float follow_yaw   = 0.0f;
+    StereoMode mode    = StereoMode::World;
     // Someone wears the headset upright (VrRuntime::headset_in_use). Asked
     // only while a recenter waits (recenter_pending).
     bool headset_in_use = false;
@@ -38,10 +38,10 @@ struct UpdateInput {
 // the look byte, takes the reference pose, re-places the menu screen, brings
 // the mode stack in line and writes the scene visibility.
 struct UpdateOutput {
-    std::optional<float> yaw;           // snap turn: the camera's new yaw
-    std::optional<bool>  look_enabled;  // the game's own look, while a camera is active
-    bool recenter     = false;          // take the reference pose (device slot 21)
-    bool place_screen = false;          // re-place the menu screen in front of the view
+    std::optional<float> yaw;         // snap turn: the camera's new yaw
+    std::optional<bool> look_enabled; // the game's own look, while a camera is active
+    bool recenter     = false;        // take the reference pose (device slot 21)
+    bool place_screen = false;        // re-place the menu screen in front of the view
     std::optional<float> scene_visibility;
     // For the debug trace of a snap step.
     std::chrono::steady_clock::time_point last_snap{};
@@ -79,19 +79,19 @@ private:
     void recenter(const UpdateInput& in, UpdateOutput& out) noexcept;
 
     const config::Settings& settings_;
-    SceneTracker&           scene_;
+    SceneTracker& scene_;
 
     // Original: StereoManager +0x310..+0x320, noted per field.
-    bool loading_blackout_ = false;                       // +0x310
-    bool keyboard_mouse_   = false;                       // +0x311  K&M in use: allow game look
-    bool r3_latch_         = false;                       // +0x313
-    bool snap_latch_       = false;                       // +0x314
-    std::chrono::steady_clock::time_point snap_time_{};   // +0x318 (clock() ms there)
-    bool recentered_       = false;                       // +0x31C
-    bool recenter_request_ = false;                       // +0x31D  runtime asked (Oculus), or us:
-                                                          // gameplay starting, headset put on
-    int  screen_replaced_  = 0;                           // +0x320
-    std::chrono::steady_clock::time_point last_snap_{};   // kept past the stick's release
+    bool loading_blackout_ = false;                     // +0x310
+    bool keyboard_mouse_   = false;                     // +0x311  K&M in use: allow game look
+    bool r3_latch_         = false;                     // +0x313
+    bool snap_latch_       = false;                     // +0x314
+    std::chrono::steady_clock::time_point snap_time_{}; // +0x318 (clock() ms there)
+    bool recentered_       = false;                     // +0x31C
+    bool recenter_request_ = false;                     // +0x31D  runtime asked (Oculus), or us:
+                                                        // gameplay starting, headset put on
+    int screen_replaced_ = 0;                           // +0x320
+    std::chrono::steady_clock::time_point last_snap_{}; // kept past the stick's release
 };
 
 } // namespace omvr::core::stereo

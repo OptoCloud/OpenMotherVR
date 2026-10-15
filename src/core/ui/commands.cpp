@@ -84,7 +84,7 @@ CommandOutcome apply_segments(config::Settings& cfg, const SettingRow& row, cons
 }
 
 CommandOutcome apply_runtime_entry(config::Settings& cfg, const SettingRow& row, const char* value) {
-    const auto n = util::parse_int(value);
+    const auto n       = util::parse_int(value);
     const auto runtime = n ? runtime_from_ui(*n) : std::nullopt;
     if (!runtime) return refused();
     return applied(cfg, row, *runtime, std::string(config::to_string(*runtime)));
@@ -101,12 +101,12 @@ CommandOutcome apply_command(config::Settings& cfg, std::string_view name, const
     const SettingRow* row = config::find_command(name);
     if (!row) return {Kind::Unknown};
     switch (row->rule) {
-        case CommandRule::Switch:       return apply_switch(cfg, *row, value);
-        case CommandRule::Choice:       return apply_choice(cfg, *row, value);
-        case CommandRule::PixelScale:   return apply_pixel_scale(cfg, *row, value);
-        case CommandRule::Segments:     return apply_segments(cfg, *row, value);
+        case CommandRule::Switch: return apply_switch(cfg, *row, value);
+        case CommandRule::Choice: return apply_choice(cfg, *row, value);
+        case CommandRule::PixelScale: return apply_pixel_scale(cfg, *row, value);
+        case CommandRule::Segments: return apply_segments(cfg, *row, value);
         case CommandRule::RuntimeEntry: return apply_runtime_entry(cfg, *row, value);
-        case CommandRule::None:         break;
+        case CommandRule::None: break;
     }
     return {Kind::Unknown};
 }
@@ -116,7 +116,7 @@ void Commands::run(char* cmd) noexcept {
         // First token = command name (strtok_s mutates cmd in place), then
         // the value token; text after it is ignored. Mirrors the strtok-pair
         // pattern throughout FUN_100202e0.
-        char* rest = nullptr;
+        char* rest       = nullptr;
         const char* name = strtok_s(cmd, kTokenSeparators, &rest);
         if (!name) return;
         const char* val = strtok_s(nullptr, kTokenSeparators, &rest);

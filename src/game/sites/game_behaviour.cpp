@@ -22,7 +22,7 @@ constexpr std::string_view kBytePatchesLog = "[hook] camera, UI and loader patch
 
 // 05 §7.1: the SSAO setting's `jne` becomes a `jmp` with the same
 // displacement, so the branch that skips SSAO is always taken.
-constexpr std::uint8_t kSsaoBranchRel = 0x29;
+constexpr std::uint8_t kSsaoBranchRel                           = 0x29;
 constexpr std::array<std::uint8_t, x86::kJmpRel8Size> kSkipSsao = {x86::kJmpRel8, kSsaoBranchRel};
 
 // 05 §7.3: over the `mov ecx, reg` before the noise call, a jump past the
@@ -37,7 +37,7 @@ constexpr std::array<std::uint8_t, 4> kLookStateOn = {x86::kMovClImm8, 0x01, x86
 // 05 §7.5: a `jmp rel32` to the `jbe`'s target. It is one byte shorter, so
 // its displacement is one more and a `nop` fills the sixth byte.
 constexpr auto kSkipCameraCorrection = [] {
-    auto out = x86::nops<x86::kJbeRel32Size>();
+    auto out       = x86::nops<x86::kJbeRel32Size>();
     const auto jmp = x86::jmp_rel32(kCameraCorrectionRel + (x86::kJbeRel32Size - x86::kJmpRel32Size));
     std::copy(jmp.begin(), jmp.end(), out.begin());
     return out;
@@ -55,8 +55,8 @@ constexpr std::array<std::uint8_t, 1> kFocusNavigation = {x86::kJmpRel8};
 // the game's own `mov ecx, [abs]; (push 1;) call` goes.
 constexpr std::size_t kResumePopSize = x86::kMovEcxAbsSize + x86::kCallRel32Size;
 constexpr std::size_t kPausePushSize = x86::kMovEcxAbsSize + x86::kPushImm8Size + x86::kCallRel32Size;
-constexpr auto        kSkipResumePop = x86::jump_over<kResumePopSize>();
-constexpr auto        kSkipPausePush = x86::jump_over<kPausePushSize>();
+constexpr auto kSkipResumePop        = x86::jump_over<kResumePopSize>();
+constexpr auto kSkipPausePush        = x86::jump_over<kPausePushSize>();
 // The jumps this patch has always written: `jmp +9` over 11 bytes, `jmp
 // +0x0B` over 13.
 static_assert(kSkipResumePop.size() == 11 && kSkipResumePop[1] == 0x09);

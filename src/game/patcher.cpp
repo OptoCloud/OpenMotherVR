@@ -31,7 +31,8 @@ util::Result<void> Patcher::write_u32(std::uint8_t* dst, std::uint32_t value) no
     return write_bytes(dst, bytes);
 }
 
-util::Result<void> Patcher::redirect_call(std::uint8_t* site, const void* fn, std::string_view what) noexcept {
+util::Result<void> Patcher::redirect_call(std::uint8_t* site, const void* fn,
+                                          std::string_view what) noexcept {
     if (*site != x86::kCallRel32) {
         core::diag::ports::logf(log_, kNoCallLog, what, static_cast<void*>(site));
         return std::unexpected(util::Error{.code = 0, .context = "no call at the site"});

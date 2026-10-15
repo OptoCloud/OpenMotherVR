@@ -71,13 +71,13 @@ private:
 
     ports::FileStore& files_;
     diag::ports::Log& log_;
-    Settings          current_{};
+    Settings current_{};
     // The file as last loaded (or an empty object). save() writes into a copy
     // of it, so keys we do not know are kept.
-    nlohmann::json        document_ = nlohmann::json::object();
+    nlohmann::json document_ = nlohmann::json::object();
     std::filesystem::path config_dir_;
     // Where the settings in effect came from, for the settings log line.
-    std::string_view      source_ = "defaults";
+    std::string_view source_ = "defaults";
 };
 
 } // namespace omvr::core::config

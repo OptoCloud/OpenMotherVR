@@ -10,13 +10,16 @@ namespace omvr::core::stereo {
 namespace {
 
 constexpr std::string_view kRenderedLog = "[stereo] reflections rendered per eye";
-constexpr std::string_view kPovLog      = "[stereo] reflection POV {} flags 0x{:02X} -> 0x{:02X} (state {}, size {}x{})";
+constexpr std::string_view kPovLog =
+    "[stereo] reflection POV {} flags 0x{:02X} -> 0x{:02X} (state {}, size {}x{})";
 
 } // namespace
 
 void ReflectionPass::note_pov(const ReflectionPovInfo& info) noexcept {
-    auto it = std::ranges::find_if(seen_, [&](const SeenPov& e) { return e.pov == info.pov || e.pov == nullptr; });
-    if (it == seen_.end() || (it->pov != nullptr && it->flags == info.flags) || lines_ >= kReflectionLogLines) return;
+    auto it =
+        std::ranges::find_if(seen_, [&](const SeenPov& e) { return e.pov == info.pov || e.pov == nullptr; });
+    if (it == seen_.end() || (it->pov != nullptr && it->flags == info.flags) || lines_ >= kReflectionLogLines)
+        return;
     ++lines_;
     diag::ports::logf(log_, kPovLog, info.pov, it->pov ? it->flags : -1, info.flags, info.state, info.width,
                       info.height);

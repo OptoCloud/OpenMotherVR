@@ -16,8 +16,8 @@ namespace {
 
 // The version resource of `module`, empty when it has none.
 std::span<const std::uint8_t> version_resource(HINSTANCE module) noexcept {
-    HRSRC info = ::FindResourceW(module, MAKEINTRESOURCEW(kVersionResourceId), RT_VERSION);
-    HGLOBAL data = info ? ::LoadResource(module, info) : nullptr;
+    HRSRC info        = ::FindResourceW(module, MAKEINTRESOURCEW(kVersionResourceId), RT_VERSION);
+    HGLOBAL data      = info ? ::LoadResource(module, info) : nullptr;
     const auto* bytes = data ? static_cast<const std::uint8_t*>(::LockResource(data)) : nullptr;
     if (!bytes) return {};
     return {bytes, ::SizeofResource(module, info)};
@@ -39,8 +39,9 @@ std::optional<VS_FIXEDFILEINFO> fixed_file_info(std::span<const std::uint8_t> re
 std::filesystem::path module_directory() noexcept {
     HMODULE self = nullptr;
     // Any address inside this DLL names it; the function's own will do.
-    if (!::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                              reinterpret_cast<LPCWSTR>(&module_directory), &self))
+    if (!::GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCWSTR>(&module_directory), &self))
         return {};
     try {
         std::wstring buf(MAX_PATH, L'\0');

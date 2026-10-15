@@ -20,10 +20,10 @@ namespace {
 // The mul's tokens: opcode, destination (token, register), source 0 (token,
 // register), then the 5-token immediate. Rewritten, source 1 is a 3-token
 // constant-buffer operand.
-constexpr std::size_t   kMulImmediateLength = 10;
-constexpr std::size_t   kMulSrc0            = 3;
-constexpr std::size_t   kMulImmediate       = 5;
-constexpr std::uint32_t kMulCbLength        = 8;
+constexpr std::size_t kMulImmediateLength = 10;
+constexpr std::size_t kMulSrc0            = 3;
+constexpr std::size_t kMulImmediate       = 5;
+constexpr std::uint32_t kMulCbLength      = 8;
 // dcl_constantBuffer: opcode, operand token, buffer index, register count.
 constexpr std::size_t kDclCbLength   = 4;
 constexpr std::size_t kDclCbIndex    = 2;
@@ -57,10 +57,10 @@ constexpr auto kTwoThousandths = two_thousandths();
 
 // A matched site: the `mul` and the `mad` right after it.
 struct Site {
-    std::size_t   mul;       // token index of the mul's opcode
-    std::size_t   mad;       // token index of the mad's opcode
-    std::size_t   mad_src0;  // the mad's vPos operand
-    std::uint32_t temp;      // rA
+    std::size_t mul;      // token index of the mul's opcode
+    std::size_t mad;      // token index of the mad's opcode
+    std::size_t mad_src0; // the mad's vPos operand
+    std::uint32_t temp;   // rA
 };
 
 // The `mul rA.xy, vPos.xy.., l(0.001, 0.001, 0, 0)` at t[i], or nothing.
@@ -70,9 +70,9 @@ std::optional<Site> match_mul(const std::uint32_t* t, std::size_t i, std::size_t
     const auto b   = a ? parse_operand(t, i + len, a->at + a->size) : std::nullopt;
     if (!dst || !a || !b || b->at + b->size != i + len) return std::nullopt;
     if (dst->type != kTypeTemp || dst->size != 2 || !mask_mode(t[dst->at])) return std::nullopt;
-    if ((mask_of(t[dst->at]) & kMaskXY) != kMaskXY) return std::nullopt;  // writes rA.x and rA.y
+    if ((mask_of(t[dst->at]) & kMaskXY) != kMaskXY) return std::nullopt; // writes rA.x and rA.y
     if (a->type != kTypeInput || a->size != 2 || !swizzle_mode(t[a->at])) return std::nullopt;
-    if (selector(t[a->at], 0) != kX || selector(t[a->at], 1) != kY) return std::nullopt;  // vPos.xy..
+    if (selector(t[a->at], 0) != kX || selector(t[a->at], 1) != kY) return std::nullopt; // vPos.xy..
     if (!is_immediate4(t, *b, kPoint001, kPoint001, 0, 0)) return std::nullopt;
     return Site{i, 0, 0, dst->reg};
 }
@@ -89,7 +89,7 @@ bool match_mad(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s) 
     if (a->type != kTypeInput || a->size != 2 || a->reg != t[mul_vpos + 1]) return false;
     if (!swizzle_mode(t[a->at])) return false;
     for (std::uint32_t k = kX; k <= kW; ++k) {
-        if (selector(t[a->at], k) > kY) return false;  // reads vPos.x/.y only
+        if (selector(t[a->at], k) > kY) return false; // reads vPos.x/.y only
     }
     if (!is_immediate4(t, *b, 0, 0, kPoint001, kPoint001) || c->type != kTypeInput) return false;
     // The 0.001 scale of rA goes after the mad, so the mad must not write
@@ -112,8 +112,8 @@ std::uint32_t read_u32(std::span<const std::uint8_t> in, std::size_t at) noexcep
 
 // The program chunk (SHEX or SHDR): where its header starts and its size.
 struct ProgramChunk {
-    std::size_t   offset = 0;
-    std::size_t   bytes  = 0;
+    std::size_t offset        = 0;
+    std::size_t bytes         = 0;
     std::uint32_t chunk_count = 0;
 };
 
@@ -139,7 +139,8 @@ std::optional<ProgramChunk> find_program(std::span<const std::uint8_t> in) noexc
         if (!is_program_chunk(in.data() + off)) continue;
         if (p.offset) return std::nullopt;
         const std::uint32_t bytes = read_u32(in, off + kChunkSizeOffset);
-        if (std::size_t(off) + kChunkHeaderSize + bytes > in.size() || bytes % kTokenBytes) return std::nullopt;
+        if (std::size_t(off) + kChunkHeaderSize + bytes > in.size() || bytes % kTokenBytes)
+            return std::nullopt;
         p.offset = off;
         p.bytes  = bytes;
     }
@@ -153,21 +154,22 @@ std::optional<ProgramChunk> find_program(std::span<const std::uint8_t> in) noexc
 // nothing when it has no site, no cb2 declaration, or anything unexpected.
 struct Sites {
     std::vector<Site> found;
-    std::size_t       cb2_decl = 0;
+    std::size_t cb2_decl = 0;
 };
 
-bool is_cb2_declaration(const std::vector<std::uint32_t>& t, std::size_t i, std::uint32_t op, std::size_t len) {
+bool is_cb2_declaration(const std::vector<std::uint32_t>& t, std::size_t i, std::uint32_t op,
+                        std::size_t len) {
     return op == kOpDclConstantBuffer && len == kDclCbLength && op_type(t[i + 1]) == kTypeConstantBuffer &&
            t[i + kDclCbIndex] == kResolutionBuffer;
 }
 
 std::optional<Sites> find_sites(const std::vector<std::uint32_t>& t, std::size_t end) {
     Sites s;
-    std::optional<Site> pending;  // a matched `mul` waiting for its `mad`
+    std::optional<Site> pending; // a matched `mul` waiting for its `mad`
     for (std::size_t i = kProgramHeaderTokens; i < end;) {
         const std::uint32_t tok = t[i];
         const std::uint32_t op  = opcode(tok);
-        std::size_t len = inst_length(tok);
+        std::size_t len         = inst_length(tok);
         if (op == kOpCustomData) {
             if (i + 1 >= end) return std::nullopt;
             len = t[i + 1];
@@ -182,10 +184,10 @@ std::optional<Sites> find_sites(const std::vector<std::uint32_t>& t, std::size_t
         } else if (op == kOpMad && pending && !op_extended(tok)) {
             if (match_mad(t.data(), i, len, *pending)) s.found.push_back(*pending);
         }
-        pending = next;  // the pair must be adjacent
+        pending = next; // the pair must be adjacent
         i += len;
     }
-    if (s.found.empty() || !s.cb2_decl) return std::nullopt;  // no site, or cb2 would need a declaration
+    if (s.found.empty() || !s.cb2_decl) return std::nullopt; // no site, or cb2 would need a declaration
     return s;
 }
 
@@ -255,8 +257,8 @@ std::vector<std::uint8_t> reassemble(std::span<const std::uint8_t> in, const Pro
     put(kTotalSizeOffset, out.size());
     put(chunk.offset + kChunkSizeOffset, chunk.bytes + grow);
     for (std::uint32_t c = 0; c < chunk.chunk_count; ++c) {
-        const std::size_t   entry = kChunkOffsetsOffset + kTokenBytes * std::size_t(c);
-        const std::uint32_t off   = read_u32(in, entry);
+        const std::size_t entry = kChunkOffsetsOffset + kTokenBytes * std::size_t(c);
+        const std::uint32_t off = read_u32(in, entry);
         if (off > chunk.offset) put(entry, std::size_t(off) + grow);
     }
     const DxbcChecksum sum = dxbc_checksum(out);
@@ -265,7 +267,8 @@ std::vector<std::uint8_t> reassemble(std::span<const std::uint8_t> in, const Pro
 }
 
 std::vector<std::uint8_t> patch(std::span<const std::uint8_t> in, int& sites) {
-    if (in.size() < kContainerHeaderSize || std::memcmp(in.data(), kDxbcMagic.data(), kDxbcMagicBytes) != 0) return {};
+    if (in.size() < kContainerHeaderSize || std::memcmp(in.data(), kDxbcMagic.data(), kDxbcMagicBytes) != 0)
+        return {};
     // Cheap pre-filter: most shaders have no site, and skipping them avoids
     // an MD5 of each (about 20 us a shader on the game thread, half the cost
     // of creating it).
@@ -281,8 +284,8 @@ std::vector<std::uint8_t> patch(std::span<const std::uint8_t> in, int& sites) {
     const auto found = find_sites(t, t[1]);
     if (!found) return {};
     const auto prog = rewrite(t, *found);
-    auto out = reassemble(in, *chunk, prog);
-    sites = static_cast<int>(found->found.size());
+    auto out        = reassemble(in, *chunk, prog);
+    sites           = static_cast<int>(found->found.size());
     return out;
 }
 

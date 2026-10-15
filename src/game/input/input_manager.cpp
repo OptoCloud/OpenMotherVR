@@ -47,6 +47,8 @@ std::optional<PlayerDevices> InputManager::player_devices() const noexcept {
                          static_cast<std::uint8_t*>(devices[kDeviceTypeKeyboard])};
 }
 
-void set_device_active(std::uint8_t* device, bool active) noexcept { device[kInputDeviceActive] = static_cast<std::uint8_t>(active); }
+void set_device_active(std::uint8_t* device, bool active) noexcept {
+    device[kInputDeviceActive] = static_cast<std::uint8_t>(active);
+}
 
 } // namespace omvr::game::input

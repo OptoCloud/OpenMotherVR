@@ -17,16 +17,16 @@ namespace {
 // A box shown on a thread of its own by show_async.
 struct AsyncBox {
     DialogThread* owner;
-    std::string   text;
-    unsigned      type;
-    const char*   kind;
+    std::string text;
+    unsigned type;
+    const char* kind;
 };
 
 unsigned box_type(DialogKind kind) noexcept {
     switch (kind) {
         case DialogKind::Information: return MB_OK | MB_ICONINFORMATION;
-        case DialogKind::Warning:     return MB_OK | MB_ICONWARNING;
-        case DialogKind::Error:       return MB_OK | MB_ICONERROR;
+        case DialogKind::Warning: return MB_OK | MB_ICONWARNING;
+        case DialogKind::Error: return MB_OK | MB_ICONERROR;
     }
     return MB_OK;
 }
@@ -46,7 +46,8 @@ int DialogThread::show(std::string_view text, unsigned type, const char* kind) n
 }
 
 void DialogThread::log_not_shown(const Posted& p, unsigned long error) noexcept {
-    core::diag::ports::logf(log_, "dialogs: message ({}) not shown, err=0x{:08X}: {}", name_of(p.kind), error, p.text);
+    core::diag::ports::logf(log_, "dialogs: message ({}) not shown, err=0x{:08X}: {}", name_of(p.kind), error,
+                            p.text);
 }
 
 unsigned long __stdcall DialogThread::show_all(void* arg) {
@@ -98,7 +99,8 @@ int DialogThread::show_now(std::string_view text, DialogKind kind, std::string_v
 
 void DialogThread::show_async(std::string text, DialogKind kind, std::string_view label) noexcept {
     try {
-        auto box = std::make_unique<AsyncBox>(AsyncBox{this, std::move(text), box_type(kind), kind_of(label)});
+        auto box =
+            std::make_unique<AsyncBox>(AsyncBox{this, std::move(text), box_type(kind), kind_of(label)});
         // The thread owns the box once it runs; the handle is not needed.
         if (const UniqueHandle thread{::CreateThread(nullptr, 0, &show_one, box.get(), 0, nullptr)}) {
             static_cast<void>(box.release());

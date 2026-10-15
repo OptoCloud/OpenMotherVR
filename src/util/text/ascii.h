@@ -15,7 +15,8 @@ constexpr Char ascii_lower(Char c) noexcept {
 
 // `a` and `b` are equal ignoring ASCII letter case.
 template <class Char>
-constexpr bool equals_ignoring_ascii_case(std::basic_string_view<Char> a, std::basic_string_view<Char> b) noexcept {
+constexpr bool equals_ignoring_ascii_case(std::basic_string_view<Char> a,
+                                          std::basic_string_view<Char> b) noexcept {
     if (a.size() != b.size()) return false;
     for (std::size_t i = 0; i < a.size(); ++i) {
         if (ascii_lower(a[i]) != ascii_lower(b[i])) return false;

@@ -30,9 +30,9 @@ public:
     void set_debug_flag(const bool* flag) noexcept { debug_flag_.store(flag, std::memory_order_release); }
 
 private:
-    const ports::Clock&      clock_;
-    ports::LogSink&          sink_;
-    std::uint32_t            pid_;
+    const ports::Clock& clock_;
+    ports::LogSink& sink_;
+    std::uint32_t pid_;
     std::atomic<const bool*> debug_flag_{nullptr};
 };
 

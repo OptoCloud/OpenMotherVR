@@ -49,8 +49,8 @@ public:
     bool can_reset_display() const noexcept override;
 
 private:
-    CmdHandlerFn  original_cmd_       = nullptr;
-    MenuMethodFn  original_menu_open_ = nullptr;
+    CmdHandlerFn original_cmd_       = nullptr;
+    MenuMethodFn original_menu_open_ = nullptr;
     // Bytes in AI.exe's data; valid for the process's lifetime.
     std::uint8_t* exit_request_       = nullptr;
     std::uint8_t* display_reset_flag_ = nullptr;

@@ -14,8 +14,9 @@ namespace omvr::core::vr {
 // frame (+X right, +Y up, -Z forward), metres, so moving a controller can be
 // checked against the log (11 §4.2). Both are runtime-convention 3x4 poses
 // (unconverted, unscaled).
-inline void head_local_offset(const float (&head)[3][4], const float (&hand)[3][4], float (&out)[3]) noexcept {
-    constexpr int kAxes = 3;
+inline void head_local_offset(const float (&head)[3][4], const float (&hand)[3][4],
+                              float (&out)[3]) noexcept {
+    constexpr int kAxes           = 3;
     constexpr int kPositionColumn = 3;
     float d[kAxes];
     for (int r = 0; r < kAxes; ++r) d[r] = hand[r][kPositionColumn] - head[r][kPositionColumn];
@@ -40,7 +41,8 @@ public:
     // Any other text, cut to fit the buffer.
     template <class... Args>
     void append(std::format_string<Args...> fmt, Args&&... args) {
-        const auto r = std::format_to_n(buf_.data() + size_, buf_.size() - size_, fmt, std::forward<Args>(args)...);
+        const auto r =
+            std::format_to_n(buf_.data() + size_, buf_.size() - size_, fmt, std::forward<Args>(args)...);
         size_ = static_cast<std::size_t>(r.out - buf_.data());
     }
 
@@ -48,7 +50,7 @@ public:
 
 private:
     std::array<char, diag::kMessageBufferSize> buf_{};
-    std::size_t                                size_ = 0;
+    std::size_t size_ = 0;
 };
 
 } // namespace omvr::core::vr

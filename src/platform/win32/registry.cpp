@@ -46,15 +46,15 @@ std::optional<std::wstring> read_machine_string(std::wstring_view subkey, std::w
             return std::nullopt;
         }
         // Ask for the size first instead of assuming MAX_PATH.
-        DWORD type = 0;
-        DWORD size = 0;
+        DWORD type     = 0;
+        DWORD size     = 0;
         LSTATUS status = ::RegQueryValueExW(key, value_name.c_str(), nullptr, &type, nullptr, &size);
         std::wstring value;
         if (status == ERROR_SUCCESS && is_string(type) && size > 0) {
             value.resize(size / sizeof(wchar_t) + 1); // room for a missing terminator
             auto got = static_cast<DWORD>(value.size() * sizeof(wchar_t));
-            status = ::RegQueryValueExW(key, value_name.c_str(), nullptr, &type, reinterpret_cast<BYTE*>(value.data()),
-                                        &got);
+            status   = ::RegQueryValueExW(key, value_name.c_str(), nullptr, &type,
+                                          reinterpret_cast<BYTE*>(value.data()), &got);
         }
         ::RegCloseKey(key);
         if (status != ERROR_SUCCESS || !is_string(type)) return std::nullopt;

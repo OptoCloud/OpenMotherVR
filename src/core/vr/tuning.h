@@ -43,9 +43,9 @@ inline constexpr float kDefaultScreenWidth    = 2.6f;
 // A screen frame shows eye 0's half of the stereo texture, its middle half
 // vertically (03 §7, 09 §5.2): in normalised coordinates, and as quarters
 // of the height in pixels (integer division).
-inline constexpr float         kScreenLeftHalfU      = 0.5f;
-inline constexpr float         kScreenTopV           = 0.25f;
-inline constexpr float         kScreenBottomV        = 0.75f;
+inline constexpr float kScreenLeftHalfU              = 0.5f;
+inline constexpr float kScreenTopV                   = 0.25f;
+inline constexpr float kScreenBottomV                = 0.75f;
 inline constexpr std::uint32_t kScreenHeightQuarters = 4;
 inline constexpr std::uint32_t kScreenTopQuarters    = 1;
 inline constexpr std::uint32_t kScreenBottomQuarters = 3;

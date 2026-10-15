@@ -81,7 +81,7 @@ enum class AiAddr : std::uint8_t {
     GraphicsSettings         = 0x60, // DAT_10066d48  the settings object (in .data)
     InputManagerPtr          = 0x61, // DAT_10066d4c  global holding the input manager
     PovManagerPtr            = 0x62, // DAT_10066d50  global holding the POV manager
-    ExitRequest              = 0x64, // DAT_10066d58  byte: the game quits (set after mvr_vrruntime and on the runtime's quit request)
+    ExitRequest              = 0x64, // DAT_10066d58  byte: the game quits (mvr_vrruntime, runtime quit)
     RendererPtr              = 0x65, // DAT_10066d5c  global holding the Renderer*
     CreateDeviceCall         = 0x67, // DAT_10066d64  call Stereo::Init(int)
     StereoUpdateCall         = 0x68, // DAT_10066d68  call Stereo::Update(float)
@@ -119,12 +119,12 @@ static_assert(std::to_underlying(kLastNamedSlot) < kAddressTableRows);
 
 struct ReconRvas {
     // Planar reflections (dumps/07_reflections_head_pose.md).
-    std::uint32_t reflection_render_call;  // `call ReflectionPOV render` in POVManager::RenderPOVs
-    std::uint32_t reflection_render;       // ReflectionPOV render (thiscall, no args)
-    std::uint32_t apply_eye_transform;     // Stereo::ApplyEyeTransform(eye, view*, proj*) (thiscall, ret 0xC)
-    std::uint32_t pov_update_frustum;      // POV frustum from its view/proj (thiscall, no args)
-    std::uint32_t renderer_eye_owner;      // global pointer; its +0x2C is the current eye
-    std::uint32_t clear_render_target;     // clear of the bound target (cdecl); 6-byte prologue
+    std::uint32_t reflection_render_call; // `call ReflectionPOV render` in POVManager::RenderPOVs
+    std::uint32_t reflection_render;      // ReflectionPOV render (thiscall, no args)
+    std::uint32_t apply_eye_transform;    // Stereo::ApplyEyeTransform(eye, view*, proj*) (thiscall, ret 0xC)
+    std::uint32_t pov_update_frustum;     // POV frustum from its view/proj (thiscall, no args)
+    std::uint32_t renderer_eye_owner;     // global pointer; its +0x2C is the current eye
+    std::uint32_t clear_render_target;    // clear of the bound target (cdecl); 6-byte prologue
 
     // Anti-aliasing in stereo.
     std::uint32_t stereo_output_draw_call; // `call FullscreenDraw` in the final post chain's stereo path
@@ -138,9 +138,9 @@ struct ReconRvas {
     // `call rel32` in the per-object visibility loop and their callees, both
     // __cdecl with 3 args and the result in al. The loop's third optional
     // test (the shadow casters' main-view volume, 0x619920) is left alone.
-    std::uint32_t cull_distance_call;      // distance/LOD test, the loop's only caller
+    std::uint32_t cull_distance_call; // distance/LOD test, the loop's only caller
     std::uint32_t cull_distance;
-    std::uint32_t cull_occlusion_call;     // occlusion-buffer test, main POV only
+    std::uint32_t cull_occlusion_call; // occlusion-buffer test, main POV only
     std::uint32_t cull_occlusion;
 
     // Head-in-wall fade (dumps/06c_detours_and_patches.md bdc+3): the one
@@ -192,7 +192,7 @@ inline constexpr ReconRvas kReconRvas2020 = {};
 // the build it was written for.
 consteval bool every_recon_row_known(const ReconRvas& rvas) {
     constexpr std::size_t kRows = sizeof(ReconRvas) / sizeof(std::uint32_t);
-    const auto rows = std::bit_cast<std::array<std::uint32_t, kRows>>(rvas);
+    const auto rows             = std::bit_cast<std::array<std::uint32_t, kRows>>(rvas);
     return std::ranges::none_of(rows, [](std::uint32_t rva) { return rva == 0; });
 }
 static_assert(every_recon_row_known(kReconRvas2015));
@@ -220,16 +220,16 @@ struct InlineSites {
 };
 
 inline constexpr InlineSites kInlineSites2015 = {
-    .stereo_mode_tests = {0x000336B6, 0x0060FD58, 0x0060FE50, 0x0060FEBD,
-                          0x0060FF15, 0x00611740, 0x0061378A, 0x00613C80},
+    .stereo_mode_tests = {0x000336B6, 0x0060FD58, 0x0060FE50, 0x0060FEBD, 0x0060FF15, 0x00611740, 0x0061378A,
+                          0x00613C80},
     .left_stick_prompt_call_2 = 0x0042D18C,
     .ui_mouse_width_disp_lo   = 0xDC,
     .ui_mouse_height_disp_lo  = 0xE0,
 };
 
 inline constexpr InlineSites kInlineSites2020 = {
-    .stereo_mode_tests = {0x00042F96, 0x00562238, 0x00562330, 0x0056239D,
-                          0x005623F5, 0x00563C10, 0x00565C5A, 0x00566150},
+    .stereo_mode_tests = {0x00042F96, 0x00562238, 0x00562330, 0x0056239D, 0x005623F5, 0x00563C10, 0x00565C5A,
+                          0x00566150},
     .left_stick_prompt_call_2 = 0x0043E2DC,
     .ui_mouse_width_disp_lo   = 0x8C,
     .ui_mouse_height_disp_lo  = 0x90,
@@ -258,7 +258,7 @@ public:
     bool all_within(std::uint32_t image_size) const noexcept;
 
 private:
-    std::uint8_t*       base_ = nullptr;
+    std::uint8_t* base_       = nullptr;
     const AddressTable* rvas_ = nullptr;
 };
 

@@ -28,22 +28,22 @@ enum class RuntimeEntry : int { Off = 0, OpenXr = 1, OpenVr = 2 };
 
 // The script invoke methods a settings push calls on the menu (spec 06 §4.3).
 namespace script {
-inline constexpr const char* kOptionsEnabled         = "setMotherVROptionsEnabled";
-inline constexpr const char* kRuntime                = "setMotherSetVRRuntime";
-inline constexpr const char* kDebug                  = "setMotherDebug";
-inline constexpr const char* kSkipIntro              = "setMotherSkipIntro";
-inline constexpr const char* kMirrorView             = "setMotherMirrorView";
-inline constexpr const char* kMirrorViewSymmetric    = "setMotherMirrorViewSym";
-inline constexpr const char* kPixelScale             = "setMotherPixelScale";
-inline constexpr const char* kClipBlinding           = "setMotherClipBlinding";
-inline constexpr const char* kSnapRotation           = "setMotherSnapRotation";
-inline constexpr const char* kSnapRotationSegments   = "setMotherSnapRotationSegments";
-inline constexpr const char* kInputRelativeWalking   = "setMotherInputRelativeWalking";
-inline constexpr const char* kInputStrafing          = "setMotherInputStrafing";
-inline constexpr const char* kToggleGrips            = "setMotherToggleGrips";
-inline constexpr const char* kToggleCrouch           = "setMotherToggleCrouch";
+inline constexpr const char* kOptionsEnabled       = "setMotherVROptionsEnabled";
+inline constexpr const char* kRuntime              = "setMotherSetVRRuntime";
+inline constexpr const char* kDebug                = "setMotherDebug";
+inline constexpr const char* kSkipIntro            = "setMotherSkipIntro";
+inline constexpr const char* kMirrorView           = "setMotherMirrorView";
+inline constexpr const char* kMirrorViewSymmetric  = "setMotherMirrorViewSym";
+inline constexpr const char* kPixelScale           = "setMotherPixelScale";
+inline constexpr const char* kClipBlinding         = "setMotherClipBlinding";
+inline constexpr const char* kSnapRotation         = "setMotherSnapRotation";
+inline constexpr const char* kSnapRotationSegments = "setMotherSnapRotationSegments";
+inline constexpr const char* kInputRelativeWalking = "setMotherInputRelativeWalking";
+inline constexpr const char* kInputStrafing        = "setMotherInputStrafing";
+inline constexpr const char* kToggleGrips          = "setMotherToggleGrips";
+inline constexpr const char* kToggleCrouch         = "setMotherToggleCrouch";
 // One row of the controls help: an action and its control.
-inline constexpr const char* kAddControlRow          = "addMotherViewControl";
+inline constexpr const char* kAddControlRow = "addMotherViewControl";
 } // namespace script
 
 } // namespace omvr::core::ui

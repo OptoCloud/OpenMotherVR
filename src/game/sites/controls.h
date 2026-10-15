@@ -38,8 +38,8 @@ bool install_pad_slots(Patcher& patcher, std::uint8_t* pad_vtable, const PadRepl
 
 // What the controls step did.
 enum class ControlsOutcome {
-    SlotsNotWritten,   // the pad stays stock; nothing of the step is in place
-    LaterWriteFailed,  // the slots are in, a later write of the step failed
+    SlotsNotWritten,  // the pad stays stock; nothing of the step is in place
+    LaterWriteFailed, // the slots are in, a later write of the step failed
     Installed,
 };
 

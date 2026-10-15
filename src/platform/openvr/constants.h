@@ -26,20 +26,20 @@ inline constexpr int kManifestVersion = 2;
 // %LOCALAPPDATA%\openvr\openvrpaths.vrpath, a JSON file whose "runtime"
 // array names the runtime root.
 inline constexpr const wchar_t* kLocalAppDataVariable = L"LOCALAPPDATA";
-inline constexpr const char*    kPathsDirectory       = "openvr";
-inline constexpr const char*    kPathsFileName        = "openvrpaths.vrpath";
-inline constexpr const char*    kPathsRuntimeKey      = "runtime";
+inline constexpr const char* kPathsDirectory          = "openvr";
+inline constexpr const char* kPathsFileName           = "openvrpaths.vrpath";
+inline constexpr const char* kPathsRuntimeKey         = "runtime";
 
 // Inside the runtime root: the x86 loader in bin\win32, and vrclient.dll,
 // which the loader loads, in bin (03 §6.4).
-inline constexpr const char* kBinDirectory    = "bin";
-inline constexpr const char* kX86Directory    = "win32";
-inline constexpr const char* kLoaderFileName  = "openvr_api.dll";
+inline constexpr const char* kBinDirectory     = "bin";
+inline constexpr const char* kX86Directory     = "win32";
+inline constexpr const char* kLoaderFileName   = "openvr_api.dll";
 inline constexpr const char* kVrClientFileName = "vrclient.dll";
 
 // The action manifest and the binding files written next to it
 // (04 §5.8.2): bindings_<controller type>.json.
-inline constexpr const char* kManifestFileName = "actions.json";
+inline constexpr const char* kManifestFileName  = "actions.json";
 inline constexpr const char* kBindingFilePrefix = "bindings_";
 inline constexpr const char* kBindingFileSuffix = ".json";
 // Indentation of the JSON files written, for players who read them.

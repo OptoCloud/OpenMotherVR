@@ -57,9 +57,9 @@ TEST_CASE("the logger hands each line to the sink whole") {
 }
 
 TEST_CASE("the logger reports the debug setting it is pointed at") {
-    FakeClock     clock;
+    FakeClock clock;
     RecordingSink sink;
-    Logger        log(clock, sink, 1);
+    Logger log(clock, sink, 1);
     CHECK_FALSE(log.debug_enabled());
     bool debug = true;
     log.set_debug_flag(&debug);

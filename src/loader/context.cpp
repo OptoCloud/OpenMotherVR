@@ -21,7 +21,8 @@ Context* the_context = nullptr;
 std::unique_ptr<core::vr::ports::VrRuntime> make_runtime(Context& c, core::vr::DetectResult::Chosen chosen) {
     if (chosen == core::vr::DetectResult::Chosen::OpenVR) {
         return platform::openvr::make_openvr_runtime({c.log, c.clock, c.failure, c.archive_files, c.controls,
-                                                      c.dialogs, c.runtimes.last_result().openvr_runtime_path});
+                                                      c.dialogs,
+                                                      c.runtimes.last_result().openvr_runtime_path});
     }
     return platform::openxr::make_openxr_runtime({c.log, c.xr, c.controls, c.headset_audio, c.console});
 }
@@ -57,8 +58,9 @@ Context::Context(void* self) noexcept
       stereo_aa(settings.current(), log),
       reflections(keyboard, settings.current(), log),
       screen_policy(virtual_screen, keyboard, stereo, runtimes, log),
-      mirror(platform::d3d11::MirrorObjects{manager.si.mirror_vs, manager.si.mirror_ps, manager.si.mirror_cb_screen,
-                                            manager.si.mirror_cb, manager.si.mirror_sampler},
+      mirror(platform::d3d11::MirrorObjects{manager.si.mirror_vs, manager.si.mirror_ps,
+                                            manager.si.mirror_cb_screen, manager.si.mirror_cb,
+                                            manager.si.mirror_sampler},
              &manager.si.eye_texture[0].srv, log),
       window(stereo, log),
       shader_fixes(log) {}
@@ -67,7 +69,7 @@ Context& create_context(void* module) noexcept {
     // Leaked on purpose: nothing of the mod runs at process exit (no
     // destructors under the loader lock).
     static Context& ctx = *new Context(module);
-    the_context = &ctx;
+    the_context         = &ctx;
 
     // The debug setting the logger reports may change while the game runs.
     ctx.log.set_debug_flag(&ctx.settings.current().debug.debug);

@@ -33,15 +33,15 @@ namespace {
 using core::stereo::PixelSize;
 using game::AiAddr;
 using game::DeviceState;
-using game::StereoInterface;
-using game::StereoManager;
 using game::load_backend;
 using game::load_pose_fetched;
+using game::StereoInterface;
+using game::StereoManager;
 using game::store_pose_fetched;
 using game::stereo::DeviceSlot;
-using game::stereo::ManagerSlot;
 using game::stereo::load_device;
 using game::stereo::load_state;
+using game::stereo::ManagerSlot;
 using game::stereo::renderer_get;
 using game::stereo::renderer_rt;
 using game::stereo::store_state;
@@ -74,7 +74,7 @@ std::optional<PixelSize> texture_size(ID3D11Texture2D* texture) noexcept {
 // a null target keeps the previous one.
 void take_stereo_target(const game::AddressMap& addresses, StereoInterface& si, void* stereo_rt) noexcept {
     if (!stereo_rt) return;
-    auto&      t0    = si.eye_texture[0];
+    auto& t0         = si.eye_texture[0];
     const auto index = game::stereo::render_target_index(stereo_rt);
     t0.texture       = renderer_rt<ID3D11Texture2D>(addresses, AiAddr::RendererRtTexture, index);
     t0.srv           = renderer_rt<ID3D11ShaderResourceView>(addresses, AiAddr::RendererRtSrv, index);
@@ -110,9 +110,9 @@ bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noex
         auto& ctx = context();
         auto& si  = device_of(self);
         take_stereo_target(ctx.addresses, si, stereo_rt);
-        const auto size   = texture_size(si.eye_texture[0].texture);
-        auto*      device = renderer_get<ID3D11Device>(ctx.addresses, AiAddr::RendererDevice);
-        auto*      dc     = renderer_get<ID3D11DeviceContext>(ctx.addresses, AiAddr::RendererContext);
+        const auto size = texture_size(si.eye_texture[0].texture);
+        auto* device    = renderer_get<ID3D11Device>(ctx.addresses, AiAddr::RendererDevice);
+        auto* dc        = renderer_get<ID3D11DeviceContext>(ctx.addresses, AiAddr::RendererContext);
         return ctx.stereo.configure_rendering(si, size, platform::d3d11::gpu_device(device),
                                               platform::d3d11::gpu_context(dc), ctx.mirror);
     });
@@ -174,8 +174,8 @@ float* __fastcall dev_head_pose(void* self, void*, float* out) noexcept {
 // &bottom) for a target of the given size (07 §4.4). The game's version
 // ignores the size and returns the main target's eye halves, which is wrong
 // for the half-size reflection target once that is rendered per eye.
-void __fastcall dev_eye_viewport(void*, void*, int eye, int half_width, int height, int* left, int* top, int* right,
-                                 int* bottom) noexcept {
+void __fastcall dev_eye_viewport(void*, void*, int eye, int half_width, int height, int* left, int* top,
+                                 int* right, int* bottom) noexcept {
     const int x = eye == kRightEye ? half_width : 0;
     *left       = x;
     *top        = 0;
@@ -189,8 +189,8 @@ int* __fastcall dev_render_target_size(void* self, void*, int* w, int* h) noexce
     if (auto* backend = load_backend(si)) {
         guarded("GetRenderTargetSize", [&] {
             const PixelSize size = context().stereo.render_target_size(si, *backend);
-            *w = size.width;
-            *h = size.height;
+            *w                   = size.width;
+            *h                   = size.height;
         });
     }
     return w;
@@ -282,7 +282,7 @@ static_assert(std::is_convertible_v<decltype(&get_render_target_size), abi::Mana
 static_assert(std::is_convertible_v<decltype(&get_hmd_resolution), abi::ManagerSizeQuery>);
 
 game::stereo::DeviceSlots device_slots() noexcept {
-    game::stereo::DeviceSlots slots{};  // slots 12 to 14: the game's own, from the address table
+    game::stereo::DeviceSlots slots{}; // slots 12 to 14: the game's own, from the address table
     const auto set = [&slots](DeviceSlot slot, void* fn) { slots[std::to_underlying(slot)] = fn; };
     set(DeviceSlot::Release, as_slot(&dev_release));
     set(DeviceSlot::StartSensor, as_slot(&dev_start_sensor));

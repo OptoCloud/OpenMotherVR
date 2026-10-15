@@ -22,8 +22,8 @@ constexpr wchar_t kLastAscii = 0x7F;
 std::optional<int> parse_int(const char* s) noexcept {
     if (!s) return std::nullopt;
     if (*s == '+') ++s;
-    const char* end = s + std::strlen(s);
-    int v = 0;
+    const char* end    = s + std::strlen(s);
+    int v              = 0;
     const auto [p, ec] = std::from_chars(s, end, v);
     if (ec != std::errc{} || p != end || p == s) return std::nullopt;
     return v;
@@ -32,8 +32,8 @@ std::optional<int> parse_int(const char* s) noexcept {
 std::optional<float> parse_float(const char* s) noexcept {
     if (!s) return std::nullopt;
     if (*s == '+') ++s;
-    const char* end = s + std::strlen(s);
-    float v = 0.0f;
+    const char* end    = s + std::strlen(s);
+    float v            = 0.0f;
     const auto [p, ec] = std::from_chars(s, end, v, std::chars_format::fixed);
     if (ec != std::errc{} || p != end || p == s) return std::nullopt;
     return v;
@@ -52,7 +52,7 @@ std::optional<float> parse_decimal(const wchar_t* arg) noexcept {
         if (n == buf.size() || arg[n] > kLastAscii) return std::nullopt;
         buf[n] = static_cast<char>(arg[n]);
     }
-    float value = 0.0f;
+    float value          = 0.0f;
     const auto [end, ec] = std::from_chars(buf.data(), buf.data() + n, value);
     if (n == 0 || ec != std::errc{} || end != buf.data() + n) return std::nullopt;
     return value;

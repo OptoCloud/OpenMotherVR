@@ -11,10 +11,9 @@ namespace omvr::core::input {
 // The game's own pad control names, by pad code (04 §2.3): what the stock
 // ControlToName returns, and the glyphs shown until a VR set is chosen.
 inline constexpr std::array<const char*, game::kPadCodeCount> kStockPadNames = {
-    "A", "B", "X", "Y", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
-    "BACK", "START", "LB", "RB", "LT_BUTTON", "RT_BUTTON", "LSTICK_BUTTON",
-    "RSTICK_BUTTON", "LT", "RT", "LSTICK_X", "LSTICK_Y", "RSTICK_X", "RSTICK_Y",
-    "TOUCH_ZOOM_IN", "TOUCH_ZOOM_OUT",
+    "A",    "B",     "X",        "Y",        "DPAD_UP",   "DPAD_DOWN", "DPAD_LEFT",     "DPAD_RIGHT",
+    "BACK", "START", "LB",       "RB",       "LT_BUTTON", "RT_BUTTON", "LSTICK_BUTTON", "RSTICK_BUTTON",
+    "LT",   "RT",    "LSTICK_X", "LSTICK_Y", "RSTICK_X",  "RSTICK_Y",  "TOUCH_ZOOM_IN", "TOUCH_ZOOM_OUT",
 };
 
 // The button-prompt glyph shown for each pad code while VR glyphs are

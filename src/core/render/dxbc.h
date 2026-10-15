@@ -12,10 +12,10 @@ namespace omvr::core::render {
 
 // One operand: its token position and the register index (1D operands).
 struct Operand {
-    std::size_t   at;    // operand token
-    std::size_t   size;  // tokens including extensions, indices, immediates
+    std::size_t at;   // operand token
+    std::size_t size; // tokens including extensions, indices, immediates
     std::uint32_t type;
-    std::uint32_t reg;   // index 0 for 1D operands
+    std::uint32_t reg; // index 0 for 1D operands
 };
 
 // Parses the operand at `t[i]`, which must lie before `end`; only the simple
@@ -23,8 +23,8 @@ struct Operand {
 std::optional<Operand> parse_operand(const std::uint32_t* t, std::size_t end, std::size_t i);
 
 // Whether operand `o` is the 4-component immediate (x, y, z, w).
-bool is_immediate4(const std::uint32_t* t, const Operand& o, std::uint32_t x, std::uint32_t y, std::uint32_t z,
-                   std::uint32_t w);
+bool is_immediate4(const std::uint32_t* t, const Operand& o, std::uint32_t x, std::uint32_t y,
+                   std::uint32_t z, std::uint32_t w);
 
 // The DXBC checksum of a whole container: MD5's compression with DXBC's own
 // final block, over everything after the stored checksum and version. It is

@@ -30,12 +30,13 @@ struct UiReplacements {
 
 // 5: the game functions the settings push calls, and the console command
 // dispatch through handle_mvr_command.
-bool hook_script_bridge(const GameImage& g, Patcher& patcher, ui::ScriptVars& script_vars, ui::Console& console,
-                        const UiReplacements& r) noexcept;
+bool hook_script_bridge(const GameImage& g, Patcher& patcher, ui::ScriptVars& script_vars,
+                        ui::Console& console, const UiReplacements& r) noexcept;
 
 // Runtime None: the pause menu's open slot to `replacement`; `stock`
 // receives the game's method.
-bool hook_pause_settings_push(const GameImage& g, Patcher& patcher, const void* replacement, void*& stock) noexcept;
+bool hook_pause_settings_push(const GameImage& g, Patcher& patcher, const void* replacement,
+                              void*& stock) noexcept;
 
 // Sites of the UI set: the external-call slot and the menu's open slot,
 // the archive path when the mod's archive is in use, and the pause menu's

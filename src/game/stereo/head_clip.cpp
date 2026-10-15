@@ -6,7 +6,7 @@ namespace omvr::game::stereo {
 
 namespace {
 
-using HeadClipFadeFn = float (__stdcall*)(const float* eye, const float* pivot);
+using HeadClipFadeFn = float(__stdcall*)(const float* eye, const float* pivot);
 
 } // namespace
 

@@ -51,12 +51,12 @@ TEST_CASE("heading of a quaternion; yaw rotation; upright") {
     CHECK(up_y_of(Quat{}) == 1.0f);
     CHECK(is_upright(1.0f));
     CHECK(is_upright(kUprightCosine + 0.01f));
-    CHECK_FALSE(is_upright(kUprightCosine));  // strictly above
+    CHECK_FALSE(is_upright(kUprightCosine)); // strictly above
 }
 
 TEST_CASE("to_game_pose negates x and y columns and scales the position") {
     const float r[3][4] = {{1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}};
-    const auto o = to_game_pose(r, 2.0f);
+    const auto o        = to_game_pose(r, 2.0f);
     CHECK(o.m[0][0] == -1.0f);
     CHECK(o.m[0][1] == -2.0f);
     CHECK(o.m[0][2] == 3.0f);
@@ -97,7 +97,7 @@ TEST_CASE("render tangents are the widest of both eyes; symmetric forms") {
     CHECK(s.right == 1.4f);
 
     const FovAngles g = symmetric_angles({1.0f, 1.0f});
-    const float q = std::numbers::pi_v<float> / 4;
+    const float q     = std::numbers::pi_v<float> / 4;
     CHECK(g.left == doctest::Approx(-q));
     CHECK(g.right == doctest::Approx(q));
     CHECK(g.up == doctest::Approx(q));
@@ -137,11 +137,11 @@ TEST_CASE("pose hold rules") {
     CHECK(held.orientation.w == 1.0f);
     hold_pose(held, located, true, false);
     CHECK(held.orientation.y == 1.0f);
-    CHECK(held.position.x == 1.0f);  // position degraded: kept
+    CHECK(held.position.x == 1.0f); // position degraded: kept
     hold_pose(held, located, true, true);
     CHECK(held.position.x == 5.0f);
 
-    float m[3][4] = {};
+    float m[3][4]       = {};
     const float n[3][4] = {{1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}};
     hold_pose(m, n, true, false);
     CHECK(m[1][2] == 7.0f);
@@ -152,7 +152,7 @@ TEST_CASE("pose hold rules") {
     Vec3 h{1, 2, 3};
     Vec3 l{4, 5, 6};
     hold_position(h, l, false);
-    CHECK(l.x == 1.0f);  // invalid: the located one takes the held value
+    CHECK(l.x == 1.0f); // invalid: the located one takes the held value
     Vec3 l2{7, 8, 9};
     hold_position(h, l2, true);
     CHECK(h.x == 7.0f);
@@ -165,9 +165,9 @@ TEST_CASE("pose age reports every kDebugLogPeriodFrames frames") {
     const auto frames = omvr::core::diag::kDebugLogPeriodFrames;
     for (std::uint32_t i = 0; i < frames; ++i) {
         std::int64_t rendered_for = 1000;
-        if (i % 4 == 1) rendered_for = 900;  // one period early
-        if (i % 4 == 2) rendered_for = 750;  // 2.5 periods: other
-        if (i % 4 == 3) rendered_for = 0;    // unknown
+        if (i % 4 == 1) rendered_for = 900; // one period early
+        if (i % 4 == 2) rendered_for = 750; // 2.5 periods: other
+        if (i % 4 == 3) rendered_for = 0;   // unknown
         report = age.add(1000, rendered_for, kPeriod);
         if (i + 1 < frames) REQUIRE_FALSE(report.has_value());
     }
@@ -194,10 +194,10 @@ TEST_CASE("runtime choice precedence") {
     CHECK(choose_runtime(r) == Chosen::OpenXR);
 
     r.openxr_available = false;
-    CHECK(choose_runtime(r) == Chosen::OpenVR);  // falls back
+    CHECK(choose_runtime(r) == Chosen::OpenVR); // falls back
 
     r.forced = true;
-    CHECK(choose_runtime(r) == Chosen::None);  // a forced runtime is missing: no fallback
+    CHECK(choose_runtime(r) == Chosen::None); // a forced runtime is missing: no fallback
 
     DetectResult only_xr;
     only_xr.openxr_available = true;

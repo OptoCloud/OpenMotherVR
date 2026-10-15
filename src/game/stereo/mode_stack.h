@@ -41,8 +41,10 @@ core::stereo::StackSyncOutcome apply_stack_sync(const ModeStackTargets& targets,
 // returns the new element, or null when the allocation failed. Set when
 // the installer found it at its call in StereoPushMode; without it the
 // count is raised only into storage the array already has.
-using ModeStackAppendFn = std::int32_t* (__fastcall*)(void* array, void* edx, const std::int32_t* value);
+using ModeStackAppendFn = std::int32_t*(__fastcall*)(void* array, void* edx, const std::int32_t* value);
 // This build has the append routine.
-inline bool has_mode_stack_append(const ModeStackTargets& targets) noexcept { return targets.append != nullptr; }
+inline bool has_mode_stack_append(const ModeStackTargets& targets) noexcept {
+    return targets.append != nullptr;
+}
 
 } // namespace omvr::game::stereo

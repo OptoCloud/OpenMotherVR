@@ -50,7 +50,8 @@ StackSync ModePolicy::sync_mode_stack(const ModeStackState& stack, bool can_appe
 }
 
 void ModePolicy::report(StackSyncOutcome outcome) noexcept {
-    if (outcome == StackSyncOutcome::AppendFailed && append_failed_logged_.first()) log_.line(kAppendFailedLog);
+    if (outcome == StackSyncOutcome::AppendFailed && append_failed_logged_.first())
+        log_.line(kAppendFailedLog);
     if (outcome == StackSyncOutcome::NoStorage && no_storage_logged_.first()) log_.line(kNoStorageLog);
 }
 

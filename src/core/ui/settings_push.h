@@ -14,12 +14,12 @@ namespace omvr::core::ui {
 
 // The game's UI script variables and the services a settings push reads.
 struct SettingsPushDeps {
-    ports::ScriptVariables&      vars;
-    DisplayReset&                display_reset;
+    ports::ScriptVariables& vars;
+    DisplayReset& display_reset;
     const input::ControlSchemes& schemes;
-    const config::Settings&      settings;
-    ports::RuntimeState&         runtime;
-    diag::ports::Log&            log;
+    const config::Settings& settings;
+    ports::RuntimeState& runtime;
+    diag::ports::Log& log;
 };
 
 // Pushes the settings into the game's UI script variables, so the in-game
@@ -45,7 +45,7 @@ private:
     void push_controls_help(ports::UiHandle ui) noexcept;
 
     SettingsPushDeps deps_;
-    util::OnceLatch  not_ready_logged_;
+    util::OnceLatch not_ready_logged_;
 };
 
 } // namespace omvr::core::ui

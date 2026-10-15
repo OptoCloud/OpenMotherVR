@@ -36,7 +36,7 @@ public:
 
 private:
     std::chrono::steady_clock::time_point now_{std::chrono::seconds(10)};
-    core::diag::ports::LocalTime          local_{};
+    core::diag::ports::LocalTime local_{};
 };
 
 // A log that keeps every line.
@@ -54,16 +54,18 @@ public:
     }
 
     std::vector<std::string> lines;
-    bool                     debug = false;
+    bool debug = false;
 };
 
 // A sink that keeps every line it is handed.
 class RecordingSink final : public core::diag::ports::LogSink {
 public:
     bool ready() const noexcept override { return is_ready; }
-    void write(std::span<const char> line) noexcept override { writes.emplace_back(line.begin(), line.end()); }
+    void write(std::span<const char> line) noexcept override {
+        writes.emplace_back(line.begin(), line.end());
+    }
 
-    bool                     is_ready = true;
+    bool is_ready = true;
     std::vector<std::string> writes;
 };
 
@@ -89,8 +91,8 @@ public:
     util::Result<bool> exists(const std::filesystem::path& path) override { return files.contains(path); }
 
     std::map<std::filesystem::path, std::string> files;
-    int                                          writes = 0;
-    std::vector<std::string>*                    events = nullptr;
+    int writes                       = 0;
+    std::vector<std::string>* events = nullptr;
 };
 
 // The game's exit and display-reset requests, recorded.
@@ -103,10 +105,10 @@ public:
     void request_display_reset() noexcept override { ++resets; }
     bool can_reset_display() const noexcept override { return can_reset; }
 
-    int                       exits     = 0;
-    int                       resets    = 0;
-    bool                      can_reset = true;
-    std::vector<std::string>* events    = nullptr;
+    int exits                        = 0;
+    int resets                       = 0;
+    bool can_reset                   = true;
+    std::vector<std::string>* events = nullptr;
 };
 
 // This run's runtime as the test sets it.
@@ -118,9 +120,9 @@ public:
     bool session_active() const noexcept override { return active; }
 
     std::optional<core::config::VRRuntime> forced_runtime;
-    bool                                   has_failed     = false;
-    core::vr::DetectResult::Chosen         chosen_runtime = core::vr::DetectResult::Chosen::OpenVR;
-    bool                                   active         = true;
+    bool has_failed                               = false;
+    core::vr::DetectResult::Chosen chosen_runtime = core::vr::DetectResult::Chosen::OpenVR;
+    bool active                                   = true;
 };
 
 // Every script-variable call, as "name=value" in call order.
@@ -136,14 +138,15 @@ public:
     void set_float(core::ui::ports::UiHandle, const char* name, float value) noexcept override {
         calls.push_back(std::string(name) + "=" + std::to_string(value));
     }
-    bool add_row(core::ui::ports::UiHandle, const char* name, const char* a, const char* b) noexcept override {
+    bool add_row(core::ui::ports::UiHandle, const char* name, const char* a,
+                 const char* b) noexcept override {
         calls.push_back(std::string(name) + "=" + a + "|" + b);
         return ++rows < row_limit;
     }
 
-    bool                     is_ready  = true;
-    int                      rows      = 0;
-    int                      row_limit = 1000;
+    bool is_ready = true;
+    int rows      = 0;
+    int row_limit = 1000;
     std::vector<std::string> calls;
 };
 
@@ -152,7 +155,8 @@ class FakeArchiveFiles final : public core::ui::ports::ArchiveFiles {
 public:
     using Bytes = std::vector<std::byte>;
 
-    std::optional<core::ui::ports::FileIdentity> identity(const std::filesystem::path& path) noexcept override {
+    std::optional<core::ui::ports::FileIdentity> identity(
+        const std::filesystem::path& path) noexcept override {
         const auto it = files.find(path);
         if (it == files.end()) return std::nullopt;
         return core::ui::ports::FileIdentity{it->second.size(), 0};
@@ -162,17 +166,20 @@ public:
         if (it == files.end()) return std::unexpected(util::Error{kFileNotFound, "open"});
         return it->second;
     }
-    util::Result<void> write_atomically(const std::filesystem::path& path, std::span<const std::byte> data) override {
+    util::Result<void> write_atomically(const std::filesystem::path& path,
+                                        std::span<const std::byte> data) override {
         if (fail_create) return std::unexpected(util::Error{kAccessDenied, "create"});
         files[path] = Bytes(data.begin(), data.end());
         return {};
     }
     bool stamped(const std::filesystem::path&, core::ui::ports::FileTime) noexcept override { return false; }
     void stamp(const std::filesystem::path&, core::ui::ports::FileTime) noexcept override {}
-    std::optional<core::ui::ports::FileIdentity> read_sidecar(const std::filesystem::path&) noexcept override {
+    std::optional<core::ui::ports::FileIdentity> read_sidecar(
+        const std::filesystem::path&) noexcept override {
         return std::nullopt;
     }
-    void write_sidecar(const std::filesystem::path&, const core::ui::ports::FileIdentity&) noexcept override {}
+    void write_sidecar(const std::filesystem::path&, const core::ui::ports::FileIdentity&) noexcept override {
+    }
     void remove(const std::filesystem::path& path) noexcept override { files.erase(path); }
     core::ui::ports::LockState lock(std::wstring_view, std::chrono::milliseconds) noexcept override {
         return {true, false};
@@ -181,7 +188,7 @@ public:
     std::span<const std::byte> payload(core::ui::ports::ResourceId) noexcept override { return {}; }
 
     std::map<std::filesystem::path, Bytes> files;
-    bool                                   fail_create = false;
+    bool fail_create = false;
 };
 
 // Bytes of a string, for building binary inputs.

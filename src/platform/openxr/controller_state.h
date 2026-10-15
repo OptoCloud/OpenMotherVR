@@ -21,23 +21,23 @@ enum class Hand : int { Left = 0, Right = 1 };
 enum class ControllerFamily { Unknown, Thumbstick, Touchpad };
 
 struct HandState {
-    bool        active     = false; // controller present and bound
-    bool        grip_valid = false; // grip pose tracked this frame
-    util::Pose  grip{};             // seated space; the palm
-    bool        grip_velocity_valid = false;
-    util::Vec3  grip_velocity{};    // seated space, metres per second
-    float       trigger     = 0.0f; // 0..1
-    float       squeeze     = 0.0f; // grip button, 0..1
-    util::Vec2  stick{};            // thumbstick, or touchpad on Vive wands
-    bool        stick_click = false;
-    bool        primary     = false; // A / X
-    bool        secondary   = false; // B / Y
-    bool        menu        = false;
+    bool active     = false; // controller present and bound
+    bool grip_valid = false; // grip pose tracked this frame
+    util::Pose grip{};       // seated space; the palm
+    bool grip_velocity_valid = false;
+    util::Vec3 grip_velocity{}; // seated space, metres per second
+    float trigger = 0.0f;       // 0..1
+    float squeeze = 0.0f;       // grip button, 0..1
+    util::Vec2 stick{};         // thumbstick, or touchpad on Vive wands
+    bool stick_click = false;
+    bool primary     = false; // A / X
+    bool secondary   = false; // B / Y
+    bool menu        = false;
 };
 
 struct ControllerState {
     std::array<HandState, core::vr::kHandCount> hands{};
-    ControllerFamily                            family = ControllerFamily::Unknown;
+    ControllerFamily family = ControllerFamily::Unknown;
 
     const HandState& operator[](Hand h) const noexcept { return hands[static_cast<std::size_t>(h)]; }
 };

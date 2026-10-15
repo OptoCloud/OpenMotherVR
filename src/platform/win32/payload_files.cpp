@@ -49,7 +49,8 @@ bool up_to_date(const std::filesystem::path& file, const FILETIME& stamp) noexce
     const UniqueHandle h = open_existing(file, GENERIC_READ, FILE_SHARE_READ);
     if (!h) return false;
     FILETIME written{};
-    return ::GetFileTime(h.get(), nullptr, nullptr, &written) != 0 && ::CompareFileTime(&written, &stamp) == 0;
+    return ::GetFileTime(h.get(), nullptr, nullptr, &written) != 0 &&
+           ::CompareFileTime(&written, &stamp) == 0;
 }
 
 // Writes all of `data` to `file`.
@@ -60,15 +61,16 @@ bool write_all(const UniqueHandle& file, const void* data, std::size_t size) noe
 
 } // namespace
 
-bool ArchiveFiles::write_resource(int id, const std::filesystem::path& target, FileTime build_stamp) noexcept {
+bool ArchiveFiles::write_resource(int id, const std::filesystem::path& target,
+                                  FileTime build_stamp) noexcept {
     const FILETIME stamp = to_filetime(build_stamp);
-    const auto bytes = resource_bytes(module_, id);
+    const auto bytes     = resource_bytes(module_, id);
     if (bytes.empty()) {
         logf(log_, "payload: resource {} missing from module", id);
         return false;
     }
 
-    bool ok = false;
+    bool ok     = false;
     DWORD error = 0;
     {
         const UniqueHandle h = create_always(target, GENERIC_READ | GENERIC_WRITE);
@@ -132,7 +134,7 @@ std::optional<FileIdentity> ArchiveFiles::read_sidecar(const std::filesystem::pa
     const UniqueHandle h = open_existing(file, GENERIC_READ, FILE_SHARE_READ);
     if (!h) return std::nullopt;
     FileIdentity id{};
-    DWORD got = 0;
+    DWORD got     = 0;
     const bool ok = ::ReadFile(h.get(), &id, sizeof(id), &got, nullptr) && got == sizeof(id);
     return ok ? std::optional{id} : std::nullopt;
 }
@@ -149,19 +151,21 @@ void ArchiveFiles::write_sidecar(const std::filesystem::path& file, const FileId
 
 void ArchiveFiles::remove(const std::filesystem::path& path) noexcept { ::DeleteFileW(path.c_str()); }
 
-core::ui::ports::LockState ArchiveFiles::lock(std::wstring_view name, std::chrono::milliseconds timeout) noexcept {
+core::ui::ports::LockState ArchiveFiles::lock(std::wstring_view name,
+                                              std::chrono::milliseconds timeout) noexcept {
     return mutex_.lock(name, timeout);
 }
 
 void ArchiveFiles::unlock() noexcept { mutex_.unlock(); }
 
 std::span<const std::byte> ArchiveFiles::payload(core::ui::ports::ResourceId id) noexcept {
-    return resource_bytes(module_, id == core::ui::ports::ResourceId::OpenVrApi ? openvr_api_id_ : ui_patch_id_);
+    return resource_bytes(module_,
+                          id == core::ui::ports::ResourceId::OpenVrApi ? openvr_api_id_ : ui_patch_id_);
 }
 
 bool ArchiveFiles::deploy_openvr_api() noexcept {
     const FileTime build_stamp = this_module_build_filetime();
-    const auto target = module_directory() / kOpenVrApiFileName;
+    const auto target          = module_directory() / kOpenVrApiFileName;
     if (up_to_date(target, to_filetime(build_stamp))) {
         logf(log_, "payload: {} is current", utf8(target));
         return true;

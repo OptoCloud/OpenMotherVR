@@ -13,14 +13,14 @@ namespace omvr::core::vr {
 // in the game's Stereo::CreateDevice. A runtime can be detected and still
 // fail to start then (no headset connected, runtime in an error state).
 struct DetectResult {
-    bool                  openvr_available = false;
-    bool                  oculus_available = false;
-    bool                  openxr_available = false;
-    bool                  forced           = false; // -vrforce<runtime>: no fallback
-    config::VRRuntime     preferred        = config::VRRuntime::OpenVR;
+    bool openvr_available       = false;
+    bool oculus_available       = false;
+    bool openxr_available       = false;
+    bool forced                 = false; // -vrforce<runtime>: no fallback
+    config::VRRuntime preferred = config::VRRuntime::OpenVR;
     // Enumerators spelled as config::VRRuntime spells them.
     enum class Chosen { None, OpenVR, Oculus, OpenXR };
-    Chosen                chosen           = Chosen::None;
+    Chosen chosen = Chosen::None;
 
     // The OpenVR runtime root: the directory containing
     // bin/win32/openvr_api.dll. Empty when OpenVR is not available.

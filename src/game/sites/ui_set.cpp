@@ -14,10 +14,13 @@ namespace {
 namespace ports = core::diag::ports;
 
 constexpr std::string_view kArchiveRedirectedLog = "[hook] UI archive redirected to data\\mother.pak";
-constexpr std::string_view kNoModArchiveLog      = "[hook] no mod UI archive: options page unavailable, continuing";
-constexpr std::string_view kIntroPlaysStockLog   = "[hook] startup intro: plays; the options archive is not in use";
-constexpr std::string_view kIntroSkippedLog      = "[hook] startup intro: skipped";
-constexpr std::string_view kIntroPlaysFailedLog  = "[hook] startup intro: plays; the operand could not be written";
+constexpr std::string_view kNoModArchiveLog =
+    "[hook] no mod UI archive: options page unavailable, continuing";
+constexpr std::string_view kIntroPlaysStockLog =
+    "[hook] startup intro: plays; the options archive is not in use";
+constexpr std::string_view kIntroSkippedLog = "[hook] startup intro: skipped";
+constexpr std::string_view kIntroPlaysFailedLog =
+    "[hook] startup intro: plays; the operand could not be written";
 constexpr std::string_view kScriptCallbacksLog =
     "[hook] script callbacks: fire_bool={:08X} fire_int={:08X} fire_float={:08X}";
 constexpr std::string_view kCmdDispatchLog = "[hook] cmd dispatch slot {:08X} -> handle_mvr_command";
@@ -55,8 +58,8 @@ bool hook_script_bridge(const GameImage& g, Patcher& p, ui::ScriptVars& script_v
                      CodeAddress{g.at(AiAddr::FireInt)}, CodeAddress{g.at(AiAddr::FireFloat)});
     console.bind(CodeAddress{g.at(AiAddr::OriginalCmdHandler)}, CodeAddress{g.at(AiAddr::MenuOpen)},
                  g.at(AiAddr::ExitRequest), g.at(AiAddr::DisplayResetFlag));
-    ports::logf(p.log(), kScriptCallbacksLog, address_of(g.at(AiAddr::FireBool)), address_of(g.at(AiAddr::FireInt)),
-                address_of(g.at(AiAddr::FireFloat)));
+    ports::logf(p.log(), kScriptCallbacksLog, address_of(g.at(AiAddr::FireBool)),
+                address_of(g.at(AiAddr::FireInt)), address_of(g.at(AiAddr::FireFloat)));
 
     // All console commands (the UI's ExternalInterface.call("mvr_...")) now
     // pass through handle_mvr_command first.
@@ -65,12 +68,14 @@ bool hook_script_bridge(const GameImage& g, Patcher& p, ui::ScriptVars& script_v
 
     // The Fire* methods need the game's menu object, so settings are pushed
     // from a hook on it rather than from DLL code with no object at hand.
-    return p.write_pointer(g.at(AiAddr::MenuVtable) + slot_offset(kScreenOpenSlot), r.on_menu_open).has_value();
+    return p.write_pointer(g.at(AiAddr::MenuVtable) + slot_offset(kScreenOpenSlot), r.on_menu_open)
+        .has_value();
 }
 
-bool hook_pause_settings_push(const GameImage& g, Patcher& p, const void* replacement, void*& stock) noexcept {
+bool hook_pause_settings_push(const GameImage& g, Patcher& p, const void* replacement,
+                              void*& stock) noexcept {
     std::uint8_t* slot = g.at(AiAddr::PauseMenuVtable) + slot_offset(kScreenOpenSlot);
-    stock = pointer_at(slot);
+    stock              = pointer_at(slot);
     return p.write_pointer(slot, replacement).has_value();
 }
 

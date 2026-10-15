@@ -32,9 +32,9 @@ constexpr std::string_view kHeadClip    = kHeadClipArea;
 constexpr std::string_view kEventTap    = kEventTapArea;
 constexpr std::string_view kNoAddress   = "this build has no address for it";
 
-constexpr int kReflectionSites = 2;  // the render call and the clear gate
-constexpr int kStereoAaSites   = 2;  // the SMAA call and the stereo output draw
-constexpr int kCullingSites    = 2;  // the distance and the occlusion test calls
+constexpr int kReflectionSites = 2; // the render call and the clear gate
+constexpr int kStereoAaSites   = 2; // the SMAA call and the stereo output draw
+constexpr int kCullingSites    = 2; // the distance and the occlusion test calls
 constexpr int kHeadClipSites   = 1;
 constexpr int kEventTapSites   = 1;
 
@@ -46,22 +46,27 @@ constexpr std::string_view kClearGateLog =
     "[hook] {}: off; the clear gate at RendererClear (RVA {:08X}) does not hold the expected prologue, "
     "reflections stay mono";
 constexpr std::string_view kStereoAaCodeLog =
-    "[hook] {}: off; unexpected code at StereoOutputDrawCall (RVA {:08X}), SmaaCall (RVA {:08X}), PostFxInstance "
+    "[hook] {}: off; unexpected code at StereoOutputDrawCall (RVA {:08X}), SmaaCall (RVA {:08X}), "
+    "PostFxInstance "
     "or AaPass";
 constexpr std::string_view kCullingCodeLog =
     "[hook] {}: off; unexpected code at CullDistanceCall (RVA {:08X}) or CullPlaneTestACall (RVA {:08X})";
 constexpr std::string_view kCullingOnLog =
     "[hook] culling: in stereo the distance test passes and the main view's occlusion test passes";
-constexpr std::string_view kHeadClipCallLog = "[hook] {}: off; HeadClipFadeCall (RVA {:08X}) is not the expected call";
+constexpr std::string_view kHeadClipCallLog =
+    "[hook] {}: off; HeadClipFadeCall (RVA {:08X}) is not the expected call";
 constexpr std::string_view kEventTapLog =
     "[hook] {}: off; ScriptEventTap (RVA {:08X}) does not hold the expected no-op or could not be detoured";
 constexpr std::string_view kNoAppendLog =
-    "[hook] mode stack: this build has no address for the game's append; the count is raised only into existing "
+    "[hook] mode stack: this build has no address for the game's append; the count is raised only into "
+    "existing "
     "storage";
 constexpr std::string_view kAppendCodeLog =
-    "[hook] mode stack: StereoModeStackAppend's call (RVA {:08X}) is not the expected code; the count is raised "
+    "[hook] mode stack: StereoModeStackAppend's call (RVA {:08X}) is not the expected code; the count is "
+    "raised "
     "only into existing storage";
-constexpr std::string_view kAppendFoundLog = "[hook] mode stack: count raised through the game's append (RVA {:08X})";
+constexpr std::string_view kAppendFoundLog =
+    "[hook] mode stack: count raised through the game's append (RVA {:08X})";
 
 // ---- The code the fixes expect --------------------------------------------------
 
@@ -75,11 +80,12 @@ constexpr std::array<std::uint8_t, 6> kAaPassPrologue = {0x55, 0x8B, 0xEC, 0x83,
 // eax; je +0xF; push eax; push esi; push ebx`: the test takes the context's
 // occlusion buffer, which only the main POV has, so the replacement needs
 // no phase check.
-constexpr std::array<std::uint8_t, 10> kOcclusionArgs = {0x8B, 0x46, 0x5C, 0x85, 0xC0, 0x74, 0x0F, 0x50, 0x56, 0x53};
+constexpr std::array<std::uint8_t, 10> kOcclusionArgs = {0x8B, 0x46, 0x5C, 0x85, 0xC0,
+                                                         0x74, 0x0F, 0x50, 0x56, 0x53};
 
 // 05 §4.4: `lea ecx, [ebx+0x68]`, the manager's mode stack, before the
 // append's call.
-constexpr std::uint8_t kModRmEcxEbxDisp8 = 0x4B;
+constexpr std::uint8_t kModRmEcxEbxDisp8               = 0x4B;
 constexpr std::array<std::uint8_t, 3> kLeaEcxModeStack = {
     x86::kLea, kModRmEcxEbxDisp8, static_cast<std::uint8_t>(offsetof(StereoManager, stack_data))};
 
@@ -90,8 +96,9 @@ bool postfx_getter_is_expected(const std::uint8_t* getter) noexcept {
 // ---- One function per fix -------------------------------------------------------
 
 // Planar reflections render per eye (07).
-void fix_reflections(const GameImage& g, Patcher& p, const ReconRvas& r, const RenderFixHooks& hooks) noexcept {
-    ports::Log& log = p.log();
+void fix_reflections(const GameImage& g, Patcher& p, const ReconRvas& r,
+                     const RenderFixHooks& hooks) noexcept {
+    ports::Log& log    = p.log();
     std::uint8_t* site = g.at_rva(r.reflection_render_call);
     if (!calls(site, g.at_rva(r.reflection_render))) {
         ports::logf(log, kReflectionCallLog, kReflections, r.reflection_render_call);
@@ -117,7 +124,8 @@ void fix_reflections(const GameImage& g, Patcher& p, const ReconRvas& r, const R
 
 // Anti-aliasing in stereo (08 §3). Both sites or neither: without the SMAA
 // one, T2x would run temporally on the side-by-side image.
-void fix_anti_aliasing(const GameImage& g, Patcher& p, const ReconRvas& r, const RenderFixHooks& hooks) noexcept {
+void fix_anti_aliasing(const GameImage& g, Patcher& p, const ReconRvas& r,
+                       const RenderFixHooks& hooks) noexcept {
     std::uint8_t* draw_site = g.at_rva(r.stereo_output_draw_call);
     std::uint8_t* smaa_site = g.at_rva(r.smaa_call);
     if (!calls(draw_site, g.at_rva(r.fullscreen_draw)) || !calls(smaa_site, g.at_rva(r.smaa)) ||
@@ -162,7 +170,8 @@ void fix_culling(const GameImage& g, Patcher& p, const ReconRvas& r, const Rende
 
 // Head-in-wall blackout (08 §4). In stereo a fade waits 0.6 s before it
 // shows.
-void fix_head_clip_fade(const GameImage& g, Patcher& p, const ReconRvas& r, const RenderFixHooks& hooks) noexcept {
+void fix_head_clip_fade(const GameImage& g, Patcher& p, const ReconRvas& r,
+                        const RenderFixHooks& hooks) noexcept {
     if (!calls(g.at_rva(r.head_clip_fade_call), g.at_rva(r.head_clip_fade))) {
         ports::logf(p.log(), kHeadClipCallLog, kHeadClip, r.head_clip_fade_call);
         return;
@@ -175,7 +184,8 @@ void fix_head_clip_fade(const GameImage& g, Patcher& p, const ReconRvas& r, cons
 
 // Interaction and hiding state from the scripts' event strings, for the
 // features that behave differently during interactions (05 §12).
-void tap_game_events(const GameImage& g, Patcher& p, const ReconRvas& r, const RenderFixHooks& hooks) noexcept {
+void tap_game_events(const GameImage& g, Patcher& p, const ReconRvas& r,
+                     const RenderFixHooks& hooks) noexcept {
     if (install_event_tap(g.at_rva(r.event_tap), hooks.event_tap, *hooks.event_tap_trampoline, p.log())) {
         area_on(p.log(), kEventTap, kEventTapSites);
     } else {
@@ -197,7 +207,9 @@ void fix_if_known(std::uint32_t rva, std::string_view area, Fix fix, const GameI
 
 } // namespace
 
-void area_on(ports::Log& log, std::string_view area, int sites) noexcept { ports::logf(log, kAreaOnLog, area, sites); }
+void area_on(ports::Log& log, std::string_view area, int sites) noexcept {
+    ports::logf(log, kAreaOnLog, area, sites);
+}
 
 void area_off(ports::Log& log, std::string_view area, std::string_view why) noexcept {
     ports::logf(log, kAreaOffLog, area, why);

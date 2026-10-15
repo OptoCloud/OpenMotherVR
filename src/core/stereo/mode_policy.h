@@ -33,8 +33,8 @@ public:
 
 private:
     diag::ports::Log& log_;
-    util::OnceLatch   append_failed_logged_;
-    util::OnceLatch   no_storage_logged_;
+    util::OnceLatch append_failed_logged_;
+    util::OnceLatch no_storage_logged_;
 };
 
 } // namespace omvr::core::stereo

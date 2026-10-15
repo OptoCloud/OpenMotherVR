@@ -47,12 +47,12 @@ private:
     long chain(_EXCEPTION_POINTERS* info) noexcept;
 
     core::diag::ports::Log& log_;
-    Filter                  previous_ = nullptr;
-    std::atomic<bool>       logged_{false};
+    Filter previous_ = nullptr;
+    std::atomic<bool> logged_{false};
     // A filter the game (or its C runtime) installed over ours after attach.
     // Ours is put back on top and this one runs after the record, so neither
     // the record nor the game's own handling is lost.
-    std::atomic<Filter>        game_filter_{nullptr};
+    std::atomic<Filter> game_filter_{nullptr};
     // The thread currently inside game_filter_: if that filter chains to the
     // one it replaced (ours), the nested call goes on to previous_ instead of
     // looping back into it.
@@ -62,10 +62,10 @@ private:
     // faulting thread's stack: after a stack overflow only the guard region
     // is left, too little for a line buffer plus two MAX_PATH names.
     // logged_ makes the record a one-off, so one set of buffers is enough.
-    char    message_[core::diag::kMessageBufferSize];
-    char    line_[core::diag::kLineBufferSize];
+    char message_[core::diag::kMessageBufferSize];
+    char line_[core::diag::kLineBufferSize];
     wchar_t path_[kMaxPath];
-    char    name_[kMaxPath * kUtf8BytesPerUtf16Unit]; // UTF-8 of a MAX_PATH wide name
+    char name_[kMaxPath * kUtf8BytesPerUtf16Unit]; // UTF-8 of a MAX_PATH wide name
 };
 
 } // namespace omvr::platform::win32

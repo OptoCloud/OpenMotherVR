@@ -42,8 +42,8 @@ private:
     }
 
     std::span<const std::byte> data_;
-    std::size_t                pos_ = 0;
-    bool                       ok_  = true;
+    std::size_t pos_ = 0;
+    bool ok_         = true;
 };
 
 } // namespace omvr::util

@@ -28,6 +28,8 @@ DllDirectoryScope::DllDirectoryScope(const std::filesystem::path& dir) noexcept
     ::SetDllDirectoryW(dir.c_str());
 }
 
-DllDirectoryScope::~DllDirectoryScope() { ::SetDllDirectoryW(previous_.empty() ? nullptr : previous_.c_str()); }
+DllDirectoryScope::~DllDirectoryScope() {
+    ::SetDllDirectoryW(previous_.empty() ? nullptr : previous_.c_str());
+}
 
 } // namespace omvr::platform::win32

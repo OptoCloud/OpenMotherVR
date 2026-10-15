@@ -13,7 +13,7 @@ namespace omvr::core::stereo {
 // One setting change, in the game's own spelling of the value.
 struct GraphicsChange {
     GraphicsOption option;
-    const char*    value;
+    const char* value;
 };
 
 // The changes made when the sensor starts, in this order. Depth of field

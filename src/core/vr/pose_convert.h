@@ -14,7 +14,7 @@ inline util::Matrix34 to_game_pose(const float (&r)[3][4], float s) noexcept {
     for (int i = 0; i < kRows; ++i) {
         o.m[i][0] = -r[i][0];
         o.m[i][1] = -r[i][1];
-        o.m[i][2] =  r[i][2];
+        o.m[i][2] = r[i][2];
         o.m[i][3] = -s * r[i][3];
     }
     return o;

@@ -22,7 +22,7 @@ inline void* renderer(const AddressMap& addresses) noexcept {
 // One of the renderer's D3D11 objects (device, context, swapchain).
 template <class T>
 T* renderer_get(const AddressMap& addresses, AiAddr slot) noexcept {
-    using Fn = T* (__cdecl*)(void*);
+    using Fn     = T*(__cdecl*)(void*);
     const Fn get = CodeAddress{addresses.at(slot)};
     return get(renderer(addresses));
 }
@@ -30,7 +30,7 @@ T* renderer_get(const AddressMap& addresses, AiAddr slot) noexcept {
 // A render target's texture or view by its index.
 template <class T>
 T* renderer_rt(const AddressMap& addresses, AiAddr slot, std::uint16_t index) noexcept {
-    using Fn = T* (__cdecl*)(void*, std::uint32_t);
+    using Fn     = T*(__cdecl*)(void*, std::uint32_t);
     const Fn get = CodeAddress{addresses.at(slot)};
     return get(renderer(addresses), index);
 }

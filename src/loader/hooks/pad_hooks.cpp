@@ -81,7 +81,8 @@ bool __fastcall pad_is_down(void* self, void* /*edx*/, int code) noexcept {
         return false;
     }
     const int stock = ctx.pad.stock_code(code);
-    const bool stock_down = stock != game::kNoPadControl && ctx.targets.stock_pad.is_down(self, nullptr, stock);
+    const bool stock_down =
+        stock != game::kNoPadControl && ctx.targets.stock_pad.is_down(self, nullptr, stock);
     return ctx.pad.merge_down(code, stock_down);
 }
 
@@ -102,17 +103,20 @@ float __fastcall pad_axis(void* self, void* /*edx*/, int code, int negate) noexc
 // Only the low 16 bits are meaningful (04 §2.3); the compare is on the
 // signed 16-bit code. From: FUN_10009030 (ret 4).
 const char* __fastcall pad_control_name(void* self, void* /*edx*/, std::uint32_t raw) noexcept {
-    auto& ctx = context();
+    auto& ctx       = context();
     const auto code = static_cast<std::int16_t>(raw);
     if (!core::input::is_virtual_code(code)) return nullptr;
     const int stock = ctx.pad.stock_code(code);
-    if (!ctx.pad.shows_vr_glyphs()) return ctx.targets.stock_pad.name(self, nullptr, static_cast<std::uint16_t>(stock));
+    if (!ctx.pad.shows_vr_glyphs())
+        return ctx.targets.stock_pad.name(self, nullptr, static_cast<std::uint16_t>(stock));
     return ctx.pad.vr_glyph(stock);
 }
 
 // bool HasActivity(): the game uses it to pick the active input device.
 // From: FUN_10008fa0 (ret 0).
-bool __fastcall pad_has_activity(void* self, void* /*edx*/) noexcept { return merged_activity(context(), self); }
+bool __fastcall pad_has_activity(void* self, void* /*edx*/) noexcept {
+    return merged_activity(context(), self);
+}
 
 static_assert(std::is_convertible_v<decltype(&pad_is_down), game::input::IsDownFn>);
 static_assert(std::is_convertible_v<decltype(&pad_value), game::input::ValueFn>);
@@ -124,12 +128,9 @@ static_assert(std::is_convertible_v<decltype(&pad_has_activity), game::input::Ac
 
 game::sites::PadReplacements pad_replacements() noexcept {
     return {
-        game::code_pointer(&pad_is_down),
-        game::code_pointer(&pad_value),
-        game::code_pointer(&pad_axis),
-        game::code_pointer(&pad_control_name),
-        game::code_pointer(&pad_has_activity),
-        game::code_pointer(&is_move_on_left_stick),
+        game::code_pointer(&pad_is_down),      game::code_pointer(&pad_value),
+        game::code_pointer(&pad_axis),         game::code_pointer(&pad_control_name),
+        game::code_pointer(&pad_has_activity), game::code_pointer(&is_move_on_left_stick),
     };
 }
 

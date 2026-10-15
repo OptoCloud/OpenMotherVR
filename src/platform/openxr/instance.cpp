@@ -44,8 +44,8 @@ bool Session::Impl::create_instance(const std::vector<const char*>& extensions) 
     ci.applicationInfo.applicationVersion = kApplicationVersion;
     ci.applicationInfo.engineVersion      = kEngineVersion;
     ci.applicationInfo.apiVersion         = XR_API_VERSION_1_0;
-    ci.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
-    ci.enabledExtensionNames = extensions.data();
+    ci.enabledExtensionCount              = static_cast<std::uint32_t>(extensions.size());
+    ci.enabledExtensionNames              = extensions.data();
     return check(xrCreateInstance(&ci, state.instance.put()), "xrCreateInstance");
 }
 
@@ -88,17 +88,16 @@ bool Session::Impl::read_system(bool fov_ext) {
         state.config_views[1].next = &fov[1];
     }
     std::uint32_t n = 0;
-    if (!check(xrEnumerateViewConfigurationViews(state.instance.get(), state.system,
-                                                 XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
-                                                 static_cast<std::uint32_t>(state.config_views.size()), &n,
-                                                 state.config_views.data()),
+    if (!check(xrEnumerateViewConfigurationViews(
+                   state.instance.get(), state.system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+                   static_cast<std::uint32_t>(state.config_views.size()), &n, state.config_views.data()),
                "xrEnumerateViewConfigurationViews")) {
         return false;
     }
     state.config_views[0].next = state.config_views[1].next = nullptr;
-    state.info.recommended_w = state.config_views[0].recommendedImageRectWidth;
+    state.info.recommended_w                                = state.config_views[0].recommendedImageRectWidth;
     state.info.recommended_h = state.config_views[0].recommendedImageRectHeight;
-    state.info.has_fov = fov_ext;
+    state.info.has_fov       = fov_ext;
     if (fov_ext) state.info.fov = {from_xr(fov[0].recommendedFov), from_xr(fov[1].recommendedFov)};
     logf(log, kLogSystem, state.info.system_name, state.info.recommended_w, state.info.recommended_h,
          fov_ext ? "reported" : "not reported (from the first frame)");

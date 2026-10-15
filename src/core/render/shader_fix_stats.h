@@ -23,9 +23,9 @@ public:
 
 private:
     diag::ports::Log& log_;
-    std::atomic<int>  created_{0};
-    std::atomic<int>  fixed_{0};
-    std::atomic<int>  rejected_{0};
+    std::atomic<int> created_{0};
+    std::atomic<int> fixed_{0};
+    std::atomic<int> rejected_{0};
 };
 
 } // namespace omvr::core::render

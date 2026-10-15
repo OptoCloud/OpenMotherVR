@@ -10,11 +10,14 @@ namespace {
 
 // A mutex its owner ended without releasing still guards a finished build:
 // the owner was a process of the same launch that exited.
-bool acquired(DWORD wait_result) noexcept { return wait_result == WAIT_OBJECT_0 || wait_result == WAIT_ABANDONED; }
+bool acquired(DWORD wait_result) noexcept {
+    return wait_result == WAIT_OBJECT_0 || wait_result == WAIT_ABANDONED;
+}
 
 } // namespace
 
-core::ui::ports::LockState NamedMutex::lock(std::wstring_view name, std::chrono::milliseconds timeout) noexcept {
+core::ui::ports::LockState NamedMutex::lock(std::wstring_view name,
+                                            std::chrono::milliseconds timeout) noexcept {
     try {
         const std::wstring n(name);
         mutex_.reset(::CreateMutexW(nullptr, FALSE, n.c_str()));

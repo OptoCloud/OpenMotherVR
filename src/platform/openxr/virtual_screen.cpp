@@ -19,6 +19,8 @@ std::optional<bool> VirtualScreen::start(core::stereo::SwapchainHandle handle) n
 
 void VirtualScreen::recenter() noexcept { session_.recenter(); }
 
-bool VirtualScreen::frame(core::stereo::SwapchainHandle swapchain) noexcept { return session_.frame(swapchain); }
+bool VirtualScreen::frame(core::stereo::SwapchainHandle swapchain) noexcept {
+    return session_.frame(swapchain);
+}
 
 } // namespace omvr::platform::openxr

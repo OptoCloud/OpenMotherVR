@@ -9,7 +9,8 @@ namespace omvr::core::stereo::ports {
 // the stereo texture. Render thread.
 class DesktopMirror {
 public:
-    virtual void create(vr::GpuDevice device, const MirrorConstants& eyes, const MirrorConstants& screen) noexcept = 0;
+    virtual void create(vr::GpuDevice device, const MirrorConstants& eyes,
+                        const MirrorConstants& screen) noexcept           = 0;
     virtual void draw(vr::GpuContext context, bool head_tracked) noexcept = 0;
 
 protected:

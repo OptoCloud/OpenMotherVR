@@ -20,7 +20,7 @@ public:
 
 private:
     UniqueHandle mutex_;
-    bool         held_ = false;
+    bool held_ = false;
 };
 
 } // namespace omvr::platform::win32

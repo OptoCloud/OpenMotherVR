@@ -14,7 +14,8 @@ constexpr std::string_view kFullscreenRefusedLog = "proxy: VR active, fullscreen
 
 std::optional<PixelSize> mirror_back_buffer(PixelSize requested, PixelSize window) noexcept {
     if (window.width <= 0 || window.height <= 0) return std::nullopt;
-    if (requested.width == 0 || requested.height == 0) return std::nullopt;  // "the window's size": already small
+    if (requested.width == 0 || requested.height == 0)
+        return std::nullopt; // "the window's size": already small
     if (requested == window) return std::nullopt;
     return window;
 }

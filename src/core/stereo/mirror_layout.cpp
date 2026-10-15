@@ -35,7 +35,9 @@ void set_panel(MirrorConstants& c, int panel, const UvRect& draw, const UvRect& 
 }
 
 // part / whole of a tangent, 1 when the whole is unknown.
-float tan_ratio(float part, float whole) noexcept { return whole > 0.0f ? std::clamp(part / whole, 0.0f, 1.0f) : 1.0f; }
+float tan_ratio(float part, float whole) noexcept {
+    return whole > 0.0f ? std::clamp(part / whole, 0.0f, 1.0f) : 1.0f;
+}
 
 // Eye e's real FOV inside its half of the rendered image, in UV of the whole
 // side-by-side texture: the compositor's crop bounds (03 §3.3).
@@ -44,7 +46,8 @@ UvRect eye_crop(const MirrorView& view, int e) noexcept {
     const auto& x    = view.rendered_fov[e];
     const float half = 0.5f * static_cast<float>(e);
     return {half + 0.5f * (0.5f - 0.5f * tan_ratio(d.left, x.left)), 0.5f - 0.5f * tan_ratio(d.up, x.up),
-            half + 0.5f * (0.5f + 0.5f * tan_ratio(d.right, x.right)), 0.5f + 0.5f * tan_ratio(d.down, x.down)};
+            half + 0.5f * (0.5f + 0.5f * tan_ratio(d.right, x.right)),
+            0.5f + 0.5f * tan_ratio(d.down, x.down)};
 }
 
 // Aspects in pixels: the window's, and a source region's.
@@ -60,8 +63,8 @@ struct Aspects {
 };
 
 Aspects aspects_of(const MirrorView& view) noexcept {
-    const float tex_w = static_cast<float>(std::max(view.texture.width, 1));
-    const float tex_h = static_cast<float>(std::max(view.texture.height, 1));
+    const float tex_w  = static_cast<float>(std::max(view.texture.width, 1));
+    const float tex_h  = static_cast<float>(std::max(view.texture.height, 1));
     const float window = view.window.width > 0 && view.window.height > 0
                              ? static_cast<float>(view.window.width) / static_cast<float>(view.window.height)
                              : tex_w / tex_h;
@@ -73,10 +76,10 @@ Aspects aspects_of(const MirrorView& view) noexcept {
 MirrorConstants screen_constants(const Aspects& a) noexcept {
     MirrorConstants c{};
     const float region = a.region(kScreenSource.r - kScreenSource.l, kScreenSource.b - kScreenSource.t);
-    if (region >= a.window) {  // bars above and below
+    if (region >= a.window) { // bars above and below
         const float k = a.window / region;
         set_panel(c, 0, {0.0f, (1.0f - k) * 0.5f, 1.0f, (1.0f + k) * 0.5f}, kScreenSource);
-    } else {  // bars at the sides
+    } else { // bars at the sides
         const float k = region / a.window;
         set_panel(c, 0, {(1.0f - k) * 0.5f, 0.0f, (1.0f + k) * 0.5f, 1.0f}, kScreenSource);
     }
@@ -91,7 +94,7 @@ MirrorConstants screen_constants(const Aspects& a) noexcept {
 struct EyeSources {
     UvRect left{};
     UvRect right{};
-    bool   both_cropped = false;
+    bool both_cropped = false;
 };
 
 EyeSources eye_sources(const MirrorView& view) noexcept {

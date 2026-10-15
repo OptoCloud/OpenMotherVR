@@ -52,8 +52,8 @@ inline constexpr std::int16_t kKeyDownBit = static_cast<std::int16_t>(0x8000);
 
 // RtlGetVersion reports the real Windows build, unlike GetVersionEx, whose
 // answer depends on what the game's manifest claims to support.
-inline constexpr const wchar_t* kNtdllFileName      = L"ntdll.dll";
-inline constexpr const char*    kRtlGetVersionName  = "RtlGetVersion";
+inline constexpr const wchar_t* kNtdllFileName  = L"ntdll.dll";
+inline constexpr const char* kRtlGetVersionName = "RtlGetVersion";
 
 // The crash record names the modules of this many words on top of the
 // faulting thread's stack (the return addresses of its callers).

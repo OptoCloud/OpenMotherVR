@@ -8,8 +8,8 @@ namespace {
 
 // 04 §2.2: thiscall, called as __fastcall with an unused EDX; the result
 // comes back in AL.
-using KeyDownFn = bool (__fastcall*)(void*, void*, int);
-using AnyFn     = bool (__fastcall*)(void*, void*);
+using KeyDownFn = bool(__fastcall*)(void*, void*, int);
+using AnyFn     = bool(__fastcall*)(void*, void*);
 
 } // namespace
 

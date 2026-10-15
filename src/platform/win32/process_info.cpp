@@ -14,8 +14,8 @@ namespace omvr::platform::win32 {
 
 unsigned long windows_build() noexcept {
     using RtlGetVersionFn = LONG(WINAPI*)(RTL_OSVERSIONINFOW*);
-    HMODULE ntdll = ::GetModuleHandleW(kNtdllFileName);
-    const auto get = ntdll ? proc<RtlGetVersionFn>(ntdll, kRtlGetVersionName) : nullptr;
+    HMODULE ntdll         = ::GetModuleHandleW(kNtdllFileName);
+    const auto get        = ntdll ? proc<RtlGetVersionFn>(ntdll, kRtlGetVersionName) : nullptr;
     RTL_OSVERSIONINFOW v{};
     v.dwOSVersionInfoSize = sizeof(v);
     if (!get || get(&v) != 0) return 0; // STATUS_SUCCESS is 0
@@ -23,7 +23,8 @@ unsigned long windows_build() noexcept {
 }
 
 const char* process_kind() noexcept {
-    const bool steam = has_environment_variable(kSteamGameIdVariable) || has_environment_variable(kSteamAppIdVariable);
+    const bool steam =
+        has_environment_variable(kSteamGameIdVariable) || has_environment_variable(kSteamAppIdVariable);
     return steam ? "Game" : "Launcher";
 }
 
@@ -31,7 +32,7 @@ std::string process_name(std::uint32_t pid) {
     const UniqueHandle process{::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid)};
     if (!process) return {};
     wchar_t buf[MAX_PATH] = {};
-    DWORD size = MAX_PATH;
+    DWORD size            = MAX_PATH;
     if (!::QueryFullProcessImageNameW(process.get(), 0, buf, &size)) return {};
     return utf8(std::filesystem::path{buf}.filename());
 }

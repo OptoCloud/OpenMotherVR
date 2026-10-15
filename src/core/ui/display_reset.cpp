@@ -19,7 +19,7 @@ TargetSettings target_settings(const config::Settings& cfg) noexcept {
 
 void DisplayReset::reset_if_changed(const config::Settings& cfg) noexcept {
     if (!built_) built_ = target_settings(cfg); // first call: what the targets were made with
-    TargetSettings& built = *built_;
+    TargetSettings& built    = *built_;
     const TargetSettings now = target_settings(cfg);
     if (now == built) return;
     const TargetSettings was = std::exchange(built, now);
@@ -27,11 +27,11 @@ void DisplayReset::reset_if_changed(const config::Settings& cfg) noexcept {
     // rebuild would only freeze the picture.
     if (!signals_.can_reset_display() || running_runtime(cfg, runtime_) == config::VRRuntime::None) return;
     signals_.request_display_reset();
-    diag::ports::logf(log_, "[script_bridge] display reset raised; changed:{}{}{}",
-                      changed(now.pixel_scale != was.pixel_scale, " Rendering.PixelScale"),
-                      changed(now.mirror_view_type != was.mirror_view_type, " Rendering.MirrorViewType"),
-                      changed(now.symmetric_mirror_view != was.symmetric_mirror_view,
-                              " Rendering.SymmetricMirrorView"));
+    diag::ports::logf(
+        log_, "[script_bridge] display reset raised; changed:{}{}{}",
+        changed(now.pixel_scale != was.pixel_scale, " Rendering.PixelScale"),
+        changed(now.mirror_view_type != was.mirror_view_type, " Rendering.MirrorViewType"),
+        changed(now.symmetric_mirror_view != was.symmetric_mirror_view, " Rendering.SymmetricMirrorView"));
 }
 
 } // namespace omvr::core::ui

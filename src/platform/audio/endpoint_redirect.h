@@ -35,7 +35,7 @@ public:
 
 private:
     // Set once, with endpoint_, before the slot is written; only read after.
-    ActivateFn   original_activate_ = nullptr;
+    ActivateFn original_activate_ = nullptr;
     std::wstring endpoint_;
 };
 

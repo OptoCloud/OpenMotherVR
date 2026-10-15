@@ -35,13 +35,13 @@ private:
     // Starts the session on the first such frame, once.
     void start_once(SwapchainHandle swapchain) noexcept;
 
-    ports::VirtualScreen&  screen_;
+    ports::VirtualScreen& screen_;
     const ports::Keyboard& keyboard_;
-    StereoDevice&          stereo_;
-    vr::RuntimeDetector&   runtimes_;
-    diag::ports::Log&      log_;
-    std::once_flag         started_;
-    bool                   recenter_held_ = false;
+    StereoDevice& stereo_;
+    vr::RuntimeDetector& runtimes_;
+    diag::ports::Log& log_;
+    std::once_flag started_;
+    bool recenter_held_ = false;
 };
 
 } // namespace omvr::core::stereo

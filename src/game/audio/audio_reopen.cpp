@@ -16,7 +16,7 @@ constexpr std::uint8_t kReopenFlagValue = 1;
 
 // One byte of a code pattern at its offset from the entry.
 struct PatternByte {
-    std::size_t  offset;
+    std::size_t offset;
     std::uint8_t value;
 };
 

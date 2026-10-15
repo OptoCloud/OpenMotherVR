@@ -24,7 +24,8 @@ static_assert(std::is_same_v<EndpointRedirect::ActivateFn,
 
 HRESULT create_enumerator(ComPtr<IMMDeviceEnumerator>& out) noexcept {
     IMMDeviceEnumerator* raw = nullptr;
-    const HRESULT hr = ::CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&raw));
+    const HRESULT hr =
+        ::CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&raw));
     if (SUCCEEDED(hr)) out = ComPtr<IMMDeviceEnumerator>::adopt(raw);
     return hr;
 }
@@ -44,7 +45,7 @@ HRESULT default_device(ComPtr<IMMDevice>& out) noexcept {
     HRESULT hr = create_enumerator(enumerator);
     if (FAILED(hr)) return hr;
     IMMDevice* raw = nullptr;
-    hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &raw);
+    hr             = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &raw);
     if (SUCCEEDED(hr)) out = ComPtr<IMMDevice>::adopt(raw);
     return hr;
 }
@@ -54,14 +55,15 @@ void** vtable_of(IMMDevice* device) noexcept { return *reinterpret_cast<void***>
 
 } // namespace
 
-long EndpointRedirect::activate(IMMDevice* self, REFIID iid, DWORD clsctx, PROPVARIANT* params, void** out) noexcept {
+long EndpointRedirect::activate(IMMDevice* self, REFIID iid, DWORD clsctx, PROPVARIANT* params,
+                                void** out) noexcept {
     const ComPtr<IMMDevice> headset = device_by_id(endpoint_);
     if (headset) return original_activate_(headset.get(), iid, clsctx, params, out);
     return original_activate_(self, iid, clsctx, params, out); // headset gone: the game's choice
 }
 
 long EndpointRedirect::install(std::wstring endpoint_id, ActivateFn replacement,
-                                core::diag::ports::Log& log) noexcept {
+                               core::diag::ports::Log& log) noexcept {
     endpoint_ = std::move(endpoint_id);
     // The game has COM up on this thread already; a mismatched apartment
     // (RPC_E_CHANGED_MODE) still leaves it usable. Not uninitialised: the
@@ -71,11 +73,11 @@ long EndpointRedirect::install(std::wstring endpoint_id, ActivateFn replacement,
     ComPtr<IMMDevice> device;
     if (const HRESULT hr = default_device(device); FAILED(hr)) return hr;
 
-    void** vtable = vtable_of(device.get());
-    original_activate_ = reinterpret_cast<ActivateFn>(vtable[kActivateSlot]);
-    const auto value = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(replacement));
-    const auto bytes   = std::bit_cast<std::array<std::uint8_t, sizeof(value)>>(value);
-    const bool patched = win32::write_memory(&vtable[kActivateSlot], bytes, log).has_value();
+    void** vtable        = vtable_of(device.get());
+    original_activate_   = reinterpret_cast<ActivateFn>(vtable[kActivateSlot]);
+    const auto value     = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(replacement));
+    const auto bytes     = std::bit_cast<std::array<std::uint8_t, sizeof(value)>>(value);
+    const bool patched   = win32::write_memory(&vtable[kActivateSlot], bytes, log).has_value();
     const HRESULT result = patched ? S_OK : HRESULT_FROM_WIN32(::GetLastError());
     if (FAILED(result)) original_activate_ = nullptr;
     return result;

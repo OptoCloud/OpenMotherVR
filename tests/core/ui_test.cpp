@@ -59,14 +59,15 @@ TEST_CASE("switch commands take 0 or 1") {
 
     o = apply_command(s, "mvr_debug", "1");
     CHECK(o.kind == Kind::Applied);
-    CHECK_FALSE(o.change.has_value());  // no change
+    CHECK_FALSE(o.change.has_value()); // no change
 
     CHECK(apply_command(s, "mvr_debug", "2").kind == Kind::Refused);
     CHECK(apply_command(s, "mvr_debug", nullptr).kind == Kind::Refused);
     CHECK(apply_command(s, "mvr_unknown", "1").kind == Kind::Unknown);
 
-    for (const char* name : {"mvr_mirrorviewsym", "mvr_clipblinding", "mvr_snaprotation", "mvr_inputrelativewalking",
-                             "mvr_inputstrafing", "mvr_togglegrips", "mvr_togglecrouch", "mvr_skipintro"}) {
+    for (const char* name :
+         {"mvr_mirrorviewsym", "mvr_clipblinding", "mvr_snaprotation", "mvr_inputrelativewalking",
+          "mvr_inputstrafing", "mvr_togglegrips", "mvr_togglecrouch", "mvr_skipintro"}) {
         CHECK(apply_command(s, name, "0").kind == Kind::Applied);
     }
     CHECK_FALSE(s.rendering.symmetric_mirror_view);
@@ -74,7 +75,8 @@ TEST_CASE("switch commands take 0 or 1") {
     CHECK_FALSE(s.input.snap_rotation);
     CHECK_FALSE(s.input.vr_input_relative_walking);
     CHECK_FALSE(s.input.vr_input_strafing);
-    CHECK(apply_command(s, "mvr_clipblinding", "1").effect == omvr::core::config::CommandEffect::ApplyBlinders);
+    CHECK(apply_command(s, "mvr_clipblinding", "1").effect ==
+          omvr::core::config::CommandEffect::ApplyBlinders);
 }
 
 TEST_CASE("mvr_mirrorview takes the enum's integers") {
@@ -106,7 +108,7 @@ TEST_CASE("mvr_snaprotationsegments rounds down to a step") {
     Settings s;
     const CommandOutcome same = apply_command(s, "mvr_snaprotationsegments", "13");
     CHECK(same.kind == Kind::Applied);
-    CHECK_FALSE(same.change.has_value());  // 13 rounds down to 12, the value already set
+    CHECK_FALSE(same.change.has_value()); // 13 rounds down to 12, the value already set
     CHECK(s.input.snap_rotation_segments == 12);
     CHECK(apply_command(s, "mvr_snaprotationsegments", "100").change->text == "24");
     CHECK(apply_command(s, "mvr_snaprotationsegments", "5").change->text == "4");
@@ -149,17 +151,17 @@ TEST_CASE("the runtime menu entries") {
     state.has_failed = false;
     s.vr_runtime     = VRRuntime::None;
     CHECK(running_runtime(s, state) == VRRuntime::None);
-    state.forced_runtime = VRRuntime::OpenVR;  // a switch overrides the file
+    state.forced_runtime = VRRuntime::OpenVR; // a switch overrides the file
     CHECK(running_runtime(s, state) == VRRuntime::OpenVR);
 }
 
 TEST_CASE("display reset: only on a change, only with VR") {
-    FakeGameSignals  signals;
+    FakeGameSignals signals;
     FakeRuntimeState state;
-    RecordingLog     log;
-    DisplayReset     reset(signals, state, log);
-    Settings         s;
-    reset.reset_if_changed(s);  // seeds
+    RecordingLog log;
+    DisplayReset reset(signals, state, log);
+    Settings s;
+    reset.reset_if_changed(s); // seeds
     reset.reset_if_changed(s);
     CHECK(signals.resets == 0);
 
@@ -172,12 +174,13 @@ TEST_CASE("display reset: only on a change, only with VR") {
     s.rendering.symmetric_mirror_view = false;
     reset.reset_if_changed(s);
     CHECK(log.lines.back() ==
-          "[script_bridge] display reset raised; changed: Rendering.MirrorViewType Rendering.SymmetricMirrorView");
+          "[script_bridge] display reset raised; changed: Rendering.MirrorViewType "
+          "Rendering.SymmetricMirrorView");
 
     s.vr_runtime            = VRRuntime::None;
     s.rendering.pixel_scale = 2.0f;
     reset.reset_if_changed(s);
-    CHECK(signals.resets == 2);  // no VR this run: nothing to rebuild
+    CHECK(signals.resets == 2); // no VR this run: nothing to rebuild
 
     signals.can_reset       = false;
     s.vr_runtime            = VRRuntime::OpenVR;
@@ -188,16 +191,16 @@ TEST_CASE("display reset: only on a change, only with VR") {
 
 TEST_CASE("the command runner saves, then quits, after mvr_vrruntime") {
     std::vector<std::string> events;
-    MemoryFileStore          files;
+    MemoryFileStore files;
     files.events = &events;
-    RecordingLog                           log;
-    omvr::core::config::SettingsStore      store(files, log);
+    RecordingLog log;
+    omvr::core::config::SettingsStore store(files, log);
     store.initialize(L"C:\\game");
-    FakeGameSignals  signals;
+    FakeGameSignals signals;
     signals.events = &events;
     FakeRuntimeState state;
-    DisplayReset     reset(signals, state, log);
-    Commands         commands(store, reset, signals, log);
+    DisplayReset reset(signals, state, log);
+    Commands commands(store, reset, signals, log);
 
     char cmd[] = "mvr_vrruntime 1 trailing";
     commands.run(cmd);
@@ -221,11 +224,11 @@ TEST_CASE("the command runner saves, then quits, after mvr_vrruntime") {
 
 TEST_CASE("the settings push sets every variable, then the controls help") {
     RecordingScriptVariables vars;
-    FakeGameSignals          signals;
-    FakeRuntimeState         state;
-    RecordingLog             log;
-    DisplayReset             reset(signals, state, log);
-    omvr::core::input::Glyphs         glyphs;
+    FakeGameSignals signals;
+    FakeRuntimeState state;
+    RecordingLog log;
+    DisplayReset reset(signals, state, log);
+    omvr::core::input::Glyphs glyphs;
     omvr::core::input::ControlSchemes schemes(glyphs);
     Settings s;
     s.rendering.pixel_scale = 1.5f;
@@ -234,7 +237,7 @@ TEST_CASE("the settings push sets every variable, then the controls help") {
     push.push(ports::UiHandle{});
     CHECK(vars.calls.empty());
     push.push(ports::UiHandle{});
-    CHECK(log.lines.size() == 1);  // logged once
+    CHECK(log.lines.size() == 1); // logged once
 
     push.push(ports::UiHandle{1});
     const std::vector<std::string> head(vars.calls.begin(), vars.calls.begin() + 14);
@@ -267,7 +270,7 @@ TEST_CASE("the settings push sets every variable, then the controls help") {
 
 TEST_CASE("PAK2 round trip") {
     const std::vector<OutEntry> entries = {{"a", bytes_of("abc")}, {"bb", bytes_of("d")}};
-    const std::vector<std::byte> pak = build_pak(16, entries);
+    const std::vector<std::byte> pak    = build_pak(16, entries);
     // Header 16, names "a\0bb\0" 5, table 8: entry a at 32, bb at 48.
     CHECK(pak.size() == 49u);
     CHECK(string_of(std::span(pak).first(4)) == "PAK2");
@@ -279,7 +282,7 @@ TEST_CASE("PAK2 round trip") {
     CHECK(string_of(read->at("bb")) == "d");
 
     std::vector<std::byte> bad = pak;
-    bad[0] = std::byte{'X'};
+    bad[0]                     = std::byte{'X'};
     CHECK_FALSE(read_pak(bad).has_value());
     CHECK_FALSE(read_pak(std::span(pak).first(20)).has_value());
     std::vector<std::byte> zero_align = pak;
@@ -318,7 +321,7 @@ std::uint32_t crc_of(std::string_view s) { return omvr::util::crc32(bytes_of(s))
 
 TEST_CASE("the UI patch copies, rewrites and adds entries") {
     FakeArchiveFiles files;
-    RecordingLog     log;
+    RecordingLog log;
     const std::filesystem::path stock  = L"DATA\\UI.PAK";
     const std::filesystem::path target = L"DATA\\MOTHER.PAK";
     files.files[stock] = build_pak(4, {{"keep", bytes_of("hello")}, {"edit", bytes_of("abcdef")}});
@@ -330,8 +333,8 @@ TEST_CASE("the UI patch copies, rewrites and adds entries") {
     p.entry("edit", PatchEntry::Delta);
     p.u32(6);
     p.u32(crc_of("abcdef"));
-    p.u32(5);  // output size
-    p.u32(2);  // operations
+    p.u32(5); // output size
+    p.u32(2); // operations
     p.u8(static_cast<std::uint8_t>(DeltaOp::Copy));
     p.u32(0);
     p.u32(3);
@@ -353,10 +356,10 @@ TEST_CASE("the UI patch copies, rewrites and adds entries") {
 
 TEST_CASE("the UI patch refuses another stock version and a malformed patch") {
     FakeArchiveFiles files;
-    RecordingLog     log;
+    RecordingLog log;
     const std::filesystem::path stock  = L"UI.PAK";
     const std::filesystem::path target = L"MOTHER.PAK";
-    files.files[stock] = build_pak(4, {{"keep", bytes_of("HELLO")}});
+    files.files[stock]                 = build_pak(4, {{"keep", bytes_of("HELLO")}});
 
     PatchWriter p(4, 1);
     p.entry("keep", PatchEntry::Stock);
@@ -367,7 +370,7 @@ TEST_CASE("the UI patch refuses another stock version and a malformed patch") {
     CHECK_FALSE(files.files.contains(target));
 
     std::vector<std::byte> bad = p.out;
-    bad[0] = std::byte{'X'};
+    bad[0]                     = std::byte{'X'};
     CHECK_FALSE(build_ui_archive(files, log, stock, bad, target));
     CHECK(log.lines.back() == "ui patch: embedded patch is malformed");
 
@@ -390,7 +393,7 @@ TEST_CASE("the UI patch refuses another stock version and a malformed patch") {
 
 TEST_CASE("the UI patch reports a temporary file it cannot create") {
     FakeArchiveFiles files;
-    RecordingLog     log;
+    RecordingLog log;
     files.files[L"UI.PAK"] = build_pak(4, {{"n", bytes_of("x")}});
     files.fail_create      = true;
     PatchWriter p(4, 1);

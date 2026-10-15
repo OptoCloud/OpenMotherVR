@@ -27,7 +27,8 @@ namespace ports = core::diag::ports;
 constexpr std::string_view kCheckFailedLog = "[hook] check failed at RVA {:08X}: expected {}; found {}";
 constexpr std::string_view kOutsideImageLog =
     "[hook] check failed: {} at RVA {:08X} lies outside AI.exe (size {:08X})";
-constexpr std::string_view kSlotFoundRvaLog = "[hook] check failed at RVA {:08X}: expected {}; found RVA {:08X}";
+constexpr std::string_view kSlotFoundRvaLog =
+    "[hook] check failed at RVA {:08X}: expected {}; found RVA {:08X}";
 constexpr std::string_view kSlotFoundOutsideLog =
     "[hook] check failed at RVA {:08X}: expected {}; found {:08X}, outside AI.exe";
 constexpr std::string_view kTableOutsideLog =
@@ -53,10 +54,12 @@ constexpr Pattern<3> kLoadHeadPoseSlot{
     {0xFF, x86::kModMask, 0xFF}};
 
 // 9 (05 §7.2): `comiss xmm, [disp32]`, the head-in-wall threshold.
-constexpr Pattern<3> kComissDisp32{{x86::kTwoByte, x86::kComiss, x86::kModAbsolute}, {0xFF, 0xFF, x86::kModRegMask}};
+constexpr Pattern<3> kComissDisp32{{x86::kTwoByte, x86::kComiss, x86::kModAbsolute},
+                                   {0xFF, 0xFF, x86::kModRegMask}};
 
 // 9 (05 §7.3): `mov ecx, reg; call`, the camera noise.
-constexpr Pattern<3> kMovEcxRegCall{{x86::kMovR32Rm32, x86::kModRegister, x86::kCallRel32}, {0xFF, x86::kModMask, 0xFF}};
+constexpr Pattern<3> kMovEcxRegCall{{x86::kMovR32Rm32, x86::kModRegister, x86::kCallRel32},
+                                    {0xFF, x86::kModMask, 0xFF}};
 
 // 9 (05 §7.4): `mov cl, [esp+disp8]`, the look state.
 constexpr auto kMovClEspDisp8 = std::to_array<std::uint8_t>({x86::kMovR8Rm8, x86::kModRmClSib, x86::kSibEsp});
@@ -144,12 +147,12 @@ private:
 
     // Up to kShownBytes bytes at `p` as hex, never past the image's end.
     std::string_view bytes_at(const std::uint8_t* p, ShownBytes& out) const noexcept {
-        static constexpr char kHex[] = "0123456789abcdef";
-        constexpr unsigned kNibbleBits = 4;
+        static constexpr char kHex[]       = "0123456789abcdef";
+        constexpr unsigned kNibbleBits     = 4;
         constexpr std::uint8_t kNibbleMask = 0xF;
-        const std::uint32_t at = g_.rva_of(p);
+        const std::uint32_t at             = g_.rva_of(p);
         const std::size_t n = at < g_.image_size ? std::min<std::size_t>(kShownBytes, g_.image_size - at) : 0;
-        std::size_t k = 0;
+        std::size_t k       = 0;
         for (std::size_t i = 0; i < n; ++i) {
             if (i) out[k++] = ' ';
             out[k++] = kHex[p[i] >> kNibbleBits];
@@ -159,8 +162,8 @@ private:
     }
 
     const GameImage& g_;
-    ports::Log&      log_;
-    int              failures_ = 0;
+    ports::Log& log_;
+    int failures_ = 0;
 };
 
 // ---- One checker per step ---------------------------------------------------
@@ -201,7 +204,7 @@ void check_stereo_mode_tests(Preflight& pf) noexcept {
 // 7: the hand-off of the stereo manager and device (02 §3.1, §6.1, §6.2,
 // §6.4).
 void check_stereo_hand_off(Preflight& pf) noexcept {
-    const GameImage& g = pf.game();
+    const GameImage& g        = pf.game();
     const std::uint8_t* alloc = g.at(AiAddr::StereoManagerAlloc);
     pf.expect(alloc[0] == x86::kPushImm32 && read_u32(alloc + x86::kImm32Offset) == kGameStereoManagerSize &&
                   x86::matches(alloc + kStereoAllocStoreOffset, kStoreEaxDisp32),
@@ -223,8 +226,8 @@ void check_game_side_calls(Preflight& pf) noexcept {
     const GameImage& g = pf.game();
     pf.expect(*g.at(AiAddr::StereoUpdateCall) == x86::kCallRel32, g.at(AiAddr::StereoUpdateCall),
               "call StereoUpdate");
-    pf.expect(calls(g.at(AiAddr::VirtualScreenCall), g.at(AiAddr::BuildUiQuad)), g.at(AiAddr::VirtualScreenCall),
-              "call BuildUiQuad (the virtual screen)");
+    pf.expect(calls(g.at(AiAddr::VirtualScreenCall), g.at(AiAddr::BuildUiQuad)),
+              g.at(AiAddr::VirtualScreenCall), "call BuildUiQuad (the virtual screen)");
     pf.expect(calls(g.at(AiAddr::HudPanelCall), g.at(AiAddr::BuildUiQuad)), g.at(AiAddr::HudPanelCall),
               "call BuildUiQuad (the HUD panel)");
     for (AiAddr a : {AiAddr::PushModeCallA, AiAddr::PushModeCallB, AiAddr::PushModeCallC}) {
@@ -239,13 +242,14 @@ void check_game_side_calls(Preflight& pf) noexcept {
     const std::uint8_t* second = g.at_rva(g.sites.left_stick_prompt_call_2);
     pf.expect(*first == x86::kCallRel32 && g.contains(call_target(first)), first,
               "call into AI.exe (the left-stick prompt)");
-    pf.expect(*first == x86::kCallRel32 && *second == x86::kCallRel32 && call_target(first) == call_target(second),
-              second, "the same call as LeftStickPromptCall (the second left-stick prompt)");
+    pf.expect(
+        *first == x86::kCallRel32 && *second == x86::kCallRel32 && call_target(first) == call_target(second),
+        second, "the same call as LeftStickPromptCall (the second left-stick prompt)");
 }
 
 // 8: the vtable slots the game-side hooks replace (05 §5, §6).
 void check_game_side_slots(Preflight& pf) noexcept {
-    const GameImage& g = pf.game();
+    const GameImage& g         = pf.game();
     const std::uint8_t* follow = g.at(AiAddr::FollowVtable);
     pf.expect_slot(follow + slot_offset(kFollowOnActivateSlot), g.at(AiAddr::FollowOnActivatePatch),
                    "FollowBehavior::OnActivate (slot 0)");
@@ -256,7 +260,8 @@ void check_game_side_slots(Preflight& pf) noexcept {
     auto expect_screen_slot = [&](AiAddr vtable, std::uint32_t slot, AiAddr method, std::string_view what) {
         pf.expect_slot(g.at(vtable) + slot_offset(slot), g.at(method), what);
     };
-    expect_screen_slot(AiAddr::MenuVtable, kScreenCloseSlot, AiAddr::MenuClose, "the front-end menu's close (slot 2)");
+    expect_screen_slot(AiAddr::MenuVtable, kScreenCloseSlot, AiAddr::MenuClose,
+                       "the front-end menu's close (slot 2)");
     expect_screen_slot(AiAddr::PauseMenuVtable, kScreenCloseSlot, AiAddr::PauseMenuClose,
                        "the pause menu's close (slot 2)");
     expect_screen_slot(AiAddr::LoadingScreenVtable, kScreenOpenSlot, AiAddr::LoadingScreenOpen,
@@ -306,9 +311,10 @@ void check_ui_patch_sites(Preflight& pf) noexcept {
               "je (the UI input mode)");
 
     const std::uint8_t* resume = g.at(AiAddr::ResumeGamePopMode);
-    pf.expect(x86::matches(resume, kMovEcxAbs) && calls(resume + x86::kMovEcxAbsSize, g.at(AiAddr::GamePopMode)),
-              resume, "mov ecx, [abs]; call StereoPopMode (Resume_game)");
-    const std::uint8_t* pause = g.at(AiAddr::PauseMenuPushMode);
+    pf.expect(
+        x86::matches(resume, kMovEcxAbs) && calls(resume + x86::kMovEcxAbsSize, g.at(AiAddr::GamePopMode)),
+        resume, "mov ecx, [abs]; call StereoPopMode (Resume_game)");
+    const std::uint8_t* pause      = g.at(AiAddr::PauseMenuPushMode);
     const std::uint8_t* pause_push = pause + x86::kMovEcxAbsSize;
     pf.expect(x86::matches(pause, kMovEcxAbs) && x86::matches(pause_push, kPushScreenMode) &&
                   calls(pause_push + x86::kPushImm8Size, g.at(AiAddr::GamePushMode)),
@@ -322,9 +328,9 @@ void check_ui_patch_sites(Preflight& pf) noexcept {
 
 // 9: the pad slots the controls replace as one patch (04 §3.3).
 void check_pad_slots(Preflight& pf) noexcept {
-    const GameImage& g = pf.game();
+    const GameImage& g      = pf.game();
     const std::uint8_t* pad = g.at(AiAddr::PadVtable);
-    auto expect_pad_slot = [&](std::uint32_t slot, AiAddr method, std::string_view what) {
+    auto expect_pad_slot    = [&](std::uint32_t slot, AiAddr method, std::string_view what) {
         pf.expect_slot(pad + slot_offset(slot - kPadFirstTableSlot), g.at(method), what);
     };
     expect_pad_slot(kPadIsDownSlot, AiAddr::PadIsDown, "the pad's IsDown (slot 1)");

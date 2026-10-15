@@ -48,9 +48,9 @@ void read_pad(Context& ctx, void* pad, UpdateInput& in) noexcept {
 // 05 §3.2b, e: the keyboard chord and keyboard or mouse use.
 void read_keyboard_and_mouse(const game::AddressMap& addresses, void* keyboard, void* mouse,
                              UpdateInput& in) noexcept {
-    in.keyboard_and_mouse    = true;
-    in.ctrl                  = game::input::key_down(addresses, keyboard, game::kScanLCtrl);
-    in.alt                   = game::input::key_down(addresses, keyboard, game::kScanLAlt);
+    in.keyboard_and_mouse = true;
+    in.ctrl               = game::input::key_down(addresses, keyboard, game::kScanLCtrl);
+    in.alt                = game::input::key_down(addresses, keyboard, game::kScanLAlt);
     in.key_or_mouse_activity =
         game::input::any_key(addresses, keyboard) || game::input::mouse_active(addresses, mouse);
 }
@@ -61,7 +61,7 @@ UpdateInput gather(Context& ctx, StereoManager& m, StereoInterface& device) {
     void* pad      = ctx.input_manager.pad_device();
     void* keyboard = ctx.input_manager.keyboard_device();
     void* mouse    = ctx.input_manager.mouse_device();
-    in.now = ctx.clock.now();
+    in.now         = ctx.clock.now();
     if (pad) read_pad(ctx, pad, in);
     if (keyboard && mouse) read_keyboard_and_mouse(ctx.addresses, keyboard, mouse, in);
     in.follow_active = ctx.follow.active();
@@ -76,15 +76,15 @@ UpdateInput gather(Context& ctx, StereoManager& m, StereoInterface& device) {
 
 // Re-places the menu screen in front of the current view (05 §3.2e).
 void place_menu_screen(Context& ctx, StereoManager& m) noexcept {
-    const Matrix44 quad =
-        core::stereo::virtual_screen_quad(game::stereo::view_matrix(ctx.addresses), core::stereo::kMenuScreenInvAspect);
+    const Matrix44 quad = core::stereo::virtual_screen_quad(game::stereo::view_matrix(ctx.addresses),
+                                                            core::stereo::kMenuScreenInvAspect);
     std::ranges::copy(quad, m.game_matrix);
 }
 
 // Rule f (05 §3.2f): the stack count follows the mode.
 void sync_mode_stack(Context& ctx, StereoManager& m) noexcept {
-    const auto sync =
-        ModePolicy::sync_mode_stack(game::stereo::mode_stack_state(m), game::stereo::has_mode_stack_append(ctx.targets.mode_stack));
+    const auto sync = ModePolicy::sync_mode_stack(
+        game::stereo::mode_stack_state(m), game::stereo::has_mode_stack_append(ctx.targets.mode_stack));
     ctx.modes.report(game::stereo::apply_stack_sync(ctx.targets.mode_stack, m, sync));
 }
 
@@ -112,7 +112,7 @@ float* place_quad(float* out, const Matrix44& quad) noexcept {
 // cutscenes and loading. The game's own update (DK2 recenter, fade) is not
 // run. From: FUN_1001f8a0.
 int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept {
-    auto&            ctx    = context();
+    auto& ctx               = context();
     StereoInterface* device = load_device(*self);
     if (!device || load_state(*device) != DeviceState::Running) {
         // 05 §3.2a: without a running headset only the game's own look is
@@ -128,11 +128,13 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
 }
 
 float* __cdecl place_virtual_screen(float* out, float, float inv_aspect, float) noexcept {
-    return place_quad(out, core::stereo::virtual_screen_quad(game::stereo::view_matrix(context().addresses), inv_aspect));
+    return place_quad(
+        out, core::stereo::virtual_screen_quad(game::stereo::view_matrix(context().addresses), inv_aspect));
 }
 
 float* __cdecl place_hud_panel(float* out, float, float inv_aspect, float) noexcept {
-    return place_quad(out, core::stereo::hud_panel_quad(game::stereo::view_matrix(context().addresses), inv_aspect));
+    return place_quad(
+        out, core::stereo::hud_panel_quad(game::stereo::view_matrix(context().addresses), inv_aspect));
 }
 
 // Mode 0: 3D world with the HUD panel. Mode 1: the virtual screen (menus,

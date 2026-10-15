@@ -12,10 +12,10 @@ class DllDirectoryScope {
 public:
     explicit DllDirectoryScope(const std::filesystem::path& dir) noexcept;
     ~DllDirectoryScope();
-    DllDirectoryScope(const DllDirectoryScope&) = delete;
+    DllDirectoryScope(const DllDirectoryScope&)            = delete;
     DllDirectoryScope& operator=(const DllDirectoryScope&) = delete;
-    DllDirectoryScope(DllDirectoryScope&&) = delete;
-    DllDirectoryScope& operator=(DllDirectoryScope&&) = delete;
+    DllDirectoryScope(DllDirectoryScope&&)                 = delete;
+    DllDirectoryScope& operator=(DllDirectoryScope&&)      = delete;
 
 private:
     std::wstring previous_;

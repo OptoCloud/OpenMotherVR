@@ -29,8 +29,8 @@ struct DdsPixelFormat {
     std::uint32_t rgb_bits = 0, r = 0, g = 0, b = 0, a = 0;
 };
 struct DdsHeader {
-    std::uint32_t size  = 124;  // sizeof(DdsHeader), asserted below
-    std::uint32_t flags = kDdsdCaps | kDdsdHeight | kDdsdWidth | kDdsdPixelFormat | kDdsdPitch;
+    std::uint32_t size   = 124; // sizeof(DdsHeader), asserted below
+    std::uint32_t flags  = kDdsdCaps | kDdsdHeight | kDdsdWidth | kDdsdPixelFormat | kDdsdPitch;
     std::uint32_t height = 0, width = 0, pitch = 0, depth = 0, mip_count = 1;
     std::uint32_t reserved[11]{};
     DdsPixelFormat format{};

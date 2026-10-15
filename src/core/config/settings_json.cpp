@@ -33,8 +33,8 @@ constexpr const char* kLegacyDevDebugKey  = "DevDebugOptions";
 const char* section_key(Section s) noexcept {
     switch (s) {
         case Section::Rendering: return kRenderingKey;
-        case Section::Input:     return kInputKey;
-        case Section::Settings:  break;
+        case Section::Input: return kInputKey;
+        case Section::Settings: break;
     }
     return nullptr;
 }
@@ -89,7 +89,7 @@ void read_row(const json& section, const SettingRow& row, Settings& cfg) {
     std::visit(
         [&](auto field) {
             auto& value = field(cfg);
-            using T = std::remove_reference_t<decltype(value)>;
+            using T     = std::remove_reference_t<decltype(value)>;
             if constexpr (kIsEnum<T>) {
                 value = get_enum_or(section, row.key, value);
             } else {
@@ -104,7 +104,7 @@ json value_of(const SettingRow& row, Settings& cfg) {
     return std::visit(
         [&](auto field) -> json {
             const auto& value = field(cfg);
-            using T = std::remove_cvref_t<decltype(value)>;
+            using T           = std::remove_cvref_t<decltype(value)>;
             if constexpr (kIsEnum<T>) {
                 return to_string(value);
             } else {
@@ -148,12 +148,12 @@ void write_config(json& root, const Settings& c) {
     // next read by an older build of ours.
     if (auto d = root.find(kLegacyDebugKey); d != root.end() && d->is_object()) root.erase(d);
 
-    Settings written = c;
+    Settings written   = c;
     written.vr_runtime = written_runtime(c.vr_runtime);
-    json& s = object_at(root, kSettingsKey);
+    json& s            = object_at(root, kSettingsKey);
     for (const SettingRow& row : settings_table()) {
-        const char* key = section_key(row.section);
-        json& section = key ? object_at(s, key) : s;
+        const char* key               = section_key(row.section);
+        json& section                 = key ? object_at(s, key) : s;
         section[std::string(row.key)] = value_of(row, written);
     }
 }
@@ -162,7 +162,7 @@ std::string describe(const Settings& c) {
     // Key paths as in mothervr.json, so a tester can hold the line against
     // the player's file.
     Settings shown = c;
-    json j = json::object();
+    json j         = json::object();
     for (const SettingRow& row : settings_table()) j[std::string(row.path)] = value_of(row, shown);
     return j.dump();
 }

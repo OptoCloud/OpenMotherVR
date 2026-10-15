@@ -32,7 +32,7 @@ inline constexpr float kPixelScaleDefault = 1.0f;
 // the smallest becomes the default (12: 30 degrees a step). From the
 // segment cascade in FUN_10020870.
 inline constexpr std::array<int, 6> kSnapSegmentSteps{24, 12, 6, 4, 3, 2};
-inline constexpr int                kSnapSegmentsDefault = 12;
+inline constexpr int kSnapSegmentsDefault = 12;
 // mvr_snaprotationsegments refuses fewer than this (spec 06 §4.2).
 inline constexpr int kSnapSegmentsMinCommand = 2;
 

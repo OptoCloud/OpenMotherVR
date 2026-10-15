@@ -15,8 +15,8 @@ namespace omvr::core::ui::ports {
 
 // What MOTHER.PAK was built from: UI.PAK's size and last-write time.
 struct FileIdentity {
-    std::uint64_t size = 0;
-    std::uint64_t written = 0;
+    std::uint64_t size                         = 0;
+    std::uint64_t written                      = 0;
     bool operator==(const FileIdentity&) const = default;
 };
 
@@ -38,7 +38,7 @@ class ArchiveFiles {
 public:
     // Size and last-write time, or nullopt when absent or a directory.
     virtual std::optional<FileIdentity> identity(const std::filesystem::path& path) noexcept = 0;
-    virtual util::Result<std::vector<std::byte>> read(const std::filesystem::path& path) = 0;
+    virtual util::Result<std::vector<std::byte>> read(const std::filesystem::path& path)     = 0;
     // Error context "create" when the temporary file could not be created,
     // "write" for a later failure.
     virtual util::Result<void> write_atomically(const std::filesystem::path& path,
@@ -46,14 +46,14 @@ public:
     // The file's last-write time equals `stamp`.
     virtual bool stamped(const std::filesystem::path& path, FileTime stamp) noexcept = 0;
     // Sets all three file times to `stamp`.
-    virtual void stamp(const std::filesystem::path& path, FileTime stamp) noexcept = 0;
-    virtual std::optional<FileIdentity> read_sidecar(const std::filesystem::path& path) noexcept = 0;
+    virtual void stamp(const std::filesystem::path& path, FileTime stamp) noexcept                 = 0;
+    virtual std::optional<FileIdentity> read_sidecar(const std::filesystem::path& path) noexcept   = 0;
     virtual void write_sidecar(const std::filesystem::path& path, const FileIdentity& id) noexcept = 0;
-    virtual void remove(const std::filesystem::path& path) noexcept = 0;
+    virtual void remove(const std::filesystem::path& path) noexcept                                = 0;
     // A lock shared between the processes of one game launch.
     virtual LockState lock(std::wstring_view name, std::chrono::milliseconds timeout) noexcept = 0;
-    virtual void unlock() noexcept = 0;
-    virtual std::span<const std::byte> payload(ResourceId id) noexcept = 0;
+    virtual void unlock() noexcept                                                             = 0;
+    virtual std::span<const std::byte> payload(ResourceId id) noexcept                         = 0;
 
 protected:
     ~ArchiveFiles() = default;

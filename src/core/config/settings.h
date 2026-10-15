@@ -57,22 +57,22 @@ enum class StereoAA { Auto = 0, On = 1, Off = 2 };
 
 // Defaults are the original's, except the runtime (see Config).
 struct RenderingSettings {
-    MirrorViewType mirror_view_type     = MirrorViewType::RightEye;
-    bool           symmetric_mirror_view = true;
-    float          pixel_scale           = kPixelScaleDefault;
-    bool           clipping_blinders     = true;
-    StereoAA       stereo_aa             = StereoAA::Auto;
+    MirrorViewType mirror_view_type = MirrorViewType::RightEye;
+    bool symmetric_mirror_view      = true;
+    float pixel_scale               = kPixelScaleDefault;
+    bool clipping_blinders          = true;
+    StereoAA stereo_aa              = StereoAA::Auto;
 };
 
 // Whether the game's anti-aliasing should run in stereo with `r`.
 inline bool stereo_aa_enabled(const RenderingSettings& r) noexcept {
-    return r.stereo_aa == StereoAA::On
-        || (r.stereo_aa == StereoAA::Auto && r.pixel_scale <= kStereoAaMaxAutoScale);
+    return r.stereo_aa == StereoAA::On ||
+           (r.stereo_aa == StereoAA::Auto && r.pixel_scale <= kStereoAaMaxAutoScale);
 }
 
 struct InputSettings {
     bool snap_rotation             = true;
-    int  snap_rotation_segments    = kSnapSegmentsDefault;
+    int snap_rotation_segments     = kSnapSegmentsDefault;
     bool vr_input_relative_walking = true;
     bool vr_input_strafing         = true;
     bool toggle_grips              = false;
@@ -83,16 +83,16 @@ struct DebugSettings {
     bool skip_startup_intro = false;
     // "Dev. Debug Options" in the MotherVR menu: unhides Select Level and the
     // debug checkpoints. Stored as Settings.DebugOptions.
-    bool debug              = false;
+    bool debug = false;
 };
 
 struct Settings {
     // The original defaults to None. OpenVR is the runtime we have a stereo
     // device for, so a first launch starts in VR.
-    VRRuntime         vr_runtime = VRRuntime::OpenVR;
+    VRRuntime vr_runtime = VRRuntime::OpenVR;
     RenderingSettings rendering{};
-    InputSettings     input{};
-    DebugSettings     debug{};
+    InputSettings input{};
+    DebugSettings debug{};
 };
 
 } // namespace omvr::core::config

@@ -44,13 +44,13 @@ public:
     const DetectResult& last_result() noexcept;
 
 private:
-    diag::ports::Log&       log_;
+    diag::ports::Log& log_;
     const config::Settings& settings_;
     const config::ports::LaunchSwitches& switches_;
-    ports::RuntimeProbe&    openvr_;
-    ports::RuntimeProbe&    openxr_;
-    DetectResult            last_{};
-    std::once_flag          detected_;
+    ports::RuntimeProbe& openvr_;
+    ports::RuntimeProbe& openxr_;
+    DetectResult last_{};
+    std::once_flag detected_;
 };
 
 } // namespace omvr::core::vr

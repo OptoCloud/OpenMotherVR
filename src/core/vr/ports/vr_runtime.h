@@ -29,7 +29,7 @@ public:
     // when the headset cannot be driven at all (no OpenXR session): the
     // stereo device then drops back to no HMD.                          slot 3
     virtual bool create_render_resources(GpuDevice device, GpuContext context) = 0;
-    virtual void release_render_resources() = 0;                      // slot 4
+    virtual void release_render_resources()                                    = 0; // slot 4
     // Head pose in the game's convention (see to_game_pose), metres
     // times `world_scale`.                                              slot 5
     virtual void head_pose(util::Matrix34& out, float world_scale) = 0;

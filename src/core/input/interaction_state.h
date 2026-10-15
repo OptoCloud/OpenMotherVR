@@ -18,7 +18,15 @@
 namespace omvr::core::input {
 
 enum class Interaction : std::uint8_t {
-    None, Generic, SuitChange, Keypad, Hacking, Cutting, Terminal, Ladder, Rewire,
+    None,
+    Generic,
+    SuitChange,
+    Keypad,
+    Hacking,
+    Cutting,
+    Terminal,
+    Ladder,
+    Rewire,
 };
 
 // The tracked state of 11 §5.3. Each value is one atomic, so any thread
@@ -29,9 +37,9 @@ public:
     explicit InteractionState(diag::ports::Log& log) noexcept : log_(log) {}
 
     // Safe from any thread.
-    [[nodiscard]] bool        in_interaction() const noexcept;  // between start_interaction and its end
-    [[nodiscard]] Interaction interaction() const noexcept;     // the specific kind, when announced
-    [[nodiscard]] bool        hiding() const noexcept;          // in a locker or under a table
+    [[nodiscard]] bool in_interaction() const noexcept;     // between start_interaction and its end
+    [[nodiscard]] Interaction interaction() const noexcept; // the specific kind, when announced
+    [[nodiscard]] bool hiding() const noexcept;             // in a locker or under a table
 
     // One string the scripts passed. Returns true when it changed the state.
     // Game thread.
@@ -45,12 +53,12 @@ private:
     void end_interaction() noexcept;
     bool on_prefixed_event(std::string_view text) noexcept;
 
-    diag::ports::Log&        log_;
-    std::atomic<bool>        in_interaction_{false};
+    diag::ports::Log& log_;
+    std::atomic<bool> in_interaction_{false};
     std::atomic<Interaction> interaction_{Interaction::None};
-    std::atomic<bool>        hiding_{false};
-    std::mutex                         mutex_;  // guards seen_; never held across a game call
-    std::set<std::string, std::less<>> seen_;   // find() without a copy
+    std::atomic<bool> hiding_{false};
+    std::mutex mutex_;                        // guards seen_; never held across a game call
+    std::set<std::string, std::less<>> seen_; // find() without a copy
 };
 
 } // namespace omvr::core::input

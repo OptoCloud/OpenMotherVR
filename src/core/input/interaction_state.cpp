@@ -12,21 +12,21 @@ namespace {
 // (11 §5.3).
 struct Kind {
     std::string_view prefix;
-    Interaction      kind;
+    Interaction kind;
 };
 constexpr std::array kKinds = {
-    Kind{game::kEventSuitChange, Interaction::SuitChange},
-    Kind{game::kEventKeypad,     Interaction::Keypad},
-    Kind{game::kEventHacking,    Interaction::Hacking},
-    Kind{game::kEventCutting,    Interaction::Cutting},
-    Kind{game::kEventTerminal,   Interaction::Terminal},
-    Kind{game::kEventLadder,     Interaction::Ladder},
-    Kind{game::kEventRewire,     Interaction::Rewire},
+    Kind{game::kEventSuitChange, Interaction::SuitChange}, Kind{game::kEventKeypad, Interaction::Keypad},
+    Kind{game::kEventHacking, Interaction::Hacking},       Kind{game::kEventCutting, Interaction::Cutting},
+    Kind{game::kEventTerminal, Interaction::Terminal},     Kind{game::kEventLadder, Interaction::Ladder},
+    Kind{game::kEventRewire, Interaction::Rewire},
 };
 
 // The strings that end any interaction.
 constexpr std::array kEnds = {
-    game::kEventStopInteraction, game::kEventLadderFinish, game::kEventHidingFinish, game::kEventSuitChangeFinish,
+    game::kEventStopInteraction,
+    game::kEventLadderFinish,
+    game::kEventHidingFinish,
+    game::kEventSuitChangeFinish,
 };
 
 constexpr std::string_view kEventLog = "[events] \"{}\"{}: interaction {} kind {} hiding {}";
@@ -35,7 +35,8 @@ constexpr std::string_view kNewTag   = " (new)";
 // 11 §5.2: most traffic is per-frame engine chatter that no tracked string
 // resembles; drop it before any matching.
 bool is_chatter(std::string_view text) noexcept {
-    return text.empty() || text[0] == game::kEventChatterInitial || text.starts_with(game::kEventChatterPrefix);
+    return text.empty() || text[0] == game::kEventChatterInitial ||
+           text.starts_with(game::kEventChatterPrefix);
 }
 
 bool is_end(std::string_view text) noexcept {
@@ -105,12 +106,15 @@ void InteractionState::log_event(std::string_view text, bool changed) noexcept {
         if (!first && !changed) return;
         diag::ports::logf(log_, kEventLog, text, first ? kNewTag : std::string_view{}, in_interaction(),
                           static_cast<int>(interaction()), hiding());
-    } catch (...) {
-    }
+    } catch (...) {}
 }
 
-bool InteractionState::in_interaction() const noexcept { return in_interaction_.load(std::memory_order_relaxed); }
-Interaction InteractionState::interaction() const noexcept { return interaction_.load(std::memory_order_relaxed); }
+bool InteractionState::in_interaction() const noexcept {
+    return in_interaction_.load(std::memory_order_relaxed);
+}
+Interaction InteractionState::interaction() const noexcept {
+    return interaction_.load(std::memory_order_relaxed);
+}
 bool InteractionState::hiding() const noexcept { return hiding_.load(std::memory_order_relaxed); }
 
 } // namespace omvr::core::input

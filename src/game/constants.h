@@ -11,8 +11,8 @@ namespace omvr::game {
 // Builds of AlienIsolation.exe (named "AI.exe" on disk) the mod can patch,
 // by their PE IMAGE_FILE_HEADER.TimeDateStamp (01 §3.1).
 enum class GameBuild : std::uint32_t {
-    Original2015 = 0x54E3199D,  // launch build
-    Patched2020  = 0x5FD25676,  // December 2020 Steam/Epic update
+    Original2015 = 0x54E3199D, // launch build
+    Patched2020  = 0x5FD25676, // December 2020 Steam/Epic update
 };
 
 // The builds identify() knows, in the order they are tried.
@@ -23,8 +23,8 @@ inline constexpr const char* kGameModuleName = "AI.exe";
 
 // What the game's own pointers lead to before the UI set replaces them
 // (01 §2.5.1).
-inline constexpr std::string_view kStockUiPak  = "data\\ui.pak";
-inline constexpr std::string_view kShowBootup  = "ShowBootup";
+inline constexpr std::string_view kStockUiPak = "data\\ui.pak";
+inline constexpr std::string_view kShowBootup = "ShowBootup";
 
 // Virtual control codes (04 §3): map 0 (player) 0x100.., map 1 (UI) 0x200..,
 // map 2 0x400... Within a map, digital action k has code base + k and analog
@@ -78,12 +78,12 @@ inline constexpr std::uint32_t kFollowLookStoreOffset   = 8;
 
 // The XInput pad's vtable address in the table points at slot 1 (one past
 // the destructor); the replaced methods' slots.
-inline constexpr std::uint32_t kPadFirstTableSlot   = 1;
-inline constexpr std::uint32_t kPadIsDownSlot       = 1;
-inline constexpr std::uint32_t kPadGetValueSlot     = 2;
-inline constexpr std::uint32_t kPadGetAxisSlot      = 3;
-inline constexpr std::uint32_t kPadControlNameSlot  = 5;
-inline constexpr std::uint32_t kPadHasActivitySlot  = 11;
+inline constexpr std::uint32_t kPadFirstTableSlot  = 1;
+inline constexpr std::uint32_t kPadIsDownSlot      = 1;
+inline constexpr std::uint32_t kPadGetValueSlot    = 2;
+inline constexpr std::uint32_t kPadGetAxisSlot     = 3;
+inline constexpr std::uint32_t kPadControlNameSlot = 5;
+inline constexpr std::uint32_t kPadHasActivitySlot = 11;
 
 // ---- Input (04 §2) ------------------------------------------------------------
 
@@ -92,24 +92,24 @@ inline constexpr int kScanLCtrl = 0x1D;
 inline constexpr int kScanLAlt  = 0x38;
 
 // Pad control codes (04 §2.3). "No control" is -1, read as 16 bits 0xFFFF.
-inline constexpr int         kNoPadControl = -1;
-inline constexpr int         kPadA         = 0x00;
-inline constexpr int         kPadB         = 0x01;
-inline constexpr int         kPadX         = 0x02;
-inline constexpr int         kPadY         = 0x03;
-inline constexpr int         kPadBack      = 0x08;
-inline constexpr int         kPadStart     = 0x09;
-inline constexpr int         kPadLB        = 0x0A;
-inline constexpr int         kPadRB        = 0x0B;
-inline constexpr int         kPadRStick    = 0x0F;
-inline constexpr int         kPadLStickX   = 0x12;
-inline constexpr std::size_t kPadCodeCount = 0x18;  // the codes are 0x00..0x17
+inline constexpr int kNoPadControl         = -1;
+inline constexpr int kPadA                 = 0x00;
+inline constexpr int kPadB                 = 0x01;
+inline constexpr int kPadX                 = 0x02;
+inline constexpr int kPadY                 = 0x03;
+inline constexpr int kPadBack              = 0x08;
+inline constexpr int kPadStart             = 0x09;
+inline constexpr int kPadLB                = 0x0A;
+inline constexpr int kPadRB                = 0x0B;
+inline constexpr int kPadRStick            = 0x0F;
+inline constexpr int kPadLStickX           = 0x12;
+inline constexpr std::size_t kPadCodeCount = 0x18; // the codes are 0x00..0x17
 
 // Action maps (04 §2.4): 0 player, 1 menus, 2 a third map no VR action is
 // routed to.
 inline constexpr std::size_t kActionMapCount = 3;
-inline constexpr int         kPlayerMap      = 0;
-inline constexpr int         kMenuMap        = 1;
+inline constexpr int kPlayerMap              = 0;
+inline constexpr int kMenuMap                = 1;
 
 // Capacity of a map: digital and analog action entries, composite entries
 // and the code dwords of one composite entry.
@@ -193,8 +193,8 @@ inline constexpr std::string_view kEventLadder       = "ladder_interaction";
 inline constexpr std::string_view kEventRewire       = "rewire_interaction";
 // Per-frame engine chatter starts with these; no tracked string does
 // (11 §5.2).
-inline constexpr char             kEventChatterInitial = 'C';
-inline constexpr std::string_view kEventChatterPrefix  = "on_";
+inline constexpr char kEventChatterInitial            = 'C';
+inline constexpr std::string_view kEventChatterPrefix = "on_";
 
 // ---- Stereo (02 §4, §6.5; 05 §3.2g, §7.2; 08 §3.1, §4.1) -----------------------
 
@@ -229,7 +229,7 @@ inline constexpr std::uint32_t kHeadClipThresholdBits = 0x3727C5ACu;
 // ovrHmdCap_LowPersistence; ovrTrackingCap_Orientation |
 // ovrTrackingCap_MagYawCorrection | ovrTrackingCap_Position;
 // ovrDistortionCap_TimeWarp.
-inline constexpr std::int32_t  kHmdTypeDk2        = 6;
+inline constexpr std::int32_t kHmdTypeDk2         = 6;
 inline constexpr std::uint32_t kDk2HmdCaps        = 0x83;
 inline constexpr std::uint32_t kDk2SensorCaps     = 0x70;
 inline constexpr std::uint32_t kDk2DistortionCaps = 0x02;

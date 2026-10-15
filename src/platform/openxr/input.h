@@ -38,8 +38,8 @@ public:
 private:
     // One binding: action + component path under /user/hand/<side>/input or /output.
     struct Bind {
-        XrAction*   action;
-        const char* left;  // nullptr: not bound on that hand
+        XrAction* action;
+        const char* left; // nullptr: not bound on that hand
         const char* right;
     };
 
@@ -56,10 +56,10 @@ private:
 
     // Why a hand's grip was not located, logged once per hand and change.
     struct GripOutcome {
-        bool                 locate_failed  = false;
-        XrSpaceLocationFlags flags          = 0;
-        bool                 pose_active    = false;
-        bool                 trigger_active = false;
+        bool locate_failed         = false;
+        XrSpaceLocationFlags flags = 0;
+        bool pose_active           = false;
+        bool trigger_active        = false;
 
         friend bool operator==(const GripOutcome&, const GripOutcome&) = default;
     };
@@ -79,18 +79,18 @@ private:
     void log_untracked_grip(int hand, XrResult located, XrSpaceLocationFlags flags) noexcept;
 
     core::diag::ports::Log& log_;
-    XrInstance     instance_ = XR_NULL_HANDLE;
-    XrSession      session_  = XR_NULL_HANDLE;
-    ActionSetOwner set_;   // destroys its actions too
+    XrInstance instance_ = XR_NULL_HANDLE;
+    XrSession session_   = XR_NULL_HANDLE;
+    ActionSetOwner set_; // destroys its actions too
 
     std::array<XrPath, core::vr::kHandCount> hand_path_{};
-    Actions                                  actions_{};
+    Actions actions_{};
     std::array<SpaceOwner, core::vr::kHandCount> grip_space_{};
-    ControllerState                          state_{};
+    ControllerState state_{};
 
     // Logged on change; kept across destroy(), as the log is per process.
     std::array<util::ChangeLatch<GripOutcome>, core::vr::kHandCount> grip_logged_{};
-    XrResult                                 sync_logged_ = XR_SUCCESS;
+    XrResult sync_logged_ = XR_SUCCESS;
 };
 
 } // namespace omvr::platform::openxr

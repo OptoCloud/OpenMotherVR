@@ -58,66 +58,66 @@ namespace omvr::loader {
 // not use it before attach.
 struct Context {
     explicit Context(void* module) noexcept;
-    Context(const Context&) = delete;
+    Context(const Context&)            = delete;
     Context& operator=(const Context&) = delete;
 
     void* const module; // this DLL's HINSTANCE
 
     // diag
-    platform::win32::SystemClock    clock;
-    platform::win32::FileLogSink    log_sink;
-    core::diag::Logger              log;
-    platform::win32::CrashRecorder  crash;
+    platform::win32::SystemClock clock;
+    platform::win32::FileLogSink log_sink;
+    core::diag::Logger log;
+    platform::win32::CrashRecorder crash;
     // config, ui
-    ProcessLaunchSwitches           launch;  // the command-line switches, read at attach
-    platform::win32::FileStore      files;
-    core::config::SettingsStore     settings;
-    platform::win32::DialogThread   dialogs;
-    platform::win32::ArchiveFiles   archive_files;
-    core::ui::UiArchiveDeployer     ui_archive;
+    ProcessLaunchSwitches launch; // the command-line switches, read at attach
+    platform::win32::FileStore files;
+    core::config::SettingsStore settings;
+    platform::win32::DialogThread dialogs;
+    platform::win32::ArchiveFiles archive_files;
+    core::ui::UiArchiveDeployer ui_archive;
     // game
-    game::AddressMap                addresses;
-    game::StereoManager             manager{};  // the object whose address the game is given
-    game::ui::ScriptVars            script_vars;
-    game::ui::Console               console;
-    RuntimeStateView                runtime_state;  // over `runtimes` and `stereo`, declared below
-    core::ui::DisplayReset          display_reset;
+    game::AddressMap addresses;
+    game::StereoManager manager{}; // the object whose address the game is given
+    game::ui::ScriptVars script_vars;
+    game::ui::Console console;
+    RuntimeStateView runtime_state; // over `runtimes` and `stereo`, declared below
+    core::ui::DisplayReset display_reset;
     // input
-    game::input::InputManager       input_manager;
-    core::input::Glyphs             glyphs;
-    core::input::ControlSchemes     schemes;
-    core::input::VirtualPad         pad;
-    core::input::ControlMapper      controls;
-    core::input::InteractionState   interactions;
+    game::input::InputManager input_manager;
+    core::input::Glyphs glyphs;
+    core::input::ControlSchemes schemes;
+    core::input::VirtualPad pad;
+    core::input::ControlMapper controls;
+    core::input::InteractionState interactions;
     // ui
-    core::ui::SettingsPush          settings_push;
-    core::ui::Commands              commands;
+    core::ui::SettingsPush settings_push;
+    core::ui::Commands commands;
     // vr
-    core::vr::RuntimeFailure        failure;  // why the runtime of this run failed to start
-    platform::openxr::Session       xr;  // shared by the OpenXR runtime and the virtual screen
-    platform::openvr::RuntimeProbe  openvr_probe;
-    platform::openxr::RuntimeProbe  openxr_probe;
-    core::vr::RuntimeDetector       runtimes;
+    core::vr::RuntimeFailure failure; // why the runtime of this run failed to start
+    platform::openxr::Session xr;     // shared by the OpenXR runtime and the virtual screen
+    platform::openvr::RuntimeProbe openvr_probe;
+    platform::openxr::RuntimeProbe openxr_probe;
+    core::vr::RuntimeDetector runtimes;
     platform::openxr::VirtualScreen virtual_screen;
-    platform::win32::Keyboard       keyboard;
-    loader::HeadsetAudio            headset_audio;
+    platform::win32::Keyboard keyboard;
+    loader::HeadsetAudio headset_audio;
     // stereo, render
-    game::stereo::FollowCamera      follow;
-    core::stereo::SceneTracker      scene;
-    core::stereo::ModePolicy        modes;
-    core::stereo::StereoUpdate      update;
-    core::stereo::StereoDevice      stereo;  // owns the VrRuntime through a factory
-    platform::d3d11::MirrorRenderer mirror;  // the desktop mirror on the stereo device's objects
-    core::stereo::HeadClipDelay     head_clip;
-    core::stereo::StereoAa          stereo_aa;
-    core::stereo::ReflectionPass    reflections;
+    game::stereo::FollowCamera follow;
+    core::stereo::SceneTracker scene;
+    core::stereo::ModePolicy modes;
+    core::stereo::StereoUpdate update;
+    core::stereo::StereoDevice stereo;      // owns the VrRuntime through a factory
+    platform::d3d11::MirrorRenderer mirror; // the desktop mirror on the stereo device's objects
+    core::stereo::HeadClipDelay head_clip;
+    core::stereo::StereoAa stereo_aa;
+    core::stereo::ReflectionPass reflections;
     core::stereo::VirtualScreenPolicy screen_policy;
-    core::stereo::DesktopWindow     window;
-    core::render::ShaderFixStats    shader_fixes;
+    core::stereo::DesktopWindow window;
+    core::render::ShaderFixStats shader_fixes;
     // proxy, hooks
-    platform::d3d11::SystemD3d11    system_d3d11;
-    std::atomic<bool>               ui_set_only{false};
-    HookTargets                     targets;
+    platform::d3d11::SystemD3d11 system_d3d11;
+    std::atomic<bool> ui_set_only{false};
+    HookTargets targets;
 };
 
 // Builds the context once, in DLL_PROCESS_ATTACH, before the first log line.

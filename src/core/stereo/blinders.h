@@ -7,6 +7,6 @@ namespace omvr::core::stereo {
 // static storage for the whole run. kHeadClipOn with clipping blinders on,
 // kHeadClipOff (never black) with them off. Game thread.
 float& head_clip_threshold() noexcept;
-void   set_clipping_blinders(bool on) noexcept;
+void set_clipping_blinders(bool on) noexcept;
 
 } // namespace omvr::core::stereo

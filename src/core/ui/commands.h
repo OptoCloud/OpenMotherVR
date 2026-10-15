@@ -16,15 +16,15 @@ namespace omvr::core::ui {
 // A setting a command changed, for the log: its key path and new value.
 struct SettingChange {
     std::string_view path;
-    std::string      text;
+    std::string text;
 };
 
 // What an mvr_ command did to the settings.
 struct CommandOutcome {
     enum class Kind { Unknown, Refused, Applied };
-    Kind                         kind   = Kind::Unknown;
+    Kind kind                           = Kind::Unknown;
     std::optional<SettingChange> change = std::nullopt; // set when the value differs
-    config::CommandEffect        effect = config::CommandEffect::None;
+    config::CommandEffect effect        = config::CommandEffect::None;
 };
 
 // Whether the console input `cmd` is an options-page command (kCommandPrefix
@@ -61,9 +61,9 @@ private:
     void carry_out(const CommandOutcome& outcome);
 
     config::SettingsStore& store_;
-    DisplayReset&          display_reset_;
-    ports::GameSignals&    signals_;
-    diag::ports::Log&      log_;
+    DisplayReset& display_reset_;
+    ports::GameSignals& signals_;
+    diag::ports::Log& log_;
 };
 
 } // namespace omvr::core::ui

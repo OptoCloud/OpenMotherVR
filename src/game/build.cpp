@@ -36,7 +36,8 @@ void* game_module() noexcept {
 std::optional<GameBuild> identify_ai_exe() noexcept {
     const auto stamp = platform::win32::loaded_image_timestamp(game_module());
     if (!stamp) return std::nullopt;
-    const auto known = std::ranges::find(kKnownBuilds, *stamp, [](GameBuild b) { return std::to_underlying(b); });
+    const auto known =
+        std::ranges::find(kKnownBuilds, *stamp, [](GameBuild b) { return std::to_underlying(b); });
     if (known == kKnownBuilds.end()) return std::nullopt;
     return *known;
 }

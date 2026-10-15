@@ -32,11 +32,9 @@ TextureBounds crop_bounds(int eye, const RawProjection& p, RenderTangents t) noe
     // The frustum's centre maps to the middle of the eye's image; each eye
     // owns half of the texture's width.
     constexpr float kHalf = 0.5f;
-    const float eye_u = eye == 0 ? 0.0f : kHalf;
-    return {(kHalf + kHalf * p.left / t.horizontal) * kHalf + eye_u,
-            kHalf - kHalf * p.bottom / t.vertical,
-            (kHalf + kHalf * p.right / t.horizontal) * kHalf + eye_u,
-            kHalf - kHalf * p.top / t.vertical};
+    const float eye_u     = eye == 0 ? 0.0f : kHalf;
+    return {(kHalf + kHalf * p.left / t.horizontal) * kHalf + eye_u, kHalf - kHalf * p.bottom / t.vertical,
+            (kHalf + kHalf * p.right / t.horizontal) * kHalf + eye_u, kHalf - kHalf * p.top / t.vertical};
 }
 
 TextureSize scaled_size(std::uint32_t width, std::uint32_t height, float pixel_scale) noexcept {

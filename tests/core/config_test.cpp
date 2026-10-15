@@ -43,7 +43,7 @@ TEST_CASE("defaults") {
 }
 
 TEST_CASE("read_config reads every key of the original layout") {
-    const json root = json::parse(R"({"Settings": {
+    const json root  = json::parse(R"({"Settings": {
         "VRRuntime": "OpenXR", "DebugOptions": true, "SkipStartupIntro": true,
         "Rendering": {"MirrorViewType": "LeftEye", "SymmetricMirrorView": false, "PixelScale": 1.5,
                       "ClippingBlinders": false, "StereoAntiAliasing": "On"},
@@ -80,8 +80,10 @@ TEST_CASE("read_config takes the original's integers for enums") {
 }
 
 TEST_CASE("read_config: legacy spellings and layout") {
-    CHECK(read_config(json::parse(R"({"Settings": {"VRRuntime": "Disabled"}})")).vr_runtime == VRRuntime::None);
-    CHECK(read_config(json::parse(R"({"Settings": {"VRRuntime": "Oculus"}})")).vr_runtime == VRRuntime::Oculus);
+    CHECK(read_config(json::parse(R"({"Settings": {"VRRuntime": "Disabled"}})")).vr_runtime ==
+          VRRuntime::None);
+    CHECK(read_config(json::parse(R"({"Settings": {"VRRuntime": "Oculus"}})")).vr_runtime ==
+          VRRuntime::Oculus);
 
     const Settings legacy =
         read_config(json::parse(R"({"DebugOptions": {"SkipStartupIntro": true, "DevDebugOptions": true}})"));
@@ -89,8 +91,8 @@ TEST_CASE("read_config: legacy spellings and layout") {
     CHECK(legacy.debug.debug);
 
     // The original's keys win over the legacy object.
-    const Settings both = read_config(json::parse(
-        R"({"DebugOptions": {"DevDebugOptions": true}, "Settings": {"DebugOptions": false}})"));
+    const Settings both = read_config(
+        json::parse(R"({"DebugOptions": {"DevDebugOptions": true}, "Settings": {"DebugOptions": false}})"));
     CHECK_FALSE(both.debug.debug);
 }
 
@@ -141,7 +143,7 @@ TEST_CASE("write_config keeps unknown keys, drops the legacy object, never write
     json root = json::parse(R"({"DebugOptions": {"DevDebugOptions": true}, "Other": 1,
         "Settings": {"Custom": "x", "Rendering": {"Extra": 2}}})");
     Settings s;
-    s.vr_runtime = VRRuntime::Oculus;
+    s.vr_runtime                 = VRRuntime::Oculus;
     s.rendering.mirror_view_type = MirrorViewType::BothEyes;
     write_config(root, s);
     CHECK_FALSE(root.contains("DebugOptions"));
@@ -184,7 +186,7 @@ TEST_CASE("the settings table: commands and their rules") {
     CHECK(find_command("mvr_vrruntime")->effect == CommandEffect::QuitGame);
     CHECK(find_command("mvr_clipblinding")->effect == CommandEffect::ApplyBlinders);
     CHECK(find_command("mvr_nothing") == nullptr);
-    CHECK(find_command("") == nullptr);  // the AA row has no command
+    CHECK(find_command("") == nullptr); // the AA row has no command
 }
 
 TEST_CASE("enum names round trip") {
@@ -198,17 +200,19 @@ TEST_CASE("enum names round trip") {
     CHECK(parse_stereo_aa("Auto") == StereoAA::Auto);
 }
 
-const std::filesystem::path kDir = L"C:\\game";
+const std::filesystem::path kDir  = L"C:\\game";
 const std::filesystem::path kFile = kDir / kSettingsFileName;
 
 TEST_CASE("settings store: first launch, a byte-order mark, an unusable file") {
     MemoryFileStore files;
-    RecordingLog    log;
-    SettingsStore   store(files, log);
-    CHECK(store.initialize(kDir));  // absent: the caller writes the template
+    RecordingLog log;
+    SettingsStore store(files, log);
+    CHECK(store.initialize(kDir)); // absent: the caller writes the template
     CHECK(store.load_source() == "defaults, first launch");
 
-    files.files[kFile] = "\xEF\xBB\xBF" R"({"Settings": {"VRRuntime": "OpenXR"}})";
+    files.files[kFile] =
+        "\xEF\xBB\xBF"
+        R"({"Settings": {"VRRuntime": "OpenXR"}})";
     SettingsStore bom(files, log);
     CHECK_FALSE(bom.initialize(kDir));
     CHECK(bom.current().vr_runtime == VRRuntime::OpenXR);
@@ -216,18 +220,18 @@ TEST_CASE("settings store: first launch, a byte-order mark, an unusable file") {
 
     files.files[kFile] = "{ not json";
     SettingsStore broken(files, log);
-    CHECK_FALSE(broken.initialize(kDir));  // there, but unusable: kept until a change
+    CHECK_FALSE(broken.initialize(kDir)); // there, but unusable: kept until a change
     CHECK(broken.load_source() == "defaults, file unusable");
     CHECK(broken.current().vr_runtime == VRRuntime::OpenVR);
 }
 
 TEST_CASE("settings store: save keeps unknown keys and writes four-space JSON") {
     MemoryFileStore files;
-    RecordingLog    log;
+    RecordingLog log;
     files.files[kFile] = R"({"Mine": true, "Settings": {"VRRuntime": "Oculus"}})";
     SettingsStore store(files, log);
     store.initialize(kDir);
-    CHECK(store.current().vr_runtime == VRRuntime::OpenXR);  // sanitized
+    CHECK(store.current().vr_runtime == VRRuntime::OpenXR); // sanitized
     store.current().rendering.pixel_scale = 2.0f;
     store.save_current();
     CHECK(files.writes == 1);
@@ -259,7 +263,7 @@ TEST_CASE("-vrscale: the next argument, within range, the last wins") {
     CHECK(world_scale_in(Args{L"AI.exe", L"-vrscale"}) == kWorldScaleDefault);
     CHECK(world_scale_in(Args{L"AI.exe", L"-vrscale", L"1.2", L"-vrscale", L"0.8"}) == 0.8f);
     CHECK(world_scale_in(Args{L"AI.exe", L"-vrscale", L"1.2", L"-vrscale", L"9"}) == kWorldScaleDefault);
-    CHECK(world_scale_in(Args{L"-vrscale", L"1.2"}) == kWorldScaleDefault);  // args[0] is the program
+    CHECK(world_scale_in(Args{L"-vrscale", L"1.2"}) == kWorldScaleDefault); // args[0] is the program
 }
 
 } // namespace

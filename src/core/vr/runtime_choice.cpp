@@ -13,7 +13,7 @@ bool preferred_available(const DetectResult& r) noexcept {
         case VRRuntime::OpenVR: return r.openvr_available;
         case VRRuntime::Oculus: return r.oculus_available;
         case VRRuntime::OpenXR: return r.openxr_available;
-        case VRRuntime::None:   return false;
+        case VRRuntime::None: return false;
     }
     return false;
 }
@@ -23,7 +23,7 @@ Chosen chosen_for(VRRuntime runtime) noexcept {
         case VRRuntime::OpenVR: return Chosen::OpenVR;
         case VRRuntime::Oculus: return Chosen::Oculus;
         case VRRuntime::OpenXR: return Chosen::OpenXR;
-        case VRRuntime::None:   return Chosen::None;
+        case VRRuntime::None: return Chosen::None;
     }
     return Chosen::None;
 }
@@ -39,9 +39,9 @@ Chosen first_available(const DetectResult& r) noexcept {
 } // namespace
 
 DetectResult::Chosen choose_runtime(const DetectResult& r) noexcept {
-    if (r.preferred == VRRuntime::None) return Chosen::None;       // the player picked "Disable VR"
+    if (r.preferred == VRRuntime::None) return Chosen::None; // the player picked "Disable VR"
     if (preferred_available(r)) return chosen_for(r.preferred);
-    if (r.forced) return Chosen::None;                             // a forced runtime is missing
+    if (r.forced) return Chosen::None; // a forced runtime is missing
     return first_available(r);
 }
 
@@ -50,7 +50,7 @@ const char* to_string(DetectResult::Chosen c) noexcept {
         case Chosen::OpenVR: return "OpenVR";
         case Chosen::Oculus: return "Oculus";
         case Chosen::OpenXR: return "OpenXR";
-        case Chosen::None:   return "None";
+        case Chosen::None: return "None";
     }
     return "None";
 }

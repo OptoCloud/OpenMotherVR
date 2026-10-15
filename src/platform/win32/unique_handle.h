@@ -12,7 +12,7 @@ class UniqueHandle {
 public:
     UniqueHandle() noexcept = default;
     explicit UniqueHandle(void* handle) noexcept : handle_(handle) {}
-    UniqueHandle(const UniqueHandle&) = delete;
+    UniqueHandle(const UniqueHandle&)            = delete;
     UniqueHandle& operator=(const UniqueHandle&) = delete;
     UniqueHandle(UniqueHandle&& other) noexcept : handle_(std::exchange(other.handle_, nullptr)) {}
     UniqueHandle& operator=(UniqueHandle&& other) noexcept {
@@ -43,7 +43,7 @@ class UniqueModule {
 public:
     UniqueModule() noexcept = default;
     explicit UniqueModule(void* module) noexcept : module_(module) {}
-    UniqueModule(const UniqueModule&) = delete;
+    UniqueModule(const UniqueModule&)            = delete;
     UniqueModule& operator=(const UniqueModule&) = delete;
     UniqueModule(UniqueModule&& other) noexcept : module_(std::exchange(other.module_, nullptr)) {}
     UniqueModule& operator=(UniqueModule&& other) noexcept {

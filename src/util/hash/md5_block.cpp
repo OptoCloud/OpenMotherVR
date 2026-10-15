@@ -10,9 +10,9 @@ namespace {
 
 // RFC 1321 section 3.4: 64 steps in four rounds of 16, over a block of
 // sixteen 32-bit words.
-constexpr int         kSteps         = 64;
-constexpr int         kStepsPerRound = 16;
-constexpr std::size_t kBlockWords    = 16;
+constexpr int kSteps              = 64;
+constexpr int kStepsPerRound      = 16;
+constexpr std::size_t kBlockWords = 16;
 
 // floor(abs(sin(i + 1)) * 2^32)
 constexpr std::array<std::uint32_t, kSteps> kMd5K = {
@@ -28,10 +28,9 @@ constexpr std::array<std::uint32_t, kSteps> kMd5K = {
 
 // The left-rotate amounts per step (RFC 1321 section 3.4).
 constexpr std::array<int, kSteps> kMd5S = {
-    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-    5, 9,  14, 20, 5, 9,  14, 20, 5, 9,  14, 20, 5, 9,  14, 20,
-    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+    7,  12, 17, 22, 7,  12, 17, 22, 7,  12, 17, 22, 7,  12, 17, 22, 5,  9,  14, 20, 5,  9,
+    14, 20, 5,  9,  14, 20, 5,  9,  14, 20, 4,  11, 16, 23, 4,  11, 16, 23, 4,  11, 16, 23,
+    4,  11, 16, 23, 6,  10, 15, 21, 6,  10, 15, 21, 6,  10, 15, 21, 6,  10, 15, 21,
 };
 
 // The message word each round reads at step i: i, 5i + 1, 3i + 5 and 7i,
@@ -43,7 +42,8 @@ struct WordOrder {
 constexpr std::array<WordOrder, kSteps / kStepsPerRound> kWordOrder = {{{1, 0}, {5, 1}, {3, 5}, {7, 0}}};
 
 // The round's auxiliary function F, G, H or I of b, c, d.
-constexpr std::uint32_t round_function(int round, std::uint32_t b, std::uint32_t c, std::uint32_t d) noexcept {
+constexpr std::uint32_t round_function(int round, std::uint32_t b, std::uint32_t c,
+                                       std::uint32_t d) noexcept {
     switch (round) {
         case 0: return (b & c) | (~b & d);
         case 1: return (d & b) | (~d & c);
@@ -59,10 +59,11 @@ void md5_block(std::uint32_t state[4], const std::uint8_t* block) noexcept {
     std::memcpy(m.data(), block, sizeof(m));
     std::uint32_t a = state[0], b = state[1], c = state[2], d = state[3];
     for (int i = 0; i < kSteps; ++i) {
-        const int round = i / kStepsPerRound;
+        const int round   = i / kStepsPerRound;
         const auto& order = kWordOrder[static_cast<std::size_t>(round)];
-        const auto g = static_cast<std::size_t>((order.scale * i + order.offset) % kStepsPerRound);
-        const std::uint32_t f = round_function(round, b, c, d) + a + kMd5K[static_cast<std::size_t>(i)] + m[g];
+        const auto g      = static_cast<std::size_t>((order.scale * i + order.offset) % kStepsPerRound);
+        const std::uint32_t f =
+            round_function(round, b, c, d) + a + kMd5K[static_cast<std::size_t>(i)] + m[g];
         a = d;
         d = c;
         c = b;

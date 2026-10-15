@@ -64,7 +64,7 @@ std::optional<std::span<const std::byte>> checked_stock(const StockEntries& stoc
 // operation reaches outside `base` or the result is not `out_size` long.
 bool apply_delta(Reader& r, std::span<const std::byte> base, std::vector<std::byte>& out) {
     const auto out_size = r.get<std::uint32_t>();
-    const auto ops = r.get<std::uint32_t>();
+    const auto ops      = r.get<std::uint32_t>();
     out.reserve(out_size);
     for (std::uint32_t k = 0; k < ops && r.ok(); ++k) {
         if (static_cast<DeltaOp>(r.get<std::uint8_t>()) == DeltaOp::Copy) {
@@ -92,7 +92,7 @@ EntryResult read_entry_data(Reader& r, PatchEntry kind, const StockEntries& stoc
         return EntryResult::Ok;
     }
     const auto size = r.get<std::uint32_t>();
-    const auto crc = r.get<std::uint32_t>();
+    const auto crc  = r.get<std::uint32_t>();
     const auto base = checked_stock(stock, e.name, size, crc);
     if (!base) return EntryResult::WrongStock;
     if (kind == PatchEntry::Stock) {
@@ -106,18 +106,20 @@ EntryResult read_entry_data(Reader& r, PatchEntry kind, const StockEntries& stoc
 // The output archive's entries, or nullopt (logged where the reason is
 // one a player can act on).
 std::optional<std::vector<OutEntry>> read_entries(Reader& r, std::uint32_t count, const StockEntries& stock,
-                                                  diag::ports::Log& log, const std::filesystem::path& stock_path) {
+                                                  diag::ports::Log& log,
+                                                  const std::filesystem::path& stock_path) {
     std::vector<OutEntry> out;
     out.reserve(count);
     for (std::uint32_t i = 0; i < count; ++i) {
-        const auto name_len = r.get<std::uint16_t>();
+        const auto name_len   = r.get<std::uint16_t>();
         const auto name_bytes = r.bytes(name_len);
-        const auto kind = static_cast<PatchEntry>(r.get<std::uint8_t>());
+        const auto kind       = static_cast<PatchEntry>(r.get<std::uint8_t>());
         if (!r.ok()) return std::nullopt;
         OutEntry e{std::string(reinterpret_cast<const char*>(name_bytes.data()), name_len), {}};
         const EntryResult result = read_entry_data(r, kind, stock, e);
         if (result == EntryResult::WrongStock) {
-            logf(log, "ui patch: {} in {} is not the version the patch was made for", e.name, path_text(stock_path));
+            logf(log, "ui patch: {} in {} is not the version the patch was made for", e.name,
+                 path_text(stock_path));
             return std::nullopt;
         }
         if (result != EntryResult::Ok || !r.ok()) return std::nullopt;
@@ -133,11 +135,12 @@ bool is_patch(std::span<const std::byte> magic) noexcept {
 
 } // namespace
 
-bool build_ui_archive(ports::ArchiveFiles& files, diag::ports::Log& log, const std::filesystem::path& stock_path,
-                      std::span<const std::byte> patch, const std::filesystem::path& target) noexcept {
+bool build_ui_archive(ports::ArchiveFiles& files, diag::ports::Log& log,
+                      const std::filesystem::path& stock_path, std::span<const std::byte> patch,
+                      const std::filesystem::path& target) noexcept {
     try {
         const auto stock_file = files.read(stock_path);
-        const auto stock = stock_file ? read_pak(*stock_file) : std::nullopt;
+        const auto stock      = stock_file ? read_pak(*stock_file) : std::nullopt;
         if (!stock) {
             logf(log, "ui patch: cannot read {}", path_text(stock_path));
             return false;
@@ -158,7 +161,8 @@ bool build_ui_archive(ports::ArchiveFiles& files, diag::ports::Log& log, const s
             logf(log, "ui patch: cannot write {}", path_text(target));
             return false;
         }
-        logf(log, "ui patch: built {} ({} entries) from {}", path_text(target), out->size(), path_text(stock_path));
+        logf(log, "ui patch: built {} ({} entries) from {}", path_text(target), out->size(),
+             path_text(stock_path));
         return true;
     } catch (const std::exception& e) {
         logf(log, "ui patch: {}", e.what());

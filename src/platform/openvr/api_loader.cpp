@@ -31,22 +31,22 @@ namespace {
 using core::diag::ports::logf;
 using win32::utf8;
 
-constexpr std::string_view kLogNoExport        = "openvr: GetProcAddress({}) failed err={}";
-constexpr std::string_view kLogLoadFailed      = "openvr: LoadLibrary failed at {} err=0x{:08X}";
-constexpr std::string_view kLogLoaded          = "openvr: loaded {}";
-constexpr std::string_view kLogResolved        = "openvr: entry points resolved";
-constexpr std::string_view kLogVrClientFailed  = "openvr: vrclient.dll pre-load FAILED err=0x{:08X} path={}";
-constexpr std::string_view kLogVrClientLoaded  = "openvr: vrclient.dll pre-loaded at {:08X}";
-constexpr std::string_view kLogInitOk          = "openvr: VR_InitInternal2 ok, token={}";
-constexpr std::string_view kLogInitFailed      = "openvr: VR_InitInternal2 failed: {} ({})";
-constexpr std::string_view kLogSystemFailed    = "openvr: GetGenericInterface(IVRSystem) failed: {} ({})";
-constexpr std::string_view kLogSystemOk        = "openvr: IVRSystem ok, per-eye RT={}x{} IPD={:.4f}m";
-constexpr std::string_view kLogShutDown        = "openvr: shut down";
+constexpr std::string_view kLogNoExport       = "openvr: GetProcAddress({}) failed err={}";
+constexpr std::string_view kLogLoadFailed     = "openvr: LoadLibrary failed at {} err=0x{:08X}";
+constexpr std::string_view kLogLoaded         = "openvr: loaded {}";
+constexpr std::string_view kLogResolved       = "openvr: entry points resolved";
+constexpr std::string_view kLogVrClientFailed = "openvr: vrclient.dll pre-load FAILED err=0x{:08X} path={}";
+constexpr std::string_view kLogVrClientLoaded = "openvr: vrclient.dll pre-loaded at {:08X}";
+constexpr std::string_view kLogInitOk         = "openvr: VR_InitInternal2 ok, token={}";
+constexpr std::string_view kLogInitFailed     = "openvr: VR_InitInternal2 failed: {} ({})";
+constexpr std::string_view kLogSystemFailed   = "openvr: GetGenericInterface(IVRSystem) failed: {} ({})";
+constexpr std::string_view kLogSystemOk       = "openvr: IVRSystem ok, per-eye RT={}x{} IPD={:.4f}m";
+constexpr std::string_view kLogShutDown       = "openvr: shut down";
 
 // Texts of the player's start-up failure message (13 §5.3).
-constexpr std::string_view kFailNoExport       = "openvr_api.dll has no export ";
-constexpr std::string_view kFailCannotLoad     = "cannot load ";
-constexpr const char*      kNoErrorDescription = "<error description unavailable>";
+constexpr std::string_view kFailNoExport   = "openvr_api.dll has no export ";
+constexpr std::string_view kFailCannotLoad = "cannot load ";
+constexpr const char* kNoErrorDescription  = "<error description unavailable>";
 
 // The Error context of a missing interface.
 constexpr std::string_view kGenericInterfaceCall = "VR_GetGenericInterface";
@@ -58,10 +58,10 @@ using ErrorDescriptionFn    = const char*(__cdecl*)(vr::EVRInitError);
 
 // The loader's exports the mod uses (03 §6.4).
 struct Entries {
-    InitInternal2Fn       init_internal2        = nullptr;
-    ShutdownInternalFn    shutdown_internal     = nullptr;
+    InitInternal2Fn init_internal2              = nullptr;
+    ShutdownInternalFn shutdown_internal        = nullptr;
     GetGenericInterfaceFn get_generic_interface = nullptr;
-    ErrorDescriptionFn    error_description     = nullptr;
+    ErrorDescriptionFn error_description        = nullptr;
 };
 
 // The deployed copy next to the game when it is there, else SteamVR's own.
@@ -74,9 +74,9 @@ std::filesystem::path loader_path(const std::filesystem::path& bin_dir) {
 } // namespace
 
 struct ApiLoader::State {
-    win32::UniqueModule api;        // openvr_api.dll
-    win32::UniqueModule vrclient;   // our extra reference from the pre-load
-    Entries      entries{};
+    win32::UniqueModule api;      // openvr_api.dll
+    win32::UniqueModule vrclient; // our extra reference from the pre-load
+    Entries entries{};
 };
 
 ApiLoader::ApiLoader(core::diag::ports::Log& log, core::vr::RuntimeFailure& failure) noexcept
@@ -122,7 +122,8 @@ bool ApiLoader::resolve_entries() noexcept {
         return false;
     };
     Entries& e = state_->entries;
-    return resolve(e.init_internal2, "VR_InitInternal2") && resolve(e.shutdown_internal, "VR_ShutdownInternal") &&
+    return resolve(e.init_internal2, "VR_InitInternal2") &&
+           resolve(e.shutdown_internal, "VR_ShutdownInternal") &&
            resolve(e.get_generic_interface, "VR_GetGenericInterface") &&
            resolve(e.error_description, "VR_GetVRInitErrorAsEnglishDescription");
 }
@@ -136,7 +137,7 @@ void ApiLoader::preload_vrclient(const std::filesystem::path& runtime_root) noex
     if (!state_->vrclient) {
         const DWORD error = ::GetLastError();
         logf(log_, kLogVrClientFailed, error, utf8(vrclient_path));
-        return;   // VR_InitInternal2 may still find it another way
+        return; // VR_InitInternal2 may still find it another way
     }
     logf(log_, kLogVrClientLoaded, std::bit_cast<std::uintptr_t>(state_->vrclient.get()));
 }
@@ -178,7 +179,8 @@ bool ApiLoader::init(const std::filesystem::path& runtime_root, win32::ArchiveFi
 // served and logs what the headset asks for (03 §6.4, "logged once").
 bool ApiLoader::check_system() noexcept {
     vr::EVRInitError err = vr::VRInitError_None;
-    auto* system = static_cast<vr::IVRSystem*>(state_->entries.get_generic_interface(vr::IVRSystem_Version, &err));
+    auto* system =
+        static_cast<vr::IVRSystem*>(state_->entries.get_generic_interface(vr::IVRSystem_Version, &err));
     if (err != vr::VRInitError_None || !system) {
         logf(log_, kLogSystemFailed, static_cast<int>(err), error_text(err));
         failure_.report(error_text(err), static_cast<std::int32_t>(err));
@@ -201,7 +203,7 @@ util::Result<void*> ApiLoader::generic_interface(const char* version) noexcept {
         return std::unexpected(util::Error{vr::VRInitError_Init_NotInitialized, kGenericInterfaceCall});
     }
     vr::EVRInitError err = vr::VRInitError_None;
-    void* const p = state_->entries.get_generic_interface(version, &err);
+    void* const p        = state_->entries.get_generic_interface(version, &err);
     if (err != vr::VRInitError_None || !p) {
         return std::unexpected(util::Error{static_cast<std::int32_t>(err), kGenericInterfaceCall});
     }

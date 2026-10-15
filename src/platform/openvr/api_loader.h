@@ -7,13 +7,13 @@
 
 namespace omvr::core::diag::ports {
 class Log;
-}
+} // namespace omvr::core::diag::ports
 namespace omvr::core::vr {
 class RuntimeFailure;
-}
+} // namespace omvr::core::vr
 namespace omvr::platform::win32 {
 class ArchiveFiles;
-}
+} // namespace omvr::platform::win32
 
 namespace omvr::platform::openvr {
 
@@ -30,7 +30,7 @@ public:
     ApiLoader(core::diag::ports::Log& log, core::vr::RuntimeFailure& failure) noexcept;
     // Frees what is still loaded; after shutdown() that is nothing.
     ~ApiLoader();
-    ApiLoader(const ApiLoader&) = delete;
+    ApiLoader(const ApiLoader&)            = delete;
     ApiLoader& operator=(const ApiLoader&) = delete;
 
     // Brings up an OpenVR scene session. `runtime_root` is the directory
@@ -65,9 +65,9 @@ private:
     const char* error_text(int error) const noexcept;
     void unload() noexcept;
 
-    core::diag::ports::Log&    log_;
-    core::vr::RuntimeFailure&  failure_;
-    std::unique_ptr<State>     state_;
+    core::diag::ports::Log& log_;
+    core::vr::RuntimeFailure& failure_;
+    std::unique_ptr<State> state_;
 };
 
 } // namespace omvr::platform::openvr

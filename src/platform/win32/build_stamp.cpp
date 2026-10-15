@@ -16,8 +16,9 @@ namespace omvr::platform::win32 {
 std::int64_t this_module_build_filetime() noexcept {
     HMODULE self = nullptr;
     // Any address inside this DLL names it; the function's own will do.
-    ::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                         reinterpret_cast<LPCWSTR>(&this_module_build_filetime), &self);
+    ::GetModuleHandleExW(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        reinterpret_cast<LPCWSTR>(&this_module_build_filetime), &self);
     const auto seconds = loaded_image_timestamp(self);
     if (!seconds) return 0;
     return static_cast<std::int64_t>(*seconds) * kFileTimeTicksPerSecond + kFileTimeUnixEpoch;

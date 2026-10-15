@@ -9,7 +9,7 @@ RuntimeEntry ui_runtime_value(config::VRRuntime r) noexcept {
         case config::VRRuntime::OpenXR:
         case config::VRRuntime::Oculus: return RuntimeEntry::OpenXr;
         case config::VRRuntime::OpenVR: return RuntimeEntry::OpenVr;
-        default:                        return RuntimeEntry::Off;
+        default: return RuntimeEntry::Off;
     }
 }
 
@@ -19,13 +19,13 @@ config::VRRuntime running_runtime(const config::Settings& cfg, ports::RuntimeSta
     switch (state.chosen()) {
         case vr::DetectResult::Chosen::OpenVR: return config::VRRuntime::OpenVR;
         case vr::DetectResult::Chosen::OpenXR: return config::VRRuntime::OpenXR;
-        default:                                return config::VRRuntime::None;
+        default: return config::VRRuntime::None;
     }
 }
 
 std::optional<config::VRRuntime> runtime_from_ui(int entry) noexcept {
     switch (static_cast<RuntimeEntry>(entry)) {
-        case RuntimeEntry::Off:    return config::VRRuntime::None;
+        case RuntimeEntry::Off: return config::VRRuntime::None;
         case RuntimeEntry::OpenXr: return config::VRRuntime::OpenXR;
         case RuntimeEntry::OpenVr: return config::VRRuntime::OpenVR;
     }

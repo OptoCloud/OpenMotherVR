@@ -15,7 +15,7 @@ struct LocalTime {
 class Clock {
 public:
     virtual std::chrono::steady_clock::time_point now() const noexcept = 0;
-    virtual LocalTime local_time() const noexcept = 0;
+    virtual LocalTime local_time() const noexcept                      = 0;
 
 protected:
     ~Clock() = default;

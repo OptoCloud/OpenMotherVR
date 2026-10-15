@@ -8,9 +8,9 @@ namespace omvr::core::stereo {
 
 // What the stereo output does with the game's AA mode.
 enum class AaAction {
-    Skip     = 0,  // setting off, or Auto above its pixel scale
-    Run      = 1,  // run the AA pass as the game's mode says
-    RunAsT1x = 2,  // SMAA T2x runs as SMAA T1x
+    Skip     = 0, // setting off, or Auto above its pixel scale
+    Run      = 1, // run the AA pass as the game's mode says
+    RunAsT1x = 2, // SMAA T2x runs as SMAA T1x
 };
 
 // Anti-aliasing in stereo (08 §3).
@@ -37,7 +37,8 @@ class StereoAa final {
 public:
     // `settings` is the live settings object: StereoAntiAliasing and the
     // pixel scale are read each frame.
-    StereoAa(const config::Settings& settings, diag::ports::Log& log) noexcept : settings_(settings), log_(log) {}
+    StereoAa(const config::Settings& settings, diag::ports::Log& log) noexcept
+        : settings_(settings), log_(log) {}
 
     // The stereo output runs the game's AA pass for `mode` instead of its
     // own full-screen draw: an AA mode is set, and StereoAntiAliasing is on,
@@ -51,14 +52,16 @@ public:
 
     // The AA pass's SMAA runs spatially (without the temporal resolve, which
     // also zeroes the next frame's projection jitter) while stereo runs.
-    static bool spatial_smaa(bool temporal, bool stereo_running) noexcept { return temporal && stereo_running; }
+    static bool spatial_smaa(bool temporal, bool stereo_running) noexcept {
+        return temporal && stereo_running;
+    }
 
 private:
     const config::Settings& settings_;
-    diag::ports::Log&       log_;
+    diag::ports::Log& log_;
     // The last logged mode and action; none before the first.
-    std::int32_t logged_mode_   = -1;
-    int          logged_action_ = -1;
+    std::int32_t logged_mode_ = -1;
+    int logged_action_        = -1;
 };
 
 } // namespace omvr::core::stereo

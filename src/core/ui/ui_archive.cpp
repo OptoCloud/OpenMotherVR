@@ -35,9 +35,11 @@ ArchivePaths archive_paths(const std::filesystem::path& game_dir) {
 
 } // namespace
 
-bool UiArchiveDeployer::reuse_or_build(const std::filesystem::path& stock, const std::filesystem::path& target,
-                                       const std::filesystem::path& sidecar, const ports::FileIdentity& source,
-                                       std::int64_t build_stamp, bool may_build) noexcept {
+bool UiArchiveDeployer::reuse_or_build(const std::filesystem::path& stock,
+                                       const std::filesystem::path& target,
+                                       const std::filesystem::path& sidecar,
+                                       const ports::FileIdentity& source, std::int64_t build_stamp,
+                                       bool may_build) noexcept {
     if (files_.stamped(target, build_stamp) && files_.read_sidecar(sidecar) == source) {
         logf(log_, "payload: {} is current", path_text(target));
         return true;
@@ -53,7 +55,8 @@ bool UiArchiveDeployer::reuse_or_build(const std::filesystem::path& stock, const
     // Built from the player's own UI.PAK and the embedded patch; no game
     // files ship with the mod.
     files_.remove(sidecar);
-    if (!build_ui_archive(files_, log_, stock, files_.payload(ports::ResourceId::UiPatch), target)) return false;
+    if (!build_ui_archive(files_, log_, stock, files_.payload(ports::ResourceId::UiPatch), target))
+        return false;
     files_.stamp(target, build_stamp);
     files_.write_sidecar(sidecar, source);
     return true;
@@ -68,7 +71,8 @@ bool UiArchiveDeployer::deploy(const std::filesystem::path& game_dir, std::int64
     if (!source) {
         logf(log_, "payload: {} not found", path_text(paths.stock));
         // The original disables the mod here; we only lose the options page.
-        dialogs_.post(ui_pak_missing(path_text(paths.stock)), ports::DialogKind::Error, nullptr, "UI.PAK missing");
+        dialogs_.post(ui_pak_missing(path_text(paths.stock)), ports::DialogKind::Error, nullptr,
+                      "UI.PAK missing");
         return false;
     }
     // When Steam relaunches the game, two processes attach close together

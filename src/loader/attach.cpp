@@ -32,7 +32,8 @@ void log_settings(Context& ctx) {
     logf(ctx.log, "config: vr_runtime={} pixel_scale={:.2f} snap_rot={} skip_intro={} dev_debug={}",
          core::config::to_string(cfg.vr_runtime), cfg.rendering.pixel_scale, cfg.input.snap_rotation,
          cfg.debug.skip_startup_intro, cfg.debug.debug);
-    logf(ctx.log, "config: settings in effect ({}): {}", ctx.settings.load_source(), core::config::describe(cfg));
+    logf(ctx.log, "config: settings in effect ({}): {}", ctx.settings.load_source(),
+         core::config::describe(cfg));
 }
 
 // The exe check: an unknown AI.exe gets a message, and the installer
@@ -58,8 +59,9 @@ void check_game_build(Context& ctx) {
 // From: FUN_1000ce80 (first-run branch).
 void welcome_first_launch(Context& ctx, bool installed) {
     if (installed) {
-        ctx.dialogs.post(std::string(core::ui::welcome()), DialogKind::Information,
-                         [&ctx] { ctx.settings.save_current(); }, "welcome");
+        ctx.dialogs.post(
+            std::string(core::ui::welcome()), DialogKind::Information,
+            [&ctx] { ctx.settings.save_current(); }, "welcome");
     } else {
         ctx.log.line("config: mod not active this run; welcome and mothervr.json left for a run where it is");
     }

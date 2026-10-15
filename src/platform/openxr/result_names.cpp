@@ -14,26 +14,28 @@ namespace {
 
 using core::diag::ports::logf;
 
-constexpr std::string_view kLogFailed       = "openxr: {} failed: {} ({})";
+constexpr std::string_view kLogFailed        = "openxr: {} failed: {} ({})";
 constexpr std::string_view kLogSucceedsAgain = "openxr: {} succeeds again";
 
 } // namespace
 
 const char* result_name(XrResult r) noexcept {
     switch (r) {
-#define OMVR_XR_RESULT_CASE(name, value) case name: return #name;
+#define OMVR_XR_RESULT_CASE(name, value) \
+    case name: return #name;
         XR_LIST_ENUM_XrResult(OMVR_XR_RESULT_CASE)
 #undef OMVR_XR_RESULT_CASE
-        default: return "unknown XrResult";
+            default : return "unknown XrResult";
     }
 }
 
 const char* state_name(XrSessionState s) noexcept {
     switch (s) {
-#define OMVR_XR_STATE_CASE(name, value) case name: return #name;
+#define OMVR_XR_STATE_CASE(name, value) \
+    case name: return #name;
         XR_LIST_ENUM_XrSessionState(OMVR_XR_STATE_CASE)
 #undef OMVR_XR_STATE_CASE
-        default: return "unknown XrSessionState";
+            default : return "unknown XrSessionState";
     }
 }
 

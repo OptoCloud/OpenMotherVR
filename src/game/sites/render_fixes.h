@@ -31,15 +31,16 @@ void area_off(core::diag::ports::Log& log, std::string_view area, std::string_vi
 // game; on a build without the address, or other code at its call, the
 // update keeps to the storage the stack already has.
 // The append found goes to `out`.
-void find_mode_stack_append(const GameImage& g, core::diag::ports::Log& log, stereo::ModeStackTargets& out) noexcept;
+void find_mode_stack_append(const GameImage& g, core::diag::ports::Log& log,
+                            stereo::ModeStackTargets& out) noexcept;
 
 // The AI.exe functions the render fixes' replacements call, as the
 // installer finds them. Each is filled before its call is redirected.
 struct RenderFixTargets {
     stereo::ReflectionTargets reflection{};
-    stereo::StereoAaTargets   aa{};
-    stereo::CullTargets       cull{};
-    stereo::HeadClipTargets   head_clip{};
+    stereo::StereoAaTargets aa{};
+    stereo::CullTargets cull{};
+    stereo::HeadClipTargets head_clip{};
 };
 
 // The replacements of the render fixes (07, 08).
@@ -50,8 +51,8 @@ struct RenderFixHooks {
     const void* cull_distance;
     const void* cull_occlusion;
     const void* head_clip_fade;
-    TapFn       event_tap;
-    TapFn*      event_tap_trampoline;
+    TapFn event_tap;
+    TapFn* event_tap_trampoline;
     // Where the targets the replacements call are kept.
     RenderFixTargets* targets;
     // Gates the game's clear for the reflection targets; false if the

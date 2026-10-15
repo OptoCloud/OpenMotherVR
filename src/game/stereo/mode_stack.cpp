@@ -31,14 +31,14 @@ void log_mode_change(core::diag::ports::Log& log, std::int32_t before, std::int3
 void push_mode(const AddressMap& addresses, core::diag::ports::Log& log, StereoManager& sm,
                std::int32_t mode) noexcept {
     const std::int32_t before = sm.mode;
-    const abi::PushMode push = CodeAddress{addresses.at(AiAddr::GamePushMode)};
+    const abi::PushMode push  = CodeAddress{addresses.at(AiAddr::GamePushMode)};
     push(&sm, nullptr, mode);
     log_mode_change(log, before, sm.mode);
 }
 
 void pop_mode(const AddressMap& addresses, core::diag::ports::Log& log, StereoManager& sm) noexcept {
     const std::int32_t before = sm.mode;
-    const abi::PopMode pop = CodeAddress{addresses.at(AiAddr::GamePopMode)};
+    const abi::PopMode pop    = CodeAddress{addresses.at(AiAddr::GamePopMode)};
     pop(&sm, nullptr);
     log_mode_change(log, before, sm.mode);
 }
@@ -75,30 +75,27 @@ void apply_mode_steps(const AddressMap& addresses, core::diag::ports::Log& log, 
     if (steps.push) push_mode(addresses, log, sm, std::to_underlying(*steps.push));
 }
 
-StackSyncOutcome apply_stack_sync(const ModeStackTargets& targets, StereoManager& sm, StackSync sync) noexcept {
+StackSyncOutcome apply_stack_sync(const ModeStackTargets& targets, StereoManager& sm,
+                                  StackSync sync) noexcept {
     switch (sync) {
-    case StackSync::None:
-        break;
-    case StackSync::Lower:
-        sm.stack_top = sm.mode;
-        break;
-    case StackSync::Append: {
-        const std::int32_t      screen = kScreen;
-        const ModeStackAppendFn append = CodeAddress{targets.append};
-        if (!append(&sm.stack_data, nullptr, &screen)) {
-            // The routine raises the count even when its allocation failed,
-            // over a null array: take it back.
-            sm.stack_top = 0;
-            return StackSyncOutcome::AppendFailed;
+        case StackSync::None: break;
+        case StackSync::Lower: sm.stack_top = sm.mode; break;
+        case StackSync::Append: {
+            const std::int32_t screen      = kScreen;
+            const ModeStackAppendFn append = CodeAddress{targets.append};
+            if (!append(&sm.stack_data, nullptr, &screen)) {
+                // The routine raises the count even when its allocation failed,
+                // over a null array: take it back.
+                sm.stack_top = 0;
+                return StackSyncOutcome::AppendFailed;
+            }
+            break;
         }
-        break;
-    }
-    case StackSync::WriteInPlace:
-        sm.stack_data[0] = kScreen;
-        sm.stack_top     = 1;  // one entry
-        break;
-    case StackSync::NoStorage:
-        return StackSyncOutcome::NoStorage;
+        case StackSync::WriteInPlace:
+            sm.stack_data[0] = kScreen;
+            sm.stack_top     = 1; // one entry
+            break;
+        case StackSync::NoStorage: return StackSyncOutcome::NoStorage;
     }
     return StackSyncOutcome::Done;
 }

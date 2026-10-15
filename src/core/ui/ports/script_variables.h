@@ -12,9 +12,9 @@ enum class UiHandle : std::uintptr_t {};
 class ScriptVariables {
 public:
     // The setters every push needs are known, so early or late calls are safe.
-    virtual bool ready() const noexcept = 0;
-    virtual void set_bool(UiHandle ui, const char* name, bool value) noexcept = 0;
-    virtual void set_int(UiHandle ui, const char* name, int value) noexcept = 0;
+    virtual bool ready() const noexcept                                         = 0;
+    virtual void set_bool(UiHandle ui, const char* name, bool value) noexcept   = 0;
+    virtual void set_int(UiHandle ui, const char* name, int value) noexcept     = 0;
     virtual void set_float(UiHandle ui, const char* name, float value) noexcept = 0;
     // Registers a row with two display strings. False when the game's
     // function for it is not known (nothing is called).

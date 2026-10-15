@@ -8,8 +8,8 @@
 // headers (or that headers outside this adapter must not include).
 namespace omvr::platform::openxr {
 
-inline constexpr const char* kApplicationName = "Alien: Isolation (MotherVR)";
-inline constexpr const char* kEngineName      = "MotherVR";
+inline constexpr const char* kApplicationName      = "Alien: Isolation (MotherVR)";
+inline constexpr const char* kEngineName           = "MotherVR";
 inline constexpr std::uint32_t kApplicationVersion = 1;
 inline constexpr std::uint32_t kEngineVersion      = 1;
 
@@ -18,7 +18,7 @@ inline constexpr std::uint32_t kEngineVersion      = 1;
 inline constexpr const wchar_t* kActiveRuntimeKey   = L"SOFTWARE\\Khronos\\OpenXR\\1";
 inline constexpr const wchar_t* kActiveRuntimeValue = L"ActiveRuntime";
 // The variable (and loader property) that names the runtime manifest.
-inline constexpr const char*    kRuntimeJsonName     = "XR_RUNTIME_JSON";
+inline constexpr const char* kRuntimeJsonName        = "XR_RUNTIME_JSON";
 inline constexpr const wchar_t* kRuntimeJsonVariable = L"XR_RUNTIME_JSON";
 
 // The controller actions (04 §5.8.4): one action set, created once per session.

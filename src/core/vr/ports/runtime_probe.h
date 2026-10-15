@@ -8,9 +8,9 @@ namespace omvr::core::vr::ports {
 // What a runtime probe found: whether the runtime can be started from this
 // 32-bit process, where it is, and why not.
 struct ProbeResult {
-    bool                  available = false;
+    bool available = false;
     std::filesystem::path location;
-    std::string           why;
+    std::string why;
 };
 
 // Looks for one installed VR runtime without loading any of its DLLs.

@@ -12,7 +12,7 @@ struct PoseAgeReport {
     std::uint32_t one_early = 0;   // one display period early
     std::uint32_t other     = 0;   // anything else, or unknown
     std::uint32_t known     = 0;   // frames whose age is known
-    double        mean      = 0.0; // mean age in periods, over the known frames
+    double mean             = 0.0; // mean age in periods, over the known frames
 };
 
 // How many display periods before a frame's own display time its declared
@@ -29,7 +29,7 @@ public:
 
 private:
     std::uint32_t frames_ = 0, same_ = 0, one_early_ = 0, other_ = 0, known_ = 0;
-    double        sum_    = 0.0;
+    double sum_ = 0.0;
 };
 
 } // namespace omvr::core::vr

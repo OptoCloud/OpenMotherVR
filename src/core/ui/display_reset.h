@@ -13,9 +13,9 @@ namespace omvr::core::ui {
 // raises the reset flag on every menu open; a rebuild stalls the game for
 // about 0.2 s, so it is raised only when one of these actually changed.
 struct TargetSettings {
-    float                  pixel_scale;
+    float pixel_scale;
     config::MirrorViewType mirror_view_type;
-    bool                   symmetric_mirror_view;
+    bool symmetric_mirror_view;
     bool operator==(const TargetSettings&) const = default;
 };
 
@@ -34,9 +34,9 @@ public:
     void reset_if_changed(const config::Settings& cfg) noexcept;
 
 private:
-    ports::GameSignals&           signals_;
-    ports::RuntimeState&          runtime_;
-    diag::ports::Log&             log_;
+    ports::GameSignals& signals_;
+    ports::RuntimeState& runtime_;
+    diag::ports::Log& log_;
     std::optional<TargetSettings> built_;
 };
 

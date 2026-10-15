@@ -22,7 +22,8 @@ void __fastcall on_menu_open(void* self, void* /*edx*/) noexcept {
     // nothing runs at exit.
     static util::OnceLatch logged;
     auto& ctx = context();
-    if (logged.first()) core::diag::ports::logf(ctx.log, "[script_bridge] menu opened (ui={}), pushing settings", self);
+    if (logged.first())
+        core::diag::ports::logf(ctx.log, "[script_bridge] menu opened (ui={}), pushing settings", self);
     ctx.console.open_menu(self);
     push_settings(self);
 }

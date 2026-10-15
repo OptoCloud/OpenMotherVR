@@ -18,7 +18,8 @@ namespace omvr::game::ui {
 
 // Registers a view-control item (menu row) with two display strings.
 // From: DAT_10066bf0. Used for resolution-picker rows in the VR options menu.
-using FireStr2Fn = void(__fastcall*)(void* ui, void* edx, const char* name, const char* label, const char* value);
+using FireStr2Fn = void(__fastcall*)(void* ui, void* edx, const char* name, const char* label,
+                                     const char* value);
 
 // Sets a boolean script variable by name.
 // From: DAT_10066bf4.
@@ -46,17 +47,18 @@ public:
     void set_bool(core::ui::ports::UiHandle ui, const char* name, bool value) noexcept override;
     void set_int(core::ui::ports::UiHandle ui, const char* name, int value) noexcept override;
     void set_float(core::ui::ports::UiHandle ui, const char* name, float value) noexcept override;
-    bool add_row(core::ui::ports::UiHandle ui, const char* name, const char* a, const char* b) noexcept override;
+    bool add_row(core::ui::ports::UiHandle ui, const char* name, const char* a,
+                 const char* b) noexcept override;
 
     // The setters, for the installer's log line.
-    FireBoolFn  fire_bool() const noexcept { return fire_bool_; }
-    FireIntFn   fire_int() const noexcept { return fire_int_; }
+    FireBoolFn fire_bool() const noexcept { return fire_bool_; }
+    FireIntFn fire_int() const noexcept { return fire_int_; }
     FireFloatFn fire_float() const noexcept { return fire_float_; }
 
 private:
-    FireStr2Fn  fire_str2_  = nullptr;
-    FireBoolFn  fire_bool_  = nullptr;
-    FireIntFn   fire_int_   = nullptr;
+    FireStr2Fn fire_str2_   = nullptr;
+    FireBoolFn fire_bool_   = nullptr;
+    FireIntFn fire_int_     = nullptr;
     FireFloatFn fire_float_ = nullptr;
 };
 

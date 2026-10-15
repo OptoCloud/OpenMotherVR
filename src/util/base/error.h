@@ -9,7 +9,7 @@ namespace omvr::util {
 // An expected failure: a code (a Windows error, an HRESULT, an XrResult, as
 // the context says) captured at the failing call, and what was being done.
 struct Error {
-    std::int32_t     code = 0;
+    std::int32_t code = 0;
     std::string_view context;
 };
 

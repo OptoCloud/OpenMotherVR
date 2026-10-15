@@ -7,7 +7,7 @@ namespace omvr::game::stereo {
 // The game's HeadClipFade, found by the installer and set once at attach
 // before its call is redirected.
 struct HeadClipTargets {
-    void* fade;  // float __stdcall (const vec3* eye, const vec3* pivot)
+    void* fade; // float __stdcall (const vec3* eye, const vec3* pivot)
 };
 
 // float HeadClipFade(const vec3* eye, const vec3* pivot), the game's own:

@@ -4,8 +4,6 @@
 
 namespace omvr::core::vr {
 
-void RuntimeFailure::report(std::string what, std::int32_t code) noexcept {
-    last_ = {std::move(what), code};
-}
+void RuntimeFailure::report(std::string what, std::int32_t code) noexcept { last_ = {std::move(what), code}; }
 
 } // namespace omvr::core::vr

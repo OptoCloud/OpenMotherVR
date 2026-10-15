@@ -51,8 +51,10 @@ struct StickLayout {
 // so its button glyphs fit.
 json stick_sources(const StickLayout& l) {
     json s = json::array();
-    s.push_back(source(hand("left", l.stick), "joystick", {{"position", out("move")}, {"click", out("sprint")}}));
-    s.push_back(source(hand("right", l.stick), "joystick", {{"position", out("turn")}, {"click", out("radial")}}));
+    s.push_back(
+        source(hand("left", l.stick), "joystick", {{"position", out("move")}, {"click", out("sprint")}}));
+    s.push_back(
+        source(hand("right", l.stick), "joystick", {{"position", out("turn")}, {"click", out("radial")}}));
     s.push_back(source(hand("left", "trigger"), "trigger", {{"pull", out("crouch")}}));
     s.push_back(source(hand("right", "trigger"), "trigger", {{"pull", out("fire")}}));
     s.push_back(source(hand("left", "grip"), l.grip_mode, {{l.grip_input, out("tracker")}}));
@@ -84,8 +86,9 @@ json stick_sources(const StickLayout& l) {
 json hand_poses(const char* component) {
     json p = json::array();
     for (std::size_t h = 0; h < kPoseActions.size(); ++h) {
-        p.push_back({{"output", action_path(kPoseActions[h])},
-                     {"path", std::string("/user/hand/") + (h == 0 ? "left" : "right") + "/pose/" + component}});
+        p.push_back(
+            {{"output", action_path(kPoseActions[h])},
+             {"path", std::string("/user/hand/") + (h == 0 ? "left" : "right") + "/pose/" + component}});
     }
     return p;
 }
@@ -103,13 +106,19 @@ json binding_file(const char* controller, const char* description, json sources,
 // carries the touchpad scheme's interact/reload; the left one map and
 // flashlight.
 json wmr_sources() {
-    json wmr = stick_sources({.stick = "joystick", .grip_mode = "button", .grip_input = "click",
-                              .button_a = nullptr, .button_b = nullptr, .button_x = nullptr, .button_y = nullptr,
-                              .pause_path = hand("left", "application_menu"), .pause_mode = "button"});
-    wmr.push_back(source(hand("right", "trackpad"), "dpad", {{"south", out("interact")}, {"north", out("reload")}},
-                         {{"sub_mode", "click"}}));
-    wmr.push_back(source(hand("left", "trackpad"), "dpad", {{"south", out("map")}, {"north", out("flashlight")}},
-                         {{"sub_mode", "click"}}));
+    json wmr = stick_sources({.stick      = "joystick",
+                              .grip_mode  = "button",
+                              .grip_input = "click",
+                              .button_a   = nullptr,
+                              .button_b   = nullptr,
+                              .button_x   = nullptr,
+                              .button_y   = nullptr,
+                              .pause_path = hand("left", "application_menu"),
+                              .pause_mode = "button"});
+    wmr.push_back(source(hand("right", "trackpad"), "dpad",
+                         {{"south", out("interact")}, {"north", out("reload")}}, {{"sub_mode", "click"}}));
+    wmr.push_back(source(hand("left", "trackpad"), "dpad",
+                         {{"south", out("map")}, {"north", out("flashlight")}}, {{"sub_mode", "click"}}));
     wmr.push_back(source(hand("right", "application_menu"), "button", {{"click", out("pause")}}));
     return wmr;
 }
@@ -119,7 +128,8 @@ json wmr_sources() {
 // (up) and open the radial menu (centre).
 json wand_sources() {
     json wand = json::array();
-    wand.push_back(source(hand("left", "trackpad"), "trackpad", {{"position", out("move")}, {"click", out("sprint")}}));
+    wand.push_back(
+        source(hand("left", "trackpad"), "trackpad", {{"position", out("move")}, {"click", out("sprint")}}));
     wand.push_back(source(hand("right", "trackpad"), "trackpad",
                           {{"position", out("turn")}, {"click", out("turn_engage")}}));
     wand.push_back(source(hand("right", "trackpad"), "dpad",
@@ -157,25 +167,40 @@ std::vector<std::pair<std::string, json>> default_bindings() {
     // Index has no menu button: the left trackpad press pauses, and the left
     // A/B stand in for Touch's X/Y.
     files.emplace_back("knuckles", binding_file("knuckles", "Valve Index controllers",
-        stick_sources({.stick = "thumbstick", .grip_mode = "grab", .grip_input = "grab", .button_a = "a",
-                       .button_b = "b", .button_x = "a", .button_y = "b",
-                       .pause_path = hand("left", "trackpad"), .pause_mode = "button"}),
-        "grip"));
+                                                stick_sources({.stick      = "thumbstick",
+                                                               .grip_mode  = "grab",
+                                                               .grip_input = "grab",
+                                                               .button_a   = "a",
+                                                               .button_b   = "b",
+                                                               .button_x   = "a",
+                                                               .button_y   = "b",
+                                                               .pause_path = hand("left", "trackpad"),
+                                                               .pause_mode = "button"}),
+                                                "grip"));
 
-    files.emplace_back("oculus_touch", binding_file("oculus_touch", "Oculus Touch",
-        stick_sources({.stick = "joystick", .grip_mode = "button", .grip_input = "click", .button_a = "a",
-                       .button_b = "b", .button_x = "x", .button_y = "y",
-                       .pause_path = hand("left", "application_menu"), .pause_mode = "button"}),
-        "openxr_grip"));
+    files.emplace_back("oculus_touch",
+                       binding_file("oculus_touch", "Oculus Touch",
+                                    stick_sources({.stick      = "joystick",
+                                                   .grip_mode  = "button",
+                                                   .grip_input = "click",
+                                                   .button_a   = "a",
+                                                   .button_b   = "b",
+                                                   .button_x   = "x",
+                                                   .button_y   = "y",
+                                                   .pause_path = hand("left", "application_menu"),
+                                                   .pause_mode = "button"}),
+                                    "openxr_grip"));
 
-    files.emplace_back("holographic_controller",
-                       binding_file("holographic_controller", "Windows Mixed Reality", wmr_sources(), "grip"));
-    files.emplace_back("vive_controller", binding_file("vive_controller", "Vive wands", wand_sources(), "grip"));
+    files.emplace_back(
+        "holographic_controller",
+        binding_file("holographic_controller", "Windows Mixed Reality", wmr_sources(), "grip"));
+    files.emplace_back("vive_controller",
+                       binding_file("vive_controller", "Vive wands", wand_sources(), "grip"));
     return files;
 }
 
 json manifest(const std::vector<std::pair<std::string, json>>& bindings) {
-    json actions = json::array();
+    json actions      = json::array();
     json localization = {{"language_tag", "en_US"}, {kSet, "Alien: Isolation"}};
     for (const auto& a : kActions) {
         actions.push_back({{"name", action_path(a.name)}, {"type", type_name(a.kind)}});

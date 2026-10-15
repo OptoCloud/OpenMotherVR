@@ -28,7 +28,8 @@ constexpr float element4(const float* m, std::size_t row, std::size_t col) noexc
 inline Vec3 camera_position(const float* v) noexcept {
     const auto back = [v](std::size_t row) {
         float sum = 0.0f;
-        for (std::size_t col = 0; col < 3; ++col) sum += element4(v, kTranslationRow, col) * element4(v, row, col);
+        for (std::size_t col = 0; col < 3; ++col)
+            sum += element4(v, kTranslationRow, col) * element4(v, row, col);
         return -sum;
     };
     return {back(0), back(1), back(2)};
@@ -37,7 +38,8 @@ inline Vec3 camera_position(const float* v) noexcept {
 // Sets the 4x4 `m` to identity.
 inline void identity(float* m) noexcept {
     for (std::size_t row = 0; row < kMatrix4Rows; ++row) {
-        for (std::size_t col = 0; col < kMatrix4Rows; ++col) m[row * kMatrix4Rows + col] = row == col ? 1.0f : 0.0f;
+        for (std::size_t col = 0; col < kMatrix4Rows; ++col)
+            m[row * kMatrix4Rows + col] = row == col ? 1.0f : 0.0f;
     }
 }
 

@@ -33,13 +33,13 @@ UpdateOutput StereoUpdate::run(const UpdateInput& in) noexcept {
 // kSnapRepeat. Not in the menu screen's mode, where the game has no camera
 // to turn.
 void StereoUpdate::snap_turn(const UpdateInput& in, UpdateOutput& out) noexcept {
-    const auto& input = settings_.input;
-    const bool  out_of_dead_zone = turn_out(in.turn);
+    const auto& input           = settings_.input;
+    const bool out_of_dead_zone = turn_out(in.turn);
     if (in.follow_active && input.snap_rotation && out_of_dead_zone && in.mode != StereoMode::Screen &&
         !snap_latch_) {
         snap_time_ = last_snap_ = in.now;
-        out.yaw     = snapped_yaw(in.follow_yaw, in.turn, input.snap_rotation_segments);
-        snap_latch_ = true;
+        out.yaw                 = snapped_yaw(in.follow_yaw, in.turn, input.snap_rotation_segments);
+        snap_latch_             = true;
     } else if ((!out_of_dead_zone && snap_latch_) ||
                (in.follow_active && out_of_dead_zone && snap_latch_ && in.now - snap_time_ > kSnapRepeat)) {
         // Stick released, or held long enough to repeat.
@@ -54,8 +54,8 @@ void StereoUpdate::snap_turn(const UpdateInput& in, UpdateOutput& out) noexcept 
 // takes the pose: a recenter that meets an invalid head pose queues the
 // retake again.
 void StereoUpdate::recenter(const UpdateInput& in, UpdateOutput& out) noexcept {
-    const bool chord   = (in.lb && in.rb) || (in.ctrl && in.alt);
-    bool       handled = false;
+    const bool chord = (in.lb && in.rb) || (in.ctrl && in.alt);
+    bool handled     = false;
     if (recenter_request_ && in.headset_in_use) {
         recenter_request_ = false;
         out.recenter      = true;

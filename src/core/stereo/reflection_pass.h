@@ -14,11 +14,11 @@ namespace omvr::core::stereo {
 // What the reflection render call shows of a reflection POV, for the
 // diagnostics (07 §6).
 struct ReflectionPovInfo {
-    const void*   pov;    // identity only, never dereferenced
-    std::uint8_t  flags;  // POV +0x36B
-    int           state;  // the device state, -1 without a device
-    std::int32_t  width;  // its render target's size
-    std::int32_t  height;
+    const void* pov;    // identity only, never dereferenced
+    std::uint8_t flags; // POV +0x36B
+    int state;          // the device state, -1 without a device
+    std::int32_t width; // its render target's size
+    std::int32_t height;
 };
 
 // Planar reflections (07).
@@ -33,7 +33,8 @@ struct ReflectionPovInfo {
 // diagnostics only: the game side renders. Render thread.
 class ReflectionPass final {
 public:
-    ReflectionPass(const ports::Keyboard& keyboard, const config::Settings& settings, diag::ports::Log& log) noexcept
+    ReflectionPass(const ports::Keyboard& keyboard, const config::Settings& settings,
+                   diag::ports::Log& log) noexcept
         : keyboard_(keyboard), settings_(settings), log_(log) {}
 
     // Whether the game's clear could be gated (its code is the expected
@@ -59,19 +60,19 @@ public:
     void note_rendered() noexcept;
 
 private:
-    const ports::Keyboard&  keyboard_;
+    const ports::Keyboard& keyboard_;
     const config::Settings& settings_;
-    diag::ports::Log&       log_;
-    bool                    ready_ = false;
+    diag::ports::Log& log_;
+    bool ready_ = false;
 
     // The POVs seen so far and their last flags (-1: new).
     struct SeenPov {
-        const void* pov   = nullptr;
-        int         flags = -1;
+        const void* pov = nullptr;
+        int flags       = -1;
     };
     std::array<SeenPov, kReflectionPovSlots> seen_{};
-    int             lines_            = 0;
-    bool            capture_key_down_ = false;
+    int lines_             = 0;
+    bool capture_key_down_ = false;
     util::OnceLatch rendered_logged_;
 };
 

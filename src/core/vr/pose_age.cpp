@@ -13,9 +13,12 @@ std::optional<PoseAgeReport> PoseAge::add(std::int64_t frame_time, std::int64_t 
     const double periods =
         known ? static_cast<double>(frame_time - rendered_for) / static_cast<double>(period) : 0.0;
     const long long whole = std::llround(periods);
-    if (known && whole == 0) ++same_;
-    else if (known && whole == 1) ++one_early_;
-    else ++other_;
+    if (known && whole == 0)
+        ++same_;
+    else if (known && whole == 1)
+        ++one_early_;
+    else
+        ++other_;
     if (known) {
         sum_ += periods;
         ++known_;

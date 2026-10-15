@@ -45,7 +45,8 @@ public:
     // `failure` why it failed to start, for the player's message.
     StereoDevice(game::StereoManager& manager, StereoUpdate& update, ui::ports::Dialogs& dialogs,
                  const config::Settings& settings, const config::ports::LaunchSwitches& switches,
-                 vr::RuntimeDetector& runtimes, const vr::RuntimeFailure& failure, diag::ports::Log& log) noexcept
+                 vr::RuntimeDetector& runtimes, const vr::RuntimeFailure& failure,
+                 diag::ports::Log& log) noexcept
         : manager_(manager),
           update_(update),
           dialogs_(dialogs),
@@ -97,8 +98,8 @@ public:
     // If the runtime cannot drive the headset with the game's device (no
     // OpenXR session), the device detaches here; the mirror resources are
     // still made for any call already on its way. Render thread.
-    bool configure_rendering(game::StereoInterface& si, std::optional<PixelSize> texture_size, vr::GpuDevice device,
-                             vr::GpuContext context, ports::DesktopMirror& mirror);
+    bool configure_rendering(game::StereoInterface& si, std::optional<PixelSize> texture_size,
+                             vr::GpuDevice device, vr::GpuContext context, ports::DesktopMirror& mirror);
 
     // [5] BeginFrame (03 §5, §6.2): poll the controllers, take the eye
     // offsets. Render thread.
@@ -116,15 +117,15 @@ private:
     void fail_runtime(game::StereoInterface& si, vr::DetectResult::Chosen chosen, bool late) noexcept;
     void init_device(game::StereoInterface& si) noexcept;
 
-    game::StereoManager&    manager_;
-    StereoUpdate&           update_;
-    ui::ports::Dialogs&     dialogs_;
+    game::StereoManager& manager_;
+    StereoUpdate& update_;
+    ui::ports::Dialogs& dialogs_;
     const config::Settings& settings_;
     const config::ports::LaunchSwitches& switches_;
-    vr::RuntimeDetector&      runtimes_;
+    vr::RuntimeDetector& runtimes_;
     const vr::RuntimeFailure& failure_;
-    diag::ports::Log&         log_;
-    RuntimeFactory          make_runtime_;
+    diag::ports::Log& log_;
+    RuntimeFactory make_runtime_;
 
     // The runtime behind the device. Owned here; the context that holds the
     // device is never destroyed (loader/context.cpp), so no destructor calls

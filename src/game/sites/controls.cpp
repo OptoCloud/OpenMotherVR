@@ -17,10 +17,10 @@ namespace ports = core::diag::ports;
 constexpr std::string_view kSlotFailedLog =
     "[input] gamepad vtable slot +0x{:X} could not be written; {}: VR controls are off, the game keeps its "
     "stock pad";
-constexpr std::string_view kRestoredText     = "earlier slots restored";
-constexpr std::string_view kNotRestoredText  = "restoring earlier slots FAILED";
-constexpr std::string_view kPadHookedLog     = "[input] gamepad vtable at {} hooked";
-constexpr std::string_view kLeftStickPrompt  = "left stick prompt";
+constexpr std::string_view kRestoredText    = "earlier slots restored";
+constexpr std::string_view kNotRestoredText = "restoring earlier slots FAILED";
+constexpr std::string_view kPadHookedLog    = "[input] gamepad vtable at {} hooked";
+constexpr std::string_view kLeftStickPrompt = "left stick prompt";
 
 // 05 §7.10: `setne cl` becomes `mov cl, 1; nop`: the pad always counts as
 // connected, since VR controllers come through it.
@@ -36,7 +36,7 @@ constexpr std::size_t kPadSlotCount = 5;
 
 struct Slot {
     std::uint32_t offset;
-    const void*   fn;
+    const void* fn;
 };
 
 // A failed write is logged by the patcher; that slot keeps the game's
@@ -81,10 +81,11 @@ bool install_pad_slots(Patcher& p, std::uint8_t* pad_vtable, const PadReplacemen
     for (std::size_t i = 0; i < kPadSlotCount; ++i) saved[i] = read_u32(pad_vtable + slots[i].offset);
 
     // All or nothing (04 §3.3).
-    bool restored = true;
+    bool restored             = true;
     const std::size_t written = write_slots(p, pad_vtable, slots, saved, restored);
     if (written < kPadSlotCount) {
-        ports::logf(p.log(), kSlotFailedLog, slots[written].offset, restored ? kRestoredText : kNotRestoredText);
+        ports::logf(p.log(), kSlotFailedLog, slots[written].offset,
+                    restored ? kRestoredText : kNotRestoredText);
         return false;
     }
     ports::logf(p.log(), kPadHookedLog, static_cast<void*>(pad_vtable));
@@ -93,12 +94,13 @@ bool install_pad_slots(Patcher& p, std::uint8_t* pad_vtable, const PadReplacemen
 
 ControlsOutcome install_controls(const GameImage& g, Patcher& p, const PadReplacements& replacements,
                                  input::StockPad& stock) noexcept {
-    if (!install_pad_slots(p, g.at(AiAddr::PadVtable), replacements, stock)) return ControlsOutcome::SlotsNotWritten;
-    const bool ok =
-        p.write(g.at(AiAddr::PadConnectedSet), kPadAlwaysConnected) &&
-        p.redirect_call(g.at(AiAddr::LeftStickPromptCall), replacements.move_on_left_stick, kLeftStickPrompt) &&
-        p.redirect_call(g.at_rva(g.sites.left_stick_prompt_call_2), replacements.move_on_left_stick,
-                        kLeftStickPrompt);
+    if (!install_pad_slots(p, g.at(AiAddr::PadVtable), replacements, stock))
+        return ControlsOutcome::SlotsNotWritten;
+    const bool ok = p.write(g.at(AiAddr::PadConnectedSet), kPadAlwaysConnected) &&
+                    p.redirect_call(g.at(AiAddr::LeftStickPromptCall), replacements.move_on_left_stick,
+                                    kLeftStickPrompt) &&
+                    p.redirect_call(g.at_rva(g.sites.left_stick_prompt_call_2),
+                                    replacements.move_on_left_stick, kLeftStickPrompt);
     return ok ? ControlsOutcome::Installed : ControlsOutcome::LaterWriteFailed;
 }
 

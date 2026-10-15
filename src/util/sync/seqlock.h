@@ -19,12 +19,12 @@ namespace omvr::util {
 template <class T>
 class SeqLock {
     static_assert(std::is_trivially_copyable_v<T>);
-    using Word = std::uint32_t;
+    using Word                          = std::uint32_t;
     static constexpr std::size_t kWords = (sizeof(T) + sizeof(Word) - 1) / sizeof(Word);
 
 public:
     SeqLock() noexcept { store(T{}); }
-    SeqLock(const SeqLock&) = delete;
+    SeqLock(const SeqLock&)            = delete;
     SeqLock& operator=(const SeqLock&) = delete;
 
     // One writer at a time. The sequence is odd while a store is in
@@ -64,7 +64,7 @@ public:
 private:
     static constexpr bool writing(Word sequence) noexcept { return (sequence & 1u) != 0; }
 
-    std::atomic<Word>                    seq_{0};
+    std::atomic<Word> seq_{0};
     std::array<std::atomic<Word>, kWords> words_{};
 };
 

@@ -20,18 +20,18 @@ constexpr std::string_view kUnexpectedLog = "[stereo] clear gate: unexpected cod
 
 // The clear's prologue: `push ebp; mov ebp, esp; sub esp, 0x10`. It does
 // not depend on where it runs, so the gate runs a copy of it.
-constexpr std::uint8_t kGroup1Imm8To32 = 0x83;  // sub/add/... r/m32, imm8 (reg field selects)
-constexpr std::uint8_t kModRmSubEsp     = 0xEC;  // 83 /5, esp
-constexpr std::uint8_t kModRmEbpEsp     = 0xEC;  // 8B, ebp <- esp
-constexpr std::uint8_t kClearFrameSize  = 0x10;
-constexpr std::array<std::uint8_t, 6> kClearPrologue = {x86::kPushEbp,  x86::kMovR32Rm32, kModRmEbpEsp,
+constexpr std::uint8_t kGroup1Imm8To32               = 0x83; // sub/add/... r/m32, imm8 (reg field selects)
+constexpr std::uint8_t kModRmSubEsp                  = 0xEC; // 83 /5, esp
+constexpr std::uint8_t kModRmEbpEsp                  = 0xEC; // 8B, ebp <- esp
+constexpr std::uint8_t kClearFrameSize               = 0x10;
+constexpr std::array<std::uint8_t, 6> kClearPrologue = {x86::kPushEbp,   x86::kMovR32Rm32, kModRmEbpEsp,
                                                         kGroup1Imm8To32, kModRmSubEsp,     kClearFrameSize};
 
 // The gate's machine code: room for it, and the displacement of its `jne`
 // over the prologue copy and the jump back.
-constexpr std::size_t  kStubSize = 64;
-constexpr std::uint8_t kSkipRel  = static_cast<std::uint8_t>(kClearPrologue.size() + x86::kJmpRel32Size);
-constexpr std::uint8_t kModRmCmpAbs = 0x3D;  // 80 /7, [disp32]
+constexpr std::size_t kStubSize     = 64;
+constexpr std::uint8_t kSkipRel     = static_cast<std::uint8_t>(kClearPrologue.size() + x86::kJmpRel32Size);
+constexpr std::uint8_t kModRmCmpAbs = 0x3D; // 80 /7, [disp32]
 
 // Read by the gate's machine code (`cmp byte ptr [skip_clears], 0`), so it
 // must be one byte at a fixed address. Written and read on the render
@@ -86,11 +86,11 @@ bool install_clear_gate(std::uint8_t* clear, core::diag::ports::Log& log) noexce
     std::uint8_t* stub = platform::win32::allocate_code(kStubSize);
     if (!stub) return false;
     write_gate(stub, clear);
-    platform::win32::seal_code(stub, kStubSize);  // written once; no page stays writable and executable
+    platform::win32::seal_code(stub, kStubSize); // written once; no page stays writable and executable
 
     // jmp stub; nop (the sixth byte of the prologue it replaces)
     std::array<std::uint8_t, kClearPrologue.size()> entry = x86::nops<kClearPrologue.size()>();
-    entry[0] = x86::kJmpRel32;
+    entry[0]                                              = x86::kJmpRel32;
     const auto rel = x86::le32(address_of(stub) - address_of(clear + x86::kJmpRel32Size));
     std::copy(rel.begin(), rel.end(), entry.begin() + x86::kCallOperandOffset);
     Patcher patcher{log};

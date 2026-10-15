@@ -36,22 +36,22 @@
 
 namespace omvr::core::vr {
 class RuntimeFailure;
-}
+} // namespace omvr::core::vr
 
 namespace omvr::platform::openxr {
 
 // The result of creating the session.
 struct SessionInfo {
-    bool          ok            = false;
+    bool ok                     = false;
     std::uint32_t recommended_w = 0; // per-eye image size
     std::uint32_t recommended_h = 0;
 };
 
 // What the runtime reports about the system before a session exists.
 struct SystemInfo {
-    std::uint32_t recommended_w = 0, recommended_h = 0;  // per eye
-    bool has_fov = false;                                // the runtime reported its FOV
-    std::array<core::vr::FovAngles, core::vr::kEyeCount> fov{};  // per eye, radians
+    std::uint32_t recommended_w = 0, recommended_h = 0;         // per eye
+    bool has_fov = false;                                       // the runtime reported its FOV
+    std::array<core::vr::FovAngles, core::vr::kEyeCount> fov{}; // per eye, radians
     char system_name[kSystemNameSize]{};
     char runtime_name[kRuntimeNameSize]{};
     // The headset's audio output endpoint (XR_OCULUS_audio_device_guid); empty
@@ -61,17 +61,17 @@ struct SystemInfo {
 
 // One eye's render parameters for the frame being submitted.
 struct EyeView {
-    util::Pose          pose{};   // in the seated (LOCAL) space
-    core::vr::FovAngles fov{};    // half-angles in radians (left/down negative)
+    util::Pose pose{};         // in the seated (LOCAL) space
+    core::vr::FovAngles fov{}; // half-angles in radians (left/down negative)
 };
 
 // A controller's grip pose (/input/grip/pose: origin in the palm, -Z along
 // the handle) and linear velocity, both in the seated space.
 struct HandPose {
     util::Pose pose{};
-    util::Vec3 velocity{};          // metres per second
-    bool       valid          = false;
-    bool       velocity_valid = false;
+    util::Vec3 velocity{}; // metres per second
+    bool valid          = false;
+    bool velocity_valid = false;
 };
 
 // Per-frame view state, valid after a frame() that returned true.
@@ -79,13 +79,13 @@ struct HandPose {
 // orientation and position held where the runtime reports them invalid, the
 // neutral pose before any), and the eyes keep their last valid positions.
 struct FrameViews {
-    std::array<EyeView, core::vr::kEyeCount>   eyes{};
-    util::Pose                                 head{};
-    std::array<HandPose, core::vr::kHandCount> hands{};   // left, right; located with the views
-    std::int64_t display_time = 0;           // the predictedDisplayTime they were located for
-    bool         valid = false;              // eye orientations valid: a projection layer may use them
-    bool         eye_positions_valid = false; // eye positions are this frame's, not held
-    bool         head_valid = false;         // head orientation and position both this frame's
+    std::array<EyeView, core::vr::kEyeCount> eyes{};
+    util::Pose head{};
+    std::array<HandPose, core::vr::kHandCount> hands{}; // left, right; located with the views
+    std::int64_t display_time = 0;                      // the predictedDisplayTime they were located for
+    bool valid                = false; // eye orientations valid: a projection layer may use them
+    bool eye_positions_valid  = false; // eye positions are this frame's, not held
+    bool head_valid           = false; // head orientation and position both this frame's
 };
 
 // A region of a texture in pixels (the depth slice is always the first).
@@ -98,17 +98,17 @@ struct TextureRegion {
 // shown on a world-locked virtual screen.
 struct EyeImages {
     std::array<core::vr::GpuTexture, core::vr::kEyeCount> texture{};
-    std::array<TextureRegion, core::vr::kEyeCount>        region{};  // source rect per eye
-    std::array<EyeView, core::vr::kEyeCount>              view{};    // pose + FOV each eye was rendered with
-    std::int64_t rendered_for = 0;  // display_time of the FrameViews the pose came from
+    std::array<TextureRegion, core::vr::kEyeCount> region{}; // source rect per eye
+    std::array<EyeView, core::vr::kEyeCount> view{};         // pose + FOV each eye was rendered with
+    std::int64_t rendered_for = 0; // display_time of the FrameViews the pose came from
 };
 
 class Session final {
 public:
-    Session(core::diag::ports::Log& log, const core::diag::ports::Clock& clock, core::ui::ports::Dialogs& dialogs,
-            core::vr::RuntimeFailure& failure);
+    Session(core::diag::ports::Log& log, const core::diag::ports::Clock& clock,
+            core::ui::ports::Dialogs& dialogs, core::vr::RuntimeFailure& failure);
     ~Session();
-    Session(const Session&) = delete;
+    Session(const Session&)            = delete;
     Session& operator=(const Session&) = delete;
 
     // Locate a runtime a 32-bit process can load. The loader in a 32-bit process

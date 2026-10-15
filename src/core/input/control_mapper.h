@@ -41,10 +41,10 @@ private:
         bool aim_ = false, tracker_ = false;
     };
 
-    VirtualPad&                  pad_;
-    ControlSchemes&              schemes_;
+    VirtualPad& pad_;
+    ControlSchemes& schemes_;
     const config::InputSettings& settings_;
-    GripToggles                  grips_;
+    GripToggles grips_;
 };
 
 } // namespace omvr::core::input

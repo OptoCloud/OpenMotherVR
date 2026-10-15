@@ -35,7 +35,8 @@ void ScriptVars::set_float(core::ui::ports::UiHandle ui, const char* name, float
     fire_float_(game_ui(ui), nullptr, name, value);
 }
 
-bool ScriptVars::add_row(core::ui::ports::UiHandle ui, const char* name, const char* a, const char* b) noexcept {
+bool ScriptVars::add_row(core::ui::ports::UiHandle ui, const char* name, const char* a,
+                         const char* b) noexcept {
     if (!fire_str2_) return false;
     fire_str2_(game_ui(ui), nullptr, name, a, b);
     return true;
