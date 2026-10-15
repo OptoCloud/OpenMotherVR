@@ -154,52 +154,173 @@ void init_device(StereoInterface& si) noexcept {
 
 // ---- Mirror (desktop window) ----------------------------------------------------
 
-// The 48-byte constant buffer of the mirror shaders.
+// The constant buffer of mirror.hlsl: per panel, the draw rectangle in
+// window UV and the source region in stereo-texture UV, each as left, top,
+// right, bottom (v down). Panel 1 is empty except for "both eyes" cropped.
 struct MirrorConstants {
-    float draw_top_left[2];
-    float draw_bottom_right[2];
-    float sample_top_left[2];
-    float sample_bottom_right[2];
-    float scale_adjust;
-    float window_aspect;
-    float pad[2];
+    float draw[2][4];
+    float source[2][4];
 };
-static_assert(sizeof(MirrorConstants) == 0x30);
+static_assert(sizeof(MirrorConstants) == 0x40);
 
-// Which part of the eye texture to show in the window, letterboxed: both
-// eyes, the left half or the right half. Without "symmetric", each eye is
-// cropped from the symmetric render FOV back to its real FOV.
+struct UvRect {
+    float l, t, r, b;
+};
+
+void set_panel(MirrorConstants& c, int panel, const UvRect& draw, const UvRect& source) noexcept {
+    const float d[4] = {draw.l, draw.t, draw.r, draw.b};
+    const float s[4] = {source.l, source.t, source.r, source.b};
+    std::memcpy(c.draw[panel], d, sizeof(d));
+    std::memcpy(c.source[panel], s, sizeof(s));
+}
+
+// part / whole of a tangent, 1 when the whole is unknown.
+float tan_ratio(float part, float whole) noexcept {
+    return whole > 0.0f ? std::clamp(part / whole, 0.0f, 1.0f) : 1.0f;
+}
+
+// Eye e's real FOV (DefaultEyeFov) inside its half of the rendered image
+// (MaxEyeFov, the FOV the eye was rendered with), in UV of the whole
+// side-by-side texture: the compositor's crop bounds.
+UvRect eye_crop(const StereoInterface& si, int e) noexcept {
+    const auto& d = si.desc.default_eye_fov[e];
+    const auto& x = si.desc.max_eye_fov[e];
+    const float half = 0.5f * static_cast<float>(e);
+    return {half + 0.5f * (0.5f - 0.5f * tan_ratio(d.left, x.left)),
+            0.5f - 0.5f * tan_ratio(d.up, x.up),
+            half + 0.5f * (0.5f + 0.5f * tan_ratio(d.right, x.right)),
+            0.5f + 0.5f * tan_ratio(d.down, x.down)};
+}
+
+// What the window shows, for the current layout, window size and mirror
+// settings. Head-tracked frames (`screen` false) show the eye image(s),
+// filling the window width at their own aspect (a near-square eye in a
+// 16:9 window is cropped top and bottom). Screen frames show the region the
+// headset's virtual screen shows, eye 0's half, middle half vertically,
+// fitted whole. Outside the draw area the shader paints black.
+//
+// Without "symmetric", each eye is cropped from the symmetric render FOV
+// back to its real FOV; "both eyes" then shows eye 0's crop on the left and
+// eye 1's on the right, over the union of their vertical ranges so the
+// halves show the same rows and neither is stretched.
 // From: FUN_1001eda0, the tail (which tests the type as 0 both, 2 left,
-// otherwise right: the original's MirrorViewType integers).
-MirrorConstants mirror_constants(const StereoInterface& si) noexcept {
+// otherwise right: the original's MirrorViewType integers). The original
+// took the right eye's crop from the left half, drew "both eyes" cropped as
+// eye 0 and its mirror image, and left the crop's height out of the draw
+// height; it also showed whatever the game had bound at t0 in screen frames.
+MirrorConstants mirror_constants(const StereoInterface& si, bool screen) noexcept {
     using config::MirrorViewType;
+    const float tex_w = static_cast<float>(std::max(si.rt_width, 1));
+    const float tex_h = static_cast<float>(std::max(si.rt_height, 1));
+    const float window_aspect = si.mirror_width > 0 && si.mirror_height > 0
+                                    ? static_cast<float>(si.mirror_width) / static_cast<float>(si.mirror_height)
+                                    : tex_w / tex_h;
+    // Pixel aspect of a source region du x dv.
+    auto region_aspect = [&](float du, float dv) {
+        return du > 0.0f && dv > 0.0f ? (du * tex_w) / (dv * tex_h) : window_aspect;
+    };
+
+    MirrorConstants c{};
+    if (screen) {
+        const UvRect source{0.0f, 0.25f, 0.5f, 0.75f};
+        const float a = region_aspect(0.5f, 0.5f);
+        if (a >= window_aspect) {   // bars above and below
+            const float k = window_aspect / a;
+            set_panel(c, 0, {0.0f, (1.0f - k) * 0.5f, 1.0f, (1.0f + k) * 0.5f}, source);
+        } else {                    // bars at the sides
+            const float k = a / window_aspect;
+            set_panel(c, 0, {(1.0f - k) * 0.5f, 0.0f, (1.0f + k) * 0.5f, 1.0f}, source);
+        }
+        return c;
+    }
+
     const auto& cfg = config::current().rendering;
     const MirrorViewType m = cfg.mirror_view_type;
-    float u0 = 0.0f, u1 = 1.0f, v0 = 0.0f, v1 = 1.0f, xr = 1.0f;
+    UvRect left_src{}, right_src{};
+    bool both_cropped = false;
     if (cfg.symmetric_mirror_view) {
-        if (m == MirrorViewType::LeftEye)       { u0 = 0.0f; u1 = 0.5f; }
-        else if (m == MirrorViewType::RightEye) { u0 = 0.5f; u1 = 1.0f; }
+        if (m == MirrorViewType::LeftEye)       left_src = {0.0f, 0.0f, 0.5f, 1.0f};
+        else if (m == MirrorViewType::BothEyes) left_src = {0.0f, 0.0f, 1.0f, 1.0f};
+        else                                    left_src = {0.5f, 0.0f, 1.0f, 1.0f};
+    } else if (m == MirrorViewType::BothEyes) {
+        left_src  = eye_crop(si, 0);
+        right_src = eye_crop(si, 1);
+        const float v0 = std::min(left_src.t, right_src.t);
+        const float v1 = std::max(left_src.b, right_src.b);
+        left_src.t = right_src.t = v0;
+        left_src.b = right_src.b = v1;
+        both_cropped = true;
     } else {
-        const int e = m == MirrorViewType::RightEye ? 1 : 0;
-        const auto& d = si.desc.default_eye_fov[e];
-        const auto& x = si.desc.max_eye_fov[e];
-        u0 = (0.5f - (d.left / x.left) * 0.5f) * 0.5f;
-        u1 = ((d.right / x.right) * 0.5f + 0.5f) * 0.5f;
-        v0 = 0.5f - (d.up / x.up) * 0.5f;
-        v1 = (d.down / x.down) * 0.5f + 0.5f;
-        if (m == MirrorViewType::BothEyes) xr = 0.5f;
+        left_src = eye_crop(si, m == MirrorViewType::LeftEye ? 0 : 1);
     }
-    const float rt_aspect  = si.rt_height ? float(si.rt_width) / float(si.rt_height) : 1.0f;
-    const float win_aspect = si.mirror_height ? float(si.mirror_width) / float(si.mirror_height) : rt_aspect;
-    const float k = win_aspect * xr / ((u1 - u0) * rt_aspect);
 
-    // The original uses 1.0 the first time, then 0.5 / pixel scale: it
-    // compensated for eyes that started at half size. Ours are full size
-    // from the start, so the mirror fills the window at 1.0.
-    constexpr float scale_adjust = 1.0f;
+    const float du_left  = left_src.r - left_src.l;
+    const float du_right = both_cropped ? right_src.r - right_src.l : 0.0f;
+    const float k = window_aspect / region_aspect(du_left + du_right, left_src.b - left_src.t);
+    const float top = (1.0f - k) * 0.5f, bottom = (1.0f + k) * 0.5f;
+    if (both_cropped) {
+        // Each half as wide as its crop's share of the summed width.
+        const float split = du_left + du_right > 0.0f ? du_left / (du_left + du_right) : 0.5f;
+        set_panel(c, 0, {0.0f, top, split, bottom}, left_src);
+        set_panel(c, 1, {split, top, 1.0f, bottom}, right_src);
+    } else {
+        set_panel(c, 0, {0.0f, top, 1.0f, bottom}, left_src);
+    }
+    return c;
+}
 
-    return {{0.0f, (1.0f - k) * 0.5f}, {xr, (1.0f + k) * 0.5f}, {u0, v0}, {u1, v1},
-            scale_adjust, win_aspect, {}};
+void release_mirror(StereoInterface& si) noexcept {
+    release(si.mirror_vs);
+    release(si.mirror_ps);
+    release(si.mirror_cb_screen);
+    release(si.mirror_cb);
+    release(si.mirror_sampler);
+}
+
+bool mirror_ready(const StereoInterface& si) noexcept {
+    return si.mirror_vs && si.mirror_ps && si.mirror_cb_screen && si.mirror_cb && si.mirror_sampler;
+}
+
+// (Re)creates the mirror's shaders, constants and sampler. On a failure
+// none is kept and the window is cleared to black instead (end frame); VR is
+// unaffected. Slot 3 only, so not per frame.
+void create_mirror(StereoInterface& si, ID3D11Device* device) noexcept {
+    release_mirror(si);
+    const char* what = "vertex shader";
+    HRESULT hr = device->CreateVertexShader(kMirrorVS, sizeof(kMirrorVS), nullptr, &si.mirror_vs);
+    if (SUCCEEDED(hr)) {
+        what = "pixel shader";
+        hr = device->CreatePixelShader(kMirrorPS, sizeof(kMirrorPS), nullptr, &si.mirror_ps);
+    }
+    const D3D11_BUFFER_DESC cb_desc{sizeof(MirrorConstants), D3D11_USAGE_DEFAULT,
+                                    D3D11_BIND_CONSTANT_BUFFER, 0, 0, 0};
+    if (SUCCEEDED(hr)) {
+        what = "constant buffer";
+        const MirrorConstants eyes = mirror_constants(si, false);
+        const D3D11_SUBRESOURCE_DATA data{&eyes, 0, 0};
+        hr = device->CreateBuffer(&cb_desc, &data, &si.mirror_cb);
+    }
+    if (SUCCEEDED(hr)) {
+        const MirrorConstants screen = mirror_constants(si, true);
+        const D3D11_SUBRESOURCE_DATA data{&screen, 0, 0};
+        hr = device->CreateBuffer(&cb_desc, &data, &si.mirror_cb_screen);
+    }
+    if (SUCCEEDED(hr)) {
+        what = "sampler";
+        D3D11_SAMPLER_DESC s{};
+        s.Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        s.AddressU = s.AddressV = s.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+        s.MaxAnisotropy  = 1;
+        s.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        s.MinLOD         = -D3D11_FLOAT32_MAX;
+        s.MaxLOD         = D3D11_FLOAT32_MAX;
+        hr = device->CreateSamplerState(&s, &si.mirror_sampler);
+    }
+    if (FAILED(hr) || !mirror_ready(si)) {
+        release_mirror(si);
+        diag::logf("[stereo] desktop mirror off: creating its {} failed (0x{:08X}); the window shows black, "
+                   "VR not affected", what, static_cast<unsigned long>(hr));
+    }
 }
 
 // ---- Device vtable (all __thiscall; see stereo_device.h) -------------------------
@@ -263,31 +384,7 @@ bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noex
         fail_runtime(si, runtime::last_result().chosen);
     }
 
-    release(si.mirror_vs);
-    device->CreateVertexShader(kMirrorVS, sizeof(kMirrorVS), nullptr, &si.mirror_vs);
-    release(si.mirror_ps_eyes);
-    device->CreatePixelShader(kMirrorPSEyes, sizeof(kMirrorPSEyes), nullptr, &si.mirror_ps_eyes);
-    release(si.mirror_ps_screen);
-    device->CreatePixelShader(kMirrorPSScreen, sizeof(kMirrorPSScreen), nullptr, &si.mirror_ps_screen);
-
-    release(si.mirror_cb);
-    const D3D11_BUFFER_DESC cb_desc{sizeof(MirrorConstants), D3D11_USAGE_DEFAULT,
-                                    D3D11_BIND_CONSTANT_BUFFER, 0, 0, 0};
-    device->CreateBuffer(&cb_desc, nullptr, &si.mirror_cb);
-    if (si.mirror_cb) {
-        const MirrorConstants c = mirror_constants(si);
-        ctx->UpdateSubresource(si.mirror_cb, 0, nullptr, &c, 4, 4);
-    }
-
-    release(si.mirror_sampler);
-    D3D11_SAMPLER_DESC s{};
-    s.Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-    s.AddressU = s.AddressV = s.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-    s.MaxAnisotropy  = 1;
-    s.ComparisonFunc = D3D11_COMPARISON_NEVER;
-    s.MinLOD         = -D3D11_FLOAT32_MAX;
-    s.MaxLOD         = D3D11_FLOAT32_MAX;
-    device->CreateSamplerState(&s, &si.mirror_sampler);
+    create_mirror(si, device);
 
     diag::logf("[stereo] rendering configured: {}x{} texture={}", si.rt_width, si.rt_height,
                static_cast<void*>(t0.texture));
@@ -328,45 +425,60 @@ void __fastcall dev_begin_frame(void* self, void*) noexcept {
 
 // [6] EndFrame: submit the eyes, draw the mirror, present. LibOVR's
 // EndFrame presented in SDK-distortion mode, so the game does not.
-void __fastcall dev_end_frame(void* self, void*) noexcept {
-    auto& si = device_of(self);
-    if (si.backend) si.backend->submit_frame(si.eye_texture[0].texture);
-
-    auto* swap = renderer_get<IDXGISwapChain>(AiAddr::RendererSwapChain);
-    auto* ctx  = renderer_get<ID3D11DeviceContext>(AiAddr::RendererContext);
-
+void draw_mirror(StereoInterface& si, ID3D11DeviceContext* ctx, bool head_tracked) noexcept {
     ID3D11RenderTargetView* rtv = nullptr;
     ctx->OMGetRenderTargets(1, &rtv, nullptr);
-    if (rtv) {
-        const float dark_red[4] = {0.6f, 0.0f, 0.0f, 1.0f};
-        ctx->ClearRenderTargetView(rtv, dark_red);
-        ctx->OMSetRenderTargets(1, &rtv, nullptr);
-        // Draw over the whole window, not whatever viewport the game left.
-        ID3D11Resource* res = nullptr;
-        rtv->GetResource(&res);
-        if (ID3D11Texture2D* tex = nullptr;
-            res && SUCCEEDED(res->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&tex)))) {
-            D3D11_TEXTURE2D_DESC td{};
-            tex->GetDesc(&td);
-            const D3D11_VIEWPORT vp{0.0f, 0.0f, float(td.Width), float(td.Height), 0.0f, 1.0f};
-            ctx->RSSetViewports(1, &vp);
-            tex->Release();
+    if (!rtv) {
+        // Nothing to draw into; the window keeps its last picture.
+        static bool s_logged = false;
+        if (!std::exchange(s_logged, true)) {
+            diag::log_line("[stereo] desktop mirror: the game has no output bound at end of frame");
         }
-        if (res) res->Release();
+        return;
     }
+    if (!mirror_ready(si)) {
+        const float black[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+        ctx->ClearRenderTargetView(rtv, black);
+        rtv->Release();
+        return;
+    }
+    const float dark_red[4] = {0.6f, 0.0f, 0.0f, 1.0f};
+    ctx->ClearRenderTargetView(rtv, dark_red);
+    ctx->OMSetRenderTargets(1, &rtv, nullptr);
+    // Draw over the whole window, not whatever viewport the game left.
+    ID3D11Resource* res = nullptr;
+    rtv->GetResource(&res);
+    if (ID3D11Texture2D* tex = nullptr;
+        res && SUCCEEDED(res->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&tex)))) {
+        D3D11_TEXTURE2D_DESC td{};
+        tex->GetDesc(&td);
+        const D3D11_VIEWPORT vp{0.0f, 0.0f, float(td.Width), float(td.Height), 0.0f, 1.0f};
+        ctx->RSSetViewports(1, &vp);
+        tex->Release();
+    }
+    if (res) res->Release();
     ctx->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
     ctx->RSSetState(nullptr);
+    ctx->IASetInputLayout(nullptr);
     ctx->VSSetShader(si.mirror_vs, nullptr, 0);
-    // The eyes while the game tracks the head, else what is bound at t0
-    // (menus, videos).
-    ctx->PSSetShader(si.pose_fetched ? si.mirror_ps_eyes : si.mirror_ps_screen, nullptr, 0);
+    ctx->PSSetShader(si.mirror_ps, nullptr, 0);
     ctx->PSSetShaderResources(1, 1, &si.eye_texture[0].srv);
-    ctx->PSSetConstantBuffers(0, 1, &si.mirror_cb);
+    // The eyes while the game tracks the head, else the virtual screen's
+    // region (menus, videos, loading).
+    ctx->PSSetConstantBuffers(0, 1, head_tracked ? &si.mirror_cb : &si.mirror_cb_screen);
     ctx->PSSetSamplers(0, 1, &si.mirror_sampler);
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     ctx->Draw(4, 0);
-    if (rtv) rtv->Release();  // the original leaks this reference every frame
+    rtv->Release();  // the original leaks this reference every frame
+}
 
+void __fastcall dev_end_frame(void* self, void*) noexcept {
+    auto& si = device_of(self);
+    if (si.backend) si.backend->submit_frame(si.eye_texture[0].texture);
+    auto* swap = renderer_get<IDXGISwapChain>(AiAddr::RendererSwapChain);
+    auto* ctx  = renderer_get<ID3D11DeviceContext>(AiAddr::RendererContext);
+    // The frame kind, decided before the request is cleared.
+    draw_mirror(si, ctx, si.pose_fetched != 0);
     swap->Present(0, 0);
     si.pose_fetched = 0;
 }

@@ -89,10 +89,13 @@ struct StereoInterface {
     std::int32_t     mirror_height;       // +0x210
     std::int32_t     configured_width;    // +0x214  size of the eye texture in use
     std::int32_t     configured_height;   // +0x218  (unused in the original)
+    // The mirror (stereo_device.cpp, mirror.hlsl). One shader for every
+    // mode; the frame kind picks the constant buffer. The original had a
+    // second pixel shader at +0x224 for screen frames.
     ID3D11VertexShader* mirror_vs;        // +0x21C
-    ID3D11PixelShader*  mirror_ps_eyes;   // +0x220
-    ID3D11PixelShader*  mirror_ps_screen; // +0x224
-    ID3D11Buffer*       mirror_cb;        // +0x228
+    ID3D11PixelShader*  mirror_ps;        // +0x220
+    ID3D11Buffer*       mirror_cb_screen; // +0x224  screen frames
+    ID3D11Buffer*       mirror_cb;        // +0x228  head-tracked frames
     ID3D11SamplerState* mirror_sampler;   // +0x22C
 };
 static_assert(offsetof(StereoInterface, desc) == 0x10);
@@ -110,6 +113,7 @@ static_assert(offsetof(StereoInterface, backend) == 0x1F4);
 static_assert(offsetof(StereoInterface, world_scale) == 0x204);
 static_assert(offsetof(StereoInterface, mirror_width) == 0x20C);
 static_assert(offsetof(StereoInterface, mirror_vs) == 0x21C);
+static_assert(offsetof(StereoInterface, mirror_sampler) == 0x22C);
 static_assert(sizeof(StereoInterface) == 0x230);
 
 // The device state is read on the game's job threads (the cull hooks) while
