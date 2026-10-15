@@ -34,6 +34,14 @@ struct GameHookTargets {
 };
 void install_game_hooks(const GameHookTargets& targets) noexcept;
 
+// The game's mode-stack append (spec 05 section 3.2f): thiscall on the
+// stack array at StereoManager +0x68, one `const int*` argument, ret 4;
+// grows the array through the game's allocator, raises the count and
+// returns the new element, or null when the allocation failed. Set when
+// the installer found it at its call in StereoPushMode; without it the
+// count is raised only into storage the array already has.
+void install_mode_stack_append(void* append) noexcept;
+
 // The "head in wall" blackout threshold the game compares against (its
 // address is patched into the game). 1e-5 with clipping blinders on, 1.0 off.
 float& head_clip_threshold() noexcept;

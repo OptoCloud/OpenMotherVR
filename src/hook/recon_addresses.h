@@ -47,6 +47,14 @@ struct ReconRvas {
     // Script event tap: a retail
     // no-op, `mov eax, ecx; ret 4`, that scripts pass debug strings to.
     std::uint32_t event_tap;
+
+    // Mode stack (cleanroom 05 section 3.2f, 01 StereoModeStackAppend): the
+    // game's int-array append and its call in StereoPushMode, after
+    // `lea ecx, [ebx+0x68]`. thiscall(const int*), ret 4; returns the new
+    // element or null. Checked in the 2015 AI.exe (timestamp 0x54E3199D):
+    // `8d 4b 68 e8 e8 a8 cb ff` at 0x5D9C50.
+    std::uint32_t mode_stack_append_call;
+    std::uint32_t mode_stack_append;
 };
 
 inline constexpr ReconRvas kReconRvas2015 = {
@@ -69,6 +77,8 @@ inline constexpr ReconRvas kReconRvas2015 = {
     .head_clip_fade_call     = 0x0034E2C1,
     .head_clip_fade          = 0x00346DE0,
     .event_tap               = 0x00A1BCC0,
+    .mode_stack_append_call  = 0x005D9C53,
+    .mode_stack_append       = 0x00294540,
 };
 
 inline constexpr ReconRvas kReconRvas2020 = {};

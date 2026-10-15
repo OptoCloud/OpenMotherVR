@@ -117,19 +117,36 @@ void game_pop_to_world(StereoManager* sm) noexcept {
     }
 }
 
+// The game's append on the mode stack (game_hooks.h); null when this build
+// has no address for it. Set at attach, read on the game thread.
+using ModeStackAppendFn = std::int32_t* (__fastcall*)(void* array, void* edx, const std::int32_t* value);
+ModeStackAppendFn g_mode_stack_append = nullptr;
+
 // Rule f: at the end of each update the stack count equals the mode, after
 // unbalanced game pushes and pops. Lowering writes the count. Raising does
 // not, because when the game entered mode 1 without a push the array may
 // have no storage (data null, capacity 0) and a count of 1 over it makes
-// the game's next pop read element 0 through null. The game's append
-// routine, which allocates, is not in the address tables; until it is, the
-// count is raised only into storage the game already has, else left as it
-// is (game_pop_to_world still gets back to mode 0) and that is logged once.
+// the game's next pop read element 0 through null. It appends 1 through the
+// game's own routine, which allocates (on this thread, where the game
+// pushes too). Without that routine the count is raised only into storage
+// the game already has, else left as it is (game_pop_to_world still gets
+// back to mode 0) and that is logged once.
 void sync_mode_stack(StereoManager& m) noexcept {
     if (m.mode >= 0 && m.stack_top > m.mode) {
         m.stack_top = m.mode;
     } else if (m.mode == 1 && m.stack_top == 0) {
-        if (m.stack_data && m.stack_capacity >= 1) {
+        if (g_mode_stack_append) {
+            constexpr std::int32_t kScreenMode = 1;
+            if (!g_mode_stack_append(&m.stack_data, nullptr, &kScreenMode)) {
+                // The routine raises the count even when its allocation
+                // failed, over a null array: take it back.
+                m.stack_top = 0;
+                static bool s_logged = false;
+                if (!std::exchange(s_logged, true)) {
+                    diag::log_line("[stereo] the game's mode-stack append failed; count left at 0");
+                }
+            }
+        } else if (m.stack_data && m.stack_capacity >= 1) {
             m.stack_data[0] = 1;
             m.stack_top = 1;
         } else {
@@ -201,6 +218,10 @@ void install_game_hooks(const GameHookTargets& targets) noexcept {
 float& head_clip_threshold() noexcept { return g_head_clip_threshold; }
 
 void request_recenter() noexcept { g_update.recenter_request = true; }
+
+void install_mode_stack_append(void* append) noexcept {
+    g_mode_stack_append = reinterpret_cast<ModeStackAppendFn>(append);
+}
 
 void set_clipping_blinders(bool on) noexcept {
     g_head_clip_threshold = on ? kHeadClipOn : kHeadClipOff;

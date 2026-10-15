@@ -587,6 +587,29 @@ bool install_game_side_hooks() noexcept {
     return true;
 }
 
+// 8: the game's mode-stack append, so the stereo update can raise the stack
+// count through the game's allocator. Nothing is written to the game; on a
+// build without the address, or other code at its call, the update keeps to
+// the storage the stack already has.
+void find_mode_stack_append(const Game& g) noexcept {
+    const ReconRvas& r = recon_rvas(g.version);
+    if (r.mode_stack_append == 0) {
+        diag::log_line("[hook] mode stack: this build has no address for the game's append; the count is raised "
+                       "only into existing storage");
+        return;
+    }
+    constexpr std::uint8_t kLeaEcxStack[] = {0x8D, 0x4B, 0x68};   // lea ecx, [ebx+0x68]
+    const std::uint8_t* site = g.base + r.mode_stack_append_call;
+    if (std::memcmp(site - sizeof(kLeaEcxStack), kLeaEcxStack, sizeof(kLeaEcxStack)) != 0 ||
+        !calls(site, g.base + r.mode_stack_append)) {
+        diag::logf("[hook] mode stack: StereoModeStackAppend's call (RVA {:08X}) is not the expected code; the "
+                   "count is raised only into existing storage", r.mode_stack_append_call);
+        return;
+    }
+    stereo::install_mode_stack_append(g.base + r.mode_stack_append);
+    diag::logf("[hook] mode stack: count raised through the game's append (RVA {:08X})", r.mode_stack_append);
+}
+
 // 8b: planar reflections render per eye.
 constexpr std::string_view kReflections = "per-eye reflections";
 void fix_reflections(const Game& g, const ReconRvas& r) noexcept {
@@ -818,6 +841,7 @@ bool install(HMODULE self, const std::filesystem::path& game_dir) noexcept {
     if (!install_stereo_device(g)) return failed("stereo path");
     area_on("stereo path", static_cast<int>(g.sites.stereo_mode_tests.size()) + kStereoDeviceSites);
     if (!install_game_side_hooks()) return failed("game behaviour");
+    find_mode_stack_append(g);
     // The pause menu's open slot is written with the game-side hooks; its
     // wrapper also pushes the settings.
     area_on("options UI", mod_archive ? 4 : 3);
