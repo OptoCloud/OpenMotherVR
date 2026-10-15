@@ -567,8 +567,8 @@ bool install_stereo_device(const Game& /*g*/) noexcept {
 }
 
 // 8
-constexpr int kGameSideSites = 21;   // 10 vtable slots, 9 calls, 2 left-stick calls
-bool install_game_side_hooks(const Game& g) noexcept {
+constexpr int kGameSideSites = 19;   // 10 vtable slots, 9 calls
+bool install_game_side_hooks() noexcept {
     using namespace stereo;
     auto slot = [](AiAddr a, int index) {
         return *reinterpret_cast<void**>(ai_address(a) + 4 * index);
@@ -612,9 +612,7 @@ bool install_game_side_hooks(const Game& g) noexcept {
     for (AiAddr a : {AiAddr::PopModeCallA, AiAddr::PopModeCallB, AiAddr::PopModeCallC}) {
         if (!redirect_call(ai_address(a), &pop_mode, "PopMode")) return false;
     }
-    return redirect_call(ai_address(AiAddr::LeftStickPromptCall), &is_move_on_left_stick, "left stick prompt") &&
-           redirect_call(g.base + g.sites.left_stick_prompt_call_2, &is_move_on_left_stick,
-                         "left stick prompt");
+    return true;
 }
 
 // 8b: planar reflections render per eye.
@@ -738,7 +736,7 @@ void install_reconstruction_fixes(const Game& g) noexcept {
 }
 
 // 9: camera, UI and loader byte patches.
-constexpr int kBytePatchSites = 13;
+constexpr int kBytePatchSites = 12;
 bool apply_byte_patches(const Game& g) noexcept {
     auto at = [](AiAddr a, std::ptrdiff_t offset = 0) { return ai_address(a) + offset; };
     const bool ok =
@@ -770,11 +768,31 @@ bool apply_byte_patches(const Game& g) noexcept {
         patch(at(AiAddr::PauseMenuPushMode),
               {0xEB, 0x0B, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop}) &&
         // No 30 Hz throttle in the loading loop: the headset needs frames.
-        patch(at(AiAddr::LoaderSleepPush), {0x53}) &&
-        // The pad always counts as connected: VR controllers come through it.
-        patch(at(AiAddr::PadConnectedSet), {0xB1, 0x01, kNop});
+        patch(at(AiAddr::LoaderSleepPush), {0x53});
     if (ok) diag::log_line("[hook] camera, UI and loader patches applied");
     return ok;
+}
+
+// 9, controls: VR input goes through the game's gamepad, five of its vtable
+// slots replaced as one patch. Only with those in place does the pad count
+// as always connected and do the left-stick prompts ask the remapped
+// bindings; without them the real pad keeps the game's own behaviour
+// (gamepad.h, spec 04 section 3.3). 0 when the slots were not written, -1
+// when a later write failed.
+constexpr int kControlSites = 8;   // five pad slots, connected flag, two prompt calls
+int install_controls(const Game& g) noexcept {
+    if (!input::install(ai_address(AiAddr::PadVtable),
+                        reinterpret_cast<void**>(ai_address(AiAddr::InputManagerPtr)))) {
+        return 0;
+    }
+    const bool ok =
+        // The pad always counts as connected: VR controllers come through it.
+        patch(ai_address(AiAddr::PadConnectedSet), {0xB1, 0x01, kNop}) &&
+        redirect_call(ai_address(AiAddr::LeftStickPromptCall), &stereo::is_move_on_left_stick,
+                      "left stick prompt") &&
+        redirect_call(g.base + g.sites.left_stick_prompt_call_2, &stereo::is_move_on_left_stick,
+                      "left stick prompt");
+    return ok ? kControlSites : -1;
 }
 
 bool failed(const char* step) noexcept {
@@ -827,7 +845,7 @@ bool install(HMODULE self, const std::filesystem::path& game_dir) noexcept {
     if (!force_stereo_mode(g)) return failed("stereo path");
     if (!install_stereo_device(g)) return failed("stereo path");
     area_on("stereo path", static_cast<int>(g.sites.stereo_mode_tests.size()) + kStereoDeviceSites);
-    if (!install_game_side_hooks(g)) return failed("game behaviour");
+    if (!install_game_side_hooks()) return failed("game behaviour");
     // The pause menu's open slot is written with the game-side hooks; its
     // wrapper also pushes the settings.
     area_on("options UI", mod_archive ? 4 : 3);
@@ -836,12 +854,10 @@ bool install(HMODULE self, const std::filesystem::path& game_dir) noexcept {
     // 9
     if (!apply_byte_patches(g)) return failed("game behaviour");
     area_on("game behaviour", kGameSideSites + kBytePatchSites);
-    // VR input goes through the game's gamepad: five of its vtable slots.
-    if (input::install(ai_address(AiAddr::PadVtable),
-                       reinterpret_cast<void**>(ai_address(AiAddr::InputManagerPtr)))) {
-        area_on("controls", 5);
-    } else {
-        area_off("controls", "the pad's vtable slots could not be written");
+    switch (const int sites = install_controls(g)) {
+        case 0:  area_off("controls", "the pad's vtable slots could not be written; the pad stays stock"); break;
+        case -1: return failed("controls");
+        default: area_on("controls", sites); break;
     }
 
     // Settings reach the menu through on_menu_open, as in the original.

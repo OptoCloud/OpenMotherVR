@@ -32,7 +32,9 @@ namespace mothervr::hook {
 //   8b. Fixes the original lacks (planar reflections, anti-aliasing,
 //      culling, head-in-wall fade), each skipped on its own when its code
 //      does not match.
-//   9. Camera, UI and loader byte patches; gamepad vtable hooks (VR input).
+//   9. Camera, UI and loader byte patches; gamepad vtable hooks (VR input),
+//      then, only if those are in place, the pad-connected patch and the
+//      left-stick prompt redirects.
 //
 // From: FUN_1001d6f0 @ 0x1001d6f0 (the original monolithic hook installer).
 //
