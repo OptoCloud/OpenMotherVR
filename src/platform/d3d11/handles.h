@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/stereo/types.h"
 #include "core/vr/types.h"
 
 #include <cstdint>
@@ -7,6 +8,7 @@
 struct ID3D11Device;
 struct ID3D11DeviceContext;
 struct ID3D11Texture2D;
+struct IDXGISwapChain;
 
 // The D3D11 interfaces behind core's opaque GPU handles.
 namespace omvr::platform::d3d11 {
@@ -19,6 +21,9 @@ inline ID3D11DeviceContext* to_d3d(core::vr::GpuContext h) noexcept {
 }
 inline ID3D11Texture2D* to_d3d(core::vr::GpuTexture h) noexcept {
     return reinterpret_cast<ID3D11Texture2D*>(static_cast<std::uintptr_t>(h));
+}
+inline IDXGISwapChain* to_d3d(core::stereo::SwapchainHandle h) noexcept {
+    return reinterpret_cast<IDXGISwapChain*>(static_cast<std::uintptr_t>(h));
 }
 
 inline core::vr::GpuDevice gpu_device(ID3D11Device* p) noexcept {

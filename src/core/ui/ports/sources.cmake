@@ -3,5 +3,6 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/archive_files.h
     ${CMAKE_CURRENT_LIST_DIR}/dialogs.h
     ${CMAKE_CURRENT_LIST_DIR}/game_signals.h
+    ${CMAKE_CURRENT_LIST_DIR}/runtime_state.h
     ${CMAKE_CURRENT_LIST_DIR}/script_variables.h
 )
