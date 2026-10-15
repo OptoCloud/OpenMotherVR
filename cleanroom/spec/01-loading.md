@@ -1,4 +1,4 @@
-<!-- Provenance: AI.exe 2015 analysis (PE headers, imports, code at each listed RVA; every patch-site and preflight byte in this revision re-read from the installed Steam 2015 AI.exe, timestamp 0x54E3199D); Windows 11 load tests in the game directory; SysWOW64\d3d11.dll export table; the built proxy's import and export tables; Windows' built-in application compatibility database (its entry for AI.EXE); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; this project's own design decisions for v1 (preflight, runtime probing and fallback, deferred message boxes, display-reset re-entry); orderings are stated only where §2.6 gives a game, Windows or runtime reason; in-game runs on the 2015 build with SteamVR and Index; user decision on flat play with runtime None (answer to Q6, ANSWERS.md); user decision that the UI archive is built as defined in 14-ui-resources.md; AI.exe 2015 analysis by the spec side for r5 (the five pointer-table slots that also hold ScriptEventTap's address); a tester's report on SteamVR with a Steam Frame headset (OpenXR not starting from a leftover 32-bit registration, Desktop Game Theatre, a crash without a record); project decisions of r5, each with its reason inline (runtime discovery order, the options page shows the runtime this run drives, the crash record's filter installed at attach); clean-room review round 2 and coverage review of spec r6, applied in r6 (the 2020 mouse displacement bytes credited to the earlier mod's installer; the OpenXR discovery rule given with its reason; probing leaves the process environment alone; the function at RVA 0x5E0D40 labelled `CreateDevice` as in 02 and 03; the reflection fix all-or-nothing as 07 requires; exact vtable slot checks; the skip-intro operand only with the mod's archive; the device creation export's window results; the proxy pinned in the game process; a host that is not the game; no welcome on a run where the mod is not active; 2020 structure offsets unverified); AI.exe 2015 analysis by the spec side for r6 (`CreateDevice`'s only call site; the game's window procedure and its `WM_ACTIVATE` and `WM_KILLFOCUS` branches; the C runtime's unhandled-exception filter, installed by a C runtime initialiser after the DLL attach, and its fail-fast paths); project decision of r6 with its reason inline (the crash record's filter installed again at the first device creation call); cross-document pass after the second clean-room review, applied in r7 (the UI archive redirect string stated by its form as in 14; the two processes of a Steam restart may overlap in time; the window procedure no longer described by one means of keeping focus loss from it; the v2 address tables pointed to); AI.exe 2015 analysis by the spec side for r7 (the game window's `WM_SIZE` path to the size handler of the object holding its display mode; the low 16-bit read and the 0x17 limit behind `PadControlToName`; the camera behaviour's yaw setter, its per-update method and the slots that fill its character and head positions; the padding after `ScriptEventTap` and the RVAs of its five pointer-table slots). Revision: r7 -->
+<!-- Provenance: AI.exe 2015 analysis (PE headers, imports, code at each listed RVA; every patch-site and preflight byte in this revision re-read from the installed Steam 2015 AI.exe, timestamp 0x54E3199D); Windows 11 load tests in the game directory; SysWOW64\d3d11.dll export table; the built proxy's import and export tables; Windows' built-in application compatibility database (its entry for AI.EXE); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; this project's own design decisions for v1 (preflight, runtime probing and fallback, deferred message boxes, display-reset re-entry); orderings are stated only where §2.6 gives a game, Windows or runtime reason; in-game runs on the 2015 build with SteamVR and Index; user decision on flat play with runtime None (answer to Q6, ANSWERS.md); user decision that the UI archive is built as defined in 14-ui-resources.md; AI.exe 2015 analysis by the spec side for r5 (the five pointer-table slots that also hold ScriptEventTap's address); a tester's report on SteamVR with a Steam Frame headset (OpenXR not starting from a leftover 32-bit registration, Desktop Game Theatre, a crash without a record); project decisions of r5, each with its reason inline (runtime discovery order, the options page shows the runtime this run drives, the crash record's filter installed at attach); clean-room review round 2 and coverage review of spec r6, applied in r6 (the 2020 mouse displacement bytes credited to the earlier mod's installer; the OpenXR discovery rule given with its reason; probing leaves the process environment alone; the function at RVA 0x5E0D40 labelled `CreateDevice` as in 02 and 03; the reflection fix all-or-nothing as 07 requires; exact vtable slot checks; the skip-intro operand only with the mod's archive; the device creation export's window results; the proxy pinned in the game process; a host that is not the game; no welcome on a run where the mod is not active; 2020 structure offsets unverified); AI.exe 2015 analysis by the spec side for r6 (`CreateDevice`'s only call site; the game's window procedure and its `WM_ACTIVATE` and `WM_KILLFOCUS` branches; the C runtime's unhandled-exception filter, installed by a C runtime initialiser after the DLL attach, and its fail-fast paths); project decision of r6 with its reason inline (the crash record's filter installed again at the first device creation call); cross-document pass after the second clean-room review, applied in r7 (the UI archive redirect string stated by its form as in 14; the two processes of a Steam restart may overlap in time; the window procedure no longer described by one means of keeping focus loss from it; the v2 address tables pointed to); AI.exe 2015 analysis by the spec side for r7 (the game window's `WM_SIZE` path to the size handler of the object holding its display mode; the low 16-bit read and the 0x17 limit behind `PadControlToName`; the camera behaviour's yaw setter, its per-update method and the slots that fill its character and head positions; the padding after `ScriptEventTap` and the RVAs of its five pointer-table slots); r8 (CLEANROOM r3, what a player sees may be stated exactly): the unsupported-build message given as its exact text, caption, icon and button (the earlier mod's text, kept because the behaviour is unchanged; the caption without a version as a project decision), the other messages named by their exact first lines, the options page and its controls named by the labels a player sees. Revision: r8 -->
 
 # 01. Loading, build identification, runtime selection and AI.exe addresses
 
@@ -6,9 +6,10 @@ This document covers how the mod gets into `AI.exe` on Windows 11, what it
 may do at load time and in which order, how it tells game builds apart, the
 preflight that checks every patch site before anything is written, how the
 VR runtime for a run is chosen, and the full list of game addresses that
-the other documents use. Files the mod writes and the player-facing
-message boxes are in `13-distribution.md`; how the UI archive is built is
-in `14-ui-resources.md`.
+the other documents use. Files the mod writes and the texts of the
+messages a player sees are in `13-distribution.md` (the unsupported-build
+message, which belongs to build identification, is also given exactly in
+§3.1); how the UI archive is built is in `14-ui-resources.md`.
 
 Conventions: AI.exe is a 32-bit (x86) executable with preferred image base
 0x400000. Addresses here are **RVAs** unless they say VA (VA = image base +
@@ -317,7 +318,7 @@ patch the Rift tests, the pad, the camera, SSAO, the mode stack, the UI
 quads or the render paths of 07 and 08, does not wrap the D3D11 device or
 swapchain beyond §1.3, and does not touch the game's pixel shaders (08 §1).
 The game plays exactly as without the mod; only the Options menu has the
-VR page. The preflight (§2.5) for runtime None covers only the UI set's
+`MotherVR` page. The preflight (§2.5) for runtime None covers only the UI set's
 sites.
 
 When the runtime is OpenVR or OpenXR but is not installed or fails to start
@@ -329,12 +330,12 @@ The player can set the runtime to None to get the unmodded game.
 
 | Condition | What the mod does |
 |---|---|
-| Build not recognised (§3) | No patch at all, no `MOTHER.PAK`. Logs the PE timestamp. Shows the unsupported-build message (`13-distribution.md` §5.3), which names the timestamp. No welcome message and no first-launch config file, so the first run on which the mod is active still shows the welcome (13 §5.3). The game runs unmodified; the forwarders keep working |
+| Build not recognised (§3) | No patch at all, no `MOTHER.PAK`. Logs the PE timestamp. Shows the unsupported-build message `Exe check failed!` (§3.1, also listed in `13-distribution.md` §5.3), which shows the timestamp. No welcome message and no first-launch config file, so the first run on which the mod is active still shows the welcome (13 §5.3). The game runs unmodified; the forwarders keep working |
 | Recognised build, but an address for it lies outside the image, or any preflight check (§2.5) fails | No patch at all, no `MOTHER.PAK`. Logs each failing check naming the site, and that nothing was patched. No message box (project decision: a recognised build that fails the preflight has been changed by something other than the mod; the game still plays unmodified, and the log names the site for anyone diagnosing it). No welcome message and no first-launch config file, as in the row above. The game runs unmodified |
 | A page cannot be made writable or a write fails after the preflight passed | Logs the address, the Windows error, and that the game is left partly patched, and applies no further patch. Earlier patches are not undone. This is not expected to happen on any supported system; it is the only path that leaves a partly patched game |
 | The game folder cannot be written | The game still starts. Each missing artefact degrades on its own: no `MOTHER.PAK` means no options page (row below), no local `openvr_api.dll` means the runtime's own loader (§5.3), and a log that cannot be opened goes to the debugger output (`11-diagnostics.md`). The mod never needs elevation, a registry change or a folder rename (12, 13) |
 | An optional fix's own check fails (§2.5.2) | That fix stays off, with one log line; everything else is applied |
-| The UI archive cannot be produced (`14-ui-resources.md`) | `UiPakPathPtr` is left alone; the options page is missing; VR works. One log line, and the message box of `13-distribution.md` §5.3 when `DATA\UI.PAK` itself is missing |
+| The UI archive cannot be produced (`14-ui-resources.md`) | `UiPakPathPtr` is left alone; the options page is missing; VR works. One log line, and the message box `Failed to find UI.PAK!` of `13-distribution.md` §5.3 when `DATA\UI.PAK` itself is missing |
 | The config file cannot be read or parsed | Defaults (06 §3.1); not a failure of loading |
 
 The rule: the **core set** (the stereo path and stereo object hand-off,
@@ -506,7 +507,30 @@ already-mapped headers (no file I/O).
 | 2020 update (Steam, GOG, Epic) | 0x5FD25676 | 2020-12-10 17:10:14 | Recognised; core addresses known (2020 columns), none verified against a 2020 binary; see §3.2 |
 
 Any other timestamp (or a main module without valid DOS and NT headers,
-read as timestamp 0) is unknown (§2.4).
+read as timestamp 0) is unknown (§2.4). The player is then shown, on every
+launch with that build, a standard Windows message box with caption
+`MotherVR`, the warning icon and one OK button, in front of the game window
+and never under the loader lock (§2.2). Its text is the one players of the
+earlier mod saw for an unknown build, kept because the behaviour is the
+same (the mod stays off and the game starts normally). It is quoted as in
+03 §6.4: one box line per quoted line, a line ending in `\` continues on
+the next box line without a blank line between, an empty quoted line is a
+blank line in the box, and the code span marks the name `MotherVR`, which
+the box shows as plain text:
+
+> Exe check failed!\
+> [0x`<timestamp>`]
+>
+> This check is to ensure that `MotherVR` is correctly modifying the game, and is looking in the correct locations.
+>
+> If Alien: Isolation is on an out-dated version, make sure to update through Steam or Epic. If a new update to the game has just been released, or this check failed for some other reason, `MotherVR` may need to be updated.
+>
+> `MotherVR` will now be disabled, and Alien: Isolation will startup normally.
+
+`<timestamp>` is the PE timestamp found, in upper-case hexadecimal without
+leading zeros (`0x0` for a main module without valid headers). The caption
+has no version number, so it stays the same across releases (project
+decision); the box has only OK because closing it is the only action.
 
 The 2015 build: image base 0x400000, `SizeOfImage` 0x1F81000,
 `DllCharacteristics` 0x8140, sections `.text` 0x1000, `.rdata` 0xD9F000,
@@ -860,7 +884,7 @@ DLL search path while `openvr_api.dll` loads and `VR_InitInternal2` runs.
 | Outcome | Behaviour |
 |---|---|
 | No runtime chosen (§5.2 step 2 or 4) | No stereo device; logged; **no message box**. The game runs flat on the patched stereo path (02's no-device behaviour) |
-| The chosen runtime fails to start (DLL cannot load, init error, missing interface, no OpenXR session possible with the game's device) | No stereo device; the runtime is shut down and unloaded; the runtime-failure message of `13-distribution.md` §5.3 is shown once, modal, on the thread that hit the failure (the game thread), and the game waits until it is closed; then the game runs flat |
+| The chosen runtime fails to start (DLL cannot load, init error, missing interface, no OpenXR session possible with the game's device) | No stereo device; the runtime is shut down and unloaded; the runtime-failure message, `Failed to initialize SteamVR!` (03 §6.4) or `Failed to initialize OpenXR!` (09 §7), both also listed in `13-distribution.md` §5.3, is shown once, modal, on the thread that hit the failure (the game thread), and the game waits until it is closed; then the game runs flat |
 | Started | Device attached to the stereo object; the reference pose taken, and retaken once the headset is in use if it was not in use at that moment (03 §2.2) |
 
 A failure detected later, when the game configures rendering (OpenXR
@@ -869,8 +893,8 @@ detaches the device there.
 
 Neither a fallback nor a failure rewrites the stored runtime: `VRRuntime`
 keeps the player's preference, so the next launch tries it again. The
-options page reflects the runtime actually running: None after a failed
-start, the substitute after a fallback. So the player sees that the
+options page's `VR Runtime Set` shows the runtime actually running: `None`
+after a failed start, the substitute after a fallback. So the player sees that the
 preferred runtime is not in use and can choose again (06 §5.2).
 
 A runtime that started can still fail to reach the headset: SteamVR's
@@ -896,15 +920,16 @@ directory (`13-distribution.md` §4).
    appear after the attach lines. With a box open, the game window does not
    start rendering until it is closed.
 4. **Unknown build.** Changing one byte of the PE timestamp in a copy of
-   `AI.exe` (test only): the unsupported-build message shows the new value
-   in hex, the log says the build is unknown and that nothing is patched, the
+   `AI.exe` (test only): the `Exe check failed!` box of §3.1 appears, its
+   second line showing the new value as `[0x...]` in upper-case hex, the log says the build is unknown and that nothing is patched, the
    game plays unmodified, and `DATA\MOTHER.PAK` is not created.
 5. **Preflight.** Changing the byte at `SsaoSettingBranch` in a test copy
    from 0x75 to 0x74: the log names the SSAO branch, says nothing was
    patched, and the game plays unmodified, with no box. No other site is
    modified (compare process memory of a few sites with the file).
 6. **Runtime None.** With `-vrforcenone`: the log shows only the UI set
-   (§2.3) applied and no runtime probe; the Options menu has the VR page;
+   (§2.3) applied and no runtime probe; the Options menu has the
+   `MotherVR` entry;
    graphics options behave as unmodded (SSAO can be enabled and shows); no
    replacement is installed on the game's device or swapchain, including
    the pixel shader replacement of 08 §1, and the log has no swapchain,
@@ -914,19 +939,20 @@ directory (`13-distribution.md` §4).
    unavailable, chosen None, no box, and the game runs flat.
 8. **Fallback.** With `VRRuntime` `"OpenXR"`, no OpenXR runtime usable from
    32-bit, and SteamVR installed, no switch: the log shows the fallback to
-   OpenVR and VR starts; the options page shows OpenVR, and `mothervr.json`
+   OpenVR and VR starts; the options page's `VR Runtime Set` shows
+   `SteamVR`, and `mothervr.json`
    still says `"OpenXR"`.
 9. **Runtime failure box.** With SteamVR installed but its server unable to
    start (for example the headset unplugged, or another VR app launching):
-   one runtime-failure message naming SteamVR, the runtime's error text and
-   its code;
-   the game continues flat after it is closed. The options page then shows
-   runtime None, and `mothervr.json` still says `"OpenVR"`.
+   one `Failed to initialize SteamVR!` box (03 §6.4), its second line
+   showing the runtime's error text and its code; the game continues flat
+   after it is closed. The options page's `VR Runtime Set` then shows
+   `None`, and `mothervr.json` still says `"OpenVR"`.
 10. **Display reset.** Changing the resolution in the game's video options
     in VR: the log shows a display reset and no second `CreateDevice` call,
     no second runtime start and no box; VR continues.
-11. **Runtime change.** Choosing another runtime in the VR page: the game
-    exits; `mothervr.json` holds the new value; the next launch uses it.
+11. **Runtime change.** Pressing `Use OpenXR` (or `Disable VR`) on the
+    `VR Runtime` page: the game exits at once, without a prompt; `mothervr.json` holds the new value; the next launch uses it.
 12. **Two processes.** Starting `AI.exe` directly (outside Steam) produces
     two attach headers with different process ids in one log, and neither
     process crashes.
@@ -944,7 +970,7 @@ directory (`13-distribution.md` §4).
     the game reaches the title screen.
 16. **No welcome without the mod.** On the build of check 4 with no
     `mothervr.json`: no welcome appears and no `mothervr.json` is written;
-    a later run on the unchanged game shows the welcome once.
+    a later run on the unchanged game shows the welcome (00 §2.7) once.
 17. **Crash record after start-up.** In a test build of the mod that
     raises an access violation on the game thread once the title screen is
     up: the log has the crash record (11 §6), and Windows still reports the

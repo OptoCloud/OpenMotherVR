@@ -1,4 +1,4 @@
-<!-- Provenance: format analysis of the Steam 2015 DATA/UI.PAK (PAK2 container, entry table, padding, names), its Scaleform movies (GFX header and tag stream, PlaceObject records, DefineEditText bounds, DoABC2 tags, ABC files: pools, namespaces, classes, traits, method bodies, scope depths, opcode set) and its DDS glyphs, read with the spec side's own tools; a survey of every root movie of the stock archive (stage size, named placements, their bounds and whether they hold text, later-frame matrices) and of every stock `resizeListener`, which is the source of the layout selection in 3.6; the stock game's ActionScript classes in those movies (ImageSubstitution, frontend.GameMenu and its subclasses, frontend.menu.Menu and MenuPage, NewFrontendMenu, LoadingScreen, CraftingScreen, CreditsScreen, PickupOverlay, PopupOverlay, TRCSystemOverlay, WeaponStuff, ChallengeMapOverlay, RadialMenuScreen, Reaction_Game); the game's default input bindings in DATA\INPUT.XML (source of the prompt actions in 3.4); AI.exe 2015 (UI archive path pointer, on_page_changed registration site); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; r1 used a comparison of the stock archive with the earlier mod's archive to find the movies to touch, and r2 replaces every selection that came from it with the stock survey and the game's binding data above (no value, string, name, code or image is taken from that archive); viewing geometry of 03 and 05 for the layout requirements; observation in game by the spec side (the game opens a UI archive through a redirected path, and an archive whose names are in sorted order loads); user requirements (archive built at launch from the player's own UI.PAK through a compiled bundle, no game or mod asset shipped, players need no tools, unknown UI.PAK leaves the game running). r3 (spec r7, second clean-room review): the key file's name left to the implementation; the in-game observations added to these sources; the crosshair placement chosen by the rules of 3.6.2 from the spec side's own survey of `WEAPONSTUFF` (root placement and script uses of `crosshairs_mc`); the redirect string stated by its form; the fast-path cost reason given as an estimate; the DoABC2 count recounted (230 in the archive, all decoded by the spec side's own reader); the movies' change sets listed per movie; smaller consistency fixes. r4 (spec r7 cross-check): the linking runs only in the game's process on a recognised build whose checks passed (01 §2.4, §3.1), with an acceptance check. Revision: r4 -->
+<!-- Provenance: format analysis of the Steam 2015 DATA/UI.PAK (PAK2 container, entry table, padding, names), its Scaleform movies (GFX header and tag stream, PlaceObject records, DefineEditText bounds, DoABC2 tags, ABC files: pools, namespaces, classes, traits, method bodies, scope depths, opcode set) and its DDS glyphs, read with the spec side's own tools; a survey of every root movie of the stock archive (stage size, named placements, their bounds and whether they hold text, later-frame matrices) and of every stock `resizeListener`, which is the source of the layout selection in 3.6; the stock game's ActionScript classes in those movies (ImageSubstitution, frontend.GameMenu and its subclasses, frontend.menu.Menu and MenuPage, NewFrontendMenu, LoadingScreen, CraftingScreen, CreditsScreen, PickupOverlay, PopupOverlay, TRCSystemOverlay, WeaponStuff, ChallengeMapOverlay, RadialMenuScreen, Reaction_Game); the game's default input bindings in DATA\INPUT.XML (source of the prompt actions in 3.4); AI.exe 2015 (UI archive path pointer, on_page_changed registration site); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; r1 used a comparison of the stock archive with the earlier mod's archive to find the movies to touch, and r2 replaces every selection that came from it with the stock survey and the game's binding data above (no value, string, name, code or image is taken from that archive); viewing geometry of 03 and 05 for the layout requirements; observation in game by the spec side (the game opens a UI archive through a redirected path, and an archive whose names are in sorted order loads); user requirements (archive built at launch from the player's own UI.PAK through a compiled bundle, no game or mod asset shipped, players need no tools, unknown UI.PAK leaves the game running). r3 (spec r7, second clean-room review): the key file's name left to the implementation; the in-game observations added to these sources; the crosshair placement chosen by the rules of 3.6.2 from the spec side's own survey of `WEAPONSTUFF` (root placement and script uses of `crosshairs_mc`); the redirect string stated by its form; the fast-path cost reason given as an estimate; the DoABC2 count recounted (230 in the archive, all decoded by the spec side's own reader); the movies' change sets listed per movie; smaller consistency fixes. r4 (spec r7 cross-check): the linking runs only in the game's process on a recognised build whose checks passed (01 §2.4, §3.1), with an acceptance check. r5 (CLEANROOM r3, what a player sees): the labels, help rows and glyph designs a player sees are those the spec states (06 §5, 04 §4.1, §5.7), and the constraint against using another mod now covers its files only; the layout factors fixed at the menu factor players of the earlier mod saw (1.22) and, for the HUD, the smallest factor meeting the project's 80% floor (1.38, project decision), from what players of the earlier mod saw, read by the spec side (menus 1.22, HUD 1.33, subtitles 1.25, crosshair 3.16, the other moves of 3.6.6); what the player sees with skip intro; the UI.PAK message named by its first line. No game fact was added. Revision: r5 -->
 
 # 14. UI resources: the options archive
 
@@ -9,8 +9,10 @@ own stock movies to produce `DATA\MOTHER.PAK`, which the game then opens
 instead of `DATA\UI.PAK`.
 
 What the options page must do, the commands it sends and the values pushed
-to it are in 06. Why VR glyphs exist and which VR controls get one is in
-04 §4.1. Where the HUD and the virtual screen sit in the headset is in 05.
+to it are in 06, which also gives its labels, values and description lines
+exactly. Why VR glyphs exist, which VR controls get one and what each
+glyph shows are in 04 §4.1; the rows of the controls help page are in 04
+§5.7. Where the HUD and the virtual screen sit in the headset is in 05.
 When this work runs relative to the rest of start-up is in 01 §2 and 12
 §2.3. Which events are logged and what each conveys is in 11 §2.1 and
 §2.5; the messages to the player are in 13 §5.3.
@@ -40,9 +42,14 @@ without shipping any game file and without using another mod's files.
    movie, no part of a movie, no game image, no binary delta against a game
    file. A delta from the stock archive to any modified archive is excluded
    too, because it encodes the modified movies.
-2. Nothing the project ships or builds from comes from another mod: no
-   archive, movie, ActionScript, bytecode, image, label text, help text or
-   layout value. The menu is authored here from 06 and this document.
+2. Nothing the project ships or builds from comes from another mod's
+   files: no archive, movie, ActionScript, bytecode or image. The menu is
+   authored here from 06 and this document. The labels, help texts, glyph
+   designs and layout factors a player sees are the ones the spec states
+   (06 §5, 04 §4.1 and §5.7, 3.6 here); many of them are what players of
+   the earlier mod saw, which the spec may state exactly (CLEANROOM r3),
+   and the implementation takes them from the spec, never from a mod's
+   files.
 3. The developer build never reads `UI.PAK`, `MOTHER.PAK` or any mod's
    binary. It works from the project's sources and from the facts in this
    document (class, member and namespace names, signatures, expected sizes
@@ -518,9 +525,12 @@ Stock labels are localisation keys (`AI_UI_MENU_OPTIONS`,
 `AI_UI_MENU_VIDEO`, ...), resolved by the game's text system, which is not
 in `UI.PAK`. A literal string in a label is shown as it is: the stock "Select
 Level" and "Trigger Debug Checkpoint" items use literal English. The
-project's labels are therefore literal strings of its own (06 §5); the VR
-entry's label is `MotherVR` so existing guides apply, and the runtime value
-1 is shown as "OpenXR" (06 §5.2). No localisation entry is added.
+project's labels, values and description lines are therefore literal
+English strings, exactly as 06 §5 gives them (the labels players of the
+earlier mod knew, where the behaviour is unchanged); the entry's label is
+`MotherVR` so existing guides apply, and the runtime value 1 is shown as
+"OpenXR" (06 §5.2). The controls help rows are literal strings sent by the
+DLL (04 §5.7). No localisation entry is added.
 
 ### 2.9 Glyph images
 
@@ -554,7 +564,9 @@ ids are the implementation's choice under these constraints:
 - the native side (04 §4) returns exactly the input ids the movies
   register.
 
-The images are drawn by this project (4.2). Call the number of glyphs `G`;
+The images are drawn by this project (4.2) to the designs of 04 §4.1:
+32 x 32 pixels with transparency, colourless, in the size and style of the
+stock glyphs. Call the number of glyphs `G`;
 the VR-set output has 505 + `G` entries (5.7).
 
 ### 2.10 Default input bindings (`DATA\INPUT.XML`)
@@ -663,7 +675,9 @@ holds only one `DELAY` entry of the stock gap length (500 ms, the gap
 between entries in every stock startup playlist, 2.7.4), so that nothing
 is played and `FinishedBootup` reaches the game about half a second later,
 as it does after the last entry of a stock playlist. `ShowBootup` itself
-is not changed.
+is not changed. What the player sees: about half a second of black
+instead of the logo videos and the legal screen, then the title screen
+(05 §11), as players of the earlier mod saw it with the same option.
 
 ### 3.4 `ImageSubstitution` (VR set; 19 movies)
 
@@ -725,8 +739,22 @@ of their monitor-reference angle:
 - on the HUD panel: scale factor `s_hud` from 1.38 to 1.72 (0.8 x 0.0414 /
   0.0240 = 1.38; 1.72 gives the monitor size).
 
-The implementation picks one value of each in these ranges and checks it in
-the headset (acceptance 13). Bounds, after scaling:
+The values v1 uses:
+
+- `s_menu` = **1.22**. Players of the earlier mod saw the menu lists, item
+  descriptions, button legends, the loading and death-screen tips and the
+  credits 1.22 times their stock size; that factor lies in the range (85%
+  of the monitor-reference angle), so v1 keeps the size players knew.
+- `s_hud` = **1.38** (project decision). Players of the earlier mod saw
+  the health bar, ammo counter and HUD overlays about 1.33 times their
+  stock size and the in-game subtitles 1.25 times, which on the HUD panel
+  is 77% and 73% of the monitor-reference angle, just under the floor
+  above; 1.38 is the smallest factor that meets the floor, so it stays
+  closest to the size players knew.
+
+Either value is changed, within its range, only if the headset check
+(acceptance 13) fails at it; the values used are those of the layout file
+(4.2). Bounds, after scaling:
 
 - every selected element stays fully inside its movie's stage;
 - the selected elements of one screen do not overlap each other or the
@@ -940,11 +968,37 @@ So the edit is a scale of `s_hud` in the matrix of the root placement of
 values above (5.5). It is the outermost placement and passes rules 3 to 5,
 so no inner placement is edited.
 
+Players of the earlier mod saw the crosshair about 3.16 times its stock
+size (about 1.8° across in the headset) and the grapple and struggle
+prompt about 4.46 times. v1 gives both `s_hud` (project decision, pending
+user confirmation: at 1.38 the crosshair subtends about 0.8°, 80% of its
+monitor-reference angle like the HUD text, which is enough to find and aim
+with, while a crosshair more than twice that covers more of a distant
+target; the prompt is
+text and is sized like the other HUD text, 3.6.1).
+
 #### 3.6.5 Not changed
 
 The background video placement (`moviePlayer`) and colour transforms are
 not changed. `CREDITSSCREEN`, `MOVIEPLAYER` and `SUBTITLES` get layout
 edits only.
+
+#### 3.6.6 Compared with the layout players knew
+
+Players of the earlier mod saw these layout changes besides the factors of
+3.6.1 and 3.6.4. v1 does not copy them as offsets; it reaches the same aim
+(text inside the clear part of the view, nothing overlapping) through the
+bounds of 3.6.1, which move an element only as far as needed:
+
+| Screen | Seen by players of the earlier mod | v1 |
+|---|---|---|
+| Front-end and pause menus | menu list 140 px (of 720) lower | stock anchor, moved only as the bounds require [guess: check in the headset whether the list at 1.22 meets the logos or the description; open in 7] |
+| Front end | the two title logos 1.22 times larger, about 31 px to the right | unchanged unless the overlap check needs them moved (3.6.2) |
+| Game-over menu | menu list 25 px higher, tip text 108 px to the right | stock anchors, moved only as the bounds require |
+| Loading screen | tip text 21.5 px lower; subtitles at the stock size | tip and subtitles at `s_menu` |
+| Cutscene videos | subtitles 1.25 times larger | `s_menu` (1.22) |
+| In-game subtitles | 1.25 times larger, moved left (x 145 to 23) and up (y 530 to 500) | `s_hud`, text field narrowed to the margins (3.6.2) |
+| HUD health bar, ammo counter, pickup hold-to-throw prompt | moved further in from the left edge (96 to 144 units) | further in by the factor of `k` (3.6.3: 96 x 1.38, about 132 px) |
 
 ## 4. Developer build
 
@@ -973,7 +1027,7 @@ All authored in this project:
 | Project sources | for each target class, the project's new methods and fields, written in a source file that also contains that class's declarations, so they compile as members of the class and may use its protected and private members |
 | Binding file | text (for example JSON): for each change of section 3, the target movies, class, kind (hook, add method, add field), stock member, project member, alias name, change set (menu or VR), and the expected overriders of a hooked method (2.7.2) |
 | Layout file | text: each edit of 3.6 with its expected stock record values and its new values (`s_menu`, `s_hud` and derived numbers) |
-| Glyph sources | one 32 x 32 RGBA PNG per glyph of 2.9, drawn for this project |
+| Glyph sources | one 32 x 32 RGBA PNG per glyph of 2.9, drawn for this project to the designs of 04 §4.1 |
 
 ### 4.3 Process
 
@@ -1336,8 +1390,8 @@ existing `MOTHER.PAK` is not used and not deleted.
 
 | Cause | Reason | Logged (11 §2.1) | Player (13 §5.3) |
 |---|---|---|---|
-| `UI.PAK` missing | `missing` | error, every launch | the "`UI.PAK` missing" message at every launch: the game cannot show its UI without it, so the player must repair the installation |
-| `UI.PAK` not PAK2 or damaged | `format` | error, every launch | the "UI archive unusable" message, once per distinct `UI.PAK` (size, last-write time) |
+| `UI.PAK` missing | `missing` | error, every launch | the message whose first line is `Failed to find UI.PAK!` (13 §5.3) at every launch: the game cannot show its UI without it, so the player must repair the installation |
+| `UI.PAK` not PAK2 or damaged | `format` | error, every launch | the UI-archive message of 13 §5.3, once per distinct `UI.PAK` (size, last-write time) |
 | unknown version (5.3 step 5) | `unknown_version` (with the entry) | error, every launch | as for `format` |
 | link or layout check failed (bundle and game disagree) | `link` / `layout` (with movie, class, member, check) | error, every launch | as for `format` |
 | write failed (read-only folder, disk full, access denied) | `write` (with the Windows error) | error, every launch | as for `format` |
@@ -1381,8 +1435,9 @@ called (01 §2.2).
 4. With runtime OpenVR, the VR page exists in the front-end and pause
    menus and 06 §8's checks pass; the game-over menu shows no VR page and
    its Video items behave as in the stock game.
-5. `SkipStartupIntro` on: no ident videos; the log shows the intro skipped
-   (06 §6).
+5. `SkipStartupIntro` on (`Skip Startup Intro` on the options page): no
+   logo video and no legal screen, about half a second of black, then the
+   title screen; the log shows the intro skipped (06 §6).
 6. Truncate `MOTHER.PAK` by one byte: next start rebuilds. Replace it with
    a 0-byte file: rebuilds. Write garbage into its first 4 bytes and
    restore its last-write time: rebuilds (header check).
@@ -1404,12 +1459,12 @@ called (01 §2.2).
     game uses a complete archive.
 13. In the headset, with runtime OpenVR: menu text, item descriptions,
     the loading tip, subtitles, the crosshair and HUD prompts are readable
-    without leaning in; the crosshair is enlarged and stays at the centre
+    without leaning in at `s_menu` 1.22 and `s_hud` 1.38 (3.6.1); the crosshair is enlarged and stays at the centre
     of the view while aiming, after the weapon changes and after an
     accuracy change; nothing is cut off at the stage edges on the Video
     page with advanced options; the health bar, ammo counter, tutorial
     overlays and subtitles are inside the clear part of the view. Prompts
-    show VR glyphs, including the confirm and back prompts of menus and the
+    show VR glyphs drawn as 04 §4.1 describes, including the confirm and back prompts of menus and the
     `$a$`-style tokens in tutorial text (04 §4.1). The crafting screen
     shows the pad form of the craft prompt after the keyboard was used.
 14. Page ids: with the logging of game script events (11 §5) on, visit every stock
@@ -1482,6 +1537,11 @@ called (01 §2.2).
 - Whether the game's archive lookup needs sorted names (2.2), and whether
   it accepts an absolute path in `UiPakPathPtr` (which would remove the
   current-directory caveat of 5.2).
+- The layout players of the earlier mod knew (3.6.6): whether v1 should
+  also move the front-end and pause menu lists lower (140 px there) and
+  enlarge the title logos, once the headset check shows how the lists at
+  1.22 sit against the logos and descriptions; and whether the user wants
+  the larger crosshair players knew (3.6.4).
 - Screens left at the stock size (3.6.2, 3.6.3): the hub and crafting
   screens, Survivor mode, the radial menu's corner prompts and
   `RELOADING`; each needs a re-layout or its own constant edits, and the

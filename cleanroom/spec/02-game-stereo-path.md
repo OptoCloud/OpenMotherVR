@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (disassembly of every site, wrapper and game method named here, re-checked against the binary for r2: frame loop, present step, display reset, configure-rendering and shutdown wrappers, CreateDevice, setting handlers); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; public LibOVR 0.4.0 headers (layouts of the headset description, eye descriptors and texture descriptors, and their constants); observation in game by the spec side (thread ids and call counts per hook; frame times after a display reset; an earlier mod showed each eye at half resolution); user requirements (full resolution from the first answer, eye layout from the created texture, display reset only on a changed setting); AI.exe 2015 analysis by the spec side for r4 (the game's window procedure on focus loss and deactivation); a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus); clean-room review round 2 and coverage review of spec r6, applied in r5 (2020 cells not taken from the earlier mod's table set to "?"; the device description fields left free without example values; the function at RVA 0x5E0D40 labelled `CreateDevice` in every document; the no-headset outcome told to the player only when a runtime was chosen; the thread rule of a late detach; the Stereo Mode handler changes no other setting, and a VR run leaves the player's saved values alone; AI.exe 2015 analysis by the spec side for r5: the only call site of `CreateDevice`, the window procedure's RVAs in 01 §4.6); cross-document pass after that review, applied in r6 (the window procedure's RVAs pointed to in 03 §9.6 as well as 01 §4.6); AI.exe 2015 analysis by the spec side for r6 (the game's table of setting names). Revision: r6 -->
+<!-- Provenance: game analysis of AI.exe 2015 (disassembly of every site, wrapper and game method named here, re-checked against the binary for r2: frame loop, present step, display reset, configure-rendering and shutdown wrappers, CreateDevice, setting handlers); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; public LibOVR 0.4.0 headers (layouts of the headset description, eye descriptors and texture descriptors, and their constants); observation in game by the spec side (thread ids and call counts per hook; frame times after a display reset; an earlier mod showed each eye at half resolution); user requirements (full resolution from the first answer, eye layout from the created texture, display reset only on a changed setting); AI.exe 2015 analysis by the spec side for r4 (the game's window procedure on focus loss and deactivation); a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus); clean-room review round 2 and coverage review of spec r6, applied in r5 (2020 cells not taken from the earlier mod's table set to "?"; the device description fields left free without example values; the function at RVA 0x5E0D40 labelled `CreateDevice` in every document; the no-headset outcome told to the player only when a runtime was chosen; the thread rule of a late detach; the Stereo Mode handler changes no other setting, and a VR run leaves the player's saved values alone; AI.exe 2015 analysis by the spec side for r5: the only call site of `CreateDevice`, the window procedure's RVAs in 01 §4.6); cross-document pass after that review, applied in r6 (the window procedure's RVAs pointed to in 03 §9.6 as well as 01 §4.6); AI.exe 2015 analysis by the spec side for r6 (the game's table of setting names); r7 (CLEANROOM r3, what a player sees may be stated exactly): the failure message and the options page's state after a failure named as the player sees them (the boxes' first lines, `VR Runtime Set` and the greyed entries), pointing to the documents that give the exact texts; no game fact changed. Revision: r7 -->
 
 # 02 - The game's dormant stereo path
 
@@ -315,9 +315,10 @@ target first) to its own function with the same convention. When it returns for
   world scale from `-vrscale` (06 §2) is in effect.
 - **No headset.** Manager +0x04 is null, the reason is logged, and the
   game's manager shutdown has **not** run (it would free objects the mod
-  owns). When a runtime was chosen and failed to start, the player has been
-  told once (13); when no runtime was chosen (none available, or a forced
-  runtime missing) there is no message (01 §5.3). The game then runs flat
+  owns). When a runtime was chosen and failed to start, the player has
+  seen its failure box once, `Failed to initialize SteamVR!` (03 §6.4) or
+  `Failed to initialize OpenXR!` (09 §7); when no runtime was chosen (none
+  available, or a forced runtime missing) there is no message (01 §5.3). The game then runs flat
   (7.5).
 
 For any other `type` nothing changes.
@@ -626,8 +627,9 @@ frame.
 When the runtime fails after CreateDevice succeeded (for example an OpenXR
 session that cannot be created on the game's device, 09 §7), afterwards:
 the device's state is 0, manager +0x04 is null, the runtime is released, the
-VR options are marked unavailable in the options page (06), and the player
-has been told once (13). Every game wrapper then sees no device and the game
+options page shows VR as not running (its `Rendering` and `Input` entries
+greyed, `VR Runtime Set` showing `None`, 06 §5), and the player has seen
+the `Failed to initialize OpenXR!` box once (09 §7). Every game wrapper then sees no device and the game
 runs flat from the next frame (7.5). The runtime is not started again in
 this run.
 
@@ -811,8 +813,9 @@ or seen in game:
    VR as in item 1 (SteamVR need not be running first). With the runtime set
    to OpenVR or OpenXR but the runtime unable to start, or no headset
    appearing within the bounded wait (03 §6.4): the log says no headset was
-   attached and why, the player is told once, and the game runs flat on the
-   monitor with working menus and gameplay. With no runtime available (for
+   attached and why, the player sees one `Failed to initialize SteamVR!`
+   box (03 §6.4) or one `Failed to initialize OpenXR!` box (09 §7), and
+   the game runs flat on the monitor with working menus and gameplay. With no runtime available (for
    example `-vrforceopenvr` with SteamVR not installed) the log says why
    and no message is shown (01 §5.3).
 9. The game's "reset view" menu item and pad LB+RB recenter yaw only:

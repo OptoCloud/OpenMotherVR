@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). r3 (spec r7 cross-check): 07 §8 item 1 no longer names the viewport setter or a viewport constant, so the viewport setter 0x621350 (it builds one viewport and calls `ID3D11DeviceContext::RSSetViewports`), the constant writers 0x621C20 and 0x621C90 and the pass set-up's type argument are given as this document's own facts, verified by the spec side in the 2015 `AI.exe`, and the velocity shader question no longer assumes a viewport constant; the settings setter labelled `SettingsSetOption` as in 01 §4, and whether it reaches the saved settings left open as 02 §11 item 5 does; the 2D-only effects keep the player's saved settings as 02 §6.5 now requires of v1. Revision: r3 -->
+<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). r3 (spec r7 cross-check): 07 §8 item 1 no longer names the viewport setter or a viewport constant, so the viewport setter 0x621350 (it builds one viewport and calls `ID3D11DeviceContext::RSSetViewports`), the constant writers 0x621C20 and 0x621C90 and the pass set-up's type argument are given as this document's own facts, verified by the spec side in the 2015 `AI.exe`, and the velocity shader question no longer assumes a viewport constant; the settings setter labelled `SettingsSetOption` as in 01 §4, and whether it reaches the saved settings left open as 02 §11 item 5 does; the 2D-only effects keep the player's saved settings as 02 §6.5 now requires of v1. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Graphics` page of the options page given exactly (item order, labels, control kinds, value names, steps, description lines, greying and the rule for showing an item), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the game's English menu texts it names read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the anti-aliasing option names from `DATA\ENGINE_SETTINGS.XML`; the `Pixel Scale` item and the Video page's `Shadow Map Resolution` item named by their labels. Revision: r4 -->
 
 # 24. Rendering in v2
 
@@ -611,7 +611,8 @@ options as long as a saved value names them.
 
 ### 6.4 Acceptance
 
-Override on with `ShadowMap4096`: the game's graphics menu offers 4096; the
+Override on with `ShadowMap4096`: the Video page's `Shadow Map Resolution`
+item offers `4096`; the
 log shows the additions made; shadows are sharper; the player's
 `DATA\ENGINE_SETTINGS.XML` is byte-identical to before. Override off: the
 menu is stock. A deliberately broken XML (in a test copy of the game only):
@@ -661,7 +662,8 @@ v1 has one resolution multiplier, `Rendering.PixelScale` (03 §4.1, §10),
 applied on top of the runtime's own resolution. v2 adds **no second static
 scale** [proposal: two multipliers that multiply each other confuse players
 (03 §10 already warns about the runtime's one)]. The pixel scale stays the
-v1 options-page control it is (06 §5).
+v1 options-page control it is (`Pixel Scale` on the `Rendering` page, 06
+§5).
 
 Dynamic resolution (changing the render size with load) is not offered
 [proposal]: the game rebuilds its targets only through a display reset,
@@ -778,9 +780,48 @@ missing key reads as its default; unknown keys are kept, 06 §3):
 All defaults are v1 values (20 §1.1). The master switch `EnhancedMode`
 (20 §1.3, 22 §3.1), when off, makes every key here read as its default;
 for the keys that apply at the next launch, the value it had at that
-launch counts. The options page shows those the user confirms, where 20
-§10 item 6 puts v2 settings; the engine settings keys need a restart,
-which the page must say.
+launch counts.
+
+**Options page.** The keys have items on the `Graphics` page of the
+`Enhanced Mode` page (22 §12.1, which also gives the rules every v2 page
+follows: look, value display, description lines, greying and hidden
+items). An item is shown only once its feature is implemented and the
+user has confirmed it [proposal: several features here are conditional on
+a measurement, §2.4, §3.1, §7.1, §9.1]. The labels, values and description
+lines are exact; they are this project's texts, in the style of the v1
+page players know (00 §2.6) [proposal for each text: it names the result
+the player gets, in the fewest words that fit the stock description
+length, 22 §12.1]. Game names in them are the game's English menu texts
+(`Anti-aliasing`, `Shadow Map Resolution`, `Planar Reflections`,
+`Chromatic Aberration`, `Film Grain Intensity` in
+`DATA\TEXT\ENGLISH\UI.TXT`) and the anti-aliasing option name `SMAA T2x`
+of `DATA\ENGINE_SETTINGS.XML` [sure for the texts; likely that the Video
+page shows the XML option name as the value].
+
+`Graphics`, in order:
+
+| # | Label | Kind | Values shown | Key | Description line | Greyed while |
+|---|---|---|---|---|---|---|
+| 1 | `Per-Eye Temporal AA` | toggle | on / off | `Graphics.PerEyeTemporalAA` | `With Anti-aliasing at SMAA T2x, smooths edges over two frames in each eye` | |
+| 2 | `Temporal AA` | list | `Off`, `On` | `Graphics.TemporalAA` | `Stronger temporal anti-aliasing, for shimmer that SMAA T2x leaves` | |
+| 3 | `Steady Smoke and Fog` | toggle | on / off | `Graphics.SteadyParticleLighting` | `Lights smoke, fog and particles the same in both eyes and every frame` | |
+| 4 | `World Behind Pause Menu` | toggle | on / off | `Graphics.PauseWorldBackdrop` | `Shows the paused world, darkened, around the pause menu` | |
+| 5 | `Engine Settings Override` | toggle | on / off | `Graphics.EngineSettingsOverride` | `Requires restart! Adds the VR options below to the game's graphics settings` | |
+| 6 | `4096 Shadow Maps` | toggle | on / off | `Graphics.ShadowMap4096` | `Requires restart! Adds 4096 to Shadow Map Resolution in the Video options` | `Engine Settings Override` off |
+| 7 | `Sharp Reflections` | toggle | on / off | `Graphics.SharpReflections` | `Requires restart! Adds a Planar Reflections option without blur` | `Engine Settings Override` off |
+| 8 | `Texture Streaming Memory` | list | `Game`, `300 MB`, `400 MB`, ... `1000 MB` (steps of 100), `1024 MB` | `Graphics.StreamingTextureHeapMB` (`Game` is 0) | `Requires restart! Memory for streaming textures. Game: the game's own size` | `Engine Settings Override` off |
+| 9 | `Model Streaming Memory` | list | `Game`, `128 MB`, `192 MB`, ... `512 MB` (steps of 64) | `Graphics.StreamingModelHeapMB` (`Game` is 0) | `Requires restart! Memory for streaming models. Game: the game's own size` | `Engine Settings Override` off |
+| 10 | `Foveated Rendering` | list | `Off`, `Low`, `High` | `Graphics.FoveatedRendering` | `Renders the edges of the view at lower detail` | shown greyed with `Not supported by this graphics card` where §7.1's support is missing |
+| 11 | `Lens Flares in VR` | toggle | on / off | `Graphics.LensFlares` | `Off: no lens flares in the headset` | |
+| 12 | `Chromatic Aberration in VR` | toggle | on / off | `Graphics.ChromaticAberration` | `Off: no color fringes in the headset, whatever the Video setting` | |
+| 13 | `Film Grain in VR` | toggle | on / off | `Graphics.FilmGrain` | `Off: no film grain in the headset, whatever the Video setting` | |
+| 14 | `Graphics State Cache` | toggle | on / off | `Graphics.StateCache` | `Requires restart! Skips repeated graphics state changes` | |
+
+Items 11 to 13 carry `in VR` because the game's Video page has its own
+`Chromatic Aberration` and `Film Grain Intensity` items, which these do
+not change (§8), so the two are never confused. A stored heap size between
+the list's steps (for example 350) is shown at the nearest step (22
+§12.1) and kept.
 
 ## 11. Common requirements
 
@@ -895,7 +936,8 @@ To be applied in the v1 revision that collects v2 changes (20 §10 item 11):
 - `03-hmd-and-frames.md` §7: the pause backdrop exception (24 §5); §4.4
   slot 3 and slot 4: v2 resources created and released there (24 §5.5,
   §2).
-- `06-options-and-config.md` §1: the `Graphics` section exists (24 §10).
+- `06-options-and-config.md` §1: the `Graphics` section exists (24 §10);
+  §5: the `Graphics` page (24 §10, under 22 §12.1).
 - `11-diagnostics.md` §2: the events of 24 §11.3.
 - `12-threads-and-robustness.md` §4.2: the features of this document are
   optional fixes.

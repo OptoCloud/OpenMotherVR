@@ -1,4 +1,4 @@
-<!-- Provenance: AI.exe 2015 analysis (order of CreateDevice, the render-target size query, D3D11 device creation and device slot 3, 01 §2.1, 02 §6; the game's quit flag); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; OpenXR 1.0 specification and the XR_KHR_D3D11_enable, XR_EPIC_view_configuration_fov, XR_OCULUS_audio_device_guid, XR_KHR_loader_init and XR_EXT_loader_init_properties extensions, and the OpenXR registry (symbolic names of XrResult values); the OpenXR loader's Windows registry convention and its documented handling of elevated processes; observation by the spec side on the test machine (SteamVR registers only a 64-bit runtime manifest and installs a 32-bit sibling); in-game testing and test logs by the spec side on SteamVR's OpenXR runtime (SteamVR/OpenXR 2.17.10) with a Valve Index headset and controllers (session creation, FOV fallback, frame boundary with pose age 0, recentering); performance measurements by the spec side (frame boundary placement, controller latency, a frame loop that rendered with views one period old); user requirements; a tester's report on SteamVR with a Steam Frame headset (XR_ERROR_RUNTIME_UNAVAILABLE at instance creation, an empty failure text, no visible way back to SteamVR, the game not shown in the headset with Desktop Game Theatre on); project decisions, each with its reason inline (r4: runtime discovery prefers the 64-bit view's runtime, the not-shown check; r5: probing has no effect beyond the log and the loader is directed only when OpenXR starts, expandable registry values are expanded, a re-anchor looking straight up or down keeps the previous yaw, per-frame call failures are logged per change of result, a session or instance loss never quits the game, the failure message's content as an unordered list of facts); r6 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (`CreateDevice` at RVA 0x5E0D40 has the single call site `StereoInitCall`), the label `CreateDevice` used as in 01, 02 and 03, the loader fallback of §1 kept for safety only because the shipped loader implements both loader extensions (13 §7), the virtual screen of §8 never in a process that is not the game (01 §3.1). Revision: r6 -->
+<!-- Provenance: AI.exe 2015 analysis (order of CreateDevice, the render-target size query, D3D11 device creation and device slot 3, 01 §2.1, 02 §6; the game's quit flag); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; OpenXR 1.0 specification and the XR_KHR_D3D11_enable, XR_EPIC_view_configuration_fov, XR_OCULUS_audio_device_guid, XR_KHR_loader_init and XR_EXT_loader_init_properties extensions, and the OpenXR registry (symbolic names of XrResult values); the OpenXR loader's Windows registry convention and its documented handling of elevated processes; observation by the spec side on the test machine (SteamVR registers only a 64-bit runtime manifest and installs a 32-bit sibling); in-game testing and test logs by the spec side on SteamVR's OpenXR runtime (SteamVR/OpenXR 2.17.10) with a Valve Index headset and controllers (session creation, FOV fallback, frame boundary with pose age 0, recentering); performance measurements by the spec side (frame boundary placement, controller latency, a frame loop that rendered with views one period old); user requirements; a tester's report on SteamVR with a Steam Frame headset (XR_ERROR_RUNTIME_UNAVAILABLE at instance creation, an empty failure text, no visible way back to SteamVR, the game not shown in the headset with Desktop Game Theatre on); project decisions, each with its reason inline (r4: runtime discovery prefers the 64-bit view's runtime, the not-shown check; r5: probing has no effect beyond the log and the loader is directed only when OpenXR starts, expandable registry values are expanded, a re-anchor looking straight up or down keeps the previous yaw, per-frame call failures are logged per change of result, a session or instance loss never quits the game, the failure message's content as an unordered list of facts, replaced in r7 by the exact text); r6 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (`CreateDevice` at RVA 0x5E0D40 has the single call site `StereoInitCall`), the label `CreateDevice` used as in 01, 02 and 03, the loader fallback of §1 kept for safety only because the shipped loader implements both loader extensions (13 §7), the virtual screen of §8 never in a process that is not the game (01 §3.1); r7 (CLEANROOM r3, what a player sees may be stated exactly): the OpenXR failure message and the OpenXR headset-not-showing-the-game warning given as exact texts with caption, icon and button, as the project's own texts based on the earlier mod's runtime failure message (the earlier mod had no OpenXR message: its second runtime was Oculus), each with the reason it differs; the texts quoted in the form of 03 §6.4 (blockquotes, the name `MotherVR` written as the box shows it); the options page's runtime controls named by the labels a player sees (`Use OpenXR` in the place of the earlier `Use Oculus`, `VR Runtime Set`, as 00 §2.6); the undefined-result text fixed as `unknown error`, as the SteamVR message's. Section numbers are unchanged from r6. Revision: r7 -->
 
 # 09: Running the stereo device on OpenXR
 
@@ -13,9 +13,11 @@ can be created, how the FOV is obtained, how frames are paced and
 submitted, which space poses are expressed in, how the session's states
 are handled, how invalid poses are treated, and what happens on failure.
 
-Runtime value 1 selects OpenXR (06 §1); the menu's former "Oculus" slot,
-a config file saying `"Oculus"`, `-vrforceoculus` and `-vrforceopenxr` all
-mean OpenXR.
+Runtime value 1 selects OpenXR (06 §1); the `Use OpenXR` button of the
+options page's `VR Runtime` page (06 §5, the place of the button players
+knew as `Use Oculus`), a config file saying `"Oculus"`, `-vrforceoculus`
+and `-vrforceopenxr` all mean OpenXR, and the page's `VR Runtime Set`
+shows `OpenXR` while it runs (00 §2.6).
 
 **Status: verified in game** on SteamVR's OpenXR runtime with a Valve Index
 headset and Index controllers: stereo, head tracking, the virtual screen,
@@ -257,7 +259,26 @@ that the player still connects the warning with the empty headset. It is
 measured so that a change of the wall clock cannot trigger it.
 
 The warning must block neither the render thread nor the game thread: it
-is shown without waiting for the player (13 §5.2).
+is shown without waiting for the player (13 §5.2). It is a standard Windows
+message box with the caption `MotherVR`, the warning icon and an OK button,
+brought to the foreground, with this text (13 §5.3 lists it with the
+other messages, in the same words). Quoted box texts in this document are
+shown as in 03 §6.4: one box line per quoted line, a line ending in `\`
+continues on the next box line without a blank line between, an empty
+quoted line is a blank line in the box, and a code span marks a
+compatibility name (`MotherVR`, `mothervr.log`) or a placeholder, shown in
+the box as plain text.
+
+> The OpenXR runtime is not showing the game in the headset.
+>
+> With SteamVR this is usually its Desktop Game Theatre. In Steam, open the Properties of Alien: Isolation and uncheck 'Use Desktop Game Theatre while SteamVR is active', then restart SteamVR and the game.
+
+Why this text (project decision): the earlier mod had no such warning; it
+named the same Steam setting, in the same words, in its SteamVR start-up
+failure message, so a player who knew that message recognises the fix.
+`'Use Desktop Game Theatre while SteamVR is active'` is Steam's own label
+for the setting, quoted as Steam shows it. The text says "With SteamVR"
+because the cause is SteamVR's and other OpenXR runtimes have no Theatre.
 
 ## 4. FOV and recommended size
 
@@ -571,34 +592,55 @@ recenter in practice moves the game's forward to where the player faces.
 | a running session not shown in the headset within about 10 s (§3.1) | logged; the player is warned once, without blocking; nothing else changes |
 | no interaction profile bound | no VR input; gamepad, keyboard and mouse keep working |
 
-"Told once" is one message (13 owns messages to the player; wording,
-icon and buttons are the implementation's). It must convey, each for its
-reason:
+"Told once" is one message (13 §5.3 lists it with the other messages to
+the player). It is a standard Windows message box with the caption
+`MotherVR`, the error icon and an OK button, brought to the foreground.
+Its text, quoted as in §3.1, with `<...>` filled in as the list after it
+says:
 
-- that OpenXR could not be started, so the player knows which part failed;
-- the failing step with the result's text and number, for diagnosis by
-  the player or in a bug report. The text is never empty: the runtime's
-  own text (`xrResultToString`) when an instance exists, otherwise (a
-  failure of `xrCreateInstance` or of a call before it) the result's
-  symbolic name as the OpenXR registry defines it, for example
+> Failed to initialize OpenXR!\
+> [`<error>` | `<code>`]
+>
+> No usable 32-bit OpenXR runtime could be loaded. `mothervr.log` lists the runtimes that were tried.
+>
+> Look into the above error, and try again once it has been resolved.
+>
+> To go back to SteamVR, choose "Use SteamVR" on the `MotherVR` options page, or start the game with -vrforceopenvr.
+>
+> `MotherVR` will now start with VR disabled. Restart the game to try again.
+
+- `<error>`: the failing result's text, never empty: the runtime's own
+  text (`xrResultToString`) when an instance exists, otherwise (a failure
+  of `xrCreateInstance` or of a call before it) the result's symbolic name
+  as the OpenXR registry defines it, for example
   `XR_ERROR_RUNTIME_UNAVAILABLE`, because `xrResultToString` needs an
-  instance; a value the registry does not define is shown with its number
-  and a text saying that it is not a defined result;
-- that the game now runs with VR disabled, so the player knows why the
-  game is flat;
-- that a restart is needed to try again, because the runtime is not
-  retried in this run; the stored runtime choice is kept, so a restart
-  retries OpenXR (06 §5.2);
-- how to go back to SteamVR (both routes: the options page's runtime
-  choice and the `-vrforceopenvr` switch, 01 §5.1), because a player who
-  switched to OpenXR and cannot start it otherwise has no obvious way
-  back;
-- for `XR_ERROR_RUNTIME_UNAVAILABLE` (-51) also: the likely cause (the
-  loader found no runtime build it could load into a 32-bit process) and
-  where the player can see which manifests were examined (the log, §1),
+  instance. A value the registry does not define is shown as
+  `unknown error`, as in the SteamVR failure message (13 §5.3).
+- `<code>`: the `XrResult` as a signed decimal number (`-51`).
+- The paragraph starting `No usable 32-bit OpenXR runtime` appears only
+  for `XR_ERROR_RUNTIME_UNAVAILABLE` (-51), with the empty line after it;
+  otherwise the box goes from the bracket line's empty line straight to
+  `Look into the above error`.
+
+Why this text (project decision). It follows the earlier mod's runtime
+failure messages, which players know: the first line names the runtime,
+the bracket line gives the error text and number for diagnosis by the
+player or in a bug report, and the last paragraph says that the game now
+runs with VR disabled and that a restart tries again (the runtime is not
+retried in this run; the stored runtime choice is kept, so a restart
+retries OpenXR, 06 §5.2). The earlier mod had no OpenXR message (its
+second runtime was Oculus); this one adds, each for its reason:
+
+- the way back to SteamVR, by the button label a player sees on the
+  `VR Runtime` page (06 §5) and by the `-vrforceopenvr` switch (01 §5.1),
+  because a player who switched to OpenXR and cannot start it otherwise
+  has no obvious way back (reported by a tester);
+- for -51, the likely cause (no runtime build the loader could load into
+  a 32-bit process) and that the log lists the manifests examined (§1),
   because this result can only be diagnosed from that list.
 
-The list is unordered; the wording and order are the implementation's.
+The failing step is not in the message: the log names it (11 §2.4), and
+the bracket line keeps the shape of the other runtime failure messages.
 
 Every failing OpenXR call whose failure ends or degrades VR is logged with
 its result (11 §2.4), with the same never-empty text. A call made every
@@ -705,8 +747,10 @@ log content as in 11.
    missing file) with OpenXR forced: no VR, the reason logged, the game runs
    flat.
 9. Start with SteamVR not running and OpenXR forced (or the headset off when
-   the runtime cannot start without it): one message naming the failing
-   step and result; the game runs flat, the fullscreen option works.
+   the runtime cannot start without it): one `Failed to initialize
+   OpenXR!` message as §7 gives it, with the result's text and code; the
+   log names the failing step; the game runs flat, the fullscreen option
+   works.
 10. Session failure at configure rendering (for example by forcing the game
     onto another adapter on a hybrid laptop): one message; the game renders
     flat and presents itself, not in stereo.
@@ -728,14 +772,16 @@ log content as in 11.
     forced in a way that reaches `xrCreateInstance` (for example
     `XR_RUNTIME_JSON` pointing at a manifest whose library cannot load):
     the message and the log give the result's symbolic name (never an
-    empty text) and its number; the message says how to go back to
-    SteamVR, and for -51 it names the likely cause and points at the log.
-    The options page then shows runtime None (06 §5.2).
+    empty text) and its number; the message's text is exactly that of §7,
+    with the `No usable 32-bit OpenXR runtime` paragraph for -51 and
+    without it for any other result.
+    The `VR Runtime` page's `VR Runtime Set` then shows `None` (06 §5.2).
 15. Not shown: with Steam's "Use Desktop Game Theatre while SteamVR is
     active" on for the game and SteamVR running, start with OpenXR: if the
     session runs but stays below `VISIBLE` for about 10 s, the log shows
-    every state change and one not-visible event with the state, and one
-    warning appears without stopping the game. With the setting off, no
+    every state change and one not-visible event with the state, and the
+    warning of §3.1 appears once, with its exact text, without stopping
+    the game. With the setting off, no
     such event or warning.
 16. Probing only: with OpenVR selected and an OpenXR runtime registered,
     start the game: the log shows the OpenXR registry values and manifests

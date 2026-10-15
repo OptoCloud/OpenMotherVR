@@ -1,4 +1,4 @@
-<!-- Provenance: AI.exe 2015 analysis (initialisation order, the per-object visibility loop, the calling conventions of the replaced methods); measurements in game of test builds (thread ids of every hook, call counts per frame, render-thread timings, 600-frame pose-fetch timing on OpenVR and OpenXR, a torn head-pose handover on OpenXR); user requirements (verify before writing, no per-frame logging on the render thread, no work at process exit, unknown build patches nothing, the mod never needs elevation); project decisions with their reasons inline (message boxes at attach, unwritable game folder); the earlier mod's player-facing behaviour (its message for OpenVR error 117 pointing at Steam's Desktop Game Theatre); public OpenVR headers (`EVRInitError` values); Microsoft documentation of DllMain, the loader lock, structured exceptions and the DLL search order, DXGI, OpenVR and OpenXR threading rules; the C++ memory model; a tester's report on SteamVR with a Steam Frame headset (focus taken by other applications, the game not shown in the headset, a crash with nothing in the log); project decisions of r3 with their reasons in 03, 09, 11 and 13 (the borderless mirror window, focus loss kept from the game, the non-blocking headset warning, the crash record, the event tap's image-range guard, the page showing the runtime this run drives); AI.exe 2015 analysis by the spec side for r4 (the C runtime's own unhandled-exception filter, installed after DLL attach, 11 §6.1); project decisions of r4, each with its reason inline (an OpenXR loss never quits the game; the proxy stays loaded once anything points into it; a caught exception's return value; a protection that cannot be restored; groups of sites applied whole; a late detach on the render thread and the runtime's release; the controls help set crossing threads; an attach-time message that cannot be shown); r5 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (the stereo device creation has one call site, so a display reset does not call it again, 02 §6.1), the attach cost stated as 14 §5.10's limits instead of measurements, a process that is not the game, the welcome only on a run where the mod is active, a checked original byte behind a derived written value, the logging of game script events named as in 11 §5, the focus-loss fix described by its result. Revision: r5 -->
+<!-- Provenance: AI.exe 2015 analysis (initialisation order, the per-object visibility loop, the calling conventions of the replaced methods); measurements in game of test builds (thread ids of every hook, call counts per frame, render-thread timings, 600-frame pose-fetch timing on OpenVR and OpenXR, a torn head-pose handover on OpenXR); user requirements (verify before writing, no per-frame logging on the render thread, no work at process exit, unknown build patches nothing, the mod never needs elevation); project decisions with their reasons inline (message boxes at attach, unwritable game folder); the earlier mod's player-facing behaviour (its message for OpenVR error 117 pointing at Steam's Desktop Game Theatre); public OpenVR headers (`EVRInitError` values); Microsoft documentation of DllMain, the loader lock, structured exceptions and the DLL search order, DXGI, OpenVR and OpenXR threading rules; the C++ memory model; a tester's report on SteamVR with a Steam Frame headset (focus taken by other applications, the game not shown in the headset, a crash with nothing in the log); project decisions of r3 with their reasons in 03, 09, 11 and 13 (the borderless mirror window, focus loss kept from the game, the non-blocking headset warning, the crash record, the event tap's image-range guard, the page showing the runtime this run drives); AI.exe 2015 analysis by the spec side for r4 (the C runtime's own unhandled-exception filter, installed after DLL attach, 11 §6.1); project decisions of r4, each with its reason inline (an OpenXR loss never quits the game; the proxy stays loaded once anything points into it; a caught exception's return value; a protection that cannot be restored; groups of sites applied whole; a late detach on the render thread and the runtime's release; the controls help set crossing threads; an attach-time message that cannot be shown); r5 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (the stereo device creation has one call site, so a display reset does not call it again, 02 §6.1), the attach cost stated as 14 §5.10's limits instead of measurements, a process that is not the game, the welcome only on a run where the mod is active, a checked original byte behind a derived written value, the logging of game script events named as in 11 §5, the focus-loss fix described by its result; r6 (CLEANROOM r3, what a player sees may be stated exactly): messages to the player named by the first line a player reads (the texts are in 03 §6.4 for SteamVR, 09 §3.1 and §7 for OpenXR, and 13 §5.3 for all), the earlier mod's SteamVR failure message for error 117 stated as the player-visible source of the Desktop Game Theatre cause, options page items named by their labels in the acceptance checks. Section numbers are unchanged from r5. Revision: r6 -->
 
 # 12. Threads and robustness
 
@@ -104,9 +104,11 @@ succeeded.
 
 ### 2.4 Messages decided at attach
 
-Some messages to the player are decided during attach: unsupported build,
-first-launch welcome (only on a run where the mod is active, 01 §2.4), the
-`UI.PAK` and UI-archive messages (13 §5.3). None is shown in a process that
+Some messages to the player are decided during attach: unsupported build
+(the box starting `Exe check failed!`), first-launch welcome (starting
+`Welcome to`, only on a run where the mod is active, 01 §2.4), the
+`UI.PAK` message (starting `Failed to find UI.PAK!`) and the UI-archive
+message (13 §5.3 gives every text exactly). None is shown in a process that
 is not the game (01 §3.1). The requirements (project decision; the reasons
 are given with each):
 
@@ -361,13 +363,13 @@ since they were built: pixel scale, mirror view type, symmetric mirror (06,
 | `AI.exe` is not a recognised build | patch nothing; the forwarders work; log the timestamp; the unsupported-build message of 13 §5.3 (01 §2.4); no welcome and no first-launch `mothervr.json`, because the welcome would describe a mod that is not running (01 §2.4) |
 | a core site differs (preflight) | patch nothing; log every differing site; the game runs unmodified |
 | an optional fix's site differs or its address is unknown on this build | that fix stays off; log it; everything else works |
-| `UI.PAK` missing or not the expected version | no options page this session; VR works; the message 13 §5.3 gives for the cause (06, 14) |
+| `UI.PAK` missing or not the expected version | no options page this session; VR works; the message 13 §5.3 gives for the cause (`Failed to find UI.PAK!` when the file is missing; 06, 14) |
 | config file missing, unreadable or invalid | defaults; out-of-range values sanitised (06) |
 | the game folder cannot be written (the player's account lacks write access; project decision: the mod never requires elevation, a registry change or a folder rename, because players cannot be expected to change their installation for it) | the game still starts and each missing file degrades on its own: events go to the debugger output when the log cannot be opened (11 §1.1); without a usable `MOTHER.PAK` there is no options page and the UI-archive message of 13 §5.3 is shown; without a local `openvr_api.dll` the runtime's own loader is used (13 §3.2); a `mothervr.json` that cannot be written leaves the settings in effect for this session only (13 §3.6) |
 | runtime None (configured or `-vrforcenone`) | the unmodded game: only the UI set of 01 §2.3 is patched, no stereo device, no D3D11 wrapping beyond the forwarders, no shader patch |
 | the configured runtime is not installed (not forced) | fall back to another installed runtime, OpenVR first, then OpenXR; log why (11 §2.3) |
 | a runtime forced on the command line is not installed, or none is installed | no stereo device; the game runs flat on the stereo path's no-device behaviour (02); logged, no message box |
-| the runtime fails to start (OpenVR `VR_Init` error, OpenXR instance, system or session failure) | shut the runtime down again, destroy the backend, leave the stereo object without a device (device pointer null, state none) and the options page's VR-enabled flag off, with the page showing runtime None while the stored `VRRuntime` is kept (06 §5.2), show the runtime-failure message of 13 §5.3 once (it names the runtime, the failing step, the error's code and a description that is never empty, and that VR stays off until restart; for OpenXR also how to go back to SteamVR). For OpenVR's `EVRInitError` value 117 (`VRInitError_Init_AnotherAppLaunching` in the public OpenVR headers) the message must also say that another application is launching VR and point at Steam's Desktop Game Theatre as the likely cause [likely: see the provenance header; not reproduced by the spec side]. The game continues flat; it must not be left in Rift mode with no device, rendering both eyes into a window that nothing submits |
+| the runtime fails to start (OpenVR `VR_Init` error, OpenXR instance, system or session failure) | shut the runtime down again, destroy the backend, leave the stereo object without a device (device pointer null, state none) and the options page's VR-enabled flag off, with the page showing runtime None while the stored `VRRuntime` is kept (06 §5.2), show the runtime-failure message once: `Failed to initialize SteamVR!` (03 §6.4, 13 §5.3) or `Failed to initialize OpenXR!` (09 §7), whose bracket line gives the error's description, never empty, and its code, and whose last paragraph says that VR stays off until a restart; the OpenXR one also says how to go back to SteamVR. For OpenVR's `EVRInitError` value 117 (`VRInitError_Init_AnotherAppLaunching` in the public OpenVR headers) the SteamVR message is the variant of 03 §6.4 that adds the paragraphs naming SteamVR Desktop Game Theatre and Steam's setting for it [likely cause: the earlier mod's message for this error, which players saw, named the Theatre as a possible cause; not reproduced by the spec side]. The game continues flat; it must not be left in Rift mode with no device, rendering both eyes into a window that nothing submits |
 | the OpenXR session cannot be created on the game's D3D11 device (found when the game configures rendering, for example the game on a GPU other than the headset's) | the same detach and message, at that point. Calls into the stereo device that the game makes after the detach (it may already be committed to rendering this frame) must still be safe: none may use a resource the failed path did not create. The `Present` path must not try to start the runtime again |
 | the runtime asks the application to quit (OpenXR session `EXITING`, 09 §3) | set the game's quit request flag, as the game did for its old runtime's quit signal; log; VR stays off until restart |
 | the OpenXR session or instance is lost (`LOSS_PENDING`, instance loss pending, 09 §3) | VR stops for this run; the game is not asked to quit and keeps running in stereo on the mirror (09 §3); logged |
@@ -404,10 +406,12 @@ since they were built: pixel scale, mirror view type, symmetric mirror (06,
 5. Start with OpenVR selected and SteamVR not installed: if an OpenXR
    runtime exists the log shows the fallback to OpenXR; with
    `-vrforceopenvr` instead, no stereo device and the game runs flat.
-6. Start with the headset unplugged (SteamVR installed): one message box
-   naming SteamVR and the error; the game reaches the main menu on the
-   monitor at its normal resolution, and the Options VR page shows VR
-   disabled with runtime None, while `mothervr.json` still holds the
+6. Start with the headset unplugged (SteamVR installed): one
+   `Failed to initialize SteamVR!` message box (03 §6.4) with the
+   runtime's error text and code; the game reaches the main menu on the
+   monitor at its normal resolution; under Options > `MotherVR`, the
+   `Rendering` and `Input` entries are greyed and the `VR Runtime` page's
+   `VR Runtime Set` shows `None`, while `mothervr.json` still holds the
    stored runtime (06 §5.2).
 7. Change the pixel scale in the menu: one `ResizeBuffers` and one freeze;
    open and close the pause menu ten times: no `ResizeBuffers` line and no
@@ -415,17 +419,18 @@ since they were built: pixel scale, mirror view type, symmetric mirror (06,
 8. Quit from the main menu with VR running: the process ends within a few
    seconds, the log's last line for that process id is the detach marker,
    and Event Viewer records no `AI.exe` error.
-9. First launch without `mothervr.json`: the welcome box appears in front
-   of the game, the game window does not render until it is closed, and the
-   config file exists afterwards.
+9. First launch without `mothervr.json`: the welcome box (13 §5.3,
+   starting `Welcome to`) appears in front of the game, the game window
+   does not render until it is closed, and the config file exists
+   afterwards.
 10. Run with a performance overlay (SteamVR frame timing): no periodic
     render-thread spikes at a fixed interval during steady play.
 11. Remove write access to the game folder for the player's account
     (`MOTHER.PAK`, `mothervr.log` and `openvr_api.dll` absent) and start
     with OpenVR: the game reaches the main menu, VR runs through the
-    runtime's own `openvr_api.dll`, the options page is missing with its
-    message, no elevation prompt appears, and a debug-output viewer shows
-    the events.
+    runtime's own `openvr_api.dll`, Options has no `MotherVR` entry and
+    the UI-archive message of 13 §5.3 is shown, no elevation prompt
+    appears, and a debug-output viewer shows the events.
 12. Edit a copy of `AI.exe` so a redirected call site (for example
     `StereoUpdateCall`) calls another function of the game: the log names
     that site as failing its callee check and nothing is patched.
@@ -435,7 +440,8 @@ since they were built: pixel scale, mirror view type, symmetric mirror (06,
     failing slot, and the real gamepad works as in the unmodded game.
 14. Controls help across threads: with OpenVR, switch controllers (a wand
     and then a Touch-style controller) while opening and closing the pause
-    menu repeatedly: the help page always shows one complete set.
+    menu repeatedly: the `View Controls` page always shows one complete
+    set of rows (04 §5.7), never rows of both.
 15. Unload safety: a developer build that calls `FreeLibrary` on the
     proxy, after the game has started, more times than it was loaded: the
     proxy stays loaded and the game keeps running.

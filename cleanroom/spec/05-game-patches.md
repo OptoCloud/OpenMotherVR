@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build, every original byte below re-read from the binary for r3), required behaviour restated from observing the earlier mod in game, in-game observation by the spec side in a headset (head tracking, stereo, menus, HUD, loading screens confirmed), measurements in game by the spec side (render-target rebuild stall), user requirements (automatic recenter on headset-on and gameplay start, no 0.2 s freeze on every menu open), project decisions (snap-turn threshold and repeat, each with its reason inline), AI.exe 2015 analysis of the mode-stack container (answer to Q5, ANSWERS.md), a head-in-wall blackout in the mission 4 android scene noted in another mod's analysis (acceptance item and open question only). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; a tester's report on SteamVR with a Steam Frame headset (a view sliding after snap-turn steps); project decisions of spec r6 (ANSWERS.md: the stereo-mode and snap-turn diagnostics of 11 §4.5 behind `DebugOptions`). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the FollowBehavior yaw setter (the two yaw fields); the stereo-mode diagnostic covers every mode change; the snap-turn trace window, the head-in-wall delay and the "headset in use" test are owned by 11, 08 and 03 and only referred to here; keyboard and mouse each read whenever their own device exists; vtable slots checked against the exact function of 01 §4; the mouse-displacement low byte checked before it is changed; skip intro only with the mod's UI archive in place; the script event tap deferred to 11 §5; the render-target rebuild flag stated as a result; acceptance items for raising the mode-stack count and for the mode-change log. r7 (spec r7 cross-check): the device creation trigger of the automatic recenter happens once per process (02 §6.1); the event tap installed on every run with the full set, `DebugOptions` deciding only its logging (11 §5). Revision: r7 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build, every original byte below re-read from the binary for r3), required behaviour restated from observing the earlier mod in game, in-game observation by the spec side in a headset (head tracking, stereo, menus, HUD, loading screens confirmed), measurements in game by the spec side (render-target rebuild stall), user requirements (automatic recenter on headset-on and gameplay start, no 0.2 s freeze on every menu open), project decisions (snap-turn threshold and repeat, each with its reason inline), AI.exe 2015 analysis of the mode-stack container (answer to Q5, ANSWERS.md), a head-in-wall blackout in the mission 4 android scene noted in another mod's analysis (acceptance item and open question only). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; a tester's report on SteamVR with a Steam Frame headset (a view sliding after snap-turn steps); project decisions of spec r6 (ANSWERS.md: the stereo-mode and snap-turn diagnostics of 11 §4.5 behind `DebugOptions`). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the FollowBehavior yaw setter (the two yaw fields); the stereo-mode diagnostic covers every mode change; the snap-turn trace window, the head-in-wall delay and the "headset in use" test are owned by 11, 08 and 03 and only referred to here; keyboard and mouse each read whenever their own device exists; vtable slots checked against the exact function of 01 §4; the mouse-displacement low byte checked before it is changed; skip intro only with the mod's UI archive in place; the script event tap deferred to 11 §5; the render-target rebuild flag stated as a result; acceptance items for raising the mode-stack count and for the mode-change log. r7 (spec r7 cross-check): the device creation trigger of the automatic recenter happens once per process (02 §6.1); the event tap installed on every run with the full set, `DebugOptions` deciding only its logging (11 §5). r8 (CLEANROOM r3, what a player sees): what the player sees with skip intro (about half a second of black, then the title screen), as players of the earlier mod saw it; the options named by their labels where the player meets them; the log wording referred to 11. Revision: r8 -->
 
 # 05: Changes to game behaviour
 
@@ -25,7 +25,9 @@ OpenXR. With runtime None only the UI set of 01 §2.3 is applied; from this
 document that is the settings push when the front-end and pause menus open
 (§5, without the stereo-mode handling) and skip intro (§11).
 
-Settings are named by their `mothervr.json` key (`06` §1).
+Settings are named by their `mothervr.json` key (`06` §1); where the
+player meets one, its label on the `MotherVR` options page (06) is given
+too.
 
 Confidence: **[sure]** the game code shows it directly, or it was observed in
 game; **[likely]** strong inference; **[guess]** plausible, must be confirmed
@@ -172,7 +174,8 @@ device. It is **deflected** when it is below -0.5 or above 0.5 (project
 decision: half deflection, so stick drift or a light touch never turns).
 
 While stereo runs, the active pad device exists, a FollowBehavior is
-tracked and active, `SnapRotation` is on and the current stereo mode
+tracked and active, `SnapRotation` (`Snap Rotation` on the options
+page's `Input` sub-page) is on and the current stereo mode
 (`+0x60`) is not 1:
 
 - deflecting the stick turns the player by one step at once: one step added
@@ -600,7 +603,8 @@ in the way. The threshold is a constant 1e-5 (bits 0x3727C5AC, at RVA
 
 **Change.** Point the 4-byte address at +3 to a float the mod owns and keeps
 for the life of the process: 1e-5 (bit-identical to the game's, 0x3727C5AC)
-when `ClippingBlinders` (`06` §1) is on, 1.0 when it is off. Set it at
+when `ClippingBlinders` (`06` §1; `Clip Blinding` on the options page's
+`Rendering` sub-page) is on, 1.0 when it is off. Set it at
 install from the config and update it as soon as the option changes (the
 `mvr_clipblinding` command, `06` §4.2); the game reads it on its next camera
 update. A 4-byte aligned float written in one store needs no further
@@ -854,6 +858,13 @@ the operand is left alone and the intro plays, because the stock movie has
 no skip-intro function (`06` §6). Changing the option takes effect on the
 next launch.
 
+What the player sees with the option (`Skip Startup Intro` on the options
+page) on: instead of the start-up logo videos (the game's `*_IDENT.USM`
+videos in `DATA\UI\MOVIES`) and the legal screen, about half a second of
+black, then the title screen
+(the skip-intro function's one 500 ms gap, `14` §3.3). This is what
+players of the earlier mod saw with the same option.
+
 ## 12. Game events the mod reacts to
 
 | Event | Source | Reaction |
@@ -935,7 +946,7 @@ headset worn unless stated. "Log" means the mod's log file.
 1. The log records, once at start-up, which groups of this document were
    applied (Rift checks, stereo hooks, menu objects, byte patches), and on a
    modified `AI.exe` the first mismatching site and that nothing was patched
-   (wording is the implementation's).
+   (wording and format in `11-diagnostics.md`).
 2. The front-end menu appears on a level screen about 1 m wide, 1.5 m ahead,
    at eye height, facing the direction the head faced when it opened; moving
    the head does not move it. Opening it while looking down still gives a
@@ -974,8 +985,8 @@ headset worn unless stated. "Log" means the mod's log file.
     render-target rebuild (no swap-chain resize in the log, no 0.2 s
     freeze); changing the pixel scale in the menu causes exactly one rebuild
     and the new resolution appears without a restart.
-16. With `SkipStartupIntro` on, the next launch goes straight to the title
-    screen.
+16. With `SkipStartupIntro` on, the next launch shows no logo video and no
+    legal screen: about half a second of black, then the title screen.
 17. Load a different level ten times in one session: no crash (no writes
     through a freed camera behaviour).
 18. In the mission 4 android encounter (a scripted player animation), the

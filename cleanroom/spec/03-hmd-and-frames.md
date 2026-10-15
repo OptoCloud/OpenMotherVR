@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (device methods 3 to 16, relative head pose, render-target size query, render-target rebuild flag, renderer accessors, order of renderer initialisation); OpenVR, DXGI, Win32 and LibOVR 0.4 public API semantics (fullscreen transitions, window placement, window subclassing, interface versions, the LibOVR descriptor fields); observation in game by the spec side on SteamVR with a Valve Index (full resolution from the start, eye layout tied to the created texture, windowed swapchain, mirror back buffer at window size, recenter when worn and when gameplay starts, running start with pose age 0 over 600 frames, render-target sizes up to 13440x6720 and the 16384 texture limit, pixel-scale changes applied in the same run through the rebuild flag, head motion moving the camera correctly, the game's threads per device slot); observation of the SteamVR install by the spec side (where the x86 `vrclient.dll` and its libraries are); performance measurements in game by the spec side (mirror and back-buffer cost, controller latency); answers to implementation questions Q1, Q3, Q4 (ANSWERS.md); user requirements and project decisions (SteamVR need not be running, invalid poses, bounded start-up waits). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. For spec r6: AI.exe 2015 analysis by the spec side (the game's window procedure, RVA 0x612850, and its focus, activation and size handling); OpenVR public API (IVRApplications, the scene application's process id); observation in game by the spec side (a mirror window shrunk to fit its monitor, as the spec r4 decision required, put the menus and the cursor off centre); project decisions of spec r6, prompted by a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus; the game not shown in the headset with Desktop Game Theatre on), each with its reason inline (a mirror window that does not fit becomes borderless over its monitor, replacing the spec r4 shrink-and-centre decision; focus loss is kept from the game while a headset is attached; the scene-application check after about 3 s). For this document's r6 (after spec r6): clean-room review round 2 applied (results instead of mechanisms in §6.7, §9.3 and §9.6; the window-size behaviour traced in the game; the screen-frame mirror question restated from the game; descriptor header values left free); coverage review (late detach on the render thread, one interception failing, mirror resources failing, mirror shaders built at build time, the `vrclient.dll` location, failure text without a runtime error, acceptance checks for invalid poses, cropped mirror modes and the pose handover). Section numbers are unchanged from r5. For r7: cross-document alignment after the second fix pass (CreateDevice labelled with its RVA, and its single call site re-verified by the spec side in the 2015 `AI.exe`; required and optional OpenVR interfaces and the loader release as in 13 §3.2; the reason the mirror's shaders must not contain the dither pattern; the back-buffer view the mirror binds is not created per frame; references to 06 §4.6 and 05 §10 for the rebuild flag; the pose-handover check no longer points at an event 11 does not define). Section numbers are unchanged from r6. Revision: r7 -->
+<!-- Provenance: game analysis of AI.exe 2015 (device methods 3 to 16, relative head pose, render-target size query, render-target rebuild flag, renderer accessors, order of renderer initialisation); OpenVR, DXGI, Win32 and LibOVR 0.4 public API semantics (fullscreen transitions, window placement, window subclassing, interface versions, the LibOVR descriptor fields); observation in game by the spec side on SteamVR with a Valve Index (full resolution from the start, eye layout tied to the created texture, windowed swapchain, mirror back buffer at window size, recenter when worn and when gameplay starts, running start with pose age 0 over 600 frames, render-target sizes up to 13440x6720 and the 16384 texture limit, pixel-scale changes applied in the same run through the rebuild flag, head motion moving the camera correctly, the game's threads per device slot); observation of the SteamVR install by the spec side (where the x86 `vrclient.dll` and its libraries are); performance measurements in game by the spec side (mirror and back-buffer cost, controller latency); answers to implementation questions Q1, Q3, Q4 (ANSWERS.md); user requirements and project decisions (SteamVR need not be running, invalid poses, bounded start-up waits). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. For spec r6: AI.exe 2015 analysis by the spec side (the game's window procedure, RVA 0x612850, and its focus, activation and size handling); OpenVR public API (IVRApplications, the scene application's process id); observation in game by the spec side (a mirror window shrunk to fit its monitor, as the spec r4 decision required, put the menus and the cursor off centre); project decisions of spec r6, prompted by a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus; the game not shown in the headset with Desktop Game Theatre on), each with its reason inline (a mirror window that does not fit becomes borderless over its monitor, replacing the spec r4 shrink-and-centre decision; focus loss is kept from the game while a headset is attached; the scene-application check after about 3 s). For this document's r6 (after spec r6): clean-room review round 2 applied (results instead of mechanisms in §6.7, §9.3 and §9.6; the window-size behaviour traced in the game; the screen-frame mirror question restated from the game; descriptor header values left free); coverage review (late detach on the render thread, one interception failing, mirror resources failing, mirror shaders built at build time, the `vrclient.dll` location, failure text without a runtime error, acceptance checks for invalid poses, cropped mirror modes and the pose handover). Section numbers are unchanged from r5. For r7: cross-document alignment after the second fix pass (CreateDevice labelled with its RVA, and its single call site re-verified by the spec side in the 2015 `AI.exe`; required and optional OpenVR interfaces and the loader release as in 13 §3.2; the reason the mirror's shaders must not contain the dither pattern; the back-buffer view the mirror binds is not created per frame; references to 06 §4.6 and 05 §10 for the rebuild flag; the pose-handover check no longer points at an event 11 does not define). Section numbers are unchanged from r6. For r8, under the clean-room process r3 (what a player sees may be stated exactly): the SteamVR failure box of §6.4 given exactly (caption, icon, button, text: the earlier mod's text, whose behaviour is unchanged, with this project's caption `MotherVR` without a version, the `unknown error` fallback and this project's descriptions for failures the earlier mod did not report) and the headset-not-showing-the-game warning of §6.7 (this project's text, a check the earlier mod did not have); the options-page labels of the mirror and pixel-scale settings (§8.1, §10, parameters table); what the player sees of the virtual screen (§7); acceptance checks 3, 13, 14 and 16 naming the boxes and labels. No game fact was added. Section numbers are unchanged from r7. Revision: r8 -->
 
 # 03 - Head tracking, projection, render targets, frames, virtual screen, mirror
 
@@ -18,7 +18,7 @@ Parameters used throughout:
 | Symbol | Meaning | Source |
 |---|---|---|
 | `s` | world scale (metres scale), default 1.0 | command line `-vrscale <value>` only, read once when the stereo device is first created, accepted in [0.495, 1.505], otherwise 1.0 (06 §2). Never stored, never in the menu |
-| `p` | pixel scale, default 1.0, range 0.5 to 4.0 | config file and options menu only (06 §1); no command-line override. The effective value is capped (§4.1) |
+| `p` | pixel scale, default 1.0, range 0.5 to 4.0 | config file and the options page's `Pixel Scale` slider only (06 §1, §5); no command-line override. The effective value is capped (§4.1) |
 | eye 0 / eye 1 | the game's eye indices | eye 0 is the **left** eye: left half of the target, submitted as `Eye_Left`; eye 1 is the right eye |
 | `W`, `H` | the side-by-side render target's size | §4 |
 | `A` | the desktop window's aspect, width / height of the size the game asked for (§4.1, §8) | §8 |
@@ -457,20 +457,63 @@ the device is attached last, so the game never sees a half-filled device.
 
 Failure: shut the runtime down if it was initialised, leave manager +0x04
 null and the device state 0, so the game continues on the stereo path's
-no-device behaviour (02), and tell the player once (13 §5). The message must
-convey that SteamVR could not be started, the runtime's error text and
-number, and what the player can do next (the game continues without VR in
-this run). When the failure is not an error the runtime returned (a loader
-export or a required interface is missing, or no compositor appeared
-within the bounded wait), the message and the log name what was missing
-(the export, the interface version, or the compositor) instead of a
-runtime error text, with the error code the failing call returned, or the
-Windows error code when the loader itself could not be loaded; never an
-empty text or a bare 0 (13 §5.3). For error 117 (`VRInitError_Init_AnotherAppLaunching`) it must
-also convey that SteamVR Desktop Game Theatre is the likely cause and that
-Steam's option to use Desktop Game Theatre while SteamVR is active must be
-turned off in the game's Steam properties. The runtime is not retried in
-this run.
+no-device behaviour (02), and tell the player once with the message box
+below (13 §5.3 lists it with the other messages; the text is the same
+there). The runtime is not retried in this run.
+
+The box is a standard Windows message box: caption `MotherVR`, error icon,
+one OK button, in front of the game window; the game continues flat while
+it is open and after it is closed. Its text is the one players of the
+earlier mod saw for this failure (behaviour unchanged), with the
+placeholders filled as the table below says. Quoted box texts in this
+document are shown one box line per quoted line; a line ending in `\`
+continues on the next box line without a blank line between, and an
+empty quoted line is a blank line in the box. `MotherVR` is written as a
+code span only to mark it as the compatibility name; the box shows it as
+plain text.
+
+For any error other than 117:
+
+> Failed to initialize SteamVR!\
+> [`<description>` | `<code>`]
+>
+> Look into the above error, and try again once it has been resolved.
+>
+> `MotherVR` will now start with VR disabled. Restart the game to try again.
+
+For error 117 (`VRInitError_Init_AnotherAppLaunching`), whose usual cause
+is SteamVR's Desktop Game Theatre starting for the game, two paragraphs
+are added after the first one:
+
+> Failed to initialize SteamVR!\
+> [`<description>` | `<code>`]
+>
+> Look into the above error, and try again once it has been resolved.
+>
+> It's possible that this error is being caused by SteamVR Desktop Game Theatre.
+>
+> To use `MotherVR` with SteamVR, you need to uncheck 'Use Desktop Game Theatre while SteamVR is active' in the Steam Properties for Alien: Isolation, and make sure that VR Game Theatre isn't running when you start the game.
+>
+> `MotherVR` will now start with VR disabled. Restart the game to try again.
+
+('Use Desktop Game Theatre while SteamVR is active' is Steam's own label
+for the setting.)
+
+| Failure | `<description>` | `<code>` |
+|---|---|---|
+| the runtime returned an error (`VR_InitInternal2`, or `VR_GetGenericInterface` for a required interface that reports an error) | the runtime's English description of it (`VR_GetVRInitErrorAsEnglishDescription`); `unknown error` when that text is empty | the OpenVR error number, decimal |
+| the loader could not be loaded | `cannot load <path>`, with the full path of the copy tried last | the Windows error code, decimal (for example 126) |
+| a loader export is missing | `openvr_api.dll has no <export>`, with the export's name | the Windows error code of the lookup, decimal (127) |
+| a required interface is not served | `<interface> not available`, with the interface version requested (for example `IVRCompositor_021`) | the OpenVR error number the request returned, decimal |
+| no compositor within the bounded wait | `no compositor after <n> s`, with the wait's length in whole seconds | the OpenVR error number of the last request, decimal |
+
+The texts of the last four rows are this project's: the earlier mod gave
+these cases no description of their own (a loader that could not be loaded
+had a box of its own, which this row replaces, so that every SteamVR
+start-up failure shows the same box). Each names what was missing, so a
+player can report it, and the box never shows an empty description or a
+bare 0. The
+log records the same values (11 §2.3).
 
 ### 6.5 Display reset and later CreateDevice calls
 
@@ -523,8 +566,24 @@ the game's own process:
 | Result | Required |
 |---|---|
 | the game's process | logged once (11 §2.4) |
-| another process, or none (0) | logged once with that process's id and, when it can be read, its executable's file name (11 §2.4); the headset-not-showing-the-game warning of 13 §5.3 is shown once per process, naming that executable when known. Nothing else changes: frames keep being submitted |
+| another process, or none (0) | logged once with that process's id and, when it can be read, its executable's file name (11 §2.4); the warning below is shown once per process, naming that executable when known. Nothing else changes: frames keep being submitted |
 | the interface `IVRApplications` is not available | the check is skipped and that is logged; this is not a start-up failure, because the check is advisory |
+
+The warning is a standard Windows message box (13 §5.3 lists it with the
+other messages; the text is the same there): caption `MotherVR`, warning
+icon, one OK button. Its text is this project's (the earlier mod had no
+such check; the wording follows its Theatre advice of §6.4, with the
+steps that fix the cause), quoted as in §6.4:
+
+> SteamVR is not showing the game in the headset (it shows `<process>`).
+>
+> This is usually SteamVR's Desktop Game Theatre. In Steam, open the Properties of Alien: Isolation and uncheck 'Use Desktop Game Theatre while SteamVR is active', then restart SteamVR and the game.
+
+`<process>` is the file name of the other process's executable, as
+without its folder (for example `steam.exe`). When the process is
+none (0) or its executable cannot be read, the parenthesis and the space
+before it are left out, so the first line is "SteamVR is not showing the
+game in the headset."
 
 The warning must block neither the render thread nor the game thread
 (13 §5.2): the frame loop keeps submitting while it is open, so the game
@@ -536,7 +595,10 @@ made once per process; it is not repeated after a display reset.
 Screen frames are those where the game did not ask for a head-tracked pose:
 menus, the title video, loading screens, cutscenes. Their camera ignores the
 head, so they are shown on a flat, world-locked screen instead of as stereo
-3D.
+3D. What the player sees: the game's flat picture (the left eye's image,
+middle half vertically) on a level panel about 3.56 m wide, 1.5 m ahead
+at the head height of the last recenter, with no frame or border; the
+rest of the view is black.
 
 Required in every screen frame:
 
@@ -569,8 +631,12 @@ fractions of the window.
 
 ### 8.1 What is shown
 
-Settings (06 §1): **mirror view** = both eyes (0), right eye (1, default) or
-left eye (2); **symmetric** = on (default) or off.
+Settings (06 §1), on the options page's `Rendering` page (06 §5) with the
+labels players of the earlier mod knew: **mirror view**
+(`Rendering.MirrorViewType`, the list `Mirror View` with the values
+`Both Eyes`, `Right Eye`, `Left Eye`) = both eyes (0), right eye (1,
+default) or left eye (2); **symmetric** (`Rendering.SymmetricMirrorView`,
+the toggle `Mirror View Symmetry`) = on (default) or off.
 
 Head-tracked frames show the eye image(s):
 
@@ -866,9 +932,10 @@ the runtime's pixels, 2.0 four times. Observed on Index: GPU time in the
 same scene 3.1 to 3.6 ms at 1.0 and 7.3 to 7.7 ms at 1.5; a heavy scene at
 1.5 missed 90 Hz. [sure]
 
-Required: default 1.0; the options page and the player guide describe it as
-a multiplier of the runtime's (SteamVR's) resolution and warn that raising
-both multiplies (06 §5); the cap of §4.1 applies to any value; a change
+Required: default 1.0; the options page (the slider `Pixel Scale` on the
+`Rendering` page, whose description text 06 §5 gives) and the player guide
+describe it as a multiplier of the runtime's (SteamVR's) resolution and
+warn that raising both multiplies; the cap of §4.1 applies to any value; a change
 applies at the next render-target rebuild (§4.2), which the mod requests
 when the value changes.
 
@@ -923,8 +990,8 @@ rename them. Bytes at the patched sites are in 01 §4 and 02 §6.
 
 ## 13. Acceptance
 
-Checks with OpenVR (SteamVR) unless noted; the log content is that of 11
-(wording is the implementation's).
+Checks with OpenVR (SteamVR) unless noted; the log's events, format and
+wording are those of 11; message boxes are those of §6.4 and §6.7.
 
 1. Start with a headset worn: the log shows the runtime chosen, the OpenVR
    start-up steps succeeding, the manufacturer, model and render tangents,
@@ -935,7 +1002,7 @@ Checks with OpenVR (SteamVR) unless noted; the log content is that of 11
 2. Turn the head
    quickly in gameplay: no lag or swimming beyond the compositor's normal
    reprojection.
-3. Set pixel scale 2.0 in the menu during play: within a second the log shows
+3. Set `Pixel Scale` to 2.0 on the options page during play: within a second the log shows
    a new render-target size (twice the previous per axis), a
    `ResizeBuffers` at the window size, and a new configuration; the eyes
    stay aligned. Set 4.0 on a 2688-wide eye: the logged effective pixel
@@ -979,14 +1046,18 @@ Checks with OpenVR (SteamVR) unless noted; the log content is that of 11
 12. With runtime None, or SteamVR not installed with OpenVR forced: no
     stereo, the game's fullscreen option works, no swapchain changes are
     logged.
-13. SteamVR running with Desktop Game Theatre active: the message names
-    error 117 and Desktop Game Theatre; the game continues without VR.
+13. SteamVR running with Desktop Game Theatre active: the box of §6.4
+    for error 117 appears, its second line reading `[<description> | 117]`
+    with SteamVR's description of that error, with the two Desktop Game
+    Theatre paragraphs; after OK the game continues without VR.
 14. Start the game with SteamVR not running and the headset connected:
     SteamVR starts, the log shows the interface versions obtained, and VR
     works without a restart; the start-up wait ends on the first valid
     headset pose, and the whole wait never exceeds about 10 s, however late
-    the compositor appears. With the headset unplugged: the failure
-    message appears within about 10 s and the game runs flat.
+    the compositor appears. With the headset unplugged: the box
+    "Failed to initialize SteamVR!" of §6.4 appears within about 10 s, its
+    second line showing a non-empty description and a non-zero number,
+    and the game runs flat.
 15. In gameplay, cover the headset's tracking (or step out of tracking):
     the image holds the last pose, never flips or blanks with invalid
     values. Press the recenter chord while tracking is lost: the reference
@@ -998,9 +1069,10 @@ Checks with OpenVR (SteamVR) unless noted; the log content is that of 11
 16. Steam's "Use Desktop Game Theatre while SteamVR is active" on for the
     game, SteamVR already running so start-up succeeds: about 3 s after
     the first frames the log names the process SteamVR shows instead of
-    the game, and one warning appears naming Desktop Game Theatre and the
-    Steam setting; the game keeps running while it is open. With the
-    setting off: the log says the headset shows the game, and no warning.
+    the game, and the warning box of §6.7 appears once, its first line
+    naming that process; the game keeps running and frames keep reaching
+    SteamVR while it is open. With the setting off: the log says the
+    headset shows the game, and no warning.
 17. Focus: in gameplay with the headset on, click on another window on the
     desktop (or open SteamVR's desktop window, or let a streaming client
     take the focus): the game does not pause, and a loading screen

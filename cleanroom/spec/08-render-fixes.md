@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build; every site and byte below re-read from the binary for r2; for r4 the spec side re-read the cull function 0x61FD20 and its distance test, the register 39 upload and the head-in-wall fade 0x346DE0) and of the game's pixel shaders (DXBC from the level and global shader packs; for r4 the spec side counted the pixel shaders holding the dither's immediates in three level packs); the public DXBC container layout and checksum; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and shader packs by the spec side (the dither sequence and how it fails, register 39, the cull function's tests); that analysis served only as a lead to which problems exist, and the required results of sections 1, 2 and 4 are stated as this project's own properties; in-game observation by the spec side in a headset (section 1 and section 5 confirmed working); measurements in game by the spec side (draw-submission cost with the distance, occlusion and view-volume tests all bypassed; AA cost; shader-creation cost over the first 3500 shaders of a session); user requirements (anti-aliasing choice with an automatic mode, no MD5 of every shader, shaders changed by other tools pass through); project decisions, each with its reason inline (the head-in-wall delay D, chosen afresh for r4; the bound on the dither's input). r4: clean-room review round 2 applied (section 1 as properties, section 2.1 restated from the spec side's own reading, the head-in-wall delay and its "clear" test re-derived from the game, measurement conditions stated). Section numbers are unchanged from r3. For r5: cross-document alignment after the second fix pass (the acceptance of 07 is 07 §7; the setting's full key `Rendering.StereoAntiAliasing`; the AA log event as 11 §2.4 defines it; the head-in-wall measurement no longer points at a log event 11 does not define). Section numbers are unchanged from r4. Revision: r5 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build; every site and byte below re-read from the binary for r2; for r4 the spec side re-read the cull function 0x61FD20 and its distance test, the register 39 upload and the head-in-wall fade 0x346DE0) and of the game's pixel shaders (DXBC from the level and global shader packs; for r4 the spec side counted the pixel shaders holding the dither's immediates in three level packs); the public DXBC container layout and checksum; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and shader packs by the spec side (the dither sequence and how it fails, register 39, the cull function's tests); that analysis served only as a lead to which problems exist, and the required results of sections 1, 2 and 4 are stated as this project's own properties; in-game observation by the spec side in a headset (section 1 and section 5 confirmed working); measurements in game by the spec side (draw-submission cost with the distance, occlusion and view-volume tests all bypassed; AA cost; shader-creation cost over the first 3500 shaders of a session); user requirements (anti-aliasing choice with an automatic mode, no MD5 of every shader, shaders changed by other tools pass through); project decisions, each with its reason inline (the head-in-wall delay D, chosen afresh for r4; the bound on the dither's input). r4: clean-room review round 2 applied (section 1 as properties, section 2.1 restated from the spec side's own reading, the head-in-wall delay and its "clear" test re-derived from the game, measurement conditions stated). Section numbers are unchanged from r3. For r5: cross-document alignment after the second fix pass (the acceptance of 07 is 07 §7; the setting's full key `Rendering.StereoAntiAliasing`; the AA log event as 11 §2.4 defines it; the head-in-wall measurement no longer points at a log event 11 does not define). Section numbers are unchanged from r4. For r6, under the clean-room process r3 (what a player sees may be stated exactly): the options-page label of `ClippingBlinders` (`Clip Blinding`, the label players of the earlier mod knew) in §4.1 and §4.2, and that `Rendering.StereoAntiAliasing` has no options-page control (§3.2). No game fact was added. Section numbers are unchanged from r5. Revision: r6 -->
 
 # 08: Rendering fixes
 
@@ -331,7 +331,8 @@ keeps one previous-frame view-projection, not one per eye.
 ### 3.2 Required behaviour
 
 A config setting `Rendering.StereoAntiAliasing` (06 §1) decides whether the game's AA
-runs in stereo: **On**, **Off**, or **Auto** (default): on when the pixel
+runs in stereo (set in `mothervr.json` only; the options page has no
+control for it, 06 §1, so the player sees no new label): **On**, **Off**, or **Auto** (default): on when the pixel
 scale is at most 1.3, off above. Above 1.3 the eyes are already
 supersampled by at least 1.69 times and SMAA adds about 0.6 ms GPU (measured
 0.52 to 0.76 ms at 8064x4032) for little visible gain.
@@ -384,7 +385,8 @@ visibility, 1 visible down to 0 black. Its caller, the VR camera behaviour
 update (0x34DE50) on the game's main thread, calls it once per frame at
 0x34E2C1 (`e8 1a 8b ff ff`) and stores the result in stereo object `+0x64`.
 The fade itself and the `ClippingBlinders` threshold are described in 05
-§7.2.
+§7.2; the player sets `ClippingBlinders` with the toggle `Clip Blinding` on
+the options page's `Rendering` page (06 §5).
 
 ### 4.2 Problem and required behaviour
 
@@ -432,7 +434,8 @@ forced 0 behind a loading screen) are applied after this and win over it.
 
 **Log** once at install that the fix is in.
 
-**Acceptance (in game, not yet done).** With `ClippingBlinders` on: walking
+**Acceptance (in game, not yet done).** With `ClippingBlinders` on
+(`Clip Blinding` on): walking
 through doorways, leaning around corners and brushing a wall with the head
 at normal speed never flashes black; note the longest of these contacts
 (the time the game's fade stays below 1.0, measured by any means; 11

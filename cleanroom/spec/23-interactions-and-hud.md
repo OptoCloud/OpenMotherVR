@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were verified by the spec side in the game's data; the existence of a terminal font change and of lever input emulation was known from the analysis of another mod. The camera takeover sites of 2.4 were located with the help of that analysis and verified. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). r2: second clean-room review: terminal text steps derived from this project's own legibility criterion; the reduced animation set defined by a criterion; facts with no use removed; item highlight stated as a result; the HUD game facts cited from 22 §2.4 (one description); the tap's thread left open as 11 §8 does; lever interactions own turning and the move action (22 §4.1, §7); the master switch of 20 §1.3. r3 (spec r7 cross-check): the controls help cited from 04 §5.7 (it is not in 06); the interaction names passed to `ScriptEventTap` (11 §5.1). Revision: r3 -->
+<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were verified by the spec side in the game's data; the existence of a terminal font change and of lever input emulation was known from the analysis of another mod. The camera takeover sites of 2.4 were located with the help of that analysis and verified. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). r2: second clean-room review: terminal text steps derived from this project's own legibility criterion; the reduced animation set defined by a criterion; facts with no use removed; item highlight stated as a result; the HUD game facts cited from 22 §2.4 (one description); the tap's thread left open as 11 §8 does; lever interactions own turning and the move action (22 §4.1, §7); the master switch of 20 §1.3. r3 (spec r7 cross-check): the controls help cited from 04 §5.7 (it is not in 06); the interaction names passed to `ScriptEventTap` (11 §5.1). r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Interaction` and `HUD` pages of the options page given exactly (item order, labels, control kinds, value names, ranges, steps and display formats, description lines, greying), and the controls help rows of the lever mapping, as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the activation distances' suggested values move from a first offered value to the item's description. Revision: r4 -->
 
 # 23. Interactions and HUD
 
@@ -20,7 +20,9 @@ Addresses are RVAs in the 2015 `AI.exe` (PE timestamp 0x54E3199D, image
 base 0x400000). 2020 is `?` throughout, and every feature here stays off
 on the 2020 build (20 §6). Names such as `CrosshairUpdate` are spec labels
 for code the game leaves unnamed; the implementation may rename them.
-Strings and class names the game contains are given exactly. Before any
+Strings and class names the game contains are given exactly, and so is
+the text a player sees on the options page (section 8; CLEANROOM r3).
+Before any
 site is written it is checked as 12 §4 requires; every feature here is an
 optional fix (12 §4.2): a mismatch turns that feature off alone and is
 logged.
@@ -265,8 +267,11 @@ With `Interaction.PhysicalLevers` on, when the game offers a lever or a
 junction, the player closes a hand (or both, for a two-handed lever or a
 junction) and pulls down or twists, and the handle in the game follows.
 Letting go releases the handle as releasing the pad buttons would. The
-game's own prompts still show; the controls help (04 §5.7) lists the
-hand action.
+game's own prompts still show; while the key is in effect, the controls
+help (04 §5.7) ends with two rows, after those of 22 §10.3 [proposal: in
+the bracketed style of v1's `Flashlight [Press Interact near Head]`]:
+`Pull Lever [Grip the Handle]` | `Grip and Pull Down`, and
+`Turn Valve [Grip with Both Hands]` | `Twist Both Hands`.
 
 ### 3.2 Required behaviour
 
@@ -460,7 +465,7 @@ which work at standing height].
 | `Interaction.RewireDistance` | 0, or 0.6 to 2.0 m | 1.2 m when the player turns it on | the rewire box opens towards the player and needs room for it |
 
 The default of both keys is 0 (section 8); the "Proposal" column is the
-value the options page offers first when the player turns the feature on.
+value the item's description line suggests (section 8).
 
 ### 5.4 Off, edge cases
 
@@ -580,8 +585,8 @@ highlight is the game's, as in v1. How is the implementation's choice under
 parameter, its getter and the icon record field it fills) and the open
 question of §12 item 7 (what reads that field and what it highlights)
 apply. A change may take effect only for icons started after it, for
-example from the next level load [proposal: acceptable when the options
-page says so].
+example from the next level load [proposal: acceptable because the item's
+description line says so, section 8].
 
 ### 7.4 HUD placement
 
@@ -613,7 +618,8 @@ panel that follows the head lazily instead of being fixed to it.
   not to drag the eyes. Snap turns (05 §3.2c) re-place it at once.
 - Every value keeps the HUD angular size of 14 §3.6.1 within its stated
   ratio only at the default `Width / Distance`; a player who shrinks it
-  shrinks the text with it. The options page says so.
+  shrinks the text with it. The `HUD Width` item's description says so
+  (section 8).
 - The quad matrix is never NaN; looking straight up or down keeps the last
   heading (03 §2.1 threshold).
 
@@ -648,13 +654,52 @@ its own, a wrong type gives the default, unknown keys are kept.
 Strings are case-sensitive, as in 06 §3.3. Every key is persisted when the
 player changes a setting (06 §3.1), and never written at start-up.
 
-**Options page and commands.** Each key gets a control on the VR page (or
-the further page 20 §10 item 6 decides), a value pushed to the page as 06
-§4.3 does, and a command from the page in the 06 §4.2 form (a name
-beginning `mvr_`, one value, the 06 §4.2 rule for bad values). The new
-command names are the implementation's choice (they are not compatibility
-names), must not collide with 06 §4.2's, and are listed in the player
-guide. `Interaction.FastAnimations` gets no control while reserved.
+**Options page.** Each key gets a control on the `Interaction` or `HUD`
+page of the `Enhanced Mode` page (22 §12.1, which also gives the rules
+every v2 page follows: look, value display, description lines, greying
+and hidden items). The labels, values and description lines below are
+exact; they are this project's texts, in the style of the v1 page players
+know (00 §2.6) [proposal for each text: it names the result the player
+gets, in the fewest words that fit the stock description length, 22
+§12.1]. `Interaction.FastAnimations` gets no item while reserved (4.6).
+
+`Interaction`, in order:
+
+| # | Label | Kind | Values shown | Key | Description line |
+|---|---|---|---|---|---|
+| 1 | `Levers by Hand` | toggle | on / off | `Interaction.PhysicalLevers` | `Grip levers and valves and pull or twist them with your hands` |
+| 2 | `Camera Takeovers` | list | `Game`, `Reduced` | `Interaction.CameraTakeovers` | `Reduced: fewer interactions take the view away from your head` |
+| 3 | `Terminal Distance` | list | `Off`, `0.6 m`, `0.7 m`, ... `2.0 m` (steps of 0.1) | `Interaction.TerminalDistance` | `How close you must be for a terminal's prompt. Off: the game's. Suggested: 1.0 m` |
+| 4 | `Rewire Distance` | list | `Off`, `0.6 m`, `0.7 m`, ... `2.0 m` (steps of 0.1) | `Interaction.RewireDistance` | `How close you must be for a rewire prompt. Off: the game's. Suggested: 1.2 m` |
+| 5 | `Terminal Text Size` | list | `100%`, `125%`, `150%`, `175%` | `Interaction.TerminalTextScale` | `Requires restart! Larger text on terminal screens` |
+
+Items 3 and 4 are shown greyed with `Not available yet` until the game's
+activation for these devices is located (5.2; 22 §12.1). The distances
+show one decimal and the unit (`1.0 m`) [proposal: a list value is read as
+a measure, so it keeps its unit, while a slider's number does not, 22
+§12.1].
+
+`HUD`, in order:
+
+| # | Label | Kind | Values shown | Key | Description line |
+|---|---|---|---|---|---|
+| 1 | `Crosshair` | list | `On`, `Off`, `Auto` | `Hud.Crosshair` | `Auto: hidden while the weapon aims from your hand` |
+| 2 | `Hide HUD` | toggle | on / off | `Hud.Hidden` | `Starts with the HUD hidden, prompts and objectives included` |
+| 3 | `Item Highlight` | toggle | on / off | `Hud.ItemHighlight` | `Glow on items you can pick up. A change may apply only from the next level` |
+| 4 | `HUD Placement` | list | `Head-Locked`, `Follow` | `Hud.Placement` | `Follow: the HUD stays level and catches up when you turn` |
+| 5 | `HUD Distance` | slider | 0.6 to 2 in steps of 0.1 | `Hud.Distance` | `Distance of the HUD from your eyes, in metres` |
+| 6 | `HUD Width` | slider | 0.3 to 1.2 in steps of 0.05 | `Hud.Width` | `Width in metres. A smaller HUD also makes its text smaller` |
+| 7 | `HUD Pitch` | slider | -30 to 10 in steps of 5 | `Hud.Pitch` | `Moves the HUD below (negative) or above your view, in degrees` |
+
+`Crosshair` uses the game's own value names `On` and `Off` (the game's
+menus name such values so) and `Auto` for the third. The HUD toggle
+gesture's item is on the `Controls` page (22 §12.2).
+
+**Commands.** Each key gets a value pushed to the page as 06 §4.3 does,
+and a command from the page in the 06 §4.2 form (a name beginning `mvr_`,
+one value, the 06 §4.2 rule for bad values). The new command names are the
+implementation's choice (they are not compatibility names), must not
+collide with 06 §4.2's, and are listed in the player guide.
 
 ## 9. Threads
 
@@ -722,6 +767,11 @@ OpenXR unless stated.
     follows a turn beyond about 20° smoothly.
 11. With every key at its default, the frame time on a terminal and in
     gameplay equals v1 within measurement noise (20 §1.1 rule 2).
+12. The `Interaction` and `HUD` pages show the labels, values, order and
+    description lines of section 8; `Terminal Distance` and
+    `Rewire Distance` are greyed with `Not available yet` while 5.2 is open;
+    with `Levers by Hand` on, `View Controls` ends with the two rows of
+    3.1.
 
 ## 12. Open questions
 
@@ -777,7 +827,10 @@ Not made here; for the v1 revision that collects v2 changes (20 §10 item
   matching values of "interaction kind" (game fact 2.1).
 - `11-diagnostics.md` §2: the start-up and settings events of section 10.
 - `06-options-and-config.md` §1, §3.2, §4.2, §4.3, §5.2: the `Interaction`
-  and `Hud` sections, their pushes, commands and controls (section 8).
+  and `Hud` sections, their pushes, commands and the `Interaction` and
+  `HUD` pages (section 8, under 22 §12.1).
+- `04-input.md` §5.7: the two lever rows of 3.1 after the rows of 22
+  §10.3.
 - `05-game-patches.md` §4.3: the HUD panel's size, distance and
   orientation come from `Hud.*` (7.4); the defaults are the values given
   there. §12: the events of 2.1 that v2 reacts to.

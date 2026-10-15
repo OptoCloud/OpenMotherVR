@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (the audio output reopen request function, the audio thread's device-recreate check, the game's default-device-change listener; imports SetEvent, CoInitializeEx, WaitForSingleObject); the reopen function was located from the earlier mod's use of the game's audio reopen, and its behaviour (2.2) and the listener (2.3) were then verified in AI.exe; public Windows Core Audio (MMDevice) and OpenXR XR_OCULUS_audio_device_guid documentation; user requirement (game audio on the headset when the runtime names its device); spec-side decisions with their reasons (installed once per process, pass-through when the headset device is unavailable, the player told once on failure). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. r3 (spec r7, second clean-room review): the redirect is stated as a required result, with the interception point left to the implementation (no claim about how Windows lays out its MMDevice objects); the 2020 ABI of the reopen function marked as assumed; the reopen call after installation no longer ordered after its log entry; acceptance item for a reopen function whose entry bytes differ. r4 (spec r7 cross-check): the redirect also stays after an OpenXR session or instance loss, which no longer ends the game (09 §3). Revision: r4 -->
+<!-- Provenance: game analysis of AI.exe 2015 (the audio output reopen request function, the audio thread's device-recreate check, the game's default-device-change listener; imports SetEvent, CoInitializeEx, WaitForSingleObject); the reopen function was located from the earlier mod's use of the game's audio reopen, and its behaviour (2.2) and the listener (2.3) were then verified in AI.exe; public Windows Core Audio (MMDevice) and OpenXR XR_OCULUS_audio_device_guid documentation; user requirement (game audio on the headset when the runtime names its device); spec-side decisions with their reasons (installed once per process, pass-through when the headset device is unavailable, the player told once on failure). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. r3 (spec r7, second clean-room review): the redirect is stated as a required result, with the interception point left to the implementation (no claim about how Windows lays out its MMDevice objects); the 2020 ABI of the reopen function marked as assumed; the reopen call after installation no longer ordered after its log entry; acceptance item for a reopen function whose entry bytes differ. r4 (spec r7 cross-check): the redirect also stays after an OpenXR session or instance loss, which no longer ends the game (09 §3). r5 (CLEANROOM r3, what a player sees): the failure message given exactly, as players of the earlier mod saw it for the same failure; the old rule's "what it must convey" removed; the text quoted in the form of 13 §5.1, the same as 13 §5.3. Revision: r5 -->
 
 # 10 Audio on the headset
 
@@ -133,9 +133,20 @@ placed is the implementation's choice, under these constraints:
 
 If installation fails (the redirect cannot be put in place), nothing is
 changed, VR and the game's audio continue normally on the default device,
-the failure is logged, and the player is told once (13 §5.3: game audio
-could not be moved to the headset and stays on the Windows default device,
-with the error code).
+the failure is logged, and the player is told once per launch with this
+message box (13 §5.3 lists every message box). Its text is the one players
+of the earlier mod saw for the same failure, kept because it reports the
+same failure; the caption `MotherVR`, without a version, is the project's
+(13 §5.3). Error icon, an OK button only, text (two lines, quoted as 13
+§5.1 says, word for word as 13 §5.3):
+
+> Failed to hook Audio!\
+> [0x`<result>`]
+
+where `<result>` is the failing `HRESULT` in upper-case hexadecimal digits
+without leading zeros, after the literal `0x` (for example `0x80070490`). The
+game continues: VR keeps running and the sound stays on the Windows
+default device.
 
 After a successful installation the game's reopen function (2.2) is
 called, so that a device the game already opened is reopened through the
@@ -215,6 +226,11 @@ from the audio thread).
    is not called, the log says the game's output will switch at its next
    reopen, and it does at the next change of the Windows default device;
    no crash.
+8. As item 1, with a test build whose installation of the redirect fails:
+   one message box with the caption `MotherVR` and the two lines of 3.2
+   (`Failed to hook Audio!`, then the `HRESULT` in brackets); after OK the
+   game continues in VR with its sound on the Windows default device, and
+   the log has the failure.
 
 ## 6. Open questions
 

@@ -1,4 +1,4 @@
-<!-- Provenance: user requirements; in-game observation of the earlier mod's last release on the 2015 build; AI.exe 2015 analysis; 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; in-game observation by the spec side in a headset (per-eye lighting and mirror fixes confirmed; OpenXR stereo confirmed on SteamVR with Index; controls on Index confirmed); measurements by the spec side of render-thread and GPU cost in game (pixel scale, culling, mirror size, anti-aliasing, display resets, shader patching, logging, OpenXR frame loop); user decisions of spec r3 (runtimes None / OpenVR / OpenXR, flat play with runtime None is the unmodded game, "Oculus" means OpenXR), later (OpenVR is the default runtime; the options page is project-authored and built into the player's own UI archive; the project's log format; no other mod named in the spec) and r5 (SteamVR need not be running; invalid head poses; no elevation, registry change or folder rename; settings named by their key; known problems stated as observed effects); a tester's report on SteamVR with a Steam Frame headset and project decisions of spec r6 (borderless mirror window, focus loss does not pause, the options page shows the runtime this run drives, the headset-not-showing-the-game warning, the crash record); clean-room review round 2 and coverage review of spec r6, applied in r7 (v1 defined by what the player sees; console commands moved to the robustness requirements; process exit allows only the detach log line; settings keys given for every option on the page; a program other than the game that loads the DLL is left alone; the welcome only on a run where the mod is active); cross-document pass after that review, applied in r8 (the head-in-wall delay given as about half a second, as 08 §4.2 now decides; v2 pointed to its own documents). Revision: r8 -->
+<!-- Provenance: user requirements; in-game observation of the earlier mod's last release on the 2015 build; AI.exe 2015 analysis; 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; in-game observation by the spec side in a headset (per-eye lighting and mirror fixes confirmed; OpenXR stereo confirmed on SteamVR with Index; controls on Index confirmed); measurements by the spec side of render-thread and GPU cost in game (pixel scale, culling, mirror size, anti-aliasing, display resets, shader patching, logging, OpenXR frame loop); user decisions of spec r3 (runtimes None / OpenVR / OpenXR, flat play with runtime None is the unmodded game, "Oculus" means OpenXR), later (OpenVR is the default runtime; the options page is project-authored and built into the player's own UI archive; the project's log format; no other mod named in the spec) and r5 (SteamVR need not be running; invalid head poses; no elevation, registry change or folder rename; settings named by their key; known problems stated as observed effects); a tester's report on SteamVR with a Steam Frame headset and project decisions of spec r6 (borderless mirror window, focus loss does not pause, the options page shows the runtime this run drives, the headset-not-showing-the-game warning, the crash record); clean-room review round 2 and coverage review of spec r6, applied in r7 (v1 defined by what the player sees; console commands moved to the robustness requirements; process exit allows only the detach log line; settings keys given for every option on the page; a program other than the game that loads the DLL is left alone; the welcome only on a run where the mod is active); cross-document pass after that review, applied in r8 (the head-in-wall delay given as about half a second, as 08 §4.2 now decides; v2 pointed to its own documents); r9 (CLEANROOM r3, what a player sees may be stated exactly): the welcome's exact text (the earlier mod's, with the project's change of its second paragraph and the caption without a version, each with its reason), the description line under the `MotherVR` entry, the virtual screen's look, the glyph for an action with no VR control, the messages a player sees named by their exact first lines; no passage leaves the wording of a message or a label to the implementation any more. Revision: r9 -->
 
 # 00. Overview
 
@@ -62,10 +62,17 @@ running its own gameplay, AI, audio and scripting unchanged.
   video are shown on a **virtual screen**: a flat, level screen 1.5 m in
   front of the player at eye height, fixed in the world (03 §7, 05 §4.2,
   09). It is placed in front of the player's facing when the screen opens
-  and after each recenter.
+  and after each recenter. The player sees the game's flat 16:9 picture on
+  a panel about 3.56 m wide, with no frame or border, and black around it
+  (03 §7).
 - While a loading screen is up the 3D scene behind it is black.
 - The menus use focus navigation (pad style). The mouse cursor, when used,
   maps into the menu's own 1280x720 space, not the stereo back buffer.
+- Text that would be too small in a headset is enlarged: the menu lists,
+  their description lines and button hints, loading tips, subtitles, the
+  crosshair and the HUD's health bar and ammo counter, by the factors and
+  placements of 14 §3.6 (project decision: derived from the viewing
+  distances of 03 and 05, so each is readable without leaning in).
 
 ### 2.3 Input
 
@@ -75,7 +82,20 @@ running its own gameplay, AI, audio and scripting unchanged.
   Keyboard and mouse keep working. Default bindings exist for Valve Index,
   Oculus Touch (Quest, Rift), Windows Mixed Reality and Vive wand
   controllers, rebindable in SteamVR (04 §5.8).
-- Controller prompts in the UI show VR controller glyphs.
+- Controller prompts in the UI show VR controller glyphs while the VR
+  controllers are the last input used, and the game's Xbox glyphs again
+  once a real gamepad is used (04 §4.2). The VR glyphs have the size and
+  style of the game's Xbox glyphs but no colour: a white ring with a white
+  letter for a face button, a white ring with three bars for a menu
+  button, light-grey tabs with black `LG` and `RG` for the grips (shaped
+  like the game's LB and RB), a light-grey stick seen from the side with a
+  black `R` and a small downward triangle above it for the right stick
+  click, and a thin white ring with a centre dot, or with its top or bottom
+  quarter filled, for the touchpad's centre, upper and lower clicks. A
+  prompt for an action with no VR control shows a thin white ring crossed
+  by one diagonal stroke (project decision, 04 §4.1). 04 §4.1 lists which
+  prompt shows which glyph; the images are the project's own, drawn to
+  these designs (14).
 - **Snap turn** (on by default): pushing the turn stick past half deflection
   turns the player by exactly 360°/N (N = 12 by default, so 30°; N from
   {2, 3, 4, 6, 12, 24}, so 3 gives 120°). Holding the stick repeats the
@@ -121,41 +141,89 @@ SteamVR can switch itself (10).
 
 ### 2.6 Options menu page
 
-The game's Options menu gains a VR page. Its settings take effect
-immediately unless noted, and are saved to the config file (06). Each
-setting is named below by its meaning and its `mothervr.json` key (06 §1
-has them all); the labels on the page are the implementation's own wording
-(06 §5).
+The game's Options menu gains a page titled `MotherVR`, its fourth entry
+after the game's Game, Video and Audio, in the front-end and pause menus
+(the game-over menu does not show it, 06 §5.1). The page, its sub-pages,
+labels and value names are the ones players of the earlier mod know, kept
+so that its players and their guides still find every setting (project
+decision); only the runtime labels changed, because OpenXR takes the place
+of Oculus (§3). While the `MotherVR` entry is highlighted, the
+description line under the menu reads: Adjust `MotherVR` settings (the
+earlier mod's line, kept; the code span marks the page title, which the
+menu shows as plain text). Each page's title is the label of the entry
+that opened it, as with the game's own pages. The pages are the game's
+standard vertical menu lists, in
+the same frame as the stock Options pages, with no new layout, headers or
+dividers, and every control is one of the game's own menu item kinds, so
+it looks and behaves like a stock item of that kind. 06 §5 is the full
+definition (description lines, greying and hiding rules, display formats);
+the overview, with each setting's `mothervr.json` key (06 §1):
 
-- VR runtime (`VRRuntime`): None, OpenXR or OpenVR (SteamVR). Changing it
-  quits the game; the choice applies at the next start. Value 1, formerly
-  "Oculus", selects OpenXR and is labelled OpenXR (compatibility with
-  existing config files, 06).
-- Which eye the desktop mirror shows (both, left, right;
-  `MirrorViewType`) and whether it is symmetric (`SymmetricMirrorView`).
-- Pixel scale (`PixelScale`: render resolution relative to the runtime's
-  recommendation, which already includes SteamVR's own resolution setting;
-  capped so the side-by-side target stays within 16384 pixels in each
-  direction, D3D11's texture size limit).
-- Head-in-wall blackout on/off (`ClippingBlinders`).
-- Snap turn on/off (`SnapRotation`) and the number of snap turn segments
-  (`SnapRotationSegments`).
-- Grips that toggle aiming and the motion tracker instead of being held
-  (`ToggleGrips`, 04 §5.6). `VRInputRelativeWalking`, `VRInputStrafing`
-  and `ToggleCrouch` are kept in the config file for compatibility and have
-  no effect and no control in v1 (06 §1).
-- Skipping the start-up logo and intro sequence (`SkipStartupIntro`, from
-  the next launch).
-- Developer diagnostics (`DebugOptions`): shows the game's hidden "Select
-  Level" and debug checkpoint entries in the front end, and turns on extra
-  diagnostics in the log (06 §1.3, 11 §4).
+| Page | Label | Control | Values shown | Key |
+|---|---|---|---|---|
+| `MotherVR` | `VR Runtime` | opens the page below | | |
+| | `Rendering` | opens the page below | | |
+| | `Input` | opens the page below | | |
+| | `Dev. Debug Options` | toggle | on / off | `DebugOptions` |
+| | `Skip Startup Intro` | toggle | on / off | `SkipStartupIntro` |
+| `VR Runtime` | `VR Runtime Set` | list, always greyed | `None`, `OpenXR`, `SteamVR`: the runtime running in this session | `VRRuntime` (shown, not edited here) |
+| | `Use OpenXR` | button | | `VRRuntime` |
+| | `Use SteamVR` | button | | `VRRuntime` |
+| | `Disable VR` | button | | `VRRuntime` |
+| `Rendering` | `Mirror View` | list | `Both Eyes`, `Right Eye`, `Left Eye` | `MirrorViewType` |
+| | `Mirror View Symmetry` | toggle | on / off | `SymmetricMirrorView` |
+| | `Pixel Scale` | slider | 0.5 to 4 in steps of 0.1, the number beside the bar (`1`, `1.1`, `2.5`) | `PixelScale` |
+| | `Clip Blinding` | toggle | on / off | `ClippingBlinders` |
+| `Input` | `View Controls` | opens the controls help (04 §5.7) | | |
+| | `Snap Rotation` | toggle | on / off | `SnapRotation` |
+| | `Snap Rotation Segments` | list | `24 (15°)`, `12 (30°)`, `6 (60°)`, `4 (90°)`, `3 (120°)`, `2 (180°)` | `SnapRotationSegments` |
+| | `Toggle Aim/Motion Sensor` | toggle | on / off | `ToggleGrips` |
+
+What the settings do:
+
+- **Runtime.** Each runtime button carries the description line
+  `Requires restart! Selecting this will exit the game.`; pressing it saves
+  the choice and the game exits at once, and the choice applies at the next
+  start. The button of the runtime shown is hidden. `Use OpenXR` replaces
+  the earlier mod's `Use Oculus`, and the list value `OpenXR` its `Oculus`:
+  value 1, formerly "Oculus", selects OpenXR (compatibility with existing
+  config files, 06). The `VR Runtime` entry is greyed in the pause menu,
+  because changing the runtime quits the game, which must not happen in
+  the middle of a level.
+- **Mirror** (`Mirror View`, `Mirror View Symmetry`): which eye the
+  desktop mirror shows and whether it is symmetric (§2.4, 03 §8).
+- **Pixel scale**: render resolution relative to the runtime's
+  recommendation, which already includes SteamVR's own resolution
+  setting; capped so the side-by-side target stays within 16384 pixels in
+  each direction, D3D11's texture size limit.
+- **`Clip Blinding`**: the head-in-wall blackout on or off.
+- **Snap turn** (`Snap Rotation`, `Snap Rotation Segments`): §2.3; each
+  value shows N and the step angle.
+- **`Toggle Aim/Motion Sensor`**: grips that toggle aiming and the motion
+  tracker instead of being held (04 §5.6). `VRInputRelativeWalking`,
+  `VRInputStrafing` and `ToggleCrouch` are kept in the config file for
+  compatibility and have no effect and no control in v1 (06 §1).
+- **`Skip Startup Intro`**: skips the start-up logo and intro sequence,
+  from the next launch.
+- **`Dev. Debug Options`**: shows the game's hidden `Select Level` and
+  `Trigger Debug Checkpoint` entries, and turns on extra diagnostics in the
+  log (06 §1.3, §5.5, 11 §4).
+- While VR is not running, the `Rendering` and `Input` entries are greyed;
+  while it runs, the game's own Video items that have no effect or harm a
+  headset (field of view, deep colour, motion blur, depth of field,
+  chromatic aberration, SSAO, film grain, stereo mode) are greyed (06 §5.3).
+- **`View Controls`** lists the controls of the current controller set as
+  two-column rows, the game function on the left and the control on the
+  right, looking like the rows of the game's input-mapping page; pressing a
+  row changes nothing (04 §5.7, 06 §5.2).
 
 Pixel scale and mirror changes apply without a restart: the mod asks the
 game to rebuild its render targets, a pause of about 0.2 s, and only when
 one of those settings actually changed (opening a menu never causes it,
 12 §6.3).
 
-The page and its glyph images are the project's own work. They are built
+The files that produce the page and the glyphs (UI movies, glyph images)
+are the project's own work, made from the descriptions above. They are built
 at install time into the player's own copy of the game's UI archive
 (`DATA\UI.PAK`), producing `DATA\MOTHER.PAK`; no game file and no other
 mod's UI file is shipped (06, 14).
@@ -169,10 +237,28 @@ at pixel scale 1.3 or below, where the eyes are not already supersampled;
 invalid entries take their defaults and out-of-range values are sanitised;
 it is rewritten when an option changes, keeping keys it does not know. On
 the first start without a config file, on a run where the mod is active
-(01 §2.4), the player is told once where the VR options are, and the file is
-written only after that message is closed, so that a process that exits
-first (Steam relaunching the game) leaves the one-time message for the next
-launch (13). The format, the command-line
+(01 §2.4), a welcome box greets the player once: a standard Windows
+message box with caption `MotherVR`, the information icon and one OK
+button, in front of the game window. Its text (quoted as in 03 §6.4: one
+box line per quoted line, an empty quoted line is a blank line in the box,
+and the code span marks the name `MotherVR`, which the box shows as plain
+text):
+
+> Welcome to `MotherVR` for Alien: Isolation!
+>
+> VR starts with SteamVR. To use OpenXR or turn VR off, go to Options->`MotherVR` after the game starts up. This message is only shown on the first launch of `MotherVR`.
+
+The first line and the last sentence are the earlier mod's. The first two
+sentences of the second paragraph replace that mod's "To Enable VR, you
+can do so in Options->`MotherVR` after the game starts up.", because v1
+starts VR with SteamVR by default where the earlier mod started with VR
+off, so the player needs to know where to choose OpenXR or None instead
+(project decision). The caption has no version number, so it stays the
+same across releases (project decision); the box has only OK because
+closing it is the only action. 13 §5.3 lists the same text with the other
+messages. The file is written only after that box is
+closed, so that a process that exits first (Steam relaunching the game)
+leaves the welcome for the next launch (13). The format, the command-line
 switches (`-vrforcenone`, `-vrforceopenvr`, `-vrforceopenxr`,
 `-vrforceoculus`, `-vrscale`) and the `mvr_*` console commands are in 06.
 
@@ -196,17 +282,23 @@ switches (`-vrforcenone`, `-vrforceopenvr`, `-vrforceopenxr`,
 - When the runtime is installed but fails to start (no headset, runtime
   error), the player is told once with the runtime's error, VR stays off
   for the session, and the game continues on the monitor at its normal
-  resolution, never stuck in stereo (12 §7). After a failed start the
-  options page shows that no runtime is running (None); the stored choice
+  resolution, never stuck in stereo (12 §7). The box is
+  `Failed to initialize SteamVR!` (03 §6.4) or `Failed to initialize
+  OpenXR!` (09 §7), with the runtime's error and its number on its second
+  line. After a failed start the options page's `VR Runtime Set` shows
+  `None`; the stored choice
   is not changed, so a restart tries it again and the page still offers
-  every runtime (06 §5.2). An OpenXR failure message also says how to go
-  back to SteamVR (13 §5.3).
+  every runtime (06 §5.2). The OpenXR failure message also says how to go
+  back to SteamVR: `Use SteamVR` on the options page, or the launch option
+  `-vrforceopenvr` (09 §7).
 - When SteamVR does not show the game in the headset although VR started
   (its Desktop Game Theatre is the usual cause), the player is warned once,
-  without the game stopping, and told which Steam setting to turn off
+  without the game stopping, and told which Steam setting to turn off,
+  'Use Desktop Game Theatre while SteamVR is active' as Steam labels it
   (03 §6.7, 09 §3.1).
 - If the player's `UI.PAK` is missing or not the expected one, VR works
-  without the options page (06, 14).
+  without the options page (06, 14); when it is missing, the box
+  `Failed to find UI.PAK!` names the path that was expected (13 §5.3).
 - The mod never needs elevation, a registry change or a renamed game
   folder. If the game folder is unknown or not writable, the game still
   starts and each missing file degrades on its own: no options page
@@ -215,7 +307,8 @@ switches (`-vrforcenone`, `-vrforceopenvr`, `-vrforceopenxr`,
   opened (12, 13).
 - If `AI.exe` is not a supported build, or its code at any patched place is
   not what the mod expects, the mod patches nothing and the game runs
-  unmodified; an unknown build is reported once (01 §2.4, §2.5). A program
+  unmodified; an unknown build is reported by the box `Exe check failed!`
+  with the timestamp found (01 §3.1). A program
   other than the game that loads the DLL from the game folder (a test
   harness, a tool) gets the forwarded `d3d11.dll` functions and nothing
   else (01 §3.1).
@@ -337,7 +430,7 @@ Each item states the effect observed in game and the requirement v1 meets.
 21. **Paths outside the ANSI code page** (install folder, user name) work
     everywhere; nothing throws on them (11 §1.1).
 22. **Runtime failure leaves the game playable**: the device detaches, the
-    runtime is shut down, the player is told once, and the game continues
+    runtime is shut down, the player sees one failure box (§2.8), and the game continues
     flat; a display reset never starts the runtime twice (12 §7).
 23. **Data crossing threads is never torn**: whenever the game thread,
     the render thread or a job thread reads head poses, views, hand poses

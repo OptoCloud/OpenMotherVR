@@ -1,9 +1,9 @@
-<!-- Provenance: spec side's answers to the implementation side's QUESTIONS.md r1 (questions on spec r2); user decisions for spec r3; AI.exe 2015 analysis (mode-stack container); DXGI public API semantics; user decisions for spec r4 (2026-10-14); project decisions for spec r5 (clean-room review of every document); a tester's report on SteamVR with a Steam Frame headset and project decisions for spec r6 (2026-10-15); AI.exe 2015 analysis by the spec side for spec r6 (the game's window procedure on focus loss and deactivation; the five pointer-table slots holding ScriptEventTap's address); for spec r7: the second clean-room review, the coverage review and the cross-document check of every document, with their project decisions, and AI.exe 2015 analysis by the spec side (the single call site of the device creation function, the C runtime's own exception filter and its fail-fast paths, the game window's procedure and size handler, the event tap's padding and pointer-table slots, the follow camera's position fields and yaw setter, the pad helper's code range, the action map's composite flag, the pass set-up's type argument, the setting-name table), each re-read for this revision. 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; spec r7 adds none. Revision: r5 -->
+<!-- Provenance: spec side's answers to the implementation side's QUESTIONS.md r1 (questions on spec r2); user decisions for spec r3; AI.exe 2015 analysis (mode-stack container); DXGI public API semantics; user decisions for spec r4 (2026-10-14); project decisions for spec r5 (clean-room review of every document); a tester's report on SteamVR with a Steam Frame headset and project decisions for spec r6 (2026-10-15); AI.exe 2015 analysis by the spec side for spec r6 (the game's window procedure on focus loss and deactivation; the five pointer-table slots holding ScriptEventTap's address); for spec r7: the second clean-room review, the coverage review and the cross-document check of every document, with their project decisions, and AI.exe 2015 analysis by the spec side (the single call site of the device creation function, the C runtime's own exception filter and its fail-fast paths, the game window's procedure and size handler, the event tap's padding and pointer-table slots, the follow camera's position fields and yaw setter, the pad helper's code range, the action map's composite flag, the pass set-up's type argument, the setting-name table), each re-read for this revision; for spec r8, the clean-room process r3 (what a player sees when using a mod may be stated exactly) and the exact-wording pass over every document that follows it, with its project decisions, and the game's own menu texts in `DATA\TEXT\ENGLISH\UI.TXT` read by the spec side for the v2 pages. 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; spec r7 and r8 add none. Revision: r6 -->
 
-# Answers and decisions (spec r3 to r7)
+# Answers and decisions (spec r3 to r8)
 
 This file records the spec side's answers to the implementation side's
-questions (spec r3) and the decisions taken for spec r4 to r7. Each entry
+questions (spec r3) and the decisions taken for spec r4 to r8. Each entry
 names the documents and sections it changed. Where an entry is a decision
 rather than a game fact, the reason is given. Section numbers in the
 "Changed" lines are those of the revision that made the change; a later
@@ -123,7 +123,7 @@ These are decisions, not answers to questions; each says why.
 | The log uses a Serilog-style format defined by this project. | A familiar, parseable format; the project owns its wording. | `11-diagnostics.md` §1, §2 |
 | The spec names no other mod or mod author. Names players or their files depend on (`mothervr.json` keys and values, `MOTHER.PAK`, `mothervr.log`, `mothervr_input`, `openvr_api.dll`, `mvr_*`, `-vrforce*`, `-vrscale`, the page title `MotherVR`) stay exact for compatibility and are written in code spans. | Clean-room record; `tools/spec_lint.py` enforces it. | all documents; `../CLEANROOM.md` |
 | The options menu is authored by this project, compiled at build time and linked into the player's own `UI.PAK` at install time. No game or other mod UI file is shipped or used as a source. | The menu must not derive from another mod's assets. | `14-ui-resources.md`; `06-options-and-config.md` §5, §7 |
-| Messages, labels and log text are specified by what they must convey; the implementation writes its own wording. | Wording is expression, not a requirement. | `../CLEANROOM.md`; `13-distribution.md` §5; `06-options-and-config.md` §5 |
+| Messages, labels and log text are specified by what they must convey; the implementation writes its own wording (replaced in spec r8: under `../CLEANROOM.md` r3, what a player sees is stated exactly, the earlier mod's text where this project's behaviour is unchanged and this project's text where it changed; the log stays this project's own, worded in 11; see Spec r8). | Wording is expression, not a requirement (r8: what a player sees is an observable result like any other behaviour; only the files that produce it stay excluded). | `../CLEANROOM.md`; `13-distribution.md` §5; `06-options-and-config.md` §5 |
 | A mirror window that does not fit its monitor is shrunk and centred (replaced in spec r6: it becomes borderless over its monitor). | With a headset the window keeps the fullscreen client size and runs off screen. | `03-hmd-and-frames.md` §9.3 |
 
 ## Documents in spec r4
@@ -336,7 +336,7 @@ cross-document check renumbered only 01 §4.8 (now §4.9, after a new
 | An external call with a null name pointer passes to the stock handler unchanged. | The mod must not change how the game handles calls that are not its commands. | 06 §4.1 |
 | `mvr_vrruntime` with an accepted value always stores it and quits, even when it is already stored. | After a failed start the page offers the stored runtime as a retry. | 06 §4.2 |
 | An attach-time message that cannot be shown is logged with its kind, text and reason; device creation does not wait for it; the welcome does not count as seen (`mothervr.json` is not written, so it is retried next launch). | A message the player never saw must neither hold up the game nor count as seen. | 06 §3.1; 11 §2.1, §2.6; 12 §2.4; 13 §5.2 |
-| Message box caption is the product name `OpenMotherVR`; the page title stays `MotherVR`. | The player must be able to tell which program speaks; `MotherVR` is allowed only as the page title. | 13 §5.1 |
+| Message box caption is the product name `OpenMotherVR`; the page title stays `MotherVR` (replaced in spec r8: the caption is `MotherVR` without a version; see Spec r8). | The player must be able to tell which program speaks; `MotherVR` is allowed only as the page title. | 13 §5.1 |
 | The OpenXR failure message for -51 conveys the likely cause given in 09 §7 and that the log shows which runtime manifests were examined. | -51 is diagnosable only from the log. | 13 §5.3, §9 item 11 |
 | The build pins the OpenVR SDK release and the SHA-256 of the embedded loader and fails on a missing, non-x86 or different file, never embedding a large-file placeholder. | An embedded placeholder makes every OpenVR start fail on players' machines. | 13 §7, §8, §9 item 17 |
 | The statically linked OpenXR loader implements `XR_KHR_loader_init` and `XR_EXT_loader_init_properties`; 09 §1's fallback exists for safety only. | The r6 elevated-process decision depends on them. | 09 §1; 13 §7 |
@@ -431,3 +431,83 @@ Documents in spec r7:
 | `24-rendering-v2.md` | r3 |
 | `README.md` | r8 |
 | `ANSWERS.md` | r5 |
+
+## Spec r8
+
+Spec r8 applies the clean-room process r3 (`../CLEANROOM.md`): anything a
+player sees when using a mod (the text of its message boxes, menus,
+labels, help texts and log file, and the design and layout of its menus
+and screens) is an observable result and may be stated exactly; the mod's
+files that produce it (UI archives, movies, images, shader bytecode) and
+the names it used internally stay excluded. Every document that held a
+"must convey" rule or an "own wording" rule for something a player sees
+was revised. The rule for text:
+
+- where this project's behaviour is unchanged from the earlier mod, the
+  text is the one its players saw, so players and their guides still
+  recognise every message and setting;
+- where the behaviour changed, or the earlier mod showed nothing there,
+  the text is this project's own, in the style of the earlier text, with
+  its reason;
+- the log stays this project's own format and wording (user decision of
+  spec r4; the earlier mod wrote no log file), defined in 11.
+
+Spec r8 adds no game fact about `AI.exe`. The stock menu texts named
+under v2 below were read by the spec side in the game's own
+`DATA\TEXT\ENGLISH\UI.TXT`.
+
+| Decision | Reason | Where |
+|---|---|---|
+| Every message box is given exactly: trigger, caption, icon, one OK button, text and how its placeholders are filled. All are listed in 13 §5.3; the document that defines a trigger may repeat the text, word for word. | One list that the implementation and the acceptance checks compare against; a text defined in two places must not drift. | 13 §5.1, §5.3; 01 §3.1; 03 §6.4, §6.7; 09 §3.1, §7; 10 §3.2 |
+| The caption of every box is `MotherVR`, without a version. Replaces the r7 caption `OpenMotherVR`. | It is the name players know from the earlier mod's boxes and from the options page; the release is shown in the DLL's Details tab and in the log, and a caption naming it would change with every release. | 13 §5.1; 00 §2.7 |
+| Texts kept from the earlier mod because the behaviour is unchanged: `Exe check failed!` (unsupported build), `Failed to initialize SteamVR!` with its Desktop Game Theatre variant for error 117, `Failed to hook Audio!`. | Same failure, same remedy. | 01 §3.1; 03 §6.4; 10 §3.2; 13 §5.3 |
+| This project's own texts, each with its reason: the welcome (VR starts with SteamVR by default; OK only, since nothing is decided); `Failed to find UI.PAK!` with a paragraph on repairing the installation; a new message for an unusable UI archive, first line "Failed to create `MOTHER.PAK`!"; `Failed to initialize OpenXR!` (a result name that is never empty, the way back to SteamVR, the cause of -51; the failing step goes to the log only); both headset-not-showing-the-game warnings; the descriptions of the SteamVR start-up failures that are not runtime errors. The earlier mod's messages that v1 does not show are listed with the reason. | The behaviour differs, or the earlier mod had no message there. | 13 §5.3; 00 §2.7; 03 §6.4, §6.7; 09 §3.1, §7; 11 §2.3 |
+| One quoting form for every box text: a blockquote, one box line per quoted line, `\` at the end of a line for a line break without a blank line, compatibility names as code spans of their own (the box shows plain text). | The lint accepts `MotherVR` only as a code span of its own; one form lets the texts be compared word for word. | README; 13 §5.1; 01 §3.1; 03 §6.4, §6.7; 09 §3.1, §7; 10 §3.2 |
+| The options page as players knew it: `MotherVR` is the fourth entry of Options, after Audio, with the description line "Adjust `MotherVR` settings"; one table per page (`MotherVR`, `VR Runtime`, `Rendering`, `Input`, `View Controls`) gives the order, labels, control kinds (tied to the game's own item classes), value names, description lines, greying and hiding. Other documents name settings by these labels where the player meets them. | Players and their guides find every setting where they knew it. | 06 §5; 00 §2.6; 01 §2.3; 03 §8.1, §10; 04 §5.6, §6; 05; 08 §4.1; 11 §4 |
+| Changes on the page, each with its reason: `Use OpenXR` and the value `OpenXR` replace `Use Oculus` and `Oculus` (value 1 is OpenXR, Q2); a description line for `Pixel Scale` (03 §10 requires one; the earlier mod had none) and its display format; no confirmation prompt on the runtime buttons; the Video items greyed in the front end too. | Each follows a behaviour this project changed. | 06 §5.2, §5.3; 09 intro |
+| The controls help page (`View Controls`) lists the touchpad and thumbstick rows exactly and in order, with an Index variant for the pause row; it is empty until a set is chosen and lists each row once. | The rows players knew for the same controls; a menu opened again must not repeat them. | 04 §5.7 |
+| The VR button glyphs are given as designs (what each depicts, size, transparency, grey levels) for the project to draw its own images; an action with no VR control shows a ring with one diagonal stroke (project decision). Glyph ids stay the implementation's. | The design is what players see; the images and their names are the earlier mod's files and internals. | 04 §4.1; 14 §2.9, §4.2; 00 §2.3 |
+| Layout factors fixed: `s_menu` 1.22 (the factor players knew); `s_hud` 1.38, the smallest factor that meets the 80% floor, also for the crosshair and the grapple prompt [pending user confirmation]. The other layout moves players knew are compared with v1's placement. | Both lie in the ranges 14 already required; the earlier HUD and subtitle factors fall just under the floor. | 14 §3.6.1, §3.6.4, §3.6.6 |
+| What the player sees of the virtual screen (a flat 16:9 picture on a level panel about 3.56 m wide, 1.5 m ahead, no frame, black around it) and of skip intro (about half a second of black, then the title screen) is stated. | Observable results, stated as players see them. | 03 §7; 00 §2.2; 05 §11; 14 §3.3 |
+| Every message shown is logged with a fixed `Kind` and its exact text as a JSON string (line breaks as `\n`), without the caption; an undefined `XrResult` reads `unknown error`, as in the messages. | The log must tell which box a player saw and what it said. | 11 §1.4, §2.6 |
+| v2: every options item, description line, controls help row and glyph design is given exactly as this project's text, in the style of the v1 page (title-case labels, the game's item kinds and value names, description lines of at most 93 characters, the length of the longest stock description, `AI_UI_MENU_AUDIO_LANGUAGE_DESC`), all [proposal]. Stock texts named there are the game's own (`Controller Sensitivity`, `Anti-aliasing`, `Shadow Map Resolution`, `Planar Reflections`, `Chromatic Aberration`, `Film Grain Intensity`; values `On`, `Off`, `Low`, `High`). Text of the other mod studied for v2 stays excluded. | The earlier mod had no v2 features; keeping the look of the v1 page makes the pages read as one menu. | 20 §3, §5; 21 §15.3; 22 §10, §11, §12; 23 §3.1, §8; 24 §10 |
+
+Open after spec r8, for the user: the texts this project wrote (the
+welcome, the repair paragraph of `Failed to find UI.PAK!`, the unusable
+UI archive message, the `Pixel Scale` description line, every v2 text);
+whether `Exe check failed!` should name GOG beside Steam and Epic (kept
+verbatim for now); `s_hud` 1.38 against the 1.33 and 1.25 players knew,
+the crosshair at `s_hud` against about 3.16, and whether the front-end
+and pause menu lists move 140 px lower (14 §7). Open for the spec side:
+the letter case of labels in the menu font, the sub-page titles and the
+fit of the longest description line at the VR layout scale (06 §9,
+22 §19); the v1 changes that 20 to 24 list for 04 §5.7, 06 §5 and 13 §5.3
+(the `Enhanced Mode` entry, the v2 help rows, the welcome with OpenXR as
+default of 22 §11), applied when v2's changes are merged into v1.
+
+Documents in spec r8:
+
+| Document | Revision |
+|---|---|
+| `00-overview.md` | r9 |
+| `01-loading.md` | r8 |
+| `02-game-stereo-path.md` | r7 |
+| `03-hmd-and-frames.md` | r8 |
+| `04-input.md` | r8 |
+| `05-game-patches.md` | r8 |
+| `06-options-and-config.md` | r8 |
+| `07-reflections.md` | r4 (unchanged) |
+| `08-render-fixes.md` | r6 |
+| `09-openxr.md` | r7 |
+| `10-audio.md` | r5 |
+| `11-diagnostics.md` | r6 |
+| `12-threads-and-robustness.md` | r6 |
+| `13-distribution.md` | r6 |
+| `14-ui-resources.md` | r5 |
+| `20-v2-overview.md` | r3 |
+| `21-hands-and-body.md` | r4 |
+| `22-controls-and-comfort.md` | r5 |
+| `23-interactions-and-hud.md` | r4 |
+| `24-rendering-v2.md` | r4 |
+| `README.md` | r9 |
+| `ANSWERS.md` | r6 |

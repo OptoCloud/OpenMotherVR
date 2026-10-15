@@ -1,4 +1,4 @@
-<!-- Provenance: project goals (roadmap, v2 section); user requirements (v1 = the earlier mod's behaviour with its problems fixed, v2 = enhanced mode on top of it; every v2 feature off or v1-compatible by default); proposals of this project, pending user confirmation where marked [proposal]. This document states no new game facts: game facts used here are cited from the v1 documents 00 to 14, and those for v2 are in 21 to 24, where game facts were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. 2020 values: none (v2 gives 2015 RVAs only). r2: project decisions of the second clean-room review of 20 to 24 (the master switch covers 21 to 24, one owner for seated and standing play, the engine settings override and a failed runtime, where v2 addresses are listed, this project's own feature names). Revision: r2 -->
+<!-- Provenance: project goals (roadmap, v2 section); user requirements (v1 = the earlier mod's behaviour with its problems fixed, v2 = enhanced mode on top of it; every v2 feature off or v1-compatible by default); proposals of this project, pending user confirmation where marked [proposal]. This document states no new game facts: game facts used here are cited from the v1 documents 00 to 14, and those for v2 are in 21 to 24, where game facts were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. 2020 values: none (v2 gives 2015 RVAs only). r2: project decisions of the second clean-room review of 20 to 24 (the master switch covers 21 to 24, one owner for seated and standing play, the engine settings override and a failed runtime, where v2 addresses are listed, this project's own feature names). r3 (CLEANROOM r3, what a player sees may be stated exactly): where the v2 text a player sees is stated (22 §12.1 for the page rules, each document for its items); v2 adds no message box; the options page space question answered by the `Enhanced Mode` entry and its pages. Revision: r3 -->
 
 # 20. v2 overview: enhanced mode
 
@@ -134,7 +134,9 @@ By area. Each item is a goal; the document named holds what is required.
 - Button prompts show the glyphs of the controller actually in use, and
   change when it changes.
 - OpenXR may become the default runtime (pending user decision, §9).
-- The new settings can be changed in the headset, on the options page.
+- The new settings can be changed in the headset: the `MotherVR` options
+  page gains an `Enhanced Mode` entry whose pages hold every v2 setting,
+  one page per area (22 §12).
 - A hotkey turns VR off without quitting; log lines also survive a crash
   of the whole system, and the crash record gains the mod's state (22
   §14).
@@ -171,7 +173,8 @@ Unless a v2 option the player turned on changes it:
   pose handling;
 - the v1 render fixes (07, 08), audio (10);
 - the log format and its required events (11), threads and robustness
-  rules (12), the files the mod writes and the messages to the player (13);
+  rules (12), the files the mod writes and the messages to the player (13;
+  the welcome's text changes only once OpenXR is the default, 22 §11);
 - every v1 `mothervr.json` key, its meaning and default (06 §1).
 
 Menus, videos and loading screens stay on the virtual screen in every v2
@@ -233,7 +236,13 @@ feature.
   headset off, controllers lost, runtime None, OpenVR and OpenXR.
 - **Logging** is in 11's format; each v2 document says what each event
   must convey and 11 (in a later revision) owns the wording.
-- **Messages to the player** are owned by 13.
+- **Messages to the player** are owned by 13. v2 adds no message box
+  [proposal: a v2 result is shown where the player asked for it, on the
+  options page, for example the height calibration, 22 §12.2].
+- **Text a player sees** (options page items, glyph designs, controls
+  help rows) is stated exactly (CLEANROOM r3) by the document that owns
+  the feature, as this project's text in the style of the v1 page players
+  know (00 §2.6); 22 §12.1 gives the rules every v2 page follows.
 - **Both runtimes**: a v2 feature works on OpenVR and on OpenXR, or the
   document says why it cannot and what the player sees on the other.
 - **Input**: a v2 input feature names the semantic inputs (04 §5.8.1) it
@@ -350,8 +359,8 @@ v1 terms are in 00 §5. v2 adds:
 - **2D-only effect**: a screen effect designed for a flat screen (lens
   flare, chromatic aberration, film grain, letterboxing) (24).
 - **Haptics**: vibration of a VR controller driven by game events (21).
-- **In-headset settings**: v2 settings on the options page, reachable in
-  the headset (22, 14).
+- **In-headset settings**: v2 settings on the `Enhanced Mode` pages of the
+  options page, reachable in the headset (22 §12, 14).
 - **VR-off hotkey**: a key that turns the stereo device off for the rest of
   the session without quitting (22).
 - **Crash-safe logging**: log lines flushed to disk so that they also
@@ -396,9 +405,10 @@ v1 terms are in 00 §5. v2 adds:
    and its kind. Is it enough for 21 to 23 (hand features off during an
    interaction, interaction-aware turning, physical interactions), or do
    they need the interaction's object and progress?
-6. **Options page space.** v2 adds many settings. Does the one VR page of
-   06 §5 and 14 hold them, or does v2 need further pages, and how do they
-   fit the game's page map (06 §7.3)?
+6. **Options page space.** Answered [proposal]: one `Enhanced Mode` entry
+   on the `MotherVR` page opens a page with the master switch and one
+   sub-page per settings section (22 §12.1); new pages and items are
+   created after every stock one (06 §7.3).
 7. **Per-frame budget.** v2 adds render-thread and job-thread work (hands,
    per-eye history, foveation). What total budget over v1 is acceptable,
    measured as in 00 §4.3?
@@ -427,6 +437,8 @@ Not made here; to be applied in a later revision:
   §1.1 and §2.3, 2015 only, as optional-fix sites.
 - `11-diagnostics.md`: v2 events and the v2 options in the session start
   (§10 item 10).
+- `06-options-and-config.md` §5 and `00-overview.md` §2.6: the
+  `Enhanced Mode` entry after `Input` and its pages (22 §12.1).
 - `ANSWERS.md`: record the user decisions of §9 once made, and the
   decisions of this revision (§1.2 exception, §1.3 master switch, one owner
   for seated and standing play, where v2 addresses are listed).

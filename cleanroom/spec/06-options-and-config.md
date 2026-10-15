@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (UI external-call handler and its return size, script invoke methods and their return sizes, menu Open methods, bootup movie call, quit flag getter, display-reset flag, settings handlers named in 02); the stock game's ActionScript menu classes from the player's own UI.PAK (item constructors, option setters, item data replacement, automatic ids, page maps, input-mapper selection, slider snapping); the earlier mod's settings file keys and values, command-line switches and `mvr_*` console commands, kept exactly as compatibility names; compatibility facts about tools that read the same settings file; user requirements (no shipped game archive or mod-derived UI data, v1 fixes, runtime values None / OpenVR / OpenXR, -vrscale is the world scale); user decisions for r3 and r4 (default runtime OpenVR in a fresh file; Oculus means OpenXR; runtime None is the unmodded game with the patch set decided at attach; skip intro only with the archive redirect; settings push also on loading-screen Open; no other mod named; own labels and texts); spec-side decisions for r5 (VR page hidden in the game-over menu; the game's Stereo Mode item greyed in VR; Camera Speed stays active; one rule for command values; -vrscale as a whole argument; no rewrite of the settings file at start-up; reads of values only earlier builds of this project wrote are dropped); answers to Q1, Q2, Q6 (ANSWERS.md); a tester's report on SteamVR with a Steam Frame headset (after an OpenXR failure the page offered no visible way back to SteamVR); project decision of spec r6, with its reason inline (the runtime control shows the runtime running in this session; the stored preference is kept); project decisions of spec r7, each with its reason inline (the settings file is replaced in one step, never left partly written; a leading UTF-8 byte-order mark is accepted when reading; a null command name passes to the stock handler; the welcome needs a run on which the mod is active; added acceptance checks for command values, the display-reset flag under runtime None, settings changes crossing threads, `-vrscale` parsing and skip intro without the options archive); r7 aligns this document with 01 r6 (no settings read in a process that is not the game; the welcome rule's source) and points to the v2 keys of 20 to 24 and their master switch. 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. Revision: r7 -->
+<!-- Provenance: game analysis of AI.exe 2015 (UI external-call handler and its return size, script invoke methods and their return sizes, menu Open methods, bootup movie call, quit flag getter, display-reset flag, settings handlers named in 02); the stock game's ActionScript menu classes from the player's own UI.PAK (item constructors, option setters, item data replacement, automatic ids, page maps, input-mapper selection, slider snapping); the earlier mod's settings file keys and values, command-line switches and `mvr_*` console commands, kept exactly as compatibility names; compatibility facts about tools that read the same settings file; user requirements (no shipped game archive or mod-derived UI data, v1 fixes, runtime values None / OpenVR / OpenXR, -vrscale is the world scale); user decisions for r3 and r4 (default runtime OpenVR in a fresh file; Oculus means OpenXR; runtime None is the unmodded game with the patch set decided at attach; skip intro only with the archive redirect; settings push also on loading-screen Open; no other mod named); spec-side decisions for r5 (VR page hidden in the game-over menu; the game's Stereo Mode item greyed in VR; Camera Speed stays active; one rule for command values; -vrscale as a whole argument; no rewrite of the settings file at start-up; reads of values only earlier builds of this project wrote are dropped); answers to Q1, Q2, Q6 (ANSWERS.md); a tester's report on SteamVR with a Steam Frame headset (after an OpenXR failure the page offered no visible way back to SteamVR); project decision of spec r6, with its reason inline (the runtime control shows the runtime running in this session; the stored preference is kept); project decisions of spec r7, each with its reason inline (the settings file is replaced in one step, never left partly written; a leading UTF-8 byte-order mark is accepted when reading; a null command name passes to the stock handler; the welcome needs a run on which the mod is active; added acceptance checks for command values, the display-reset flag under runtime None, settings changes crossing threads, `-vrscale` parsing and skip intro without the options archive); r7 aligns this document with 01 r6 (no settings read in a process that is not the game; the welcome rule's source) and points to the v2 keys of 20 to 24 and their master switch; r8 (CLEANROOM r3, what a player sees may be stated exactly): what players of the earlier mod saw on its options page (the place of the page in Options, its sub-pages, item order, labels, control kinds, value names, description lines, the greying of its entries and the hiding of the button of the runtime in use), given exactly where this project's behaviour is unchanged, and, each with its reason, the project's own texts where it changed (`Use OpenXR` and `OpenXR` for value 1, a description line for `Pixel Scale`) and the welcome's content by reference to 13's exact text; the r4 decision that labels are the implementation's own wording is withdrawn; also in r8: the control kinds tied to the game's own item kinds, no confirmation prompt on a runtime button, the `Pixel Scale` display format, the front-end greying of the Video items stated as a change with its reason, acceptance checks naming the labels (1, 2, 6, 10 to 13, 18, 20) and a new check of the page's layout (24), and open questions on the letter case of literal labels, the fit of the `Pixel Scale` description line and the sub-page titles. 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. Revision: r8 -->
 
 # 06 Options and config
 
@@ -17,8 +17,9 @@ the Steam 2015 `AI.exe` (PE timestamp 0x54E3199D). 2020 values were taken
 from the earlier mod's per-build address table (and, for inline sites, its
 installer) and have not been verified against a 2020 `AI.exe`.
 
-Settings are named by their `mothervr.json` key throughout. Menu labels are
-the implementation's own wording.
+Settings are named by their `mothervr.json` key throughout. The labels,
+value names and description lines a player sees for them are given exactly
+in section 5.
 
 ## 1. Settings
 
@@ -64,9 +65,10 @@ implementation treats them as unknown keys and keeps them on save (3.2).
 
 The pixel scale multiplies the per-eye size the runtime already recommends,
 and that size already includes SteamVR's own resolution setting (03 §10).
-Wherever the page or the player guide shows the pixel scale, it must say
-so and recommend 1.0 with the runtime's own resolution setting as the way
-to change resolution, because 1.5 renders 2.25 times the pixels.
+The page's description line for `Pixel Scale` (5.2) and the player guide
+(13 §8) say so and recommend 1 with the runtime's own resolution setting
+as the way to change resolution, because 1.5 renders 2.25 times the
+pixels.
 
 ### 1.1 Runtime values and the runtime that is started
 
@@ -109,7 +111,7 @@ The availability of each runtime, the preferred one (and whether it was
 forced) and the one chosen are logged (11 §2.3). If the chosen runtime then
 fails to start, the player is told once and the game runs without VR (00
 §2.8, 03, 09). Neither a fallback nor a failure changes the stored
-`VRRuntime`; the runtime control of the options page shows the runtime
+`VRRuntime`; `VR Runtime Set` on the options page shows the runtime
 running in this session (5.2).
 
 ### 1.2 Value ranges
@@ -131,7 +133,8 @@ commands (4.2) yield only listed values.
 
 ### 1.3 `DebugOptions`
 
-`DebugOptions` (a control on the VR page) does two things:
+`DebugOptions` (the toggle `Dev. Debug Options` on the `MotherVR` page,
+5.2) does two things:
 
 - UI: shows the game's hidden "Select Level" and "Trigger Debug Checkpoint"
   entries (5.5).
@@ -193,9 +196,10 @@ on the command line pauses or stops the mod while the DLL attaches.
 - **First launch** (the file does not exist; an error while checking for it
   does not count as "does not exist"): the defaults are used and, on a run
   where the mod is active (the build is recognised and the core checks of
-  01 §2.5.1 passed; 01 §2.4), the welcome message is queued. Its content
-  (13 §5.3): the mod is active, the default runtime is SteamVR, and how to change the
-  runtime. The message is never shown under the loader lock, appears in
+  01 §2.5.1 passed; 01 §2.4), the welcome message is queued. Its exact
+  text is in 13 §5.3: it greets the player, says that VR starts with
+  SteamVR, and says that OpenXR is chosen, or VR turned off, on the
+  `MotherVR` page of Options. The message is never shown under the loader lock, appears in
   front of the game window, and the game's device creation does not
   complete until it is closed (01 §2.2, 13 §5.2). **The file is written with the defaults
   only after the player closes the message**, because a process that
@@ -527,25 +531,63 @@ answers is the configured size.
 
 ## 5. The options page
 
-What the page must offer and how it must behave. Labels, descriptions,
-help texts, grouping and visual layout are the implementation's own; only
-strings the game itself contains are named. The game's menu classes it is
-built with are in section 7.
+What the player sees on the page and how it behaves. Players of the earlier
+mod know this page: its place in Options, its sub-pages, the order of its
+items, their labels, control kinds, value names and description lines are
+kept exactly where this project's behaviour is unchanged, so that those
+players and their guides still find every setting (project decision, 00
+§2.6). Where the behaviour changed, the project's own text is given with
+its reason. The game's menu classes the page is built with are in
+section 7.
+
+How texts are written here: every label, value name and description line
+is given in a code span, exactly as the page shows it, letter case,
+punctuation and spaces included. Inside a longer text the name `MotherVR`
+is written as a code span of its own (the spec's lint accepts the name only
+so); the page shows it as plain text, so "Adjust `MotherVR` settings" is
+shown as one line of plain text. Labels are literal English strings, as
+the stock "Select Level" and "Trigger Debug Checkpoint" items use (7.2), so
+no localisation entry is added (14 §2.8). How the game's menu font renders
+their letter case is the game's own (section 9).
+
+**Control kinds.** Every control is one of the game's own menu item kinds
+(7.2), so it looks and behaves exactly like a stock item of that kind; no
+new layout, headers, dividers or images are added, and every page is the
+game's standard vertical list in the same frame as the stock Options pages.
+
+| Kind | Game item (7.2) | What the player sees |
+|---|---|---|
+| sub-page entry | `MenuItemExpandable` | a line that opens a page, like the stock Game, Video and Audio entries of Options |
+| toggle | `MenuItemOptionCheckBox` | the game's on/off item |
+| list | `MenuItemOptionOptionStepper` | the game's stepper: left and right step through the named values |
+| slider | `MenuItemOptionSlider`, value shown | the game's slider bar with the number beside it |
+| button | `MenuItem` | a plain line that acts when chosen |
+| help row | `MenuItemOptionInputMapper` | a two-column row like those of the game's input-mapping page |
+
+Each sub-page shows the label of the entry that opened it as its title, as
+the stock pages do [likely: the game's own behaviour for its expandable
+entries; not checked in game for the new pages].
+
+A description line is the game's line of help text shown under the menu
+while an item is highlighted (the item's `description`, 7.2). "None" in the
+tables below means the item has no description line.
 
 ### 5.1 Where it appears
 
-One new expandable entry (the VR page), titled `MotherVR` (the title
-players know, a user decision), is added to the game's **Options** page,
-after the stock Game, Video and Audio entries. Why there: the Options page
-is the one page all three menus share through `GameMenu` (7.1).
+One new sub-page entry, labelled `MotherVR` (the title players know, a
+user decision), is the **fourth entry** of the game's **Options** page,
+directly after the stock Game, Video and Audio entries. Its description
+line is "Adjust `MotherVR` settings" (no full stop). Why there: the
+Options page is the one page all three menus share through `GameMenu`
+(7.1), and players of the earlier mod found the page in that place.
 
-- **Front end and pause menu:** the VR page is visible once a push has
-  reached the movie (4.4), so a movie whose DLL is not the mod never shows
-  it.
-- **Game-over menu:** the VR page is hidden (spec-side decision r5: that
-  menu receives no push, 4.4, so it could only show values that may be
-  wrong; the same settings are reachable from the front end and the pause
-  menu).
+- **Front end and pause menu:** the `MotherVR` entry is visible once a
+  push has reached the movie (4.4), so a movie whose DLL is not the mod
+  never shows it.
+- **Game-over menu:** the `MotherVR` entry is hidden (spec-side decision
+  r5: that menu receives no push, 4.4, so it could only show values that
+  may be wrong; the same settings are reachable from the front end and the
+  pause menu).
 
 Stock ids (game facts in 7.3):
 
@@ -555,86 +597,156 @@ Stock ids (game facts in 7.3):
   is moved. Pages and rows the game never addresses by automatic id (a
   root page whose id is replaced at once, rows created at run time) are
   exempt; 14 §2.7.2 gives the exact facts.
-- Every VR page is attached before the movie assigns `menu.rootPage`,
+- Every new page is attached before the movie assigns `menu.rootPage`,
   because the game finds pages and items (to restore a page with
   `setCurrentPage`, or to show, hide or enable an item by id) only through
   the maps built at that assignment.
 - In the front end the Options page also holds the storage-device item,
-  which `NewFrontendMenu` appends after the `GameMenu` items; whether the VR
-  entry comes before or after it is the implementation's choice, because
-  the game addresses that item by its fixed id (`SELECT_STORAGE_DEVICE`),
-  not by position.
+  which `NewFrontendMenu` appends after the `GameMenu` items (7.3); the
+  `MotherVR` entry comes before it, directly after Audio. The game
+  addresses that item by its fixed id (`SELECT_STORAGE_DEVICE`), not by
+  position, so this order changes nothing for the game.
 
-### 5.2 Controls
+### 5.2 Pages and controls
 
-The page offers one control per setting below.
+Items are listed in the order the page shows them, top to bottom. "Sends"
+is the command of 4.2 sent when the player changes the control or chooses
+the item.
 
-| Setting | What the control must do | Command sent on change (4.2) |
-|---|---|---|
-| `VRRuntime` | show the runtime running in this session (None, OpenXR, OpenVR, which players know as SteamVR; see below) and let the player choose another; choosing one quits the game (4.5), so the page makes that clear before the choice takes effect | `mvr_vrruntime 0` / `1` / `2` |
-| `Rendering.MirrorViewType` | choose both eyes, right eye or left eye | `mvr_mirrorview <0..2>` |
-| `Rendering.SymmetricMirrorView` | on/off | `mvr_mirrorviewsym <0/1>` |
-| `Rendering.PixelScale` | choose a value from 0.5 to 4.0 in multiples of 0.1 and show the current value with one decimal | `mvr_pixelscale <value>` |
-| `Rendering.ClippingBlinders` | on/off | `mvr_clipblinding <0/1>` |
-| `Input.SnapRotation` | on/off | `mvr_snaprotation <0/1>` |
-| `Input.SnapRotationSegments` | choose 24, 12, 6, 4, 3 or 2 (the step angle is 360/n degrees; showing it is the implementation's choice) | `mvr_snaprotationsegments <n>` |
-| `Input.ToggleGrips` | on/off | `mvr_togglegrips <0/1>` |
-| `DebugOptions` | on/off | `mvr_debug <0/1>` |
-| `SkipStartupIntro` | on/off | `mvr_skipintro <0/1>` |
-| Controls help | a read-only list of the pushed (action, control) rows (4.3); which rows exist, including before a controller set is chosen, is 04 §5.7's | none |
+**Page `MotherVR`** (opened by the `MotherVR` entry of Options):
+
+| # | Label | Kind | Values shown | Description line | Setting | Sends |
+|---|---|---|---|---|---|---|
+| 1 | `VR Runtime` | sub-page entry | | none | | |
+| 2 | `Rendering` | sub-page entry | | none | | |
+| 3 | `Input` | sub-page entry | | none | | |
+| 4 | `Dev. Debug Options` | toggle | on / off | none | `DebugOptions` | `mvr_debug <0/1>` |
+| 5 | `Skip Startup Intro` | toggle | on / off | none | `SkipStartupIntro` | `mvr_skipintro <0/1>` |
+
+**Page `VR Runtime`:**
+
+| # | Label | Kind | Values shown | Description line | Setting | Sends |
+|---|---|---|---|---|---|---|
+| 1 | `VR Runtime Set` | list, always greyed | `None` (0), `OpenXR` (1), `SteamVR` (2): the runtime running in this session (below) | none | `VRRuntime` (shown, not edited here) | nothing |
+| 2 | `Use OpenXR` | button | | `Requires restart! Selecting this will exit the game.` | `VRRuntime` OpenXR | `mvr_vrruntime 1` |
+| 3 | `Use SteamVR` | button | | `Requires restart! Selecting this will exit the game.` | `VRRuntime` OpenVR | `mvr_vrruntime 2` |
+| 4 | `Disable VR` | button | | `Requires restart! Selecting this will exit the game.` | `VRRuntime` None | `mvr_vrruntime 0` |
+
+- The button of the runtime that `VR Runtime Set` shows is hidden: with
+  `None` there is no `Disable VR`, with `OpenXR` no `Use OpenXR`, with
+  `SteamVR` no `Use SteamVR`. The other two are shown, so the player can
+  always choose another runtime, or choose the stored one again after a
+  failed start (4.2).
+- Choosing a button stores the choice and the game **exits at once**
+  (4.5); there is **no confirmation prompt**. The description line is the
+  warning, and it is shown on each button before it is chosen.
+- Project change: `Use OpenXR` and the value `OpenXR` take the place of the
+  `Use Oculus` button and the `Oculus` value players knew, in the same
+  places. Reason: value 1 selects OpenXR in v1 (1.1, ANSWERS Q2), and a
+  label naming Oculus would name a runtime v1 does not drive. Every other
+  label and text of this page is unchanged.
+
+**Page `Rendering`:**
+
+| # | Label | Kind | Values shown | Description line | Setting | Sends |
+|---|---|---|---|---|---|---|
+| 1 | `Mirror View` | list | `Both Eyes` (0), `Right Eye` (1), `Left Eye` (2) | none | `Rendering.MirrorViewType` | `mvr_mirrorview <0..2>` |
+| 2 | `Mirror View Symmetry` | toggle | on / off | none | `Rendering.SymmetricMirrorView` | `mvr_mirrorviewsym <0/1>` |
+| 3 | `Pixel Scale` | slider from 0.5 to 4 in steps of 0.1 | the number beside the bar (below) | the project's text below | `Rendering.PixelScale` | `mvr_pixelscale <value>` |
+| 4 | `Clip Blinding` | toggle | on / off | none | `Rendering.ClippingBlinders` | `mvr_clipblinding <0/1>` |
+
+The description line of `Pixel Scale` is the project's own (players of
+the earlier mod saw none there):
+
+`Multiplies the resolution set in SteamVR or your OpenXR runtime. Keep 1 and change resolution there: 1.5 renders 2.25 times the pixels.`
+
+Reason: the runtime's recommended size already includes SteamVR's own
+resolution setting (1, 03 §10), so raising both multiplies the cost, and
+03 §10 requires the page to say so and to recommend 1.
+
+**Page `Input`:**
+
+| # | Label | Kind | Values shown | Description line | Setting | Sends |
+|---|---|---|---|---|---|---|
+| 1 | `View Controls` | sub-page entry, opens the controls help | | none | | |
+| 2 | `Snap Rotation` | toggle | on / off | none | `Input.SnapRotation` | `mvr_snaprotation <0/1>` |
+| 3 | `Snap Rotation Segments` | list | `24 (15°)`, `12 (30°)`, `6 (60°)`, `4 (90°)`, `3 (120°)`, `2 (180°)`, in this order | none | `Input.SnapRotationSegments` | `mvr_snaprotationsegments <n>` |
+| 4 | `Toggle Aim/Motion Sensor` | toggle | on / off | none | `Input.ToggleGrips` | `mvr_togglegrips <0/1>` |
+
+Each `Snap Rotation Segments` value is the number of segments n followed
+by a space and, in brackets, the step angle 360/n with the degree sign
+(U+00B0) and no space before it.
 
 `Input.VRInputRelativeWalking`, `Input.VRInputStrafing` and
 `Input.ToggleCrouch` have no effect in v1 and get no visible control (their
-commands and pushes stay valid).
+commands and pushes stay valid). Players of the earlier mod did not see
+them either.
 
-**The runtime control shows the runtime running in this session**, or
-None when VR is off, not the stored preference (project decision of spec
-r6):
+**Page `View Controls`:** a read-only list of help rows, one per pushed
+(action, control) pair (4.3), the action in the left column and the
+control in the right. Which rows exist, their exact texts and their order,
+including before a controller set is chosen, are 04 §5.7's. The page has
+no other item.
 
-| This run | Runtime shown |
+**The runtime shown is the runtime running in this session**, or `None`
+when VR is off, not the stored preference (project decision of spec r6):
+
+| This run | `VR Runtime Set` shows |
 |---|---|
 | the stored or forced runtime started | that runtime |
 | the preferred runtime was not available and another one started (1.1) | the one that started |
-| the chosen runtime failed to start, or failed later and detached (01 §5.3, 09 §7) | None |
-| no runtime chosen (None stored or forced, or nothing available) | None |
+| the chosen runtime failed to start, or failed later and detached (01 §5.3, 09 §7) | `None` |
+| no runtime chosen (None stored or forced, or nothing available) | `None` |
 
 The stored `VRRuntime` is not rewritten by any of these, so the next
 launch tries the stored preference again. Reason: after a failed start
 the player must see that VR is off, and must be able both to try the
 stored runtime again (by choosing it, which restarts the game) and to
 switch to the other runtime; a control that kept showing the stored
-runtime would suggest it is running and could not offer it as a choice.
-Choosing any value other than the one shown stores it and quits (4.2,
-4.5), the stored value included.
+runtime would suggest it is running, and its button would be hidden.
+Choosing any visible button stores its value and quits (4.2, 4.5), the
+stored value included.
 
 Values and sending:
 
-- On/off sends 1 or 0; a choice sends the integer value, not a label.
-- Pixel scale: the 0.1 step applies from the control's first use, so the
-  player never reaches a value between steps. A pushed value (a 32-bit
-  float, 4.3) is shown and sent rounded to one decimal, so 1.1 shows as
-  `1.1`. It is sent as a decimal string that 4.2 reads as the shown value
-  (for example `1.5`).
+- On/off sends 1 or 0; a list sends the integer value of the chosen
+  entry, not its label.
+- `Pixel Scale` shows its value rounded to one decimal, as a plain decimal
+  number with no unit and no trailing zero: `0.5`, `1`, `1.1`, `2.5`, `4`.
+  (Game fact: the slider shows `String(value)`, 7.2, so a value rounded to
+  one decimal shows exactly so; an unrounded pushed float would show as
+  `1.100000023841858`, 4.3.) A pushed value is rounded before it is shown,
+  and the value sent is the shown one, as a decimal string that 4.2 reads
+  as that value (for example `1.5`). The 0.1 step applies from the
+  control's first use, so the player never reaches a value between steps.
 - A control sends only when the player changes it, never when a pushed
   value sets it (game fact on the stock setters: 7.2). Each handler is
   added to its control once.
-- Controls-help rows cannot be selected: pressing one changes nothing and
-  does not enter the stock input-mapping selection, and the rows do not
-  register with the game's input-mapping table (7.2).
+- Help rows cannot be selected: pressing one changes nothing and does not
+  enter the stock input-mapping selection, and the rows do not register
+  with the game's input-mapping table (7.2).
 
 ### 5.3 State rules
 
-- With VR running false, the rendering and input controls are disabled;
-  the runtime control stays usable.
-- In the **pause menu** the runtime cannot be changed: changing it quits
-  the game, which must not happen in the middle of a level.
-- While VR is running, the stock Video items below are disabled; with VR
+- With VR running false, the `Rendering` and `Input` entries of the
+  `MotherVR` page are greyed, so their pages cannot be opened; the
+  `VR Runtime` entry, `Dev. Debug Options` and `Skip Startup Intro` stay
+  usable.
+- `VR Runtime Set` is always greyed: it shows the runtime, and the buttons
+  below it change it.
+- In the **pause menu** the `VR Runtime` entry is greyed, so the runtime
+  cannot be changed there: changing it quits the game, which must not
+  happen in the middle of a level.
+- While VR is running, the stock Video items below are greyed; with VR
   not running they are enabled. The rule holds whenever the Video page is
   shown, including after the game has replaced an item's data (7.5:
   replacing it resets `enabled`) and after the advanced Video options are
   shown or hidden. It applies in the menus that receive a push (front end
   and pause menu). The game-over menu has no VR-running state, so its Video
-  items stay as in the stock game (section 9).
+  items stay as in the stock game (section 9). The items keep the game's
+  own labels. Players of the earlier mod saw these items greyed in the
+  pause menu only; v1 greys them in the front end too, because they have
+  no effect, or do harm, in VR in either menu.
 
 | Item (7.5) | Why it is disabled in VR |
 |---|---|
@@ -674,8 +786,8 @@ Required:
   visible exactly when `DebugOptions` is on, and "Trigger Debug
   Checkpoint" is hidden.
 - Pause menu: "Trigger Debug Checkpoint" is visible exactly when
-  `DebugOptions` is on, from the push onwards and whenever the control
-  changes.
+  `DebugOptions` is on, from the push onwards and whenever the player
+  changes `Dev. Debug Options`.
 - Game-over menu: "Trigger Debug Checkpoint" stays hidden as in the stock
   game (no push, 4.4).
 
@@ -862,18 +974,18 @@ in 14 with their reasons in 04 and 05.
 Checks that show an implementation is correct. "Log" means `mothervr.log`
 (11).
 
-1. Delete `mothervr.json` and start the game: the welcome message appears
-   before the game renders; after it is closed, `mothervr.json` exists and
+1. Delete `mothervr.json` and start the game: the welcome message of
+   13 §5.3 appears before the game renders; after it is closed, `mothervr.json` exists and
    parses to the 3.2 content (`VRRuntime` `"OpenVR"`). Kill the game
    before closing the message on a fresh install: no file is written, and
    the next start shows the message again.
 2. Put `"Oculus"` in `VRRuntime` with a 32-bit OpenXR runtime installed:
-   the log shows the preference OpenXR and the OpenXR backend starts; the
-   page shows the runtime as OpenXR; the file still says `"Oculus"` until a
+   the log shows the preference OpenXR and the OpenXR backend starts;
+   `VR Runtime Set` shows `OpenXR` and `Use OpenXR` is hidden; the file still says `"Oculus"` until a
    menu change, then says `"OpenXR"`. `-vrforceoculus` behaves as
    `-vrforceopenxr`.
 2a. Runtime None (in the file or by `-vrforcenone`): the game runs exactly
-   as unmodded except for the VR page in Options (and skip intro when on);
+   as unmodded except for the `MotherVR` entry in Options (and skip intro when on);
    the log shows the UI-only patch set.
 3. Start with `-vrforceopenxr` on a machine with no 32-bit OpenXR runtime:
    the log shows OpenXR preferred, forced, and chosen None; the game runs
@@ -890,7 +1002,8 @@ Checks that show an implementation is correct. "Log" means `mothervr.log`
    unknown argument such as `-foo` changes nothing.
 6. Hand-edit `PixelScale` to 9, `SnapRotationSegments` to 5 and add
    `"Foo": 1` at the root and `"Bar": 2` inside `Input`: the log's settings
-   entry shows pixel scale 1; the menu shows 1.0 and 4 segments; after
+   entry shows pixel scale 1; `Pixel Scale` shows `1` and
+   `Snap Rotation Segments` shows `4 (90°)`; after
    changing any option the file has `PixelScale` 1.0,
    `SnapRotationSegments` 4, and still has `Foo` and `Input.Bar`.
 7. Start the game with a hand-edited file (any valid content, including a
@@ -901,21 +1014,25 @@ Checks that show an implementation is correct. "Log" means `mothervr.log`
 9. Change the pixel scale in the menu during gameplay: one short freeze, the
    headset image sharpness changes at once, the log shows a new
    render-target size (03). Re-select the same value: no freeze. Open and
-   close the VR page several times without changing anything: no freeze.
-10. Choose OpenXR on the front end's VR page: the game exits at once and
-    the file says `"OpenXR"`; in the pause menu the runtime cannot be
-    changed.
-11. Turn clipping blinders off in the pause menu and push the head into a
+   close the `MotherVR` page several times without changing anything: no freeze.
+10. Choose `Use OpenXR` on the front end's `VR Runtime` page: the game
+    exits at once, with no confirmation prompt, and the file says
+    `"OpenXR"`; before it is chosen its description line reads
+    `Requires restart! Selecting this will exit the game.`. In the pause
+    menu the `VR Runtime` entry is greyed.
+11. Turn `Clip Blinding` off in the pause menu and push the head into a
     wall: no blackout, without leaving the menu or restarting.
 12. With runtime None, or a runtime that failed to start, Options shows
-    the VR page with the runtime None, its rendering and input controls are
-    greyed, and the runtime can still be changed in the front end. After an
-    OpenXR failure, `mothervr.json` still says `"OpenXR"`; choosing OpenXR
-    on the page quits and the next launch tries OpenXR again, choosing
-    SteamVR quits and the next launch runs OpenVR. With `"OpenXR"` stored
-    and no usable OpenXR runtime (fallback to OpenVR), the page shows
-    OpenVR.
-13. `DebugOptions` on: the front-end Campaign page shows Select Level;
+    the `MotherVR` entry; `VR Runtime Set` shows `None`, `Disable VR` is
+    hidden, `Use OpenXR` and `Use SteamVR` are shown, the `Rendering` and
+    `Input` entries are greyed, and the runtime can still be changed in the
+    front end. After an OpenXR failure, `mothervr.json` still says
+    `"OpenXR"`; choosing `Use OpenXR` quits and the next launch tries
+    OpenXR again, choosing `Use SteamVR` quits and the next launch runs
+    OpenVR. With `"OpenXR"` stored and no usable OpenXR runtime (fallback
+    to OpenVR), `VR Runtime Set` shows `SteamVR` and `Use SteamVR` is
+    hidden.
+13. `Dev. Debug Options` on: the front-end Campaign page shows Select Level;
     Load Game shows Trigger Debug Checkpoint in the pause menu; off hides
     both; the log gains the gated diagnostics (1.3).
 14. `SkipStartupIntro` on, restart: the title screen appears without the
@@ -937,13 +1054,15 @@ Checks that show an implementation is correct. "Log" means `mothervr.log`
     eight items of 5.3 are greyed, also after showing and hiding the
     advanced options; Camera Speed on the Game page is not greyed. With
     runtime None they are all enabled.
-18. Die in game: the game-over menu's Options page has no VR page.
+18. Die in game: the game-over menu's Options page has no `MotherVR`
+    entry.
 19. With the logging of game script events (11 §5) on, visit every stock
     page of all three menus with the stock archive and then with
     `MOTHER.PAK`: the `on_page_changed` ids are identical.
-20. With runtime None, change the pixel scale and the mirror settings on
-    the front end's VR page: no freeze, and the log shows no render-target
-    rebuild (4.6).
+20. With runtime None the `Rendering` entry is greyed (5.3); a test page
+    or tool that sends `mvr_pixelscale 2` and `mvr_mirrorview 0` through
+    the external-call handler (4.1) causes no freeze, and the log shows no
+    render-target rebuild (4.6).
 21. During gameplay in VR, change the pixel scale, the mirror view, snap
     rotation segments and clipping blinders from the pause menu twenty
     times in a row: each change is in effect from the first frame after it,
@@ -955,6 +1074,14 @@ Checks that show an implementation is correct. "Log" means `mothervr.log`
 23. End the game process (Task Manager) right after changing a setting,
     several times: `mothervr.json` always parses and holds either the
     previous or the new settings.
+24. Open Options in the front end and in the pause menu: `MotherVR` is
+    the fourth entry, after Game, Video and Audio, with the description
+    line "Adjust `MotherVR` settings". Its pages show exactly the items,
+    order, labels, kinds, value names and description lines of 5.2;
+    `Snap Rotation Segments` steps through `24 (15°)` to `2 (180°)`;
+    `Pixel Scale` moves in steps of 0.1 from its first use and shows
+    `1`, `1.1`, ..., `4`, never a long fraction; `View Controls` lists the
+    rows of 04 §5.7.
 
 ## 9. Open questions
 
@@ -974,3 +1101,12 @@ Checks that show an implementation is correct. "Log" means `mothervr.log`
 - 2020 build: the `ShowBootup` string RVA, the movie-invoke method and the
   quit-flag setter are not listed; read the first from the push operand
   (section 6); the other two are not needed.
+- How the game's menu font renders the literal labels of 5.2 (as written,
+  or in capitals like some stock labels); the labels are given as written.
+  Check in game with the project's page.
+- Whether the description line of `Pixel Scale` (5.2) fits the game's
+  description area, which may wrap or cut a long line. Check in game at
+  720p and 1080p; if it is cut, the project shortens the text and keeps
+  its two facts (a multiplier of the runtime's resolution, 1 recommended).
+- Whether each new sub-page shows its entry's label as its title, as 5
+  expects [likely]; seen for the stock pages only.

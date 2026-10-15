@@ -1,4 +1,4 @@
-<!-- Provenance: user decision (the project's own log format of section 1, modelled on the Serilog file sink: output template, levels, source contexts, message templates, session start events, rotation; a project design, not taken from any mod); project decisions of this revision (every message template of sections 1 and 2 written fresh by the spec side from its "must convey" list; the outcome table of the event tap; the bounds of section 3), each with its reason inline; user requirements (the log is what players send with bug reports; no per-frame render-thread logging; the DebugOptions diagnostics; the mod never needs elevation); observation in game of test builds (which facts testers needed from a log across runs with OpenVR and OpenXR on SteamVR with Index; measured cost of opening the log per line on the render thread; a frame loop that rendered with views one display period old); AI.exe 2015 analysis (the script event tap: bytes and call-site count checked against the Steam 2015 binary, PE timestamp 0x54E3199D; the game's own event strings); public Win32, DXGI, OpenVR, OpenXR and Serilog documentation; AI.exe 2015 analysis by the spec side for r3 (ScriptEventTap's address also in five pointer-table slots of .rdata); the OpenXR registry (symbolic XrResult names); a tester's report on SteamVR with a Steam Frame headset (an OpenXR failure with an empty result text, the game not shown in the headset, focus taken by other applications, a view sliding after snap-turn steps, a crash in the pause menu with nothing in the log); project decisions of r3, each with its reason inline (the crash record; the image-range guard of the event tap; the stereo-mode, frame-kind and snap-turn diagnostics; the new required events and their templates, written fresh by the spec side); AI.exe 2015 analysis by the spec side for r4 (the C runtime's own unhandled-exception filter installed by its start-up after DLL attach and its two reporting paths; the padding after ScriptEventTap; the first-person camera's character position and Head1 bone position fields); project decisions of r4, each with its reason inline (the crash record's content as an unordered list, its filter installed again after the game's C runtime starts, a bounded stack use for a stack overflow; the snap trace written fresh from its must-convey list and ended when the view settles, at most 1 s; templates rechecked against their must-convey lists; the OpenXR loss and desktop mirror failure events; acceptance checks for required events); project decisions of r5 (spec r7 cross-check), each with its reason inline (the event for a process that is not the game; the event for a message that could not be shown; the OpenVR interface versions and the OpenVR start-up failures that are not runtime errors; the stereo device creation called once by the game; the settings write leaving the previous file complete; the head-in-wall contact diagnostic; section 5 named the logging of game script events; corrected cross-references to 07 and 13). Revision: r5 -->
+<!-- Provenance: user decision (the project's own log format of section 1, modelled on the Serilog file sink: output template, levels, source contexts, message templates, session start events, rotation; a project design, not taken from any mod); project decisions of this revision (every message template of sections 1 and 2 written fresh by the spec side from its "must convey" list; the outcome table of the event tap; the bounds of section 3), each with its reason inline; user requirements (the log is what players send with bug reports; no per-frame render-thread logging; the DebugOptions diagnostics; the mod never needs elevation); observation in game of test builds (which facts testers needed from a log across runs with OpenVR and OpenXR on SteamVR with Index; measured cost of opening the log per line on the render thread; a frame loop that rendered with views one display period old); AI.exe 2015 analysis (the script event tap: bytes and call-site count checked against the Steam 2015 binary, PE timestamp 0x54E3199D; the game's own event strings); public Win32, DXGI, OpenVR, OpenXR and Serilog documentation; AI.exe 2015 analysis by the spec side for r3 (ScriptEventTap's address also in five pointer-table slots of .rdata); the OpenXR registry (symbolic XrResult names); a tester's report on SteamVR with a Steam Frame headset (an OpenXR failure with an empty result text, the game not shown in the headset, focus taken by other applications, a view sliding after snap-turn steps, a crash in the pause menu with nothing in the log); project decisions of r3, each with its reason inline (the crash record; the image-range guard of the event tap; the stereo-mode, frame-kind and snap-turn diagnostics; the new required events and their templates, written fresh by the spec side); AI.exe 2015 analysis by the spec side for r4 (the C runtime's own unhandled-exception filter installed by its start-up after DLL attach and its two reporting paths; the padding after ScriptEventTap; the first-person camera's character position and Head1 bone position fields); project decisions of r4, each with its reason inline (the crash record's content as an unordered list, its filter installed again after the game's C runtime starts, a bounded stack use for a stack overflow; the snap trace written fresh from its must-convey list and ended when the view settles, at most 1 s; templates rechecked against their must-convey lists; the OpenXR loss and desktop mirror failure events; acceptance checks for required events); project decisions of r5 (spec r7 cross-check), each with its reason inline (the event for a process that is not the game; the event for a message that could not be shown; the OpenVR interface versions and the OpenVR start-up failures that are not runtime errors; the stereo device creation called once by the game; the settings write leaving the previous file complete; the head-in-wall contact diagnostic; section 5 named the logging of game script events; corrected cross-references to 07 and 13); r6 (CLEANROOM r3, what a player sees may be stated exactly): the log stays this project's own format (user decision of spec r4; the earlier mod wrote no log file, so there is no earlier text to follow), messages to the player are logged with their exact text as 03, 09 and 13 give it, with fixed `Kind` values and a rule for line breaks, the undefined `XrResult` described as `unknown error` as the messages show it, and `DebugOptions` named also by the menu label a player sees. Section numbers are unchanged from r5. Revision: r6 -->
 
 # 11. Diagnostics
 
@@ -13,9 +13,14 @@ on its own (build, runtime, patch set, sizes, failures) must be visible
 there, once, so one log from a player is enough to tell which path the mod
 took.
 
-This document owns all log wording and format. The other documents say
-which events they need logged and what each must convey; the templates for
-those events are here (§2). A document that defers an event to this one
+This document owns all log wording and format. The log's format and
+templates are this project's own (user decision, ANSWERS spec r4: a
+familiar, parseable format the project controls). Unlike the message
+texts of 13 §5 and the menu texts of 06 §5, the log has no earlier wording
+a player knows (the earlier mod wrote no log file), so nothing here
+follows an earlier text. The other documents say which events they need
+logged and what each must convey; the templates for those events are here
+(§2). A document that defers an event to this one
 and is not listed in §2 is a gap in this document, not permission to
 invent a template elsewhere.
 
@@ -95,7 +100,7 @@ with these fields:
 | `ThreadName` | `main` (the game thread, which is also the thread that runs attach), `render` (the game's render thread), `job` (a game job thread), `mod` (a thread the mod itself created, if the implementation creates any), or `other`. The game thread's id is known at attach; the render thread's at the first stereo BeginFrame or the first `Present` of the game's swapchain (12 §2) |
 | `SourceContext` | `OpenMotherVR.<Area>`, Area from §1.6 |
 | `Message` | the event's message template (§2) rendered with `:lj` semantics: string values literal, without quotes; numbers in the invariant culture (dot as decimal separator, no group separators), with the precision the template gives; booleans `True` / `False` as Serilog renders them; other structured values (objects, arrays) as JSON |
-| `Exception` | empty, or, for an event caused by a Windows or runtime error, one further line, unindented, ending in a line end, that gives the kind of error (`HRESULT`, Win32 error, `EVRInitError`, `XrResult`), its value, and the system's or runtime's own description of it (`FormatMessageW`, `VR_GetVRInitErrorAsEnglishDescription`, `xrResultToString`), for example `HRESULT 0x887A0004: <system description>`. The description is never empty: for an `XrResult` with no instance to ask (a failure of `xrCreateInstance` or of a call before it, where `xrResultToString` cannot be used), it is the result's symbolic name from the OpenXR registry, for example `XR_ERROR_RUNTIME_UNAVAILABLE`, and a value the registry does not define is described by its number and a text saying that it is not a defined result (09 §7) |
+| `Exception` | empty, or, for an event caused by a Windows or runtime error, one further line, unindented, ending in a line end, that gives the kind of error (`HRESULT`, Win32 error, `EVRInitError`, `XrResult`), its value, and the system's or runtime's own description of it (`FormatMessageW`, `VR_GetVRInitErrorAsEnglishDescription`, `xrResultToString`), for example `HRESULT 0x887A0004: <system description>`. The description is never empty: for an `XrResult` with no instance to ask (a failure of `xrCreateInstance` or of a call before it, where `xrResultToString` cannot be used), it is the result's symbolic name from the OpenXR registry, for example `XR_ERROR_RUNTIME_UNAVAILABLE`, and a value the registry does not define is described as `unknown error`, the text 09 §7's message shows for it, after its number |
 
 Hex values are written as `0x` with uppercase digits; sizes as `WxH`;
 paths as plain text (literal strings); timestamps of `AI.exe` as `0x`
@@ -348,11 +353,22 @@ failed one.
 
 Every message the mod shows (13 §5) is also logged (`INF Load`, §2.1) with
 its full text and a `Kind` naming which message it is (and one that could
-not be shown, `WRN Load`, §2.1, with the same `Kind`): unsupported build,
-welcome, `UI.PAK` missing, UI archive unusable, runtime failed, audio
-failed, headset not showing the game. What each message conveys and when
-it appears are in 13 §5; the rules for showing the messages decided at
-attach are in 12 §2.4, and the timing of the others in 13 §5.2.
+not be shown, `WRN Load`, §2.1, with the same `Kind`). `Kind` is one of
+`unsupported build`, `welcome`, `UI.PAK missing`, `UI archive unusable`,
+`runtime failed`, `audio failed` and `headset not showing the game`
+(project decision: fixed values, so a log can be searched for a message
+whatever its text). `Text` is exactly the text the box shows (13 §5.3;
+03 §6.4 and §6.7 for SteamVR, 09 §3.1 and §7 for OpenXR), with its
+placeholders filled in as they were shown and a name the spec marks as a
+code span written as plain text, as the box shows it. Unlike other string values (§1.4), `Text` is rendered as a
+JSON string: in double quotes, with JSON's escapes, so a line break of the
+box is written as `\n` and a backslash (in a path) as `\\`. Why (project
+decision): the event stays on one line of the log and still parses with
+the template of §1.4 (acceptance 1), and a path in the text cannot be
+mistaken for a line break. The caption is not logged: it is the same
+for every message. What each message says and when it appears are in 13
+§5; the rules for showing the messages decided at attach are in 12 §2.4,
+and the timing of the others in 13 §5.2.
 
 ## 3. Rate rules
 
@@ -375,8 +391,10 @@ Job threads (the cull replacements) never log.
 
 ## 4. `DebugOptions` diagnostics
 
-`DebugOptions` (06 §1.3) gates the diagnostics below and every `VRB` and
-`DBG` event. It is read each time a diagnostic is due, so turning it on or
+`DebugOptions` (06 §1.3; on the options page it is the toggle
+`Dev. Debug Options` of the `MotherVR` page, 06 §5) gates the diagnostics
+below and every `VRB` and `DBG` event. It is read each time a diagnostic
+is due, so turning it on or
 off in the menu takes effect at once.
 
 ### 4.1 Pose age (OpenXR)
@@ -780,7 +798,9 @@ What a tester does with it:
    0x54E3199D, no failed-check `ERR`, and one outcome event per feature
    area of §2.1, each in place.
 6. Run a copy of `AI.exe` with an edited timestamp: the `FTL` unrecognised
-   build event, no feature-area event, and the message shown and logged.
+   build event, no feature-area event, and the unsupported-build message
+   (its first line `Exe check failed!`, 13 §5.3) shown and logged with
+   `Kind` `unsupported build` and the found timestamp in its text.
 7. With OpenVR: both availability events, the runtime decision with its
    reason, the session-opened event, the headset event with per-eye size
    and IPD, the stereo target event with megapixels, one controller event
@@ -790,7 +810,8 @@ What a tester does with it:
 8. Play 5 minutes with `DebugOptions` off: after start-up no event is
    written during steady gameplay except state changes (menus, resets,
    controller changes); no `VRB` or `DBG` event appears.
-9. Turn `DebugOptions` on in the menu: within about 10 s (900 frames at 90
+9. Turn `Dev. Debug Options` (`DebugOptions`) on in the menu: within
+   about 10 s (900 frames at 90
    Hz) a hand offsets event appears and repeats about every 10 s; with
    OpenXR a pose age event shows 900 on time. Moving the right controller
    from the chest to arm's length forward changes its z from about -0.3 to
@@ -851,7 +872,8 @@ What a tester does with it:
     the key, the value and the source, and one save event each; make
     `mothervr.json` read-only and change a setting: the save failure event
     with its Windows error. Every message shown appears once in the log
-    with its kind; the menu-push-unavailable event, where it applies,
+    with its kind and its exact text as a JSON string (§2.6);
+    the menu-push-unavailable event, where it applies,
     appears once per process, not at every push.
 20. Session start: the attach event carries the mod's version, the Windows
     build, the process kind and the runtime's source; the settings event

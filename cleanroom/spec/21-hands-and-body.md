@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. Revision: r3 -->
+<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. Revision: r4 -->
 
 # 21. Hands and body
 
@@ -28,7 +28,8 @@ without the check. Requirements that are design choices, not facts, are
 marked **[proposal]** with a one-line reason; the user confirms or changes
 them. Tuning numbers are proposals with their reasons. Settings are named by
 their `mothervr.json` key inside `Settings` (06 §1): `Hands.Enabled` is
-`Settings.Hands.Enabled`.
+`Settings.Hands.Enabled`. Text a player sees (the options page items of
+§15.3) is stated exactly, in code spans (CLEANROOM r3).
 
 ## 1. Summary
 
@@ -1130,10 +1131,49 @@ master key on gives the whole feature; the master keys default off (20
 
 ### 15.3 Options page and console
 
-Every key appears on the options page (06 §5, 14) where 20 §10 item 6
-puts v2 settings; the calibration is 22's command (22 §3.3, §12).
+Every key appears on the options page, on the `Hands` and `Body` pages of
+the `Enhanced Mode` page (22 §12.1, which also gives the rules every v2
+page follows: look, value display, description lines, greying and hidden
+items). The calibration is 22's (22 §3.3, §12.2). The labels, values and
+description lines below are exact; they are this project's texts, in the
+style of the v1 page players know (00 §2.6) [proposal for each text: it
+names the result the player gets, in the fewest words that fit the stock
+description length, 22 §12.1].
+
+`Hands`, in order:
+
+| # | Label | Kind | Values shown | Key | Description line | Greyed while |
+|---|---|---|---|---|---|---|
+| 1 | `Tracked Hands` | toggle | on / off | `Hands.Enabled` | `Your tracked hands are used in the game, as set below` | |
+| 2 | `Aim from Hand` | toggle | on / off | `Hands.AimFromHand` | `The weapon aims where your hand points, not where you look` | `Tracked Hands` off |
+| 3 | `Motion Tracker in Hand` | toggle | on / off | `Hands.TrackerInHand` | `Hold up the motion tracker in your left hand and look at it to read it` | `Tracked Hands` off |
+| 4 | `Flashlight Aim` | list | `Head`, `Left Hand`, `Right Hand` | `Hands.FlashlightAim` | `What the flashlight points with` | `Tracked Hands` off; shown greyed with `Not available yet` until §7.2's object is verified |
+| 5 | `Melee by Swing` | toggle | on / off | `Hands.MeleeByMotion` | `Swing your hand to strike with a melee weapon` | `Tracked Hands` off |
+| 6 | `Throw by Motion` | toggle | on / off | `Hands.ThrowByMotion` | `Thrown items fly with your hand's motion` | `Tracked Hands` off |
+| 7 | `Throw Strength` | slider | 0.5 to 2 in steps of 0.1 | `Hands.ThrowStrength` | `Multiplies the speed of your throws` | `Tracked Hands` or `Throw by Motion` off |
+| 8 | `Hand Smoothing` | slider | 0 to 1 in steps of 0.1 | `Hands.Smoothing` | `Steadies the hands. Higher values steady more but lag behind` | `Tracked Hands` off |
+| 9 | `Wrist Health` | toggle | on / off | `Hands.WristHealth` | `Turn your left wrist up to see your health` | |
+| 10 | `Haptics` | toggle | on / off | `Hands.Haptics.Enabled` | `Requires restart! Controllers vibrate for game events` | |
+| 11 | `Haptics Strength` | slider | 0 to 1 in steps of 0.1 | `Hands.Haptics.Strength` | `Strength of every vibration` | `Haptics` off |
+| 12 | `Vibrate on Game Rumble` | toggle | on / off | `Hands.Haptics.GameRumble` | `Vibrate whenever the game would rumble a gamepad` | `Haptics` off |
+| 13 | `Vibrate on Damage` | toggle | on / off | `Hands.Haptics.Damage` | `Vibrate when you are hurt` | `Haptics` off |
+| 14 | `Vibrate on Tracker Pings` | toggle | on / off | `Hands.Haptics.Tracker` | `A faint tick for each motion tracker ping` | `Haptics` off |
+| 15 | `Vibrate on Firing` | toggle | on / off | `Hands.Haptics.Firing` | `Vibrate your right hand when you fire` | `Haptics` off |
+| 16 | `Vibrate on Hacking` | toggle | on / off | `Hands.Haptics.Hacking` | `Vibrate when hacking or cutting starts and ends` | `Haptics` off |
+
+`Body`, in order:
+
+| # | Label | Kind | Values shown | Key | Description line | Greyed while |
+|---|---|---|---|---|---|---|
+| 1 | `Body` | list | `Full`, `Arms and Hands`, `Hands Only`, `None` | `Body.Visible` | `Which parts of your character's body you see` | |
+| 2 | `Eye Forward` | slider | -0.2 to 0.2 in steps of 0.01 | `Body.EyeForward` | `Moves your view forward (positive) or back from the body, in metres` | |
+| 3 | `Room-Scale` | toggle | on / off | `Body.RoomScale` | `Walking in your play space moves you in the game` | |
+| 4 | `Seated Eye Raise` | slider | -0.5 to 0.5 in steps of 0.05 | `Body.SeatedEyeRaise` | `Raises (positive) or lowers the view when seated, in metres` | `Play Mode` is `Standing` (22 §12.2) |
+| 5 | `Real Crouch` | toggle | on / off | `Body.RealCrouch` | `Crouch for real to crouch in the game. Needs Standing play and a calibration` | `Play Mode` is `Seated`, or no standing height is calibrated (22 §6.2) |
+
 Console commands in the `mvr_*` family for these keys are the
-implementation's choice of names; 06 §4 lists them in its next revision.
+implementation's choice of names (they are not compatibility names); 06
+§4 lists them in its next revision.
 
 ## 16. Inputs while hands are on
 
@@ -1294,6 +1334,9 @@ where a VRB line is needed.
     rumbles; with the dashboard open, nothing vibrates.
 18. All keys of §15 at their defaults: the log shows no v2 site checked or
     hooked and no added actions; behaviour equals v1 (20 §1.1).
+19. The `Hands` and `Body` pages show the labels, values, order and
+    description lines of §15.3; with `Tracked Hands` off, items 2 to 8 of
+    `Hands` are greyed; in seated play `Real Crouch` is greyed.
 
 ## 22. Open questions
 
@@ -1405,5 +1448,11 @@ Not made here; for the next revisions:
 - `11-diagnostics.md`: the events of 21 §18.
 - `12-threads-and-robustness.md` §2.2, §3.2: the job-thread work of 21 §17
   and the copy it reads; the audio-thread rumble values.
-- `13-distribution.md`: the message that standing mode needs calibration
-  (22 §6).
+- `13-distribution.md`: no new message box; that real crouch needs
+  standing play and a calibration is said by the `Real Crouch`
+  description and the calibration's texts on the options page (§15.3, 22
+  §12.2). The player guide lists the `Hands` and `Body` pages.
+- `04-input.md` §5.7: which controls help rows change while tracked hands
+  are on (for example `Aim` no longer on the right grip with
+  `Hands.AimFromHand`) is to be given with the inputs of §16 [open: the
+  rows follow once §16's ownership table is settled, 20 §10 item 1].

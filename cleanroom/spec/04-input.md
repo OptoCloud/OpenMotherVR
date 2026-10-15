@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its names, wording or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons. r5 (spec r6): a tester's report on SteamVR with a Steam Frame headset (input while another window has the desktop focus); project decision of spec r6, with its reason inline (the touchpad scheme's scaled move limited to length 1 as a vector). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the map's digital evaluation (binding flag bit 0x40 marks a composite reference; codes reach the pad methods zero-extended), of the stock ControlToName for codes above 0x17, and of the FollowBehavior fields (the yaw setter, the character's position and its head bone's position); the five pad slots as one patch, checked against their exact functions; the controls help as content, not a page, and its crossing between threads; prompts while the options archive is not in use; VR activity seen by every reader in a game frame; the remap's flag writes given their game reason; thresholds and the initial glyph mode given reasons; keyboard and mouse each read whenever their own device exists; the recenter chord re-armed by release alone; controller identification and the OpenXR actions stated as results; the structure offsets marked as 2015 facts. r7 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (FollowBehavior +0x1C0, +0x1CC and +0x248 are written by vtable slot 6 and the update, slot 8, not by OnActivate; the `Head1` transform is taken with a mode argument of 7); a repeated CreateDevice is not expected (02 §6.1); a set is chosen at stereo device creation for the controls help; the toggled grip states kept when an OpenXR session stops; only `EXITING` sets the game's exit flag (09 §3). Revision: r7 -->
+<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its internal names or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons. r5 (spec r6): a tester's report on SteamVR with a Steam Frame headset (input while another window has the desktop focus); project decision of spec r6, with its reason inline (the touchpad scheme's scaled move limited to length 1 as a vector). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the map's digital evaluation (binding flag bit 0x40 marks a composite reference; codes reach the pad methods zero-extended), of the stock ControlToName for codes above 0x17, and of the FollowBehavior fields (the yaw setter, the character's position and its head bone's position); the five pad slots as one patch, checked against their exact functions; the controls help as content, not a page, and its crossing between threads; prompts while the options archive is not in use; VR activity seen by every reader in a game frame; the remap's flag writes given their game reason; thresholds and the initial glyph mode given reasons; keyboard and mouse each read whenever their own device exists; the recenter chord re-armed by release alone; controller identification and the OpenXR actions stated as results; the structure offsets marked as 2015 facts. r7 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (FollowBehavior +0x1C0, +0x1CC and +0x248 are written by vtable slot 6 and the update, slot 8, not by OnActivate; the `Head1` transform is taken with a mode argument of 7); a repeated CreateDevice is not expected (02 §6.1); a set is chosen at stereo device creation for the controls help; the toggled grip states kept when an OpenXR session stops; only `EXITING` sets the game's exit flag (09 §3). r8 (CLEANROOM r3, what a player sees): what a player of the earlier mod saw, read by the spec side (the designs of its controller glyphs, the rows of its controls help, the labels of the toggle-grips and snap rotation options, the values of the segments list), stated exactly where v1 behaves the same; the Index row and the unbound glyph are project decisions, each with its reason inline; the controls help is empty until a set is chosen (project decision). Revision: r8 -->
 
 # 04 Input
 
@@ -556,6 +556,32 @@ prompt did not mean:
 - the menu button;
 - the right touchpad's centre, upper-half and lower-half click regions.
 
+What each glyph shows (these are the designs players of the earlier mod
+saw for the same controls; the project draws its own images to them, 14
+§2.9). Every glyph is 32 x 32 pixels with transparency, in the size and
+style of the game's own Xbox glyphs but without colour: the round glyphs
+are near-white (about 224 grey); the grip and stick-click glyphs are light
+grey shapes (about 192 grey) with black letters.
+
+| Control | Design |
+|---|---|
+| right lower face button | a white ring (a button outline) with a white capital A inside; the shape of the game's A glyph, uncoloured |
+| right upper face button | the same ring with a white capital B |
+| left lower face button | the same ring with a white capital X |
+| left upper face button | the same ring with a white capital Y |
+| right stick click | a light-grey thumbstick seen from the side (a cap on a stem) with a black `R` on it, and a grey triangle pointing down above it |
+| left grip | a light-grey tab, rounded on its left side and square on its right, with a black `LG`; the style of the game's LB glyph |
+| right grip | the mirror image: rounded on the right, with a black `RG` |
+| menu button | a white ring with three thick horizontal white bars inside (a "menu" icon) |
+| right touchpad, centre click | a thin white ring (the touchpad) with a white dot at its centre |
+| right touchpad, upper-half click | the thin white ring with its top quarter filled white, as a wedge whose point reaches the centre |
+| right touchpad, lower-half click | the same with the bottom quarter filled |
+| unbound | a thin white ring crossed by one white diagonal stroke from its upper right to its lower left (project decision: a "none" sign, unlike every bound glyph, so no player reads it as a control) |
+
+The touchpad wedges are the regions 5.1 decodes: a click counts as upper
+or lower half only when it is not horizontal and not in the centre zone,
+which is the top or bottom quarter of the pad seen as four wedges.
+
 More glyphs may be provided. Glyph ids and image names are the
 implementation's choice, under the game's constraints: the movies look up
 a name returned by `ControlToName` case-insensitively as an input id
@@ -853,8 +879,9 @@ required in v1 (per-controller glyphs are a v2 item).
 
 ### 5.6 Option effects
 
-- **Toggle grips** (`Input.ToggleGrips`, default off; its menu label must
-  convey that the grips toggle aim and the motion tracker): while on,
+- **Toggle grips** (`Input.ToggleGrips`, default off; the option
+  `Toggle Aim/Motion Sensor` on the options page's `Input` sub-page, 06):
+  while on,
   Aim flips on each rising edge of the right grip and Motion tracker flips
   on each rising edge of the left grip; the radial input does not suppress
   the toggled tracker. While off, Aim = right grip and Motion tracker = left
@@ -870,40 +897,91 @@ required in v1 (per-controller glyphs are a v2 item).
   input behaviour in v1 (the observed controls had no effect for them, and
   the keys stay so `mothervr.json` keeps its layout) and the menu hides
   them (06).
-- `Input.SnapRotation` and `Input.SnapRotationSegments`: section 6.
-  `Input.SnapRotation` also gates touchpad turning (5.2).
+- `Input.SnapRotation` and `Input.SnapRotationSegments` (the options
+  `Snap Rotation` and `Snap Rotation Segments` on the `Input` sub-page,
+  06): section 6. `Input.SnapRotation` also gates touchpad turning (5.2).
 
 All options are read when used, so a change in the menu takes effect on
 the next frame.
 
 ### 5.7 Controls help page
 
-The options menu has a read-only controls help page that the mod fills
-with entries for the current set (5.5). The entries are delivered to the
-menu through the UI interface of 06 §4.3, one message per entry carrying
-the function's text and the control's text, whenever the mod pushes its
-settings to a menu. Required content:
+The options menu has a read-only controls help page (the `View Controls`
+sub-page of the options page, 06) that the mod fills with rows for the
+current set (5.5). Each row has two columns: the game function on the
+left, the control on the right. The rows are delivered to the menu through
+the UI interface of 06 §4.3, one message per row carrying the two texts,
+whenever the mod pushes its settings to a menu; the page shows them in the
+order they arrive. After every push the page lists exactly the current
+set's rows, each once: a menu opened again, which receives the rows again,
+must not show a row twice (how the page tells a new push from the previous
+one is the implementation's choice).
 
-- For every game function that has a default control in the current set
-  (5.2 for the touchpad set, 5.3 for the thumbstick set; 5.4 for WMR,
-  which uses the thumbstick entries), the page names that control.
-- Touchpad set: the flashlight is reachable only by interact with the
-  right hand near the head (5.10), and the page says so; weapon selection
-  has no control and no entry.
-- Thumbstick set: the flashlight has its own button and is also reachable
-  by interact near the head; the page names both.
-- Index variant (5.5): the thumbstick entries, with pause on the left
-  trackpad press.
+The rows below are exact (text, letter case and order). They are the rows
+players of the earlier mod saw for the same controls; v1 drives the game
+with those controls (5.2, 5.3), so the texts are kept.
+
+**Touchpad set** (5.2):
+
+| # | Function | Control |
+|---|---|---|
+| 1 | `Move` | `L Touchpad` |
+| 2 | `Sprint` | `L Touchpad Click` |
+| 3 | `Crouch` | `L Trigger` |
+| 4 | `Turn` | `R Touchpad L/R` |
+| 5 | `Aim` | `R Grip` |
+| 6 | `Fire / Throw / Melee` | `R Trigger` |
+| 7 | `Motion Tracker` | `L Grip` |
+| 8 | `Interact` | `R Touchpad Down` |
+| 9 | `Radial Menu` | `R Touchpad Center` |
+| 10 | `Reload / Activate` | `R Touchpad Up` |
+| 11 | `Flashlight [Press Interact near Head]` | `R Touchpad Down` |
+| 12 | `Map Menu` | `L Menu` |
+| 13 | `Pause Menu` | `R Menu` |
+
+The touchpad set has no flashlight button (only interact near the head,
+5.10, row 11) and no weapon selection, so it has no rows for them.
+
+**Thumbstick set** (5.3; also WMR, 5.4):
+
+| # | Function | Control |
+|---|---|---|
+| 1 | `Move` | `Left Thumbstick` |
+| 2 | `Sprint` | `Left Thumbstick Click` |
+| 3 | `Crouch` | `Left Trigger` |
+| 4 | `Turn` | `Right Thumbstick L/R` |
+| 5 | `Aim` | `Right Grip` |
+| 6 | `Fire / Throw / Melee` | `Right Trigger` |
+| 7 | `Motion Tracker` | `Left Grip` |
+| 8 | `Interact` | `A` |
+| 9 | `Radial Menu` | `Right Thumbstick Click` |
+| 10 | `Reload / Activate` | `B` |
+| 11 | `Flashlight` | `Y` |
+| 12 | `Flashlight [Press Interact near Head]` | `A` |
+| 13 | `Next Weapon` | `Right Thumbstick Up` |
+| 14 | `Previous Weapon` | `Right Thumbstick Down` |
+| 15 | `Map Menu` | `X` |
+| 16 | `Pause Menu` | `Menu Button` |
+
+**Index variant** (5.5): the thumbstick rows, except row 16, which reads
+`Pause Menu` | `Left Trackpad Press` (project decision: Index has no menu
+button and pauses with the left trackpad press, 5.3; the text follows the
+style of the other rows). Rows 11 and 15 keep `Y` and `X`, matching the
+glyphs Index players see (4.1), although the Index's left buttons are
+marked A and B (§11).
+
+On WMR the thumbstick rows name face buttons for controls that are
+touchpad presses (5.4); this is accepted in v1.
+
+Before a set is chosen:
+
 - From stereo device creation on, a set is always chosen (the first
   column of the table in 5.5), also before any controller is identified.
 - Until a set is chosen in this run (5.5: runtime None, a runtime that
-  failed to start, or before the stereo device is created), the page lists
-  no controller entries; it may show one entry saying that the controls
-  appear once VR is running. Showing a layout for controllers that are not
-  in use would mislead the player.
-
-The texts, the order and grouping of the entries and the page's layout are
-the implementation's.
+  failed to start, or before the stereo device is created), the page has
+  no rows (project decision: showing a layout for controllers that are not
+  in use would mislead the player, and an empty page is what players of
+  the earlier mod saw with VR off [likely]).
 
 ### 5.8 Runtime input layer
 
@@ -929,7 +1007,11 @@ referred to in the rest of this document by the game function it drives
 localisation, order and the exact split into actions in the runtime's
 files are the implementation's own, as long as the default bindings
 reproduce 5.2 to 5.4 and the player can recognise each input's game
-function from its display name in the runtime's binding UI.
+function from its display name in the runtime's binding UI. (These names
+are new to players: the earlier mod listed no inputs in SteamVR's binding
+UI, which showed only the legacy binding mode for the game. Using the
+function texts of the controls help, 5.7, as display names keeps the two
+consistent and is recommended.)
 
 | Type | Inputs (label: what it drives, 5.8.5) |
 |---|---|
@@ -1309,7 +1391,10 @@ in floating point. `segments` (`Input.SnapRotationSegments`) is one of
 24, 12, 6, 4, 3, 2 (15°, 30°, 60°, 90°, 120°, 180°; 06 normalises other
 values by rounding down to the next value in this list, and values below 2
 to 2). Every value gives exactly its angle: an earlier mod turned 180° at
-3 segments and failed below 2, which must not happen.
+3 segments and failed below 2, which must not happen. The options page
+shows the values as `24 (15°)`, `12 (30°)`, `6 (60°)`, `4 (90°)`,
+`3 (120°)` and `2 (180°)` (06), so the angle a player picks is the angle
+each step turns.
 
 ## 7. Game look enabling
 
@@ -1428,9 +1513,10 @@ SteamVR Input (OpenVR):
    motion tracker; pressing the left trackpad opens the pause menu.
 8. Prompts show the thumbstick set's glyphs (the right lower face button
    for interact, the left lower face button for map, the menu button for
-   pause) and the controls help page shows the Index variant (pause on the
-   left trackpad press). With a Vive wand as the first right-hand
-   controller: the touchpad set's glyphs and entries.
+   pause, drawn as 4.1 describes) and the controls help page shows the
+   sixteen rows of the Index variant in the order of 5.7, the last reading
+   `Pause Menu` and `Left Trackpad Press`. With a Vive wand as the first
+   right-hand controller: the touchpad set's glyphs and its thirteen rows.
 9. Open the SteamVR dashboard while holding the trigger and pushing the
    stick: the player stops firing and moving at once, and nothing reacts
    until the dashboard closes.
@@ -1444,8 +1530,8 @@ OpenXR:
     (`/interaction_profiles/valve/index_controller` with Index on SteamVR);
     `xrSyncActions` result 0 while playing and 8 with the dashboard open,
     each logged once per change.
-12. Index under OpenXR plays as in check 7, except that the pause entry of
-    the controls help page names the menu button.
+12. Index under OpenXR plays as in check 7, except that the pause row of
+    the controls help page reads `Pause Menu` and `Menu Button`.
 13. Dashboard open: all controls released, as in check 9.
 
 Common:
@@ -1479,7 +1565,8 @@ Common:
     the VR controllers and a real pad keep driving the game; keyboard and
     mouse do nothing until the game window is clicked again (03 §9.6).
 24. Runtime None, and runtime OpenVR with SteamVR not able to start: the
-    controls help page shows no controller layout (5.7).
+    controls help page has no rows (5.7). Open and close the pause menu
+    three times with VR running: the page lists each row once.
 25. Runtime OpenVR with the options archive not in use (a `UI.PAK` the mod
     rejects, 14 §5.9): prompts show the game's own pad glyphs, never an
     empty button.
@@ -1539,3 +1626,13 @@ Common:
 - WMR and Touch defaults are not verified on hardware; under OpenXR, WMR
   has no reload input (5.4), a candidate for a binding change once
   verified.
+- Index controls help and glyphs (4.1, 5.7): the map and flashlight rows
+  name `X` and `Y`, and the glyphs show X and Y, for the left buttons that
+  Index marks A and B. Whether to name them `Left A` and `Left B` (and draw
+  matching glyphs) is a user decision; v1 keeps X and Y so the rows and
+  the glyphs agree. Under OpenXR the Index gets the plain thumbstick rows
+  (5.5), whose pause row names the menu button although the Index pauses
+  with the left trackpad press; whether OpenXR should also use the Index
+  variant is a user decision.
+- How the menu font shows the rows and labels (upper or mixed case) was
+  not seen in game; the texts of 5.7 are given as they are sent.
