@@ -202,9 +202,12 @@ void OpenVrHmd::get_hmd_desc(HmdDesc& desc) {
     float l[2], r[2], t[2], b[2];
     for (int eye = 0; eye < 2; ++eye) {
         system_->GetProjectionRaw(static_cast<vr::EVREye>(eye), &l[eye], &r[eye], &t[eye], &b[eye]);
-        // OpenVR's raw top is negative and bottom positive. The original
-        // stores -top as "up"; the symmetric max below makes it harmless.
-        desc.default_eye_fov[eye] = {-t[eye], b[eye], -l[eye], r[eye]};
+        // OpenVR's raw t is negative and b positive; in image terms (v = 0
+        // at the top) b is the upward extent (03 §3.1). The original stores
+        // -t as Up, which the game never sees (it reads only the symmetric
+        // EyeFov) but which crops the mirror's eye modes on the wrong rows
+        // on a vertically asymmetric headset.
+        desc.default_eye_fov[eye] = {b[eye], -t[eye], -l[eye], r[eye]};
     }
     const float max_v = std::max({-t[0], b[0], -t[1], b[1]});
     const float max_h = std::max({-l[0], r[0], -l[1], r[1]});
