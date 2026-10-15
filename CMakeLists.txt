@@ -46,12 +46,39 @@ find_package(minhook CONFIG REQUIRED)
 # puts its include directory on the search path.
 find_path(OPENVR_INCLUDE_DIR NAMES openvr.h REQUIRED)
 
-# The DLL embeds Valve's OpenVR loader. A checkout without Git LFS has a
-# small pointer file in its place, which would be embedded silently.
-file(SIZE "${CMAKE_CURRENT_SOURCE_DIR}/res/openvr_api.dll" OPENVR_API_SIZE)
-if(OPENVR_API_SIZE LESS 100000)
-    message(FATAL_ERROR "res/openvr_api.dll is not the real DLL (Git LFS pointer?). "
-                        "Run scripts/fetch_openvr_api.ps1 or `git lfs pull`.")
+# The DLL embeds Valve's OpenVR loader, the x86 openvr_api.dll of a pinned
+# public SDK release. Whatever the file is gets embedded and written next to
+# the game, so a wrong file (a Git LFS pointer in a checkout without LFS, a
+# 64-bit build, another release) would make every OpenVR start fail on the
+# player's machine: check that it is an x86 PE image with the recorded hash.
+# Updating the loader changes the release and the hash together;
+# scripts/fetch_openvr_api.ps1 reads both from here.
+set(OPENVR_API_RELEASE "1.0.10")
+set(OPENVR_API_SHA256 "9520d2b88a97f6390fb2d0447019fa0e85344fb1c4ae1aaa3f9d78fed0c8eda3")
+set(OPENVR_API_DLL "${CMAKE_CURRENT_SOURCE_DIR}/res/openvr_api.dll")
+set(_openvr_api_fix "Run `pwsh scripts/fetch_openvr_api.ps1` (or `git lfs pull`).")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${OPENVR_API_DLL}")
+if(NOT EXISTS "${OPENVR_API_DLL}")
+    message(FATAL_ERROR "res/openvr_api.dll is missing. ${_openvr_api_fix}")
+endif()
+file(SIZE "${OPENVR_API_DLL}" OPENVR_API_SIZE)
+if(OPENVR_API_SIZE LESS 4096)
+    message(FATAL_ERROR "res/openvr_api.dll is not the real DLL (Git LFS pointer?). ${_openvr_api_fix}")
+endif()
+# PE check: "MZ", then the "PE\0\0" signature at e_lfanew (offset 0x3C,
+# little endian) followed by the machine field, 0x014C for x86.
+file(READ "${OPENVR_API_DLL}" _mz LIMIT 2 HEX)
+file(READ "${OPENVR_API_DLL}" _lfanew OFFSET 60 LIMIT 4 HEX)
+string(REGEX REPLACE "^(..)(..)(..)(..)$" "\\4\\3\\2\\1" _lfanew "${_lfanew}")
+math(EXPR _lfanew "0x${_lfanew}")
+file(READ "${OPENVR_API_DLL}" _pe OFFSET ${_lfanew} LIMIT 6 HEX)
+if(NOT _mz STREQUAL "4d5a" OR NOT _pe STREQUAL "504500004c01")
+    message(FATAL_ERROR "res/openvr_api.dll is not an x86 (32-bit) PE DLL. ${_openvr_api_fix}")
+endif()
+file(SHA256 "${OPENVR_API_DLL}" _openvr_api_hash)
+if(NOT _openvr_api_hash STREQUAL OPENVR_API_SHA256)
+    message(FATAL_ERROR "res/openvr_api.dll is not the x86 loader of OpenVR SDK ${OPENVR_API_RELEASE}: "
+                        "SHA-256 ${_openvr_api_hash}, expected ${OPENVR_API_SHA256}. ${_openvr_api_fix}")
 endif()
 
 # The pass-through exports are listed twice: as thunks (d3d11_exports.inc)
