@@ -88,9 +88,13 @@ jobs:
       - name: Build
         run: cmake --build build
 
+      # Exports, imports, architecture and the version resource; a failure
+      # stops the job before anything is packaged.
       - name: Check the DLL
         shell: pwsh
-        run: ./scripts/check_dll.ps1 build/d3d11.dll
+        env:
+          VERSION: ${{ inputs.version }}
+        run: ./scripts/check_dll.ps1 build/d3d11.dll -Version $env:VERSION
 
       - name: Package
         id: package
