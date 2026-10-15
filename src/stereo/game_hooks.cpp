@@ -71,7 +71,9 @@ struct {
     int  screen_replaced  = 0;      // +0x320
 } g_update;
 
-constexpr int   kTurnCode        = 0x12C;  // player map, analog #3 (turn)
+// The turn is the player map's analog action 3; its virtual code follows
+// the map's digital count (0x12C on the shipped map), so it is derived.
+constexpr int   kTurnMap = 0, kTurnAction = 3;
 constexpr float kTurnThreshold   = 0.5f;
 constexpr auto  kSnapRepeat      = std::chrono::milliseconds(300);
 // Debug: how long after a snap step the camera is traced.
@@ -227,7 +229,7 @@ void update_running(StereoManager* self, StereoInterface* device) {
         r3 = input::pad_button(pad, kPadRStick);
         if (input::pad_activity(pad)) u.keyboard_mouse = false;
 
-        const float turn = input::pad_axis_value(pad, kTurnCode);
+        const float turn = input::pad_axis_value(pad, input::analog_virtual_code(kTurnMap, kTurnAction));
         const bool  out  = turn < -kTurnThreshold || turn > kTurnThreshold;
         if (g_follow_active && input_cfg.snap_rotation && out && self->mode != 1 && !u.snap_latch) {
             // One step; yaw is in half turns, wrapped to [-1, 1].
@@ -403,10 +405,11 @@ void __fastcall pop_mode(StereoManager* self, void*) noexcept {
 }
 
 // The control prompts ask whether movement is on the left stick; the game's
-// own check reads the remapped bindings. From: FUN_10003100.
+// own check reads the remapped bindings. Before the first virtualisation
+// the move action has no recorded control, which the stock check answers
+// true. From: FUN_10003100.
 bool __fastcall is_move_on_left_stick(void*, void*) noexcept {
-    const auto& t = input::tiers()[0];
-    return t.original_code[t.num_digital] == 0x12;  // LSTICK_X
+    return input::move_on_left_stick();
 }
 
 // ---- Planar reflections -------------------------------------------------------------
