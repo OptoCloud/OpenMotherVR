@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/diag/ports/log.h"
+
 #include <cstdint>
 
 struct HWND__;
@@ -20,17 +22,18 @@ using WindowProc = long(__stdcall*)(HWND__* hwnd, unsigned int msg, unsigned int
 // it instead left a client area smaller than the size the game kept (it
 // ignores WM_SIZE in its fullscreen mode), which put the UI and the cursor
 // off. A window that already fits is left alone, so a size the player
-// picks stays.
-void fit_window(void* wnd) noexcept;
+// picks stays. Render thread (swapchain creation and ResizeBuffers).
+void fit_window(void* wnd, core::diag::ports::Log& log) noexcept;
 
-// The process that took the keyboard focus, for the log.
-void log_focus_loss() noexcept;
+// The process that took the keyboard focus, for the log. Game thread.
+void log_focus_loss(core::diag::ports::Log& log) noexcept;
 
-// Subclasses the game's window with `replacement` (once; `original`
-// receives the game's procedure). Pins the module.
-void subclass_game_window(void* hwnd, WindowProc replacement, WindowProc& original) noexcept;
+// Subclasses the game's window with `replacement` (once; `game_proc`
+// receives the game's own procedure). Pins the module.
+void subclass_game_window(void* hwnd, WindowProc replacement, WindowProc& game_proc,
+                          core::diag::ports::Log& log) noexcept;
 
-// Calls the game's window procedure `original`.
-long call_window_proc(WindowProc original, HWND__* hwnd, unsigned int msg, unsigned int wp, long lp) noexcept;
+// Calls the game's own window procedure `game_proc`.
+long call_window_proc(WindowProc game_proc, HWND__* hwnd, unsigned int msg, unsigned int wp, long lp) noexcept;
 
 } // namespace omvr::platform::win32

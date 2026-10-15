@@ -10,10 +10,19 @@
 namespace omvr::game {
 
 static_assert(offsetof(StereoInterface, backend) == 0x1F4);
+static_assert(offsetof(StereoInterface, runtime_id) == 0x1F8);
+static_assert(offsetof(StereoInterface, handle_seed) == 0x1FC);
+static_assert(offsetof(StereoInterface, unused_200) == 0x200);
 static_assert(offsetof(StereoInterface, world_scale) == 0x204);
-static_assert(offsetof(StereoInterface, mirror_width) == 0x20C);
 static_assert(offsetof(StereoInterface, pose_fetched) == 0x208);
+static_assert(offsetof(StereoInterface, mirror_width) == 0x20C);
+static_assert(offsetof(StereoInterface, mirror_height) == 0x210);
+static_assert(offsetof(StereoInterface, configured_width) == 0x214);
+static_assert(offsetof(StereoInterface, configured_height) == 0x218);
 static_assert(offsetof(StereoInterface, mirror_vs) == 0x21C);
+static_assert(offsetof(StereoInterface, mirror_ps) == 0x220);
+static_assert(offsetof(StereoInterface, mirror_cb_screen) == 0x224);
+static_assert(offsetof(StereoInterface, mirror_cb) == 0x228);
 static_assert(offsetof(StereoInterface, mirror_sampler) == 0x22C);
 static_assert(sizeof(StereoInterface) == 0x230);
 

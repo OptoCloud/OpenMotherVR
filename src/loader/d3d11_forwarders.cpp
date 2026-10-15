@@ -1,4 +1,4 @@
-// The d3d11.dll exports the proxy passes through verbatim.
+// The d3d11.dll exports the proxy passes through verbatim (01 §1.3).
 
 #include "loader/d3d11_forwarders.h"
 
@@ -10,11 +10,10 @@
 #include <span>
 
 // ===== Verbatim forwarders ===================================================
-// One slot per pass-through export, filled by ensure_initialized() on the
+// One slot per pass-through export, filled by ensure_d3d11_loaded() on the
 // first call of any export. The thunks live at file scope (not in a
 // namespace) so MSVC inline asm can name the table and the .def can alias
 // each export to its mvr_fwd_* symbol.
-
 
 #define OMVR_D3D11_FORWARD(i, name) +1
 constexpr unsigned kForwardCount = 0
@@ -22,11 +21,18 @@ constexpr unsigned kForwardCount = 0
     ;
 #undef OMVR_D3D11_FORWARD
 
-static void* g_forward[kForwardCount] = {};
+// The thunks index the table in 4-byte steps (`(i) * 4` below).
+static_assert(sizeof(void*) == 4, "the forwarder thunks are x86 code");
 
-// Nonzero once ensure_initialized() has run (whether or not it succeeded).
-static volatile long g_forward_ready = 0;
+// Read by the thunks' `jmp dword ptr [forward_slots + i*4]`, so a plain
+// array at a fixed address. Written once, before forward_ready is set.
+static void* forward_slots[kForwardCount] = {};
 
+// Nonzero once ensure_d3d11_loaded() has run (whether or not it succeeded).
+// The naked thunk compares it in assembly, so it stays a plain aligned long:
+// an aligned 32-bit read is atomic on x86, and it is written once with
+// InterlockedExchange (a full barrier) after the table is filled.
+static volatile long forward_ready = 0;
 
 #define OMVR_D3D11_FORWARD(i, name) #name,
 static const char* const kForwardNames[kForwardCount] = {
@@ -44,7 +50,7 @@ extern "C" void __cdecl mvr_forward_init() {
 // for a register convention) reach the real function untouched.
 extern "C" __declspec(naked) void mvr_forward_ensure() {
     __asm {
-        cmp g_forward_ready, 0
+        cmp forward_ready, 0
         jne ready
         pushad
         call mvr_forward_init
@@ -60,7 +66,7 @@ extern "C" __declspec(naked) void mvr_forward_ensure() {
 #define OMVR_D3D11_FORWARD(i, name)                                    \
     extern "C" __declspec(naked) void mvr_fwd_##name() {               \
         __asm call mvr_forward_ensure                                  \
-        __asm jmp dword ptr [g_forward + (i) * 4]                      \
+        __asm jmp dword ptr [forward_slots + (i) * 4]                  \
     }
 #include "loader/d3d11_exports.inc"
 #undef OMVR_D3D11_FORWARD
@@ -68,22 +74,24 @@ extern "C" __declspec(naked) void mvr_forward_ensure() {
 namespace omvr::loader {
 
 bool ensure_d3d11_loaded() noexcept {
-    static std::once_flag s_once;
-    static bool s_ok = false;
+    static std::once_flag once;
+    static bool           loaded = false;
     try {
-        std::call_once(s_once, [] {
-            s_ok = context().system_d3d11.load(std::span<void*>(g_forward), std::span<const char* const>(kForwardNames));
-            ::InterlockedExchange(&g_forward_ready, 1);
+        std::call_once(once, [] {
+            auto& ctx = context();
+            loaded = ctx.system_d3d11.load(std::span<void*>(forward_slots), std::span<const char* const>(kForwardNames),
+                                           ctx.log);
+            ::InterlockedExchange(&forward_ready, 1);
         });
     } catch (...) {
         // call_once only throws if the callable does, and it does not.
     }
-    return s_ok;
+    return loaded;
 }
 
 namespace entry {
 
-platform::d3d11::PFN_D3D11CreateDeviceAndSwapChain real_create_device_and_swapchain() noexcept {
+platform::d3d11::CreateDeviceAndSwapChainFn real_create_device_and_swapchain() noexcept {
     return context().system_d3d11.create_device_and_swapchain();
 }
 
@@ -96,6 +104,8 @@ bool headset_attached() noexcept { return context().window.headset_attached(); }
 bool mirror_size(std::uint32_t& width, std::uint32_t& height) noexcept {
     return context().window.mirror_size(width, height);
 }
+
+core::diag::ports::Log& log() noexcept { return context().log; }
 
 } // namespace entry
 

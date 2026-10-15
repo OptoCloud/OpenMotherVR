@@ -8,56 +8,77 @@
 
 #include "game/sites/stereo_path.h"
 
-#include "core/diag/logger.h" // R: game (A2): log through an injected Log&
-#include "game/addresses.h"
-#include "game/patcher.h"
+#include "game/code_address.h"
+#include "game/x86.h"
+
+#include <array>
+#include <cstdint>
+#include <string_view>
 
 namespace omvr::game::sites {
 
 namespace {
 
-namespace diag = core::diag;
+namespace ports = core::diag::ports;
+
+constexpr std::string_view kStereoPatchesLog = "[hook] stereo/render patches applied";
+constexpr std::string_view kHandedOverLog    = "[hook] stereo manager at {} handed to the game";
 
 // 1005dc34: `cmp eax, eax`, so ZF is always set: each `cmp reg, eax` that
 // compares the "Stereo Mode" setting against "Rift" now always matches.
-constexpr std::uint8_t kCmpEaxEax[2] = {0x39, 0xC0};
+constexpr std::array<std::uint8_t, 2> kCmpEaxEax = {x86::kCmpRm32R32, x86::kModRmEaxEax};
+
+// The hand-off (02 §3.1): `push 0xb0; ...; call new; ...; call ctor`
+// becomes `mov eax, &manager; jmp short` to the store of the result.
+constexpr std::size_t kHandOffJumpSite = x86::kMovEaxImm32Size;
+constexpr std::array<std::uint8_t, x86::kJmpRel8Size> kJumpToStore = {
+    x86::kJmpRel8,
+    static_cast<std::uint8_t>(kStereoAllocStoreOffset - (x86::kMovEaxImm32Size + x86::kJmpRel8Size))};
+static_assert(kJumpToStore[1] == 0x1D, "the jump the hand-off has always written");
+constexpr std::array<std::uint8_t, 1> kMovEax = {x86::kMovEaxImm32};
+
+// The recenter sites call device slot 11 (+0x2C); they are made to call
+// slot 21 (+0x54), the yaw-only reference pose (02 §6.4).
+constexpr std::array<std::uint8_t, 1> kReferencePoseSlot = {
+    static_cast<std::uint8_t>(slot_offset(kDeviceReferencePoseSlot))};
+
+bool hand_off_manager(const GameImage& g, Patcher& p, StereoManager& m) noexcept {
+    std::uint8_t* alloc = g.at(AiAddr::StereoManagerAlloc);
+    return p.write(alloc, kMovEax) && p.write_pointer(alloc + x86::kImm32Offset, &m) &&
+           p.write(alloc + kHandOffJumpSite, kJumpToStore);
+}
+
+bool point_recenter_sites(const GameImage& g, Patcher& p) noexcept {
+    return p.write(g.at(AiAddr::HeadPoseCallA) + x86::kMovRmDispOffset, kReferencePoseSlot) &&
+           p.write(g.at(AiAddr::HeadPoseCallB) + x86::kMovRmDispOffset, kReferencePoseSlot);
+}
+
+bool redirect_manager_calls(const GameImage& g, Patcher& p, const StereoDeviceHooks& hooks) noexcept {
+    return p.redirect_call(g.at(AiAddr::CreateDeviceCall), hooks.create_device, "CreateDevice") &&
+           p.redirect_call(g.at(AiAddr::HmdResolutionCall), hooks.get_hmd_resolution, "GetHmdResolution") &&
+           p.redirect_call(g.at(AiAddr::RenderTargetSizeCall), hooks.get_render_target_size,
+                           "GetRenderTargetSize");
+}
 
 } // namespace
 
-bool force_stereo_mode_tests(std::uint8_t* ai_base, GameBuild version) noexcept {
-    for (std::uint32_t rva : inline_sites(version).stereo_mode_tests) {
-        if (!write_bytes(ai_base + rva, kCmpEaxEax, sizeof(kCmpEaxEax))) return false;
+bool force_stereo_mode_tests(const GameImage& g, Patcher& p) noexcept {
+    for (std::uint32_t rva : g.sites.stereo_mode_tests) {
+        if (!p.write(g.at_rva(rva), kCmpEaxEax)) return false;
     }
     return true;
 }
 
-bool force_stereo_mode(const GameImage& g) noexcept {
-    if (!force_stereo_mode_tests(g.base, g.version)) return false;
-    diag::log_line("[hook] stereo/render patches applied");
+bool force_stereo_mode(const GameImage& g, Patcher& p) noexcept {
+    if (!force_stereo_mode_tests(g, p)) return false;
+    p.log().line(kStereoPatchesLog);
     return true;
 }
 
-bool install_stereo_device(StereoManager& m, const StereoDeviceHooks& hooks) noexcept {
-    stereo::initialize(m, hooks.device, hooks.manager);
-
-    // `push 0xb0; ...; call new; ...; call ctor` becomes
-    // `mov eax, &manager; jmp short` to the store of the result.
-    std::uint8_t* alloc = ai_address(AiAddr::StereoManagerAlloc);
-    // Two recenter sites call device slot 11 (+0x2C); make them call
-    // slot 21 (+0x54), the yaw-only reference pose.
-    constexpr std::uint8_t kSlot21 = 0x54;
-    const bool ok =
-        patch(alloc, {0xB8}) && write_dword(alloc + 1, address_of(&m)) &&
-        patch(alloc + 5, {0xEB, 0x1D}) &&
-        patch(ai_address(AiAddr::HeadPoseCallA) + 2, {kSlot21}) &&
-        patch(ai_address(AiAddr::HeadPoseCallB) + 2, {kSlot21}) &&
-        redirect_call(ai_address(AiAddr::CreateDeviceCall), hooks.create_device, "CreateDevice") &&
-        redirect_call(ai_address(AiAddr::HmdResolutionCall), hooks.get_hmd_resolution, "GetHmdResolution") &&
-        redirect_call(ai_address(AiAddr::RenderTargetSizeCall), hooks.get_render_target_size,
-                      "GetRenderTargetSize");
-    if (ok) {
-        diag::logf("[hook] stereo manager at {} handed to the game", static_cast<void*>(&m));
-    }
+bool install_stereo_device(const GameImage& g, Patcher& p, StereoManager& m, const StereoDeviceHooks& hooks) noexcept {
+    stereo::initialize(g.addresses, m, hooks.device, hooks.manager);
+    const bool ok = hand_off_manager(g, p, m) && point_recenter_sites(g, p) && redirect_manager_calls(g, p, hooks);
+    if (ok) ports::logf(p.log(), kHandedOverLog, static_cast<void*>(&m));
     return ok;
 }
 

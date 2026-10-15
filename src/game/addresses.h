@@ -2,11 +2,20 @@
 
 #include "game/constants.h"
 
+#include <algorithm>
 #include <array>
+#include <bit>
+#include <cstddef>
 #include <cstdint>
+#include <utility>
 
-// Every AI.exe address the mod uses, per build.
+// Every AI.exe address the mod uses, per build (01 §4).
 namespace omvr::game {
+
+// Rows in the per-build address table (ai_address_tables.inc).
+inline constexpr std::size_t kAddressTableRows = 127;
+
+using AddressTable = std::array<std::uint32_t, kAddressTableRows>;
 
 // Named slots in the original's 127-entry AI.exe address table. The value is
 // the table index, i.e. (original global - DAT_10066bc8) / 4. Only the slots
@@ -99,6 +108,10 @@ enum class AiAddr : std::uint8_t {
     CmdDispatchSlot          = 0x7E, // DAT_10066dc0  pointer to the console command handler
 };
 
+// The last named slot; every name must index into the table.
+inline constexpr AiAddr kLastNamedSlot = AiAddr::CmdDispatchSlot;
+static_assert(std::to_underlying(kLastNamedSlot) < kAddressTableRows);
+
 // AI.exe addresses the reconstruction uses that the original's table does
 // not have: ReconRvas for fixes the original never made (RVAs per build; 0
 // means not located for that build, and the fix depending on it stays off),
@@ -175,8 +188,17 @@ inline constexpr ReconRvas kReconRvas2015 = {
 
 inline constexpr ReconRvas kReconRvas2020 = {};
 
+// Every recon row has its 2015 RVA: a zero there would switch a fix off on
+// the build it was written for.
+consteval bool every_recon_row_known(const ReconRvas& rvas) {
+    constexpr std::size_t kRows = sizeof(ReconRvas) / sizeof(std::uint32_t);
+    const auto rows = std::bit_cast<std::array<std::uint32_t, kRows>>(rvas);
+    return std::ranges::none_of(rows, [](std::uint32_t rva) { return rva == 0; });
+}
+static_assert(every_recon_row_known(kReconRvas2015));
+
 inline const ReconRvas& recon_rvas(GameBuild version) noexcept {
-    return version == GameBuild::Patched_2020 ? kReconRvas2020 : kReconRvas2015;
+    return version == GameBuild::Patched2020 ? kReconRvas2020 : kReconRvas2015;
 }
 
 // Sites and bytes the original writes but codes inline in FUN_1001d6f0
@@ -214,7 +236,7 @@ inline constexpr InlineSites kInlineSites2020 = {
 };
 
 inline const InlineSites& inline_sites(GameBuild version) noexcept {
-    return version == GameBuild::Patched_2020 ? kInlineSites2020 : kInlineSites2015;
+    return version == GameBuild::Patched2020 ? kInlineSites2020 : kInlineSites2015;
 }
 
 // The selected per-build table, rebased onto the running AI.exe.
@@ -231,17 +253,13 @@ public:
     std::uint8_t* at(AiAddr slot) const noexcept;
 
     // True if every address in the selected table lies inside AI.exe's image
-    // of `image_size` bytes, so the preflight can read them.
+    // of `image_size` bytes, so the preflight can read them (01 §2.5.1: all
+    // 127 rows, named or not).
     bool all_within(std::uint32_t image_size) const noexcept;
 
 private:
-    std::uint8_t*                         base_ = nullptr;
-    const std::array<std::uint32_t, 127>* rvas_ = nullptr;
+    std::uint8_t*       base_ = nullptr;
+    const AddressTable* rvas_ = nullptr;
 };
-
-// R: game (A2) and every area: callers take the AddressMap from their owner
-// instead. The loader registers the one in its context at attach.
-void set_process_addresses(const AddressMap* map) noexcept;
-std::uint8_t* ai_address(AiAddr slot) noexcept;
 
 } // namespace omvr::game

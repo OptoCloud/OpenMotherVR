@@ -1,10 +1,8 @@
-// d3d11.dll proxy: the IDXGISwapChain and ID3D11Device replacements.
-//
-// The original MotherVR is a dxgi.dll proxy. Windows 11 will not load a
-// local dxgi.dll, but it does load a local d3d11.dll (see ../../README.md),
-// so this rebuild proxies d3d11 instead. It gives the same intercept points:
-// D3D11CreateDeviceAndSwapChain returns the game's device and swapchain,
-// whose CreatePixelShader and Present we hook.
+// The IDXGISwapChain and ID3D11Device replacements of the d3d11.dll proxy
+// (01 §1). D3D11CreateDeviceAndSwapChain returns the game's device and
+// swapchain, whose CreatePixelShader, Present, SetFullscreenState and
+// ResizeBuffers are replaced here. Render thread: the game creates shaders
+// and presents there.
 
 #include "loader/hooks/d3d11_hooks.h"
 
@@ -21,148 +19,172 @@
 
 #include <atomic>
 #include <cstdint>
+#include <string_view>
 #include <type_traits>
 
 namespace omvr::loader::hooks {
 
 namespace {
 
-namespace diag = core::diag;
+namespace ports = core::diag::ports;
 using platform::d3d11::kCreatePixelShaderVtblIndex;
 using platform::d3d11::kPresentVtblIndex;
 using platform::d3d11::kResizeBuffersVtblIndex;
 using platform::d3d11::kSetFullscreenStateVtblIndex;
-using platform::win32::replace_pointer;
 
-using PFN_Present = HRESULT (__stdcall*)(void* This, UINT SyncInterval, UINT Flags);
-using PFN_ResizeBuffers = HRESULT (__stdcall*)(void* This, UINT BufferCount,
-                                               UINT Width, UINT Height,
-                                               DXGI_FORMAT NewFormat,
-                                               UINT SwapChainFlags);
-using PFN_SetFullscreenState = HRESULT (__stdcall*)(void* This, BOOL Fullscreen, void* Target);
+constexpr std::string_view kFirstPresentLog   = "present #1";
+constexpr std::string_view kResizeLog         = "ResizeBuffers count={} {}x{} fmt={} flags=0x{:X}";
+constexpr std::string_view kResizeMirrorLog   = "ResizeBuffers: mirror back buffer {}x{}";
+constexpr std::string_view kPixelShaderLog    = "proxy: CreatePixelShader hooked (shader fixes)";
+constexpr std::string_view kPresentHookedLog  = "proxy: Present hooked, original=0x{:08X}";
+constexpr std::string_view kResizeHookedLog   = "proxy: ResizeBuffers hooked, original=0x{:08X}";
+
+// The vtable methods replaced, as the system declares them (__stdcall, this
+// first).
+using PresentFn            = HRESULT(__stdcall*)(void* self, UINT sync_interval, UINT flags);
+using ResizeBuffersFn      = HRESULT(__stdcall*)(void* self, UINT buffer_count, UINT width, UINT height,
+                                                 DXGI_FORMAT format, UINT swapchain_flags);
+using SetFullscreenStateFn = HRESULT(__stdcall*)(void* self, BOOL fullscreen, void* target);
 // ID3D11Device* this, bytecode, size, ID3D11ClassLinkage*, ID3D11PixelShader** out.
-using PFN_CreatePixelShader = HRESULT (__stdcall*)(void*, const void*, SIZE_T, void*, void**);
+using CreatePixelShaderFn  = HRESULT(__stdcall*)(void* self, const void* code, SIZE_T size, void* linkage,
+                                                 void** out);
 
-PFN_Present real_present() noexcept { return reinterpret_cast<PFN_Present>(context().originals.present); }
-PFN_ResizeBuffers real_resize() noexcept {
-    return reinterpret_cast<PFN_ResizeBuffers>(context().originals.resize_buffers);
+// The system's method saved from a slot, as its type. The one cast from
+// the untyped slot values.
+template <class Fn>
+Fn system_method(void* saved) noexcept {
+    return reinterpret_cast<Fn>(saved);
 }
-PFN_SetFullscreenState real_set_fullscreen() noexcept {
-    return reinterpret_cast<PFN_SetFullscreenState>(context().originals.set_fullscreen);
+
+// A replacement as the untyped value a vtable slot holds.
+template <class Fn>
+void* slot_value(Fn* fn) noexcept {
+    return reinterpret_cast<void*>(fn);
 }
-PFN_CreatePixelShader real_create_ps() noexcept {
-    return reinterpret_cast<PFN_CreatePixelShader>(context().originals.create_pixel_shader);
-}
+
+// The vtable of a COM object: its first pointer.
+void** vtable_of(void* object) noexcept { return *static_cast<void***>(object); }
 
 bool is_game_swapchain(void* sc) noexcept {
-    return sc && sc == context().originals.game_swapchain.load(std::memory_order_acquire);
+    return sc && sc == context().targets.game_swapchain.load(std::memory_order_acquire);
 }
 
 // With a headset attached the back buffer is both eyes side by side, far
 // past any display mode: refuse to go fullscreen (the swapchain is created
 // windowed for the same reason). DXGI's own answer for "not now".
-HRESULT __stdcall hook_SetFullscreenState(void* This, BOOL Fullscreen, void* Target) noexcept {
-    if (is_game_swapchain(This) && context().window.refuse_fullscreen(Fullscreen != FALSE)) {
+HRESULT __stdcall hook_set_fullscreen_state(void* self, BOOL fullscreen, void* target) noexcept {
+    if (is_game_swapchain(self) && context().window.refuse_fullscreen(fullscreen != FALSE)) {
         return DXGI_ERROR_NOT_CURRENTLY_AVAILABLE;
     }
-    return real_set_fullscreen()(This, Fullscreen, Target);
+    return system_method<SetFullscreenStateFn>(context().targets.set_fullscreen)(self, fullscreen, target);
 }
-std::atomic<bool>  g_hooks_installed{false};
-std::atomic<unsigned long> g_present_count{0};
 
-HRESULT __stdcall hook_Present(void* This, UINT SyncInterval, UINT Flags) noexcept {
-    if (!is_game_swapchain(This)) return real_present()(This, SyncInterval, Flags);
+HRESULT __stdcall hook_present(void* self, UINT sync_interval, UINT flags) noexcept {
+    auto& ctx = context();
+    const auto present = system_method<PresentFn>(ctx.targets.present);
+    if (!is_game_swapchain(self)) return present(self, sync_interval, flags);
 
-    const unsigned long n = g_present_count.fetch_add(1, std::memory_order_relaxed) + 1;
+    const unsigned long n = ctx.targets.present_count.fetch_add(1, std::memory_order_relaxed) + 1;
 
     // The stereo device drives VR init (once) and per-frame head-pose update.
     // True when OpenXR's virtual screen already paced this frame (xrWaitFrame):
     // present without vsync then, or the game waits twice.
-    const bool vr_paced = context().screen_policy.on_present(
-        core::stereo::SwapchainHandle{reinterpret_cast<std::uintptr_t>(This)});
+    const bool vr_paced =
+        ctx.screen_policy.on_present(core::stereo::SwapchainHandle{reinterpret_cast<std::uintptr_t>(self)});
 
     // The first call confirms the hook fired. No periodic line: this is the
     // render thread, and a log write can stall it. The first frame is also
     // a point to put the crash filter back on top, if the game installed
-    // its own after attach (spec 11, the crash record).
+    // its own after attach (11, the crash record).
     if (n == 1) {
-        diag::log_line("present #1");
+        ctx.log.line(kFirstPresentLog);
         reassert_crash_hook();
     }
-    return real_present()(This, vr_paced ? 0 : SyncInterval, Flags);
+    return present(self, vr_paced ? 0 : sync_interval, flags);
 }
 
-HRESULT __stdcall hook_ResizeBuffers(void* This, UINT BufferCount,
-                                     UINT Width, UINT Height,
-                                     DXGI_FORMAT NewFormat,
-                                     UINT SwapChainFlags) noexcept {
-    if (is_game_swapchain(This)) {
-        diag::logf("ResizeBuffers count={} {}x{} fmt={} flags=0x{:X}",
-                   BufferCount, Width, Height,
-                   static_cast<unsigned>(NewFormat),
-                   static_cast<unsigned>(SwapChainFlags));
-        // Reset frame counter so the next Present sample tags a "fresh" log
-        // line, which helps correlate resize events with framerate changes.
-        g_present_count.store(0, std::memory_order_relaxed);
-        if (context().window.mirror_size(Width, Height))
-            diag::logf("ResizeBuffers: mirror back buffer {}x{}", Width, Height);
+HRESULT __stdcall hook_resize_buffers(void* self, UINT buffer_count, UINT width, UINT height, DXGI_FORMAT format,
+                                      UINT swapchain_flags) noexcept {
+    auto& ctx = context();
+    if (is_game_swapchain(self)) {
+        ports::logf(ctx.log, kResizeLog, buffer_count, width, height, static_cast<unsigned>(format),
+                    static_cast<unsigned>(swapchain_flags));
+        // Reset the frame counter so the next Present logs a fresh first
+        // line, which ties resize events to what follows.
+        ctx.targets.present_count.store(0, std::memory_order_relaxed);
+        if (ctx.window.mirror_size(width, height)) ports::logf(ctx.log, kResizeMirrorLog, width, height);
     }
-    const HRESULT hr = real_resize()(This, BufferCount, Width, Height, NewFormat, SwapChainFlags);
-    if (SUCCEEDED(hr) && is_game_swapchain(This)) {
-        platform::d3d11::fit_game_window(static_cast<IDXGISwapChain*>(This), context().window.headset_attached());
+    const HRESULT hr = system_method<ResizeBuffersFn>(ctx.targets.resize_buffers)(self, buffer_count, width, height,
+                                                                                    format, swapchain_flags);
+    if (SUCCEEDED(hr) && is_game_swapchain(self)) {
+        platform::d3d11::fit_game_window(static_cast<IDXGISwapChain*>(self), ctx.window.headset_attached(), ctx.log);
     }
     return hr;
 }
 
-// ---- ID3D11Device::CreatePixelShader: shader fixes ---------------------------
+// ---- ID3D11Device::CreatePixelShader: shader fixes (08) ----------------------
 // Also shared by every device of the class. Not limited to the game's: the
 // patch only rewrites the game's own dither pattern, so another device's
 // shaders pass through unchanged.
 
-HRESULT __stdcall hook_CreatePixelShader(void* self, const void* code, SIZE_T size,
-                                         void* linkage, void** out) noexcept {
-    auto& stats = context().shader_fixes;
+HRESULT __stdcall hook_create_pixel_shader(void* self, const void* code, SIZE_T size, void* linkage,
+                                           void** out) noexcept {
+    auto& ctx = context();
+    const auto create = system_method<CreatePixelShaderFn>(ctx.targets.create_pixel_shader);
+    auto& stats = ctx.shader_fixes;
     const int total = stats.count_created();
     int sites = 0;
     const auto patched = core::render::patch_position_dither(code, size, sites);
     if (!patched.empty()) {
-        const HRESULT hr = real_create_ps()(self, patched.data(), patched.size(), linkage, out);
+        const HRESULT hr = create(self, patched.data(), patched.size(), linkage, out);
         if (SUCCEEDED(hr)) {
             stats.count_fixed(total);
             return hr;
         }
         stats.count_rejected(hr);
     }
-    return real_create_ps()(self, code, size, linkage, out);
+    return create(self, code, size, linkage, out);
+}
+
+static_assert(std::is_convertible_v<decltype(&hook_present), PresentFn>);
+static_assert(std::is_convertible_v<decltype(&hook_resize_buffers), ResizeBuffersFn>);
+static_assert(std::is_convertible_v<decltype(&hook_set_fullscreen_state), SetFullscreenStateFn>);
+static_assert(std::is_convertible_v<decltype(&hook_create_pixel_shader), CreatePixelShaderFn>);
+
+// Replaces vtable slot `index` of `vtable` with `replacement`; the system's
+// method, or null when the slot could not be written.
+void* replace_slot(void** vtable, std::size_t index, void* replacement, const char* method,
+                   ports::Log& log) noexcept {
+    return platform::win32::replace_pointer(&vtable[index], replacement, method, log);
 }
 
 } // namespace
 
 void install_device_hooks(void* device) noexcept {
-    static std::atomic<bool> s_done{false};
-    if (!device || s_done.exchange(true)) return;
-    void** vtbl = *reinterpret_cast<void***>(device);
-    if (auto* prev = replace_pointer(&vtbl[kCreatePixelShaderVtblIndex],
-                                     reinterpret_cast<void*>(&hook_CreatePixelShader), "CreatePixelShader")) {
-        context().originals.create_pixel_shader = prev;
-        diag::log_line("proxy: CreatePixelShader hooked (shader fixes)");
+    static std::atomic<bool> done{false};
+    if (!device || done.exchange(true)) return;
+    auto& ctx = context();
+    if (auto* prev = replace_slot(vtable_of(device), kCreatePixelShaderVtblIndex,
+                                  slot_value(&hook_create_pixel_shader), "CreatePixelShader", ctx.log)) {
+        ctx.targets.create_pixel_shader = prev;
+        ctx.log.line(kPixelShaderLog);
     }
 }
 
 void install_swapchain_hooks(void* swapchain) noexcept {
     if (!swapchain) return;
     auto& ctx = context();
-    ctx.originals.game_swapchain.store(swapchain, std::memory_order_release);
+    ctx.targets.game_swapchain.store(swapchain, std::memory_order_release);
     bool expected = false;
-    if (!g_hooks_installed.compare_exchange_strong(expected, true)) return;
+    if (!ctx.targets.swapchain_hooks_installed.compare_exchange_strong(expected, true)) return;
 
     auto* sc = static_cast<IDXGISwapChain*>(swapchain);
     const bool vr = ctx.window.headset_attached();
-    platform::d3d11::log_swapchain_desc(sc);
-    platform::d3d11::fit_game_window(sc, vr);
+    platform::d3d11::log_swapchain_desc(sc, ctx.log);
+    platform::d3d11::fit_game_window(sc, vr, ctx.log);
     if (void* hwnd = platform::d3d11::output_window(sc)) {
         keep_focus_while_vr(hwnd);
-        platform::d3d11::no_alt_enter_while_vr(sc, hwnd, ctx.window.headset_attached());
+        platform::d3d11::no_alt_enter_while_vr(sc, hwnd, ctx.window.headset_attached(), ctx.log);
     }
 
     // Each replacement goes in on its own: one that cannot be installed is
@@ -171,23 +193,19 @@ void install_swapchain_hooks(void* swapchain) noexcept {
     // without ResizeBuffers the back buffer follows the game's size after a
     // resize, without SetFullscreenState the fullscreen option may break the
     // mirror.
-    void** vtbl = *reinterpret_cast<void***>(sc);
-
-    if (auto* prev = replace_pointer(&vtbl[kPresentVtblIndex],
-                                     reinterpret_cast<void*>(&hook_Present), "Present")) {
-        ctx.originals.present = prev;
-        diag::logf("proxy: Present hooked, original=0x{:08X}", reinterpret_cast<std::uintptr_t>(prev));
+    void** vtbl = vtable_of(sc);
+    if (auto* prev = replace_slot(vtbl, kPresentVtblIndex, slot_value(&hook_present), "Present", ctx.log)) {
+        ctx.targets.present = prev;
+        ports::logf(ctx.log, kPresentHookedLog, reinterpret_cast<std::uintptr_t>(prev));
     }
-
-    if (auto* prev = replace_pointer(&vtbl[kSetFullscreenStateVtblIndex],
-                                     reinterpret_cast<void*>(&hook_SetFullscreenState), "SetFullscreenState")) {
-        ctx.originals.set_fullscreen = prev;
+    if (auto* prev = replace_slot(vtbl, kSetFullscreenStateVtblIndex, slot_value(&hook_set_fullscreen_state),
+                                  "SetFullscreenState", ctx.log)) {
+        ctx.targets.set_fullscreen = prev;
     }
-
-    if (auto* prev = replace_pointer(&vtbl[kResizeBuffersVtblIndex],
-                                     reinterpret_cast<void*>(&hook_ResizeBuffers), "ResizeBuffers")) {
-        ctx.originals.resize_buffers = prev;
-        diag::logf("proxy: ResizeBuffers hooked, original=0x{:08X}", reinterpret_cast<std::uintptr_t>(prev));
+    if (auto* prev = replace_slot(vtbl, kResizeBuffersVtblIndex, slot_value(&hook_resize_buffers), "ResizeBuffers",
+                                  ctx.log)) {
+        ctx.targets.resize_buffers = prev;
+        ports::logf(ctx.log, kResizeHookedLog, reinterpret_cast<std::uintptr_t>(prev));
     }
 }
 

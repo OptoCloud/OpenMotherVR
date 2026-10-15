@@ -3,105 +3,170 @@
 
 #include "game/sites/game_behaviour.h"
 
-#include "core/diag/logger.h" // R: game (A2): log through an injected Log&
-#include "game/addresses.h"
-#include "game/patcher.h"
+#include "game/code_address.h"
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <string_view>
 
 namespace omvr::game::sites {
 
 namespace {
 
-namespace diag = core::diag;
+constexpr std::string_view kBytePatchesLog = "[hook] camera, UI and loader patches applied";
 
-// The UI mouse patch moves the load 0x10 bytes on, from the back-buffer size
-// to the UI reference size in the same display info struct.
-constexpr std::uint8_t kUiReferenceSizeOffset = 0x10;
+// ---- 9: the bytes written (05 §7) --------------------------------------------
 
-} // namespace
+// 05 §7.1: the SSAO setting's `jne` becomes a `jmp` with the same
+// displacement, so the branch that skips SSAO is always taken.
+constexpr std::uint8_t kSsaoBranchRel = 0x29;
+constexpr std::array<std::uint8_t, x86::kJmpRel8Size> kSkipSsao = {x86::kJmpRel8, kSsaoBranchRel};
 
-bool install_game_side_hooks(const GameSideReplacements& r, GameSideOriginals& originals) noexcept {
-    auto slot = [](AiAddr a, int index) {
-        return *reinterpret_cast<void**>(ai_address(a) + 4 * index);
+// 05 §7.3: over the `mov ecx, reg` before the noise call, a jump past the
+// call.
+constexpr std::array<std::uint8_t, x86::kJmpRel8Size> kSkipCameraNoise = {
+    x86::kJmpRel8, static_cast<std::uint8_t>(x86::kCallRel32Size)};
+
+// 05 §7.4: `mov cl, [esp+disp8]` becomes `mov cl, 1` and a two-byte jump to
+// the next instruction, which keeps the four bytes' length.
+constexpr std::array<std::uint8_t, 4> kLookStateOn = {x86::kMovClImm8, 0x01, x86::kJmpRel8, 0x00};
+
+// 05 §7.5: a `jmp rel32` to the `jbe`'s target. It is one byte shorter, so
+// its displacement is one more and a `nop` fills the sixth byte.
+constexpr auto kSkipCameraCorrection = [] {
+    auto out = x86::nops<x86::kJbeRel32Size>();
+    const auto jmp = x86::jmp_rel32(kCameraCorrectionRel + (x86::kJbeRel32Size - x86::kJmpRel32Size));
+    std::copy(jmp.begin(), jmp.end(), out.begin());
+    return out;
+}();
+// The bytes this patch has always written.
+static_assert(kSkipCameraCorrection == std::array<std::uint8_t, 6>{0xE9, 0x2C, 0x03, 0x00, 0x00, 0x90});
+
+// 05 §7.6: the store of "game look enabled" in OnActivate goes.
+constexpr auto kNoLookEnable = x86::nops<x86::kMovRm8Disp32Size>();
+
+// 05 §7.8: the input-mode `je` becomes a `jmp`.
+constexpr std::array<std::uint8_t, 1> kFocusNavigation = {x86::kJmpRel8};
+
+// 05 §4.4: the menu wrappers own the stereo mode of these two screens, so
+// the game's own `mov ecx, [abs]; (push 1;) call` goes.
+constexpr std::size_t kResumePopSize = x86::kMovEcxAbsSize + x86::kCallRel32Size;
+constexpr std::size_t kPausePushSize = x86::kMovEcxAbsSize + x86::kPushImm8Size + x86::kCallRel32Size;
+constexpr auto        kSkipResumePop = x86::jump_over<kResumePopSize>();
+constexpr auto        kSkipPausePush = x86::jump_over<kPausePushSize>();
+// The jumps this patch has always written: `jmp +9` over 11 bytes, `jmp
+// +0x0B` over 13.
+static_assert(kSkipResumePop.size() == 11 && kSkipResumePop[1] == 0x09);
+static_assert(kSkipPausePush.size() == 13 && kSkipPausePush[1] == 0x0B);
+
+// 05 §7.9: `push ecx` (the remaining wait) becomes `push ebx`, so the
+// loader loop does not sleep.
+constexpr std::array<std::uint8_t, 1> kNoLoaderSleep = {x86::kPushEbx};
+
+// The UI mouse loads move on from the back-buffer size to the UI reference
+// size (05 §7.7); the preflight checked the byte the offset is added to.
+std::array<std::uint8_t, 1> ui_reference_disp(std::uint8_t back_buffer_disp_lo) noexcept {
+    return {static_cast<std::uint8_t>(back_buffer_disp_lo + kUiReferenceSizeOffset)};
+}
+
+// ---- 8: vtable slots -----------------------------------------------------------
+
+std::uint8_t* slot_at(const GameImage& g, AiAddr vtable, std::uint32_t index) noexcept {
+    return g.at(vtable) + slot_offset(index);
+}
+
+// The method in slot `index` of the vtable at `vtable`.
+void* method_at(const GameImage& g, AiAddr vtable, std::uint32_t index) noexcept {
+    return pointer_at(slot_at(g, vtable, index));
+}
+
+GameSideOriginals save_originals(const GameImage& g) noexcept {
+    return {
+        .follow_on_activate   = method_at(g, AiAddr::FollowVtable, kFollowOnActivateSlot),
+        .follow_on_deactivate = method_at(g, AiAddr::FollowVtable, kFollowOnDeactivateSlot),
+        .ui_on_message        = pointer_at(g.at(AiAddr::UiEntityMessageSlot)),
+        .menu_close           = method_at(g, AiAddr::MenuVtable, kScreenCloseSlot),
+        .pause_open           = method_at(g, AiAddr::PauseMenuVtable, kScreenOpenSlot),
+        .pause_close          = method_at(g, AiAddr::PauseMenuVtable, kScreenCloseSlot),
+        .loading_open         = method_at(g, AiAddr::LoadingScreenVtable, kScreenOpenSlot),
+        .loading_close        = method_at(g, AiAddr::LoadingScreenVtable, kScreenCloseSlot),
+        .attract_open         = method_at(g, AiAddr::AttractScreenVtable, kScreenOpenSlot),
     };
-    // Save the originals before their slots are replaced.
-    originals = {
-        .follow_on_activate   = slot(AiAddr::FollowVtable, 0),
-        .follow_on_deactivate = slot(AiAddr::FollowVtable, 1),
-        .ui_on_message        = slot(AiAddr::UiEntityMessageSlot, 0),
-        .menu_close           = slot(AiAddr::MenuVtable, 2),
-        .pause_open           = slot(AiAddr::PauseMenuVtable, 0),
-        .pause_close          = slot(AiAddr::PauseMenuVtable, 2),
-        .loading_open         = slot(AiAddr::LoadingScreenVtable, 0),
-        .loading_close        = slot(AiAddr::LoadingScreenVtable, 2),
-        .attract_open         = slot(AiAddr::AttractScreenVtable, 0),
-    };
+}
 
-    const bool slots_ok =
+bool replace_slots(const GameImage& g, Patcher& p, const GameSideReplacements& r) noexcept {
+    return
         // Track the first-person camera; watch cutscenes and level fades.
-        write_fn(ai_address(AiAddr::FollowVtable) + 0, r.follow_on_activate) &&
-        write_fn(ai_address(AiAddr::FollowVtable) + 4, r.follow_on_deactivate) &&
-        write_fn(ai_address(AiAddr::UiEntityMessageSlot), r.ui_on_message) &&
+        p.write_pointer(slot_at(g, AiAddr::FollowVtable, kFollowOnActivateSlot), r.follow_on_activate) &&
+        p.write_pointer(slot_at(g, AiAddr::FollowVtable, kFollowOnDeactivateSlot), r.follow_on_deactivate) &&
+        p.write_pointer(g.at(AiAddr::UiEntityMessageSlot), r.ui_on_message) &&
         // Menus, loading and the title video show on the virtual screen.
-        write_fn(ai_address(AiAddr::MenuVtable) + 8, r.menu_close) &&
-        write_fn(ai_address(AiAddr::PauseMenuVtable) + 0, r.pause_open) &&
-        write_fn(ai_address(AiAddr::PauseMenuVtable) + 8, r.pause_close) &&
-        write_fn(ai_address(AiAddr::LoadingScreenVtable) + 0, r.loading_open) &&
-        write_fn(ai_address(AiAddr::LoadingScreenVtable) + 8, r.loading_close) &&
-        write_fn(ai_address(AiAddr::AttractScreenVtable) + 0, r.attract_open) &&
-        write_fn(ai_address(AiAddr::AttractScreenVtable) + 8, r.attract_close);
-    if (!slots_ok) return false;
+        p.write_pointer(slot_at(g, AiAddr::MenuVtable, kScreenCloseSlot), r.menu_close) &&
+        p.write_pointer(slot_at(g, AiAddr::PauseMenuVtable, kScreenOpenSlot), r.pause_open) &&
+        p.write_pointer(slot_at(g, AiAddr::PauseMenuVtable, kScreenCloseSlot), r.pause_close) &&
+        p.write_pointer(slot_at(g, AiAddr::LoadingScreenVtable, kScreenOpenSlot), r.loading_open) &&
+        p.write_pointer(slot_at(g, AiAddr::LoadingScreenVtable, kScreenCloseSlot), r.loading_close) &&
+        p.write_pointer(slot_at(g, AiAddr::AttractScreenVtable, kScreenOpenSlot), r.attract_open) &&
+        p.write_pointer(slot_at(g, AiAddr::AttractScreenVtable, kScreenCloseSlot), r.attract_close);
+}
 
-    if (!redirect_call(ai_address(AiAddr::StereoUpdateCall), r.stereo_update, "Stereo::Update") ||
-        !redirect_call(ai_address(AiAddr::VirtualScreenCall), r.place_virtual_screen, "virtual screen") ||
-        !redirect_call(ai_address(AiAddr::HudPanelCall), r.place_hud_panel, "HUD panel")) {
+bool redirect_calls(const GameImage& g, Patcher& p, const GameSideReplacements& r) noexcept {
+    if (!p.redirect_call(g.at(AiAddr::StereoUpdateCall), r.stereo_update, "Stereo::Update") ||
+        !p.redirect_call(g.at(AiAddr::VirtualScreenCall), r.place_virtual_screen, "virtual screen") ||
+        !p.redirect_call(g.at(AiAddr::HudPanelCall), r.place_hud_panel, "HUD panel")) {
         return false;
     }
     for (AiAddr a : {AiAddr::PushModeCallA, AiAddr::PushModeCallB, AiAddr::PushModeCallC}) {
-        if (!redirect_call(ai_address(a), r.push_mode, "PushMode")) return false;
+        if (!p.redirect_call(g.at(a), r.push_mode, "PushMode")) return false;
     }
     for (AiAddr a : {AiAddr::PopModeCallA, AiAddr::PopModeCallB, AiAddr::PopModeCallC}) {
-        if (!redirect_call(ai_address(a), r.pop_mode, "PopMode")) return false;
+        if (!p.redirect_call(g.at(a), r.pop_mode, "PopMode")) return false;
     }
     return true;
 }
 
-bool apply_byte_patches(const GameImage& g, const float* head_clip_threshold) noexcept {
-    auto at = [](AiAddr a, std::ptrdiff_t offset = 0) { return ai_address(a) + offset; };
+} // namespace
+
+bool install_game_side_hooks(const GameImage& g, Patcher& patcher, const GameSideReplacements& r,
+                             GameSideOriginals& originals) noexcept {
+    // Save the game's methods before their slots are replaced.
+    originals = save_originals(g);
+    return replace_slots(g, patcher, r) && redirect_calls(g, patcher, r);
+}
+
+bool apply_byte_patches(const GameImage& g, Patcher& p, const float* head_clip_threshold) noexcept {
     const bool ok =
         // SSAO never runs: it bleeds across the side-by-side eyes.
-        patch(at(AiAddr::SsaoSettingBranch), {0xEB, 0x29}) &&
+        p.write(g.at(AiAddr::SsaoSettingBranch), kSkipSsao) &&
         // Head-in-wall blackout threshold: ours, so it follows the clipping
         // blinders option.
-        write_dword(at(AiAddr::HeadClipCompare, 3), address_of(head_clip_threshold)) &&
+        p.write_pointer(g.at(AiAddr::HeadClipCompare) + x86::kComissDispOffset, head_clip_threshold) &&
         // No procedural camera sway or breathing.
-        patch(at(AiAddr::CameraNoiseCall), {0xEB, 0x05}) &&
+        p.write(g.at(AiAddr::CameraNoiseCall), kSkipCameraNoise) &&
         // Keep the second look-integration branch of FollowBehavior on.
-        patch(at(AiAddr::FollowLookState), {0xB1, 0x01, 0xEB, 0x00}) &&
+        p.write(g.at(AiAddr::FollowLookState), kLookStateOn) &&
         // No DK2-era camera correction for head displacement.
-        patch(at(AiAddr::CameraCorrectionBranch), {0xE9, 0x2C, 0x03, 0x00, 0x00, kNop}) &&
+        p.write(g.at(AiAddr::CameraCorrectionBranch), kSkipCameraCorrection) &&
         // FollowBehavior::OnActivate leaves game look off; the stereo update
         // turns it on when snap rotation is off or keyboard/mouse is used.
-        patch(at(AiAddr::FollowOnActivatePatch, 8), {kNop, kNop, kNop, kNop, kNop, kNop}) &&
+        p.write(g.at(AiAddr::FollowOnActivatePatch) + kFollowLookStoreOffset, kNoLookEnable) &&
         // The mouse cursor maps into the 1280x720 UI space, not the
-        // side-by-side back buffer: the loads move on to the UI reference
-        // size (the preflight checked the bytes the offset is added to).
-        patch(at(AiAddr::UiMouseWidthLoad, 4),
-              {static_cast<std::uint8_t>(g.sites.ui_mouse_width_disp_lo + kUiReferenceSizeOffset)}) &&
-        patch(at(AiAddr::UiMouseHeightLoad, 4),
-              {static_cast<std::uint8_t>(g.sites.ui_mouse_height_disp_lo + kUiReferenceSizeOffset)}) &&
+        // side-by-side back buffer.
+        p.write(g.at(AiAddr::UiMouseWidthLoad) + x86::kMovssDispOffset,
+                ui_reference_disp(g.sites.ui_mouse_width_disp_lo)) &&
+        p.write(g.at(AiAddr::UiMouseHeightLoad) + x86::kMovssDispOffset,
+                ui_reference_disp(g.sites.ui_mouse_height_disp_lo)) &&
         // Menus always use focus (pad) navigation.
-        patch(at(AiAddr::UiInputModeBranch), {0xEB}) &&
+        p.write(g.at(AiAddr::UiInputModeBranch), kFocusNavigation) &&
         // The menu wrappers own the stereo mode for these two screens.
-        patch(at(AiAddr::ResumeGamePopMode), {0xEB, 0x09, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop}) &&
-        patch(at(AiAddr::PauseMenuPushMode),
-              {0xEB, 0x0B, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop, kNop}) &&
+        p.write(g.at(AiAddr::ResumeGamePopMode), kSkipResumePop) &&
+        p.write(g.at(AiAddr::PauseMenuPushMode), kSkipPausePush) &&
         // No 30 Hz throttle in the loading loop: the headset needs frames.
-        patch(at(AiAddr::LoaderSleepPush), {0x53});
-    if (ok) diag::log_line("[hook] camera, UI and loader patches applied");
+        p.write(g.at(AiAddr::LoaderSleepPush), kNoLoaderSleep);
+    if (ok) p.log().line(kBytePatchesLog);
     return ok;
 }
 

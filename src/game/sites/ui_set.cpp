@@ -2,17 +2,25 @@
 
 #include "game/sites/ui_set.h"
 
-#include "core/diag/logger.h" // R: game (A2): log through an injected Log&
-#include "game/addresses.h"
-#include "game/patcher.h"
+#include "game/code_address.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace omvr::game::sites {
 
 namespace {
 
-namespace diag = core::diag;
+namespace ports = core::diag::ports;
+
+constexpr std::string_view kArchiveRedirectedLog = "[hook] UI archive redirected to data\\mother.pak";
+constexpr std::string_view kNoModArchiveLog      = "[hook] no mod UI archive: options page unavailable, continuing";
+constexpr std::string_view kIntroPlaysStockLog   = "[hook] startup intro: plays; the options archive is not in use";
+constexpr std::string_view kIntroSkippedLog      = "[hook] startup intro: skipped";
+constexpr std::string_view kIntroPlaysFailedLog  = "[hook] startup intro: plays; the operand could not be written";
+constexpr std::string_view kScriptCallbacksLog =
+    "[hook] script callbacks: fire_bool={:08X} fire_int={:08X} fire_float={:08X}";
+constexpr std::string_view kCmdDispatchLog = "[hook] cmd dispatch slot {:08X} -> handle_mvr_command";
 
 // Strings AI.exe is pointed at. They must outlive the process's use of them,
 // hence static storage. Originally std::string members at +0x00 and +0x18 of
@@ -22,55 +30,48 @@ constexpr char kSkipBootup[]    = "SkipBootup";
 
 } // namespace
 
-bool redirect_ui_archive(bool archive_built) noexcept {
-    if (archive_built && write_dword(ai_address(AiAddr::UiPakPathPtr), address_of(kMotherPakPath))) {
-        diag::log_line("[hook] UI archive redirected to data\\mother.pak");
+bool redirect_ui_archive(const GameImage& g, Patcher& p, bool archive_built) noexcept {
+    if (archive_built && p.write_pointer(g.at(AiAddr::UiPakPathPtr), kMotherPakPath)) {
+        p.log().line(kArchiveRedirectedLog);
         return true;
     }
-    diag::log_line("[hook] no mod UI archive: options page unavailable, continuing");
+    p.log().line(kNoModArchiveLog);
     return false;
 }
 
-void skip_intro(bool mod_archive) noexcept {
+void skip_intro(const GameImage& g, Patcher& p, bool mod_archive) noexcept {
     if (!mod_archive) {
-        diag::log_line("[hook] startup intro: plays; the options archive is not in use");
-    } else if (write_dword(ai_address(AiAddr::BootupMoviePush) + 1, address_of(kSkipBootup))) {
-        diag::log_line("[hook] startup intro: skipped");
+        p.log().line(kIntroPlaysStockLog);
+    } else if (p.write_pointer(g.at(AiAddr::BootupMoviePush) + x86::kImm32Offset, kSkipBootup)) {
+        p.log().line(kIntroSkippedLog);
     } else {
-        diag::log_line("[hook] startup intro: plays; the operand could not be written");
+        p.log().line(kIntroPlaysFailedLog);
     }
 }
 
-bool hook_script_bridge(ui::ScriptVars& script_vars, ui::Console& console, const UiReplacements& r) noexcept {
-    using namespace ui;
-    script_vars.bind(reinterpret_cast<PFN_FireStr2>(ai_address(AiAddr::FireStr2)),
-                     reinterpret_cast<PFN_FireBool>(ai_address(AiAddr::FireBool)),
-                     reinterpret_cast<PFN_FireInt>(ai_address(AiAddr::FireInt)),
-                     reinterpret_cast<PFN_FireFloat>(ai_address(AiAddr::FireFloat)));
-    console.bind(reinterpret_cast<PFN_CmdHandler>(ai_address(AiAddr::OriginalCmdHandler)),
-                 reinterpret_cast<PFN_MenuMethod>(ai_address(AiAddr::MenuOpen)),
-                 ai_address(AiAddr::ExitRequest),
-                 ai_address(AiAddr::DisplayResetFlag));
-    diag::logf("[hook] script callbacks: fire_bool={:08X} fire_int={:08X} fire_float={:08X}",
-               reinterpret_cast<std::uintptr_t>(script_vars.fire_bool()),
-               reinterpret_cast<std::uintptr_t>(script_vars.fire_int()),
-               reinterpret_cast<std::uintptr_t>(script_vars.fire_float()));
+bool hook_script_bridge(const GameImage& g, Patcher& p, ui::ScriptVars& script_vars, ui::Console& console,
+                        const UiReplacements& r) noexcept {
+    script_vars.bind(CodeAddress{g.at(AiAddr::FireStr2)}, CodeAddress{g.at(AiAddr::FireBool)},
+                     CodeAddress{g.at(AiAddr::FireInt)}, CodeAddress{g.at(AiAddr::FireFloat)});
+    console.bind(CodeAddress{g.at(AiAddr::OriginalCmdHandler)}, CodeAddress{g.at(AiAddr::MenuOpen)},
+                 g.at(AiAddr::ExitRequest), g.at(AiAddr::DisplayResetFlag));
+    ports::logf(p.log(), kScriptCallbacksLog, address_of(g.at(AiAddr::FireBool)), address_of(g.at(AiAddr::FireInt)),
+                address_of(g.at(AiAddr::FireFloat)));
 
     // All console commands (the UI's ExternalInterface.call("mvr_...")) now
     // pass through handle_mvr_command first.
-    if (!write_fn(ai_address(AiAddr::CmdDispatchSlot), r.handle_mvr_command)) return false;
-    diag::logf("[hook] cmd dispatch slot {:08X} -> handle_mvr_command",
-               reinterpret_cast<std::uintptr_t>(ai_address(AiAddr::CmdDispatchSlot)));
+    if (!p.write_pointer(g.at(AiAddr::CmdDispatchSlot), r.handle_mvr_command)) return false;
+    ports::logf(p.log(), kCmdDispatchLog, address_of(g.at(AiAddr::CmdDispatchSlot)));
 
     // The Fire* methods need the game's menu object, so settings are pushed
     // from a hook on it rather than from DLL code with no object at hand.
-    return write_fn(ai_address(AiAddr::MenuVtable), r.on_menu_open);
+    return p.write_pointer(g.at(AiAddr::MenuVtable) + slot_offset(kScreenOpenSlot), r.on_menu_open).has_value();
 }
 
-bool hook_pause_settings_push(const void* replacement, void*& original) noexcept {
-    std::uint8_t* slot = ai_address(AiAddr::PauseMenuVtable);
-    original = *reinterpret_cast<void**>(slot);
-    return write_fn(slot, replacement);
+bool hook_pause_settings_push(const GameImage& g, Patcher& p, const void* replacement, void*& stock) noexcept {
+    std::uint8_t* slot = g.at(AiAddr::PauseMenuVtable) + slot_offset(kScreenOpenSlot);
+    stock = pointer_at(slot);
+    return p.write_pointer(slot, replacement).has_value();
 }
 
 } // namespace omvr::game::sites

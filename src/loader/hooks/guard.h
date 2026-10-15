@@ -1,29 +1,33 @@
 #pragma once
 
-#include "core/diag/logger.h"
+#include "core/diag/ports/log.h"
 #include "core/diag/tuning.h"
+#include "loader/context.h"
 
 #include <atomic>
 #include <exception>
+#include <string_view>
 
 namespace omvr::loader::hooks {
 
-namespace diag = core::diag;
+// The line a caught exception leaves in the log.
+inline constexpr std::string_view kCaughtExceptionLog = "[stereo] exception in {} caught: {}";
 
 // Runs `fn` for a replacement the game calls. A C++ exception from it (a
 // backend call, a failed allocation) is caught here and logged, and the
 // replacement returns `fallback`: unwinding into game code, which has no
 // handler for it, or through a noexcept function (std::terminate) would end
-// the process. Each call site (each `fn` type) logs at most 16 times, so a
-// call that throws every frame cannot flood the log; logf formats into a
-// stack buffer, without allocation.
+// the process (STYLEGUIDE 6, 7). Each call site (each `fn` type) logs at
+// most kGuardLogLimit times, so a call that throws every frame cannot flood
+// the log; logf formats into a stack buffer, without allocation.
 template <class R, class Fn>
 R guarded(const char* where, R fallback, Fn&& fn) noexcept {
     try {
         return fn();
     } catch (...) {
-        static std::atomic<int> s_logged{0};
-        if (s_logged.fetch_add(1, std::memory_order_relaxed) < diag::kGuardLogLimit) {
+        static std::atomic<int> logged{0};
+        // Relaxed: only the count matters, not what it orders.
+        if (logged.fetch_add(1, std::memory_order_relaxed) < core::diag::kGuardLogLimit) {
             const char* what = "unknown exception";
             try {
                 throw;
@@ -32,7 +36,7 @@ R guarded(const char* where, R fallback, Fn&& fn) noexcept {
             } catch (...) {
             }
             try {
-                diag::logf("[stereo] exception in {} caught: {}", where, what);
+                core::diag::ports::logf(context().log, kCaughtExceptionLog, where, what);
             } catch (...) {
             }
         }

@@ -15,20 +15,21 @@ namespace {
 LRESULT CALLBACK game_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) noexcept {
     auto& ctx = context();
     if (msg == WM_KILLFOCUS && ctx.window.headset_attached()) {
-        platform::win32::log_focus_loss();
+        platform::win32::log_focus_loss(ctx.log);
         return 0;
     }
-    return platform::win32::call_window_proc(ctx.originals.game_wndproc, hwnd, msg, wp, lp);
+    return platform::win32::call_window_proc(ctx.targets.game_wndproc, hwnd, msg, wp, lp);
 }
 
 static_assert(std::is_convertible_v<decltype(&game_wndproc), WNDPROC>);
+static_assert(std::is_convertible_v<decltype(&game_wndproc), platform::win32::WindowProc>);
 
 } // namespace
 
 void keep_focus_while_vr(void* hwnd) noexcept {
     auto& ctx = context();
-    if (!hwnd || ctx.originals.game_wndproc || !ctx.window.headset_attached()) return;
-    platform::win32::subclass_game_window(hwnd, &game_wndproc, ctx.originals.game_wndproc);
+    if (!hwnd || ctx.targets.game_wndproc || !ctx.window.headset_attached()) return;
+    platform::win32::subclass_game_window(hwnd, &game_wndproc, ctx.targets.game_wndproc, ctx.log);
 }
 
 } // namespace omvr::loader::hooks

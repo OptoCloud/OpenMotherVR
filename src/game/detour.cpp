@@ -1,21 +1,25 @@
 #include "game/detour.h"
 
-#include "core/diag/logger.h" // R: game (A2): log through an injected Log&
 #include "platform/win32/patching/inline_hook.h"
 
 #include <cstring>
+#include <string_view>
 
 namespace omvr::game {
 
-namespace diag = core::diag;
+namespace {
+
+constexpr std::string_view kUnexpectedCodeLog = "[hook] {}: unexpected code at {}, not detoured";
+
+} // namespace
 
 bool detour(std::uint8_t* target, const void* replacement, std::span<const std::uint8_t> expected,
-            void** original, const char* name) noexcept {
-    if (!target || !original || std::memcmp(target, expected.data(), expected.size()) != 0) {
-        diag::logf("[hook] {}: unexpected code at {}, not detoured", name, static_cast<void*>(target));
+            void** trampoline, const char* name, core::diag::ports::Log& log) noexcept {
+    if (!target || !trampoline || std::memcmp(target, expected.data(), expected.size()) != 0) {
+        core::diag::ports::logf(log, kUnexpectedCodeLog, name, static_cast<void*>(target));
         return false;
     }
-    return platform::win32::install_inline_hook(target, replacement, original, name);
+    return platform::win32::install_inline_hook(target, replacement, trampoline, name, log);
 }
 
 } // namespace omvr::game

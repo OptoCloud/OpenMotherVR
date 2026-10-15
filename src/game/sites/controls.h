@@ -1,7 +1,8 @@
 #pragma once
 
-#include "game/addresses.h"
+#include "game/game_image.h"
 #include "game/input/input_manager.h"
+#include "game/patcher.h"
 
 #include <cstdint>
 
@@ -20,8 +21,8 @@ struct PadReplacements {
 };
 
 // Saves the game's five pad methods into `stock` and points the vtable slots
-// at ours. `pad_vtable` is the AI.exe vtable address the original patches
-// (one slot past the destructor).
+// at ours. `pad_vtable` is the AI.exe vtable address the table names (one
+// slot past the destructor).
 //
 // The five slots are one patch (spec 04 section 3.3): with only some of
 // them replaced, the first raw IsDown query would virtualise the maps and
@@ -32,16 +33,26 @@ struct PadReplacements {
 // flag, left-stick prompt redirect) unapplied.
 //
 // From: FUN_1001d6f0 lines 368-397.
-bool install_pad_slots(std::uint8_t* pad_vtable, const PadReplacements& replacements,
+bool install_pad_slots(Patcher& patcher, std::uint8_t* pad_vtable, const PadReplacements& replacements,
                        input::StockPad& stock) noexcept;
+
+// What the controls step did.
+enum class ControlsOutcome {
+    SlotsNotWritten,   // the pad stays stock; nothing of the step is in place
+    LaterWriteFailed,  // the slots are in, a later write of the step failed
+    Installed,
+};
+
+// Sites of the controls step: five pad slots, the connected flag and two
+// prompt calls.
+inline constexpr int kControlSites = 8;
 
 // 9, controls: VR input goes through the game's gamepad, five of its vtable
 // slots replaced as one patch. Only with those in place does the pad count
 // as always connected and do the left-stick prompts ask the remapped
 // bindings; without them the real pad keeps the game's own behaviour
-// (spec 04 section 3.3). 0 when the slots were not written, -1 when a later
-// write failed, else the number of sites.
-int install_controls(std::uint8_t* game_base, const InlineSites& sites, const PadReplacements& replacements,
-                     input::StockPad& stock) noexcept;
+// (spec 04 section 3.3).
+ControlsOutcome install_controls(const GameImage& g, Patcher& patcher, const PadReplacements& replacements,
+                                 input::StockPad& stock) noexcept;
 
 } // namespace omvr::game::sites
