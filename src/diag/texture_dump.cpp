@@ -36,6 +36,12 @@ static_assert(sizeof(DdsHeader) == 124 && sizeof(DdsHeaderDx10) == 20);
 bool dump_texture(ID3D11DeviceContext* ctx, ID3D11Resource* texture,
                   const std::filesystem::path& path) noexcept {
     if (!ctx || !texture) return false;
+    std::filesystem::path target;
+    try {
+        target = path.is_relative() ? module_directory() / path : path;
+    } catch (...) {
+        return false;
+    }
     ID3D11Texture2D* src = nullptr;
     if (FAILED(texture->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&src)))) return false;
 
@@ -64,7 +70,9 @@ bool dump_texture(ID3D11DeviceContext* ctx, ID3D11Resource* texture,
             header.pitch  = mapped.RowPitch;
             DdsHeaderDx10 dx10{};
             dx10.dxgi_format = static_cast<std::uint32_t>(desc.Format);
-            std::ofstream out(path, std::ios::binary);
+            // A bare name goes to the game folder: the current directory is
+            // wherever Steam started the game.
+            std::ofstream out(target, std::ios::binary);
             const std::uint32_t magic = 0x20534444;  // "DDS "
             out.write(reinterpret_cast<const char*>(&magic), 4);
             out.write(reinterpret_cast<const char*>(&header), sizeof(header));
@@ -79,7 +87,7 @@ bool dump_texture(ID3D11DeviceContext* ctx, ID3D11Resource* texture,
         staging->Release();
     }
     logf("[diag] dump {}x{} format {} -> {} ({})", desc.Width, desc.Height,
-         static_cast<int>(desc.Format), utf8(path), ok ? "ok" : "failed");
+         static_cast<int>(desc.Format), utf8(target), ok ? "ok" : "failed");
     device->Release();
     src->Release();
     return ok;
