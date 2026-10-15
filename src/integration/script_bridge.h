@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 
 namespace mothervr::integration {
@@ -60,8 +61,12 @@ extern std::uint8_t*  g_exit_request;
 // (i.e. we own a live IVRSystem / ovrSession). Read by push_settings_to_game
 // to populate the "setMotherVROptionsEnabled" game variable.
 //
+// Atomic: written on the game thread (CreateDevice) and on the render thread
+// (a runtime that fails late, in the stereo device's slot 3, or the OpenXR
+// start at the first Present), read on the game thread.
+//
 // Corresponds to the *(StereoManager + 4) != nullptr check in FUN_10020870.
-extern bool g_vr_session_active;
+extern std::atomic<bool> g_vr_session_active;
 
 // AI.exe's "display changed" byte: when set, the game's frame loop rebuilds
 // its render targets (as after a window resize). Raised when a settings push

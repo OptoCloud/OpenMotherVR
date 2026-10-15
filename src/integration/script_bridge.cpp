@@ -41,7 +41,7 @@ PFN_CmdHandler g_original_cmd = nullptr;
 PFN_MenuMethod g_original_menu_open = nullptr;
 std::uint8_t*  g_exit_request       = nullptr;
 
-bool          g_vr_session_active    = false;
+std::atomic<bool> g_vr_session_active{false};
 std::uint8_t*  g_display_reset_flag = nullptr;
 
 // ---- Helpers ----------------------------------------------------------------
