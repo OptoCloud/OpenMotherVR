@@ -10,7 +10,7 @@ class FramePeriod {
 public:
     explicit constexpr FramePeriod(std::uint32_t period) noexcept : period_(period) {}
 
-    bool tick() noexcept { return period_ != 0 && ++count_ % period_ == 0; }
+    [[nodiscard]] bool tick() noexcept { return period_ != 0 && ++count_ % period_ == 0; }
 
 private:
     std::uint32_t period_;

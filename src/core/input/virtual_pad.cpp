@@ -7,143 +7,89 @@
 
 #include "core/input/virtual_pad.h"
 
-#include "core/diag/logger.h"
-#include "core/input/remap.h"
+#include "core/input/glyph_ids.h"
 
 #include <cmath>
 #include <cstddef>
-#include <utility>
+#include <string_view>
 
 namespace omvr::core::input {
 
-using game::input::action_map;
-using game::input::kDeviceActive;
+namespace {
+
+constexpr std::string_view kRemapLog =
+    "[input] action maps virtualised: digital/analog {}/{} {}/{} {}/{}";
+constexpr std::string_view kStockGlyphsLog =
+    "[input] no mod UI archive: button prompts keep the game's pad glyphs";
+
+} // namespace
 
 // From: FUN_100031b0.
-void VirtualPad::remap_all() noexcept {
-    std::uint8_t* mgr = manager_.manager();
-    if (!mgr) return;
-    for (int i = 0; i < 3; ++i) {
-        remap(g_tiers[i], action_map(mgr, i));
-    }
-    if (!std::exchange(s_remap_logged, true)) {
-        diag::logf("[input] action maps virtualised: digital/analog {}/{} {}/{} {}/{}",
-                   g_tiers[0].num_digital, g_tiers[0].num_analog,
-                   g_tiers[1].num_digital, g_tiers[1].num_analog,
-                   g_tiers[2].num_digital, g_tiers[2].num_analog);
-    }
+void VirtualPad::log_remap() noexcept {
+    diag::ports::logf(log_, kRemapLog, tiers_[0].num_digital, tiers_[0].num_analog, tiers_[1].num_digital,
+                      tiers_[1].num_analog, tiers_[2].num_digital, tiers_[2].num_analog);
 }
 
-// bool IsDown(int code). A raw pad code means the maps were (re)loaded and
-// need virtualising; the game then sees nothing for it.
-// From: FUN_10008d50 (ret 4).
-bool VirtualPad::is_down(void* self, int code) noexcept {
-    if (code < 0x100) {
-        if (code != -1) remap_all();
-        return false;
-    }
-    const ActionTier& t = tier_for(g_tiers, code);
-    const int o = original_code(g_tiers, code);
-    bool down = o != -1 && g_game.is_down(self, nullptr, o);
+// bool IsDown(int code). From: FUN_10008d50 (ret 4).
+bool VirtualPad::merge_down(int code, bool stock_down) const noexcept {
+    const ActionTier& t = tier_for(tiers_, code);
     const int k = code - t.base;
-    if (k >= 0 && k < t.num_digital) down |= t.digital[k] != 0;
-    return down;
+    const bool vr_down = k >= 0 && k < t.num_digital && t.digital[static_cast<std::size_t>(k)] != 0;
+    return stock_down || vr_down;
 }
 
-// float GetValue(int code): non-negative, the larger of pad and VR.
-// From: FUN_10008f00 (ret 4).
-float VirtualPad::value(void* self, int code) noexcept {
-    if (code < 0x100) return 0.0f;
-    const float game = g_game.value(self, nullptr, original_code(g_tiers, code));
-    const float vr   = vr_analog(tier_for(g_tiers, code), code);
-    return vr > game ? vr : game;
+// float GetValue(int code). From: FUN_10008f00 (ret 4).
+float VirtualPad::merge_value(int code, float stock_value) const noexcept {
+    const float vr = vr_analog(tier_for(tiers_, code), code);
+    return vr > stock_value ? vr : stock_value;
 }
 
-// float GetAxis(int code, bool negate): signed, whichever has the larger
-// magnitude. The VR value is not negated: the runtimes write signed values.
-// From: FUN_10008e20 (ret 8).
-float VirtualPad::axis(void* self, int code, int negate) noexcept {
-    if (code < 0x100) return 0.0f;
-    const float game = g_game.axis(self, nullptr, original_code(g_tiers, code), negate);
-    const float vr   = vr_analog(tier_for(g_tiers, code), code);
-    return std::fabs(vr) > std::fabs(game) ? vr : game;
+// float GetAxis(int code, bool negate). From: FUN_10008e20 (ret 8).
+float VirtualPad::merge_axis(int code, float stock_axis) const noexcept {
+    const float vr = vr_analog(tier_for(tiers_, code), code);
+    return std::fabs(vr) > std::fabs(stock_axis) ? vr : stock_axis;
 }
 
-// const char* ControlToName(uint16 code): the glyph id for button prompts.
-// From: FUN_10009030 (ret 4; the compare is on the signed 16-bit code).
-const char* VirtualPad::control_name(void* self, std::uint32_t raw) noexcept {
-    const auto code = static_cast<std::int16_t>(raw);
-    if (code < 0x100) return nullptr;
-    const int o = original_code(g_tiers, code);
-    if (!g_vr_glyphs || !g_vr_glyphs_allowed.load(std::memory_order_relaxed)) {
-        return g_game.name(self, nullptr, static_cast<std::uint16_t>(o));
-    }
-    if (o < 0 || static_cast<std::size_t>(o) >= glyphs_.size()) return "VR_MENU"; // original throws past the end
-    return glyphs_.name(static_cast<std::size_t>(o));
+// const char* ControlToName(uint16 code). From: FUN_10009030 (ret 4).
+bool VirtualPad::shows_vr_glyphs() const noexcept {
+    return vr_glyphs_ && vr_glyphs_allowed_.load(std::memory_order_relaxed);
 }
 
-// bool HasActivity(): the game uses it to pick the active input device.
-// VR activity counts as pad activity. When the source flips between VR and
-// the pad, the pad is marked inactive for one call so the game runs its
-// device-changed path and refreshes the button prompts.
-// From: FUN_10008fa0 (ret 0).
-bool VirtualPad::has_activity(void* self) noexcept {
-    const bool game = g_game.activity(self, nullptr);
-    const bool vr   = g_vr_activity.exchange(false);
-    const bool any  = game || vr;
+const char* VirtualPad::vr_glyph(int stock) const noexcept {
+    // Bounds checked: "none" or a code outside the game's pad codes shows
+    // the unbound glyph (04 §3.3).
+    if (stock < 0 || static_cast<std::size_t>(stock) >= glyphs_.size()) return kGlyphUnbound;
+    return glyphs_.name(static_cast<std::size_t>(stock));
+}
+
+// bool HasActivity(). From: FUN_10008fa0 (ret 0).
+ActivityResult VirtualPad::on_activity(bool stock_activity, PlayerDevices devices) noexcept {
+    // Read and cleared as one operation, so activity the render thread
+    // writes in between is never lost (04 §3.3).
+    const bool vr = vr_activity_.exchange(false);
+    ActivityResult result{stock_activity || vr, DeviceSwitch::None};
     // Without the mod's UI archive the prompts stay in stock-glyph mode.
-    const bool want_vr = vr && g_vr_glyphs_allowed.load(std::memory_order_relaxed);
+    const bool want_vr = vr && vr_glyphs_allowed_.load(std::memory_order_relaxed);
 
-    std::uint8_t* mgr = manager_.manager();
-    if (!mgr) return any;
-    // The player map's pad and keyboard devices (device_by_type[0], [1]).
-    // An entry stays null until the game has registered a device of that
-    // type, so neither is written through unless it exists; without both,
-    // the mode still changes and the prompts pick it up at the game's next
-    // device change (spec 04 section 4.2).
-    void* const* devices = action_map(mgr, 0).device_by_type;
-    auto* const pad      = static_cast<std::uint8_t*>(devices[0]);
-    auto* const keyboard = static_cast<std::uint8_t*>(devices[1]);
-    if (any && g_vr_glyphs != want_vr) {
-        g_vr_glyphs = want_vr;
-        if (pad && keyboard) {
-            g_device_pulse          = true;
-            pad[kDeviceActive]      = 0;
-            keyboard[kDeviceActive] = 1;
+    // Game fields are touched only while the input manager exists (04 §4.2).
+    if (devices == PlayerDevices::NoManager) return result;
+    if (result.any && vr_glyphs_ != want_vr) {
+        vr_glyphs_ = want_vr;
+        // Without both devices the mode still changes and the prompts pick
+        // it up at the game's next device change.
+        if (devices == PlayerDevices::Both) {
+            device_pulse_   = true;
+            result.devices = DeviceSwitch::PulseKeyboard;
         }
-    } else if (g_device_pulse) {
-        g_device_pulse = false;
-        if (pad) pad[kDeviceActive] = 1;
-        if (keyboard) keyboard[kDeviceActive] = 0;
+    } else if (device_pulse_) {
+        device_pulse_   = false;
+        result.devices = DeviceSwitch::RestorePad;
     }
-    return any;
+    return result;
 }
 
 void VirtualPad::use_stock_glyphs_only() noexcept {
-    if (g_vr_glyphs_allowed.exchange(false)) {
-        diag::log_line("[input] no mod UI archive: button prompts keep the game's pad glyphs");
-    }
+    if (vr_glyphs_allowed_.exchange(false)) log_.line(kStockGlyphsLog);
 }
-
-bool VirtualPad::pad_button(void* pad, int pad_code) const noexcept {
-    return g_game.is_down && g_game.is_down(pad, nullptr, pad_code);
-}
-
-// Without the replacements in place, VR has no effect on the pad: activity
-// is the stock pad's own and there is no merged turn value.
-bool VirtualPad::pad_activity(void* pad) noexcept {
-    if (!g_game.activity) return false;
-    return g_installed.load() ? has_activity(pad) : g_game.activity(pad, nullptr);
-}
-
-float VirtualPad::pad_axis_value(void* pad, int virtual_code) noexcept {
-    return g_game.axis && g_installed.load() ? axis(pad, virtual_code, 0) : 0.0f;
-}
-
-int VirtualPad::analog_virtual_code(int map, int index) const noexcept {
-    return input::analog_virtual_code(g_tiers, map, index);
-}
-
-bool VirtualPad::move_on_left_stick() const noexcept { return input::move_on_left_stick(g_tiers); }
 
 } // namespace omvr::core::input

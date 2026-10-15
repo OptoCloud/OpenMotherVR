@@ -1,6 +1,7 @@
 #pragma once
 
-// The button-prompt ids the mod's UI movies map to VR controller images.
+// The button-prompt ids the mod's UI movies map to VR controller images
+// (04 §4.1).
 namespace omvr::core::input {
 
 inline constexpr const char* kGlyphTouchpadDown   = "VR_TP_D";
@@ -14,5 +15,9 @@ inline constexpr const char* kGlyphY              = "VR_Y";
 inline constexpr const char* kGlyphX              = "VR_X";
 inline constexpr const char* kGlyphLeftGrip       = "VR_LG";
 inline constexpr const char* kGlyphRightGrip      = "VR_RG";
+
+// The glyph for an action with no pad control, or one outside the game's
+// pad codes (04 §3.3, §4.1). The UI draws it under the menu id.
+inline constexpr const char* kGlyphUnbound = kGlyphMenu;
 
 } // namespace omvr::core::input

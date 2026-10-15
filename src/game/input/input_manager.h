@@ -2,21 +2,17 @@
 
 #include "game/layout.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
-// The game's input manager and its pad device. Analysis:
+// The game's input manager and its pad device (04 §2.1 to §2.3). Analysis:
 // dumps/06d_vr_input.md.
 namespace omvr::game::input {
 
-// The input manager, by offset: the three action maps, and the devices the
-// stereo update polls (from FUN_1001f8a0). A device's +0x11 byte is the
-// game's "active device" flag.
-inline constexpr std::ptrdiff_t kMapOffsets[3]  = {0x48, 0x2998, 0x3A0C};
-inline constexpr std::ptrdiff_t kManagerMouse    = 0x4A70;
-inline constexpr std::ptrdiff_t kManagerKeyboard = 0x4A74;
-inline constexpr std::ptrdiff_t kManagerPad      = 0x4A7C;
-inline constexpr std::ptrdiff_t kDeviceActive    = 0x11;
+// The input manager's offsets (the three action maps, and the devices the
+// stereo update polls, from FUN_1001f8a0) are in game/layout.h.
 
 // ---- The game's pad methods (all __thiscall; __fastcall with an unused EDX) ----
 
@@ -26,7 +22,7 @@ using AxisFn     = float       (__fastcall*)(void* self, void* edx, int code, in
 using NameFn     = const char* (__fastcall*)(void* self, void* edx, std::uint32_t code);
 using ActivityFn = bool        (__fastcall*)(void* self, void* edx);
 
-// The stock pad methods behind the five replaced vtable slots.
+// The stock pad methods behind the five replaced vtable slots (04 §2.3).
 struct StockPad {
     IsDownFn   is_down  = nullptr;
     ValueFn    value    = nullptr;
@@ -35,29 +31,52 @@ struct StockPad {
     ActivityFn activity = nullptr;
 };
 
-// The game's input manager, through the AI.exe global that holds it.
+// The three action maps of the manager: 0 player, 1 menus, 2 other.
+using ActionMaps = std::array<GameActionMap*, kActionMapCount>;
+
+// Map 0's pad and keyboard devices (device_by_type[0], [1]). An entry stays
+// null until the game has registered a device of that type (04 §4.2).
+struct PlayerDevices {
+    std::uint8_t* pad      = nullptr;
+    std::uint8_t* keyboard = nullptr;
+};
+
+// The game's input manager, through the AI.exe global that holds it. Game
+// thread.
 class InputManager {
 public:
     // `input_manager` is the AI.exe global holding the manager pointer.
-    void bind(void** input_manager) noexcept { g_input_manager = input_manager; }
+    void bind(void** input_manager) noexcept { manager_global_ = input_manager; }
 
-    // The manager, null until the game has created it.
-    std::uint8_t* manager() const noexcept;
+    // The manager, null until the game has created it (or before bind()).
+    [[nodiscard]] std::uint8_t* manager() const noexcept;
 
     // The game's input devices, read from its input manager: the pad,
     // keyboard and mouse the stereo update polls. Null until the game has
     // created the manager, or before bind().
-    void* pad_device() const noexcept;
-    void* keyboard_device() const noexcept;
-    void* mouse_device() const noexcept;
+    [[nodiscard]] void* pad_device() const noexcept;
+    [[nodiscard]] void* keyboard_device() const noexcept;
+    [[nodiscard]] void* mouse_device() const noexcept;
+
+    // The action maps, or nullopt until the game has created the manager.
+    [[nodiscard]] std::optional<ActionMaps> action_maps() const noexcept;
+
+    // Map 0's pad and keyboard, or nullopt until the game has created the
+    // manager.
+    [[nodiscard]] std::optional<PlayerDevices> player_devices() const noexcept;
 
 private:
-    void* manager_field(std::ptrdiff_t offset) const noexcept;
+    [[nodiscard]] void* manager_field(std::ptrdiff_t offset) const noexcept;
 
-    void** g_input_manager = nullptr;
+    // Lives in AI.exe's data for the whole process.
+    void** manager_global_ = nullptr;
 };
 
 // Action map `index` (0 player, 1 UI, 2 other) of the manager `mgr`.
-GameActionMap& action_map(std::uint8_t* mgr, int index) noexcept;
+[[nodiscard]] GameActionMap& action_map(std::uint8_t* mgr, std::size_t index) noexcept;
+
+// Sets or clears a device's "is the active device" byte (04 §2.2). `device`
+// must not be null.
+void set_device_active(std::uint8_t* device, bool active) noexcept;
 
 } // namespace omvr::game::input

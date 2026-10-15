@@ -3,9 +3,10 @@
 #include "game/constants.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
-// VR input through AI.exe's XInput gamepad.
+// VR input through AI.exe's XInput gamepad (04 §3).
 //
 // MotherVR does not add an input device. It virtualises the gamepad: every
 // gamepad binding in the game's three action maps is rebound to a virtual
@@ -24,46 +25,53 @@ namespace omvr::core::input {
 // FUN_10003050 (layout of the original's is in the analysis doc; ours need
 // not match).
 struct ActionTier {
-    std::array<std::uint8_t, 0x2C> digital{};   // VR state of digital action k
-    std::array<float, 0x10>        analog{};    // VR value of analog action j
+    std::array<std::uint8_t, game::kMaxDigitalActions> digital{};   // VR state of digital action k
+    std::array<float, game::kMaxAnalogActions>         analog{};    // VR value of analog action j
     int base        = 0;
     int num_digital = 0;
     int num_analog  = 0;
-    std::array<std::int16_t, 0x39> original_code{}; // [k] / [num_digital + j]; -1 = none
+    // [k] / [num_digital + j]: the pad control action k (j) had before the
+    // remap; kNoPadControl = none.
+    std::array<std::int16_t, game::kMaxDigitalActions + game::kMaxAnalogActions> stock_code{};
 };
 
 // The three tiers: [0] player map, [1] UI map, [2] a third map VR never
 // writes (its pad bindings are still virtualised and pass through).
-using ActionTiers = std::array<ActionTier, 3>;
+inline constexpr std::size_t kTierCount = game::kActionMapCount;
+using ActionTiers = std::array<ActionTier, kTierCount>;
+
+// A code the replaced pad methods treat as a virtual code: at or above the
+// first tier's base, outside the game's pad codes (04 §3.1).
+[[nodiscard]] constexpr bool is_virtual_code(int code) noexcept { return code >= game::kTierBase[0]; }
 
 // The tiers with their bases and no recorded pad codes.
-ActionTiers make_tiers() noexcept;
+[[nodiscard]] ActionTiers make_tiers() noexcept;
 
 // The tier a virtual code belongs to.
-ActionTier& tier_for(ActionTiers& tiers, int code) noexcept;
-const ActionTier& tier_for(const ActionTiers& tiers, int code) noexcept;
+[[nodiscard]] ActionTier& tier_for(ActionTiers& tiers, int code) noexcept;
+[[nodiscard]] const ActionTier& tier_for(const ActionTiers& tiers, int code) noexcept;
 
-// The pad code a virtual code stood for, -1 for none. The original indexes
-// with code & 0xFF unchecked; codes we did not create (a stale map, 0x300..)
-// would read past the tier. From: FUN_10003130.
-int original_code(const ActionTiers& tiers, int code) noexcept;
+// The pad code a virtual code stood for, kNoPadControl for none. Bounds
+// checked: codes we did not create (a stale map, 0x300..) would otherwise
+// read past the tier (04 §3.1). From: FUN_10003130.
+[[nodiscard]] int stock_code(const ActionTiers& tiers, int code) noexcept;
 
 // Analog VR value for a virtual code, or 0 when the code is a digital
-// action. The original indexes without a bounds check.
-float vr_analog(const ActionTier& t, int code) noexcept;
+// action. Bounds checked.
+[[nodiscard]] float vr_analog(const ActionTier& t, int code) noexcept;
 
 // The virtual code of analog action `index` of action map `map`, derived
 // from the counts read at the last virtualisation (spec 04 section 3.1: the
 // turn is map 0's analog action 3 whatever the digital count is), or -1
 // before the maps are virtualised or when the map has no such action.
 // Game thread.
-int analog_virtual_code(const ActionTiers& tiers, int map, int index) noexcept;
+[[nodiscard]] int analog_virtual_code(const ActionTiers& tiers, int map, int index) noexcept;
 
 // The stock left-stick prompt check, answered for virtualised bindings:
 // true when map 0's analog action 0 (move) was on LSTICK_X, or has no pad
 // control at all (before the first virtualisation every action has none,
 // and the stock check answers true without a pad binding). Spec 04
 // section 4.3. Game thread.
-bool move_on_left_stick(const ActionTiers& tiers) noexcept;
+[[nodiscard]] bool move_on_left_stick(const ActionTiers& tiers) noexcept;
 
 } // namespace omvr::core::input

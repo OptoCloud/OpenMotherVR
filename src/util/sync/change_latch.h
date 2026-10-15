@@ -10,7 +10,7 @@ namespace omvr::util {
 template <class T>
 class ChangeLatch {
 public:
-    bool changed(const T& value) {
+    [[nodiscard]] bool changed(const T& value) {
         if (last_ && *last_ == value) return false;
         last_ = value;
         return true;

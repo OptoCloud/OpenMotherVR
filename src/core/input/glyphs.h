@@ -1,15 +1,25 @@
 #pragma once
 
+#include "game/constants.h"
+
 #include <array>
 #include <atomic>
 #include <cstddef>
 
 namespace omvr::core::input {
 
+// The game's own pad control names, by pad code (04 §2.3): what the stock
+// ControlToName returns, and the glyphs shown until a VR set is chosen.
+inline constexpr std::array<const char*, game::kPadCodeCount> kStockPadNames = {
+    "A", "B", "X", "Y", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
+    "BACK", "START", "LB", "RB", "LT_BUTTON", "RT_BUTTON", "LSTICK_BUTTON",
+    "RSTICK_BUTTON", "LT", "RT", "LSTICK_X", "LSTICK_Y", "RSTICK_X", "RSTICK_Y",
+    "TOUCH_ZOOM_IN", "TOUCH_ZOOM_OUT",
+};
+
 // The button-prompt glyph shown for each pad code while VR glyphs are
-// active. Initially the game's pad names ("A", "B", ...); the runtimes
-// override some with "VR_*" ids that the modded UI maps to controller
-// images.
+// active. Initially the game's pad names; the runtimes override some with
+// "VR_*" ids that the modded UI maps to controller images (04 §4.1).
 //
 // Original: the std::vector<std::string> at DAT_100686d4, built by
 // FUN_10001090. Literals here, so the pointers handed to the game stay valid
@@ -19,21 +29,20 @@ namespace omvr::core::input {
 // themselves never change, so relaxed ordering is enough.
 class Glyphs {
 public:
+    Glyphs() noexcept;
+
     // The game keeps the pointer it is handed, so `name` must be a string
-    // literal (or otherwise live for the whole process).
+    // literal (or otherwise live for the whole process). Render thread.
     void set_glyph(int pad_code, const char* name) noexcept;
 
-    // The glyph for pad code `code`, which must be in range.
-    const char* name(std::size_t code) const noexcept { return g_glyphs[code].load(std::memory_order_relaxed); }
-    std::size_t size() const noexcept { return g_glyphs.size(); }
+    // The glyph for pad code `code`, which must be in range. Game thread.
+    [[nodiscard]] const char* name(std::size_t code) const noexcept {
+        return names_[code].load(std::memory_order_relaxed);
+    }
+    [[nodiscard]] std::size_t size() const noexcept { return names_.size(); }
 
 private:
-    std::array<std::atomic<const char*>, 24> g_glyphs = {
-        "A", "B", "X", "Y", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
-        "BACK", "START", "LB", "RB", "LT_BUTTON", "RT_BUTTON", "LSTICK_BUTTON",
-        "RSTICK_BUTTON", "LT", "RT", "LSTICK_X", "LSTICK_Y", "RSTICK_X", "RSTICK_Y",
-        "TOUCH_ZOOM_IN", "TOUCH_ZOOM_OUT",
-    };
+    std::array<std::atomic<const char*>, game::kPadCodeCount> names_;
 };
 
 } // namespace omvr::core::input

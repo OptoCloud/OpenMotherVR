@@ -1,16 +1,14 @@
 #pragma once
 
+#include "game/addresses.h"
+
 namespace omvr::game::input {
 
 // keyboard.KeyDown(scancode), keyboard.AnyKey() and mouse.Active(), the
-// game's own, on the devices its input manager holds.
-bool key_down(void* keyboard, int scancode) noexcept;
-bool any_key(void* keyboard) noexcept;
-bool mouse_active(void* mouse) noexcept;
-
-// Scan codes the stereo update reads.
-inline constexpr int kScanLCtrl = 0x1D, kScanLAlt = 0x38;
-// Pad codes the stereo update reads.
-inline constexpr int kPadLB = 10, kPadRB = 11, kPadRStick = 15;
+// game's own (04 §2.2), on the devices its input manager holds. Game thread.
+// The scan and pad codes are in game/constants.h.
+[[nodiscard]] bool key_down(const AddressMap& addresses, void* keyboard, int scancode) noexcept;
+[[nodiscard]] bool any_key(const AddressMap& addresses, void* keyboard) noexcept;
+[[nodiscard]] bool mouse_active(const AddressMap& addresses, void* mouse) noexcept;
 
 } // namespace omvr::game::input

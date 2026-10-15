@@ -6,105 +6,168 @@
 
 #include "core/input/control_mapper.h"
 
-#include "core/config/settings_store.h"
+#include "game/constants.h"
 #include "core/input/touchpad.h"
 #include "core/input/tuning.h"
 #include "core/input/virtual_pad.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 namespace omvr::core::input {
 
+namespace {
+
+// What one frame of controls means for the game's actions, before it is
+// written to the tiers (04 §5.8.5). Pure values.
+struct GameActions {
+    float move_x = 0, move_y = 0;
+    float turn = 0;
+    bool  next_weapon = false, prev_weapon = false;
+    bool  flashlight = false;
+    bool  confirm = false;
+    bool  aim = false, tracker = false;
+};
+
+// 04 §5.8.5 Turn: with snap rotation a touchpad turn needs a click; sticks
+// just push. Only a horizontal push outside the centre turns.
+float turn_value(const Controls& c, const TouchpadRegions& stick, bool snap_rotation) noexcept {
+    if (snap_rotation && !c.turn_engaged) return 0.0f;
+    if (!stick.horizontal || stick.centre) return 0.0f;
+    return c.turn.x * (c.touchpad_scheme ? kTouchpadTurnScale : 1.0f);
+}
+
+// 04 §5.2: the touchpad's scale reaches full speed short of the rim; the
+// result stays on the unit disc the game expects of a stick, so a diagonal
+// is never faster than straight ahead.
+Vec2 move_value(const Controls& c) noexcept {
+    const float scale = c.touchpad_scheme ? kTouchpadMoveScale : 1.0f;
+    Vec2 move{c.move.x * scale, c.move.y * scale};
+    if (const float len = std::hypot(move.x, move.y); len > 1.0f) {
+        move.x /= len;
+        move.y /= len;
+    }
+    return move;
+}
+
+GameActions game_actions(const Controls& c, bool near_head, bool snap_rotation, bool aim, bool tracker) noexcept {
+    const TouchpadRegions stick = decode_touchpad(c.turn, false);
+    GameActions a;
+    const Vec2 move = move_value(c);
+    a.move_x = move.x;
+    a.move_y = move.y;
+    a.turn   = turn_value(c, stick, snap_rotation);
+    // Sticks also select weapons up and down (04 §5.3).
+    const bool weapon_stick = !c.touchpad_scheme && !stick.horizontal;
+    a.next_weapon = weapon_stick && c.turn.y > kWeaponStickDeflection;
+    a.prev_weapon = weapon_stick && c.turn.y < -kWeaponStickDeflection;
+    a.flashlight  = c.flashlight || (c.interact && near_head);
+    a.confirm     = c.interact || (c.touchpad_scheme && c.sprint);
+    a.aim         = aim;
+    a.tracker     = tracker;
+    return a;
+}
+
+// Writes action values into one tier and notes whether any of them counts
+// as VR activity (04 §5.1).
+class TierWriter {
+public:
+    explicit TierWriter(ActionTier& tier) noexcept : tier_(tier) {}
+
+    void digital(int k, bool v) noexcept {
+        tier_.digital[static_cast<std::size_t>(k)] = v;
+        active_ |= v;
+    }
+
+    // Every analog value stays within the range the game's own pad
+    // delivers, scaled or not: a runtime may report a stick slightly past 1
+    // (spec 04 section 9). NaN fails both compares of clamp, so map it to 0
+    // first.
+    void analog(int j, float v) noexcept {
+        v = std::isnan(v) ? 0.0f : std::clamp(v, -kAnalogLimit, kAnalogLimit);
+        tier_.analog[static_cast<std::size_t>(j)] = v;
+        active_ |= std::fabs(v) > kActivityThreshold;
+    }
+
+    [[nodiscard]] bool active() const noexcept { return active_; }
+
+private:
+    ActionTier& tier_;
+    bool        active_ = false;
+};
+
+// Player map (names from the controls help, 04 §2.4).
+void write_player_map(TierWriter& w, const Controls& c, const GameActions& a) noexcept {
+    using namespace game::player_action;
+    const bool fire = c.trigger_r > kTriggerPressed;
+    w.digital(kSprint, c.sprint);
+    w.digital(kCrouch, c.trigger_l > kTriggerPressed);
+    w.digital(kAim, a.aim);
+    w.digital(kFire, fire);
+    w.digital(kFire2, fire);
+    w.digital(kInteract, c.interact);
+    w.digital(kInteract2, c.interact);
+    w.digital(kRadial, c.radial);
+    w.digital(kReload, c.reload);
+    w.digital(kReload2, c.reload);
+    w.digital(kPrevWeapon, a.prev_weapon);
+    w.digital(kNextWeapon, a.next_weapon);
+    w.digital(kTracker, a.tracker);
+    w.digital(kFlashlight, a.flashlight);
+    w.digital(kMap, c.map);
+    w.digital(kLeftGripHeld, c.grip_l);
+    w.digital(kRightGripHeld, c.grip_r);
+    w.analog(kMoveX, a.move_x);
+    w.analog(kMoveY, a.move_y);
+    w.analog(kTurn, a.turn);
+}
+
+// Menu map (04 §2.4).
+void write_menu_map(TierWriter& w, const Controls& c, const GameActions& a) noexcept {
+    using namespace game::menu_action;
+    w.digital(kConfirm, a.confirm);
+    w.digital(kConfirm2, a.confirm);
+    w.digital(kRadial, c.radial);
+    w.digital(kPause, c.pause);
+    w.digital(kLeftGripHeld, c.grip_l);
+    w.digital(kBack, c.reload);
+    w.digital(kBack2, c.reload);
+    w.digital(kFlashlight, a.flashlight);
+    w.digital(kFlashlight2, a.flashlight);
+    w.analog(kTriggerL, c.trigger_l);
+    w.analog(kTriggerR, c.trigger_r);
+    w.analog(kMoveX, c.move.x);
+    w.analog(kMoveY, c.move.y);
+    w.analog(kTurnX, c.turn.x);
+    w.analog(kTurnY, c.turn.y);
+}
+
+} // namespace
+
+void ControlMapper::GripToggles::update(bool grip_r, bool grip_l, bool toggle) noexcept {
+    if (toggle) {
+        if (grip_r && !prev_grip_r_) aim_ = !aim_;
+        if (grip_l && !prev_grip_l_) tracker_ = !tracker_;
+    }
+    prev_grip_r_ = grip_r;
+    prev_grip_l_ = grip_l;
+}
+
 void ControlMapper::write(const Controls& c, bool near_head) noexcept {
-    const auto& cfg = config::current().input;
+    const bool toggle = settings_.toggle_grips;
+    grips_.update(c.grip_r, c.grip_l, toggle);
+    const bool aim     = toggle ? grips_.aim() : c.grip_r;
+    const bool tracker = toggle ? grips_.tracker() : c.grip_l && !c.radial;
+    const GameActions actions = game_actions(c, near_head, settings_.snap_rotation, aim, tracker);
 
-    const float tx = c.turn.x, ty = c.turn.y;
-    const auto pad = decode_touchpad(c.turn, false);
-    const bool horiz = pad.horizontal, centre = pad.centre;
-    // With snap rotation a touchpad turn needs a click; sticks just push.
-    const float turn = (cfg.snap_rotation && !c.turn_engaged) ? 0.0f
-                     : (horiz && !centre) ? tx * (c.touchpad_scheme ? kTurnScale : 1.0f) : 0.0f;
-    // Sticks also select weapons up and down.
-    const bool next_weapon = !c.touchpad_scheme && !horiz && ty > 0.5f;
-    const bool prev_weapon = !c.touchpad_scheme && !horiz && ty < -0.5f;
-    const float move_scale = c.touchpad_scheme ? kMoveScale : 1.0f;
-    const bool flashlight = c.flashlight || (c.interact && near_head);
-    const bool confirm = c.interact || (c.touchpad_scheme && c.sprint);
+    auto& tiers = pad_.tiers();
+    TierWriter player{tiers[game::kPlayerMap]};
+    TierWriter menu{tiers[game::kMenuMap]};
+    write_player_map(player, c, actions);
+    write_menu_map(menu, c, actions);
 
-    if (cfg.toggle_grips) {
-        if (c.grip_r && !g_prev_grip_r) g_aim_toggled = !g_aim_toggled;
-        if (c.grip_l && !g_prev_grip_l) g_tracker_toggled = !g_tracker_toggled;
-    }
-    g_prev_grip_r = c.grip_r;
-    g_prev_grip_l = c.grip_l;
-    const bool aim     = cfg.toggle_grips ? g_aim_toggled : c.grip_r;
-    const bool tracker = cfg.toggle_grips ? g_tracker_toggled : c.grip_l && !c.radial;
-
-    auto& t = pad_.tiers();
-    bool active = false;
-    auto digital = [&active](ActionTier& tier, int k, bool v) {
-        tier.digital[k] = v;
-        active |= v;
-    };
-    // Every analog value stays within the range the game's own pad delivers,
-    // scaled or not: a runtime may report a stick slightly past 1 (spec 04
-    // section 9). NaN fails both compares of clamp, so map it to 0 first.
-    auto analog = [&active](ActionTier& tier, int j, float v) {
-        v = std::isnan(v) ? 0.0f : std::clamp(v, -1.0f, 1.0f);
-        tier.analog[j] = v;
-        active |= std::fabs(v) > kActive;
-    };
-
-    // Player map (names from the controls help).
-    auto& a = t[0];
-    digital(a, 0x08, c.sprint);                // Sprint
-    digital(a, 0x09, c.trigger_l > 0.5f);      // Crouch
-    digital(a, 0x0A, aim);                     // Aim
-    digital(a, 0x0B, c.trigger_r > 0.5f);      // Fire / Throw / Melee
-    digital(a, 0x0E, c.trigger_r > 0.5f);
-    digital(a, 0x0C, c.interact);              // Interact
-    digital(a, 0x0F, c.interact);
-    digital(a, 0x0D, c.radial);                // Radial menu
-    digital(a, 0x10, c.reload);                // Reload / Activate
-    digital(a, 0x11, c.reload);
-    digital(a, 0x1A, prev_weapon);             // Previous weapon
-    digital(a, 0x1B, next_weapon);             // Next weapon
-    digital(a, 0x1C, tracker);                 // Motion tracker
-    digital(a, 0x1D, flashlight);              // Flashlight
-    digital(a, 0x26, c.map);                   // Map
-    digital(a, 0x27, c.grip_l);
-    digital(a, 0x28, c.grip_r);
-    // The touchpad's scale reaches full speed short of the rim; keep the
-    // result on the unit disc the game expects of a stick.
-    float move_x = c.move.x * move_scale, move_y = c.move.y * move_scale;
-    if (const float len = std::hypot(move_x, move_y); len > 1.0f) {
-        move_x /= len;
-        move_y /= len;
-    }
-    analog(a, 0, move_x);                      // Move
-    analog(a, 1, move_y);
-    analog(a, 3, turn);                        // Turn
-
-    // UI map.
-    auto& b = t[1];
-    digital(b, 0x00, confirm);                 // confirm
-    digital(b, 0x10, confirm);
-    digital(b, 0x01, c.radial);
-    digital(b, 0x08, c.pause);                 // Pause
-    digital(b, 0x09, c.grip_l);
-    digital(b, 0x0A, c.reload);                // back
-    digital(b, 0x0F, c.reload);
-    digital(b, 0x0B, flashlight);
-    digital(b, 0x0E, flashlight);
-    analog(b, 0, c.trigger_l);
-    analog(b, 1, c.trigger_r);
-    analog(b, 2, c.move.x);
-    analog(b, 3, c.move.y);
-    analog(b, 4, tx);
-    analog(b, 5, ty);
-
-    if (active) pad_.note_vr_activity();
+    if (player.active() || menu.active()) pad_.note_vr_activity();
 }
 
 void ControlMapper::set_scheme(ControlScheme scheme) noexcept { schemes_.set(scheme); }

@@ -6,6 +6,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/control_mapper.h
     ${CMAKE_CURRENT_LIST_DIR}/control_scheme.cpp
     ${CMAKE_CURRENT_LIST_DIR}/control_scheme.h
+    ${CMAKE_CURRENT_LIST_DIR}/controller_mapping.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/controller_mapping.h
     ${CMAKE_CURRENT_LIST_DIR}/glyph_ids.h
     ${CMAKE_CURRENT_LIST_DIR}/glyphs.cpp
     ${CMAKE_CURRENT_LIST_DIR}/glyphs.h

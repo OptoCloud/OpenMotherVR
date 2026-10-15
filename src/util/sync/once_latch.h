@@ -8,7 +8,7 @@ namespace omvr::util {
 // any thread; exactly one caller sees true.
 class OnceLatch {
 public:
-    bool first() noexcept { return !done_.exchange(true, std::memory_order_relaxed); }
+    [[nodiscard]] bool first() noexcept { return !done_.exchange(true, std::memory_order_relaxed); }
 
 private:
     std::atomic<bool> done_{false};

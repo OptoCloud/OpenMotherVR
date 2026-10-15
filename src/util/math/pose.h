@@ -6,6 +6,7 @@
 
 namespace omvr::util {
 
+// A rigid transform: rotation, then translation.
 struct Pose {
     Quat orientation{};
     Vec3 position{};
