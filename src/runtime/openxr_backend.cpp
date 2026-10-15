@@ -124,11 +124,24 @@ void point_loader_at(const std::filesystem::path& manifest) noexcept {
 
 // ---- Session state ------------------------------------------------------------
 
+// The last result of each call made on a swapchain every frame, so a call
+// that keeps failing is logged when its result changes, not every frame
+// (11 §3). Kept when the swapchain is destroyed and recreated.
+struct ChainResults {
+    XrResult create  = XR_SUCCESS;
+    XrResult images  = XR_SUCCESS;
+    XrResult acquire = XR_SUCCESS;
+    XrResult wait    = XR_SUCCESS;
+    XrResult release = XR_SUCCESS;
+    DXGI_FORMAT no_format = DXGI_FORMAT_UNKNOWN;   // source format already logged as unmatched
+};
+
 struct Swapchain {
     XrSwapchain handle = XR_NULL_HANDLE;
     std::uint32_t width = 0, height = 0;
     DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
     std::vector<XrSwapchainImageD3D11KHR> images;
+    ChainResults results{};
 };
 
 // Where the virtual screen goes when no pose is set (set_screen_pose): this
@@ -181,6 +194,11 @@ struct State {
     std::array<Vec3, 2>  last_eye_pos{{{-0.032f, 0.0f, 0.0f}, {0.032f, 0.0f, 0.0f}}};
     float                anchor_yaw = 0.0f;   // the base space's yaw at the latest anchor
 
+    // The per-frame calls' last results, logged on change (11 §3).
+    XrResult     wait_result  = XR_SUCCESS;
+    XrResult     begin_result = XR_SUCCESS;
+    XrResult     end_result   = XR_SUCCESS;
+
     // Pose-age probe: how many display periods before the frame's own
     // display time the declared (and rendered) views were predicted for.
     // 0 is right; the old loop measured 1. Logged with Dev. Debug Options.
@@ -223,14 +241,40 @@ const char* result_name(XrResult r) noexcept {
     }
 }
 
-bool check(XrResult r, const char* what) {
-    if (XR_SUCCEEDED(r)) return true;
-    char text[XR_MAX_RESULT_STRING_SIZE] = {};
+// The result's text, never empty (09 §7).
+void result_text(XrResult r, char (&text)[XR_MAX_RESULT_STRING_SIZE]) noexcept {
+    text[0] = '\0';
     if (g.instance != XR_NULL_HANDLE) xrResultToString(g.instance, r, text);
     if (text[0] == '\0') strncpy_s(text, result_name(r), _TRUNCATE);
+}
+
+// Start-up and session calls: a failure is logged and becomes the reason the
+// player's start-up message gives.
+bool check(XrResult r, const char* what) {
+    if (XR_SUCCEEDED(r)) return true;
+    char text[XR_MAX_RESULT_STRING_SIZE];
+    result_text(r, text);
     diag::logf("openxr: {} failed: {} ({})", what, static_cast<int>(r), text);
     set_init_failure(std::string{what} + ": " + text, static_cast<int>(r));
     return false;
+}
+
+// Calls made every frame (frame functions, swapchain images): logged when
+// the result changes, never on every frame, and without allocating (11 §3,
+// 12 §6.1). A failure during frames is not a start-up failure, so the
+// player's start-up message is left alone.
+bool check_frame(XrResult r, const char* what, XrResult& last) noexcept {
+    if (r != last) {
+        if (XR_FAILED(r)) {
+            char text[XR_MAX_RESULT_STRING_SIZE];
+            result_text(r, text);
+            diag::logf("openxr: {} failed: {} ({})", what, static_cast<int>(r), text);
+        } else if (XR_FAILED(last)) {
+            diag::logf("openxr: {} succeeds again", what);
+        }
+        last = r;
+    }
+    return XR_SUCCEEDED(r);
 }
 
 // Swapchain format whose images the source can be copied into
@@ -263,13 +307,20 @@ DXGI_FORMAT pick_format(DXGI_FORMAT src) {
 
 void destroy_chain(Swapchain& sc) {
     if (sc.handle != XR_NULL_HANDLE) xrDestroySwapchain(sc.handle);
+    const ChainResults results = sc.results;
     sc = {};
+    sc.results = results;
 }
 
 bool ensure_chain(Swapchain& sc, DXGI_FORMAT src_format, std::uint32_t w, std::uint32_t h) {
     const DXGI_FORMAT fmt = pick_format(src_format);
     if (fmt == DXGI_FORMAT_UNKNOWN) {
-        diag::logf("openxr: runtime has no swapchain format compatible with {}", static_cast<int>(src_format));
+        // Asked every frame; said once per game format (09 §7).
+        if (sc.results.no_format != src_format) {
+            sc.results.no_format = src_format;
+            diag::logf("openxr: runtime has no swapchain format compatible with {}; no layer will be submitted",
+                       static_cast<int>(src_format));
+        }
         return false;
     }
     if (sc.handle != XR_NULL_HANDLE && sc.format == fmt && sc.width == w && sc.height == h) return true;
@@ -284,14 +335,18 @@ bool ensure_chain(Swapchain& sc, DXGI_FORMAT src_format, std::uint32_t w, std::u
     ci.faceCount   = 1;
     ci.arraySize   = 1;
     ci.mipCount    = 1;
-    if (!check(xrCreateSwapchain(g.session, &ci, &sc.handle), "xrCreateSwapchain")) return false;
+    // Retried every frame while it fails: logged on change only.
+    if (!check_frame(xrCreateSwapchain(g.session, &ci, &sc.handle), "xrCreateSwapchain", sc.results.create)) {
+        sc.handle = XR_NULL_HANDLE;
+        return false;
+    }
 
     std::uint32_t n = 0;
     xrEnumerateSwapchainImages(sc.handle, 0, &n, nullptr);
     sc.images.assign(n, {XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR});
-    if (!check(xrEnumerateSwapchainImages(sc.handle, n, &n,
-                   reinterpret_cast<XrSwapchainImageBaseHeader*>(sc.images.data())),
-               "xrEnumerateSwapchainImages")) {
+    if (!check_frame(xrEnumerateSwapchainImages(sc.handle, n, &n,
+                         reinterpret_cast<XrSwapchainImageBaseHeader*>(sc.images.data())),
+                     "xrEnumerateSwapchainImages", sc.results.images)) {
         destroy_chain(sc);
         return false;
     }
@@ -311,14 +366,22 @@ bool copy_into(Swapchain& sc, ID3D11Texture2D* src, D3D11_BOX box) {
 
     std::uint32_t index = 0;
     XrSwapchainImageAcquireInfo ai{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-    if (!check(xrAcquireSwapchainImage(sc.handle, &ai, &index), "xrAcquireSwapchainImage")) return false;
+    if (!check_frame(xrAcquireSwapchainImage(sc.handle, &ai, &index), "xrAcquireSwapchainImage",
+                     sc.results.acquire)) {
+        return false;
+    }
     XrSwapchainImageWaitInfo wi{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
     wi.timeout = XR_INFINITE_DURATION;
-    if (check(xrWaitSwapchainImage(sc.handle, &wi), "xrWaitSwapchainImage")) {
-        g.context->CopySubresourceRegion(sc.images[index].texture, 0, 0, 0, 0, src, 0, &box);
-    }
+    const XrResult wr = xrWaitSwapchainImage(sc.handle, &wi);
+    // A timeout is a success code but leaves the image unwritten.
+    const bool waited = check_frame(wr, "xrWaitSwapchainImage", sc.results.wait) && wr != XR_TIMEOUT_EXPIRED;
+    if (waited) g.context->CopySubresourceRegion(sc.images[index].texture, 0, 0, 0, 0, src, 0, &box);
     XrSwapchainImageReleaseInfo ri{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-    return check(xrReleaseSwapchainImage(sc.handle, &ri), "xrReleaseSwapchainImage");
+    const bool released = check_frame(xrReleaseSwapchainImage(sc.handle, &ri), "xrReleaseSwapchainImage",
+                                      sc.results.release);
+    // An image that was not written must not be shown: the frame then ends
+    // with no layer (09 §5.2).
+    return waited && released;
 }
 
 bool all_finite(const Pose& p) noexcept {
@@ -816,7 +879,7 @@ void end_frame(IDXGISwapChain* swapchain) {
     ei.environmentBlendMode = g.blend;
     ei.layerCount           = layer ? 1 : 0;
     ei.layers               = layer ? &layer : nullptr;
-    check(xrEndFrame(g.session, &ei), "xrEndFrame");
+    check_frame(xrEndFrame(g.session, &ei), "xrEndFrame", g.end_result);
 }
 
 // First half of a frame: wait for the runtime to want it, begin it, and
@@ -824,9 +887,9 @@ void end_frame(IDXGISwapChain* swapchain) {
 bool begin_frame() {
     XrFrameWaitInfo wi{XR_TYPE_FRAME_WAIT_INFO};
     XrFrameState fs{XR_TYPE_FRAME_STATE};
-    if (!check(xrWaitFrame(g.session, &wi, &fs), "xrWaitFrame")) return false;
+    if (!check_frame(xrWaitFrame(g.session, &wi, &fs), "xrWaitFrame", g.wait_result)) return false;
     XrFrameBeginInfo bi{XR_TYPE_FRAME_BEGIN_INFO};
-    if (!check(xrBeginFrame(g.session, &bi), "xrBeginFrame")) return false;
+    if (!check_frame(xrBeginFrame(g.session, &bi), "xrBeginFrame", g.begin_result)) return false;
     const XrTime t = fs.predictedDisplayTime;
     g.frame_begun   = true;
     g.should_render = fs.shouldRender != XR_FALSE;
