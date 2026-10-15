@@ -30,6 +30,7 @@
 #include "game/sites/ui_set.h"
 #include "loader/context.h"
 #include "loader/hooks/event_tap_hook.h"
+#include "loader/hooks/file_hooks.h"
 #include "loader/hooks/menu_hooks.h"
 #include "loader/hooks/pad_hooks.h"
 #include "loader/hooks/render_fix_hooks.h"
@@ -241,8 +242,13 @@ bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept {
     if (!full_set) return finish_ui_only(ctx, g, patcher, mod_archive);
 
     // Settings reach the menu through on_menu_open (5).
-    return install_stereo_path(ctx, g, patcher) && install_game_side(ctx, g, patcher, mod_archive) &&
-           install_patches_and_controls(ctx, g, patcher);
+    const bool installed = install_stereo_path(ctx, g, patcher) &&
+                           install_game_side(ctx, g, patcher, mod_archive) &&
+                           install_patches_and_controls(ctx, g, patcher);
+    // The level for the Discord activity; runtime None leaves the game's
+    // imports alone like everything else outside the UI set.
+    if (installed && ctx.settings.current().discord_rich_presence) hooks::watch_game_file_opens(ai_base);
+    return installed;
 }
 
 } // namespace omvr::loader

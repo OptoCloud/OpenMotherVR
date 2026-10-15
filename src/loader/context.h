@@ -20,6 +20,7 @@
 #include "core/stereo/virtual_screen_policy.h"
 #include "core/ui/commands.h"
 #include "core/ui/display_reset.h"
+#include "core/ui/play_state.h"
 #include "core/ui/settings_push.h"
 #include "core/ui/ui_archive.h"
 #include "core/vr/runtime_detector.h"
@@ -120,7 +121,9 @@ struct Context {
     platform::d3d11::SystemD3d11 system_d3d11;
     std::atomic<bool> ui_set_only{false};
     HookTargets targets;
-    // Discord Rich Presence; its worker polls `stereo` for the VR state.
+    // What the player is doing (level, menu, cutscene), and the Discord
+    // Rich Presence whose worker polls it.
+    core::ui::PlayState play;
     platform::discord::Presence discord;
 };
 

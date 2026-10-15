@@ -182,6 +182,8 @@ inline constexpr std::string_view kEventHidingStart      = "hiding_visibility_st
 inline constexpr std::string_view kEventHidingFinish     = "hiding_visibility_finish";
 inline constexpr std::string_view kEventLadderFinish     = "ladder_interaction_finish";
 inline constexpr std::string_view kEventSuitChangeFinish = "suit_change_interaction_finish";
+inline constexpr std::string_view kEventCutsceneStart    = "cutscene_visibility_start";
+inline constexpr std::string_view kEventCutsceneFinish   = "cutscene_visibility_finish";
 // "<prefix>_start" / "<prefix>_finish".
 inline constexpr std::string_view kEventStartSuffix  = "_start";
 inline constexpr std::string_view kEventFinishSuffix = "_finish";

@@ -16,6 +16,7 @@ struct Activity {
     std::string details;         // first line
     std::string state;           // second line
     std::int64_t start_unix = 0; // "elapsed" counts from here; 0: none
+    std::string large_text;      // the image's hover text; empty: kLargeText
 
     bool operator==(const Activity&) const = default;
 };

@@ -10,6 +10,10 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/notices.cpp
     ${CMAKE_CURRENT_LIST_DIR}/notices.h
     ${CMAKE_CURRENT_LIST_DIR}/pak2.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/play_state.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/play_state.h
+    ${CMAKE_CURRENT_LIST_DIR}/presence_text.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/presence_text.h
     ${CMAKE_CURRENT_LIST_DIR}/pak2.h
     ${CMAKE_CURRENT_LIST_DIR}/runtime_menu.cpp
     ${CMAKE_CURRENT_LIST_DIR}/runtime_menu.h

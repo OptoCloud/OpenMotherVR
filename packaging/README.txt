@@ -70,8 +70,10 @@ Playing
   at Pixel Scale 1.3 or below and skips it above, where supersampling
   already does the job; "On" or "Off" force it.
 - "DiscordRichPresence" in mothervr.json: true (the default) shows
-  "Playing Alien: Isolation VR" on your Discord profile, with whether VR
-  is on and which runtime runs it; false turns it off.
+  "Playing Alien: Isolation VR" on your Discord profile, with the area
+  you are in and what you are doing (loading, paused, hiding, hacking...);
+  hover the picture for the VR runtime. false turns it off. With VR
+  disabled it shows only "VR off".
 
 If something goes wrong
 - The headset shows the game as a flat screen (Theatre), or the game

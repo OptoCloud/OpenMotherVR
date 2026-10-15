@@ -3,6 +3,7 @@
 #include "core/config/settings_json.h"
 #include "core/config/settings_table.h"
 #include "core/ui/compat_messages.h"
+#include "core/ui/presence_text.h"
 #include "game/build.h"
 #include "loader/context.h"
 #include "loader/install.h"
@@ -80,9 +81,10 @@ std::string_view runtime_label(core::config::VRRuntime r) noexcept {
     return "";
 }
 
-// Shows the game on the player's Discord profile. The worker polls only the
-// stereo device's atomic flags; the runtime is fixed for the run, so it is
-// read here.
+// Shows on the player's Discord profile where they are and what they are
+// doing. The worker polls only atomics (the play state, the interaction
+// state, the stereo device's flags); the runtime is fixed for the run, so
+// it is read here.
 void start_discord(Context& ctx) {
     if (!ctx.settings.current().discord_rich_presence) {
         ctx.log.line("discord: Rich Presence off in mothervr.json");
@@ -95,17 +97,22 @@ void start_discord(Context& ctx) {
             .count();
     ctx.discord.start(
         std::string(platform::discord::kApplicationId),
-        [&stereo = ctx.stereo, label, start] {
-            platform::discord::Activity a{.start_unix = start};
-            if (stereo.vr_session_active()) {
-                a.details = "In VR";
-                a.state   = label;
-            } else if (label.empty() || stereo.runtime_failed()) {
-                a.details = "VR off";
-            } else {
-                a.details = "Starting VR";
-                a.state   = label;
-            }
+        [&ctx, label, start] {
+            const bool tracked = !ctx.ui_set_only.load(std::memory_order_acquire);
+            const auto text    = core::ui::describe({.tracked     = tracked,
+                                                     .level       = ctx.play.level(),
+                                                     .screen      = ctx.play.screen(),
+                                                     .cutscene    = ctx.play.cutscene(),
+                                                     .interaction = ctx.interactions.interaction(),
+                                                     .hiding      = ctx.interactions.hiding()});
+            platform::discord::Activity a{
+                .details = std::string(text.details), .state = std::string(text.state), .start_unix = start};
+            if (ctx.stereo.vr_session_active())
+                a.large_text = std::format("In VR with {}", label);
+            else if (label.empty() || ctx.stereo.runtime_failed())
+                a.large_text = "VR off";
+            else
+                a.large_text = std::format("Starting {}", label);
             return a;
         },
         ctx.log);

@@ -94,7 +94,8 @@ std::string set_activity(const Activity& a, unsigned nonce) {
     if (!a.details.empty()) activity["details"] = a.details;
     if (!a.state.empty()) activity["state"] = a.state;
     if (a.start_unix != 0) activity["timestamps"] = {{"start", a.start_unix}};
-    activity["assets"] = {{"large_image", kLargeImage}, {"large_text", kLargeText}};
+    activity["assets"] = {{"large_image", kLargeImage},
+                          {"large_text", a.large_text.empty() ? std::string(kLargeText) : a.large_text}};
     return json{{"cmd", "SET_ACTIVITY"},
                 {"args", {{"pid", ::GetCurrentProcessId()}, {"activity", activity}}},
                 {"nonce", std::to_string(nonce)}}

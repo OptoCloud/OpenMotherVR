@@ -92,12 +92,14 @@ int __fastcall ui_on_message(void* self, void*, const std::uint32_t* msg, int a,
 // From: FUN_10020c80.
 void __fastcall menu_close(void* self, void*) noexcept {
     call_menu(context().targets.game_side.menu_close, self);
+    context().play.set_screen(core::ui::Screen::None);
     leave_screen_mode();
 }
 
 // From: FUN_10020ca0.
 void __fastcall pause_open(void* self, void*) noexcept {
     call_menu(context().targets.game_side.pause_open, self);
+    context().play.set_screen(core::ui::Screen::Pause);
     enter_screen_mode();
     push_settings(self);
 }
@@ -105,12 +107,14 @@ void __fastcall pause_open(void* self, void*) noexcept {
 // From: FUN_10020cf0.
 void __fastcall pause_close(void* self, void*) noexcept {
     call_menu(context().targets.game_side.pause_close, self);
+    context().play.set_screen(core::ui::Screen::None);
     leave_screen_mode();
 }
 
 // From: FUN_10020d10. The 3D scene goes black behind the loading screen.
 void __fastcall loading_open(void* self, void*) noexcept {
     call_menu(context().targets.game_side.loading_open, self);
+    context().play.set_screen(core::ui::Screen::Loading);
     enter_screen_mode();
     context().update.set_loading_blackout(true);
     push_settings(self);
@@ -119,6 +123,7 @@ void __fastcall loading_open(void* self, void*) noexcept {
 // From: FUN_10020d60.
 void __fastcall loading_close(void* self, void*) noexcept {
     call_menu(context().targets.game_side.loading_close, self);
+    context().play.set_screen(core::ui::Screen::None);
     context().update.set_loading_blackout(false);
     leave_screen_mode();
     // Entering gameplay: forward is where the player faces now.
@@ -128,10 +133,14 @@ void __fastcall loading_close(void* self, void*) noexcept {
 // From: FUN_10020da0.
 void __fastcall attract_open(void* self, void*) noexcept {
     call_menu(context().targets.game_side.attract_open, self);
+    context().play.set_screen(core::ui::Screen::Title);
     enter_screen_mode();
 }
 
 // From: FUN_10020dd0 (the game's close is an empty method).
-void __fastcall attract_close(void*, void*) noexcept { leave_screen_mode(); }
+void __fastcall attract_close(void*, void*) noexcept {
+    context().play.set_screen(core::ui::Screen::None);
+    leave_screen_mode();
+}
 
 } // namespace omvr::loader::hooks
