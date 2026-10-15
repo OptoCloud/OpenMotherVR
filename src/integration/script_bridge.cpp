@@ -20,10 +20,13 @@
 #include "stereo/game_hooks.h"
 #include "stereo/stereo_device.h"
 
-#include <cstring>  // strtok_s, strncmp, strcmp
-#include <cstdlib>  // atoi, atof
+#include <charconv> // from_chars
+#include <cstring>  // strtok_s, strncmp, strcmp, strlen
+#include <format>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>  // exchange
 
 namespace mothervr::integration {
@@ -101,8 +104,60 @@ void reset_display_if_changed(const config::Config& cfg) noexcept {
     static TargetSettings built = target_settings(cfg); // first call: what the targets were made with
     const TargetSettings now = target_settings(cfg);
     if (now == built) return;
-    built = now;
-    if (g_display_reset_flag) *g_display_reset_flag = 1;
+    const TargetSettings was = std::exchange(built, now);
+    // With no VR this run there are no stereo targets to resize, and a
+    // rebuild would only freeze the picture.
+    if (!g_display_reset_flag || running_runtime(cfg) == config::VRRuntime::None) return;
+    *g_display_reset_flag = 1;
+    diag::logf("[script_bridge] display reset raised; changed:{}{}{}",
+               now.pixel_scale != was.pixel_scale ? " Rendering.PixelScale" : "",
+               now.mirror_view_type != was.mirror_view_type ? " Rendering.MirrorViewType" : "",
+               now.symmetric_mirror_view != was.symmetric_mirror_view ? " Rendering.SymmetricMirrorView" : "");
+}
+
+// A command's value: a decimal integer with an optional sign and nothing
+// after it in the token. Anything else is not a value (spec 06 §4.2).
+std::optional<int> parse_int(const char* s) noexcept {
+    if (!s) return std::nullopt;
+    if (*s == '+') ++s;
+    const char* end = s + std::strlen(s);
+    int v = 0;
+    const auto [p, ec] = std::from_chars(s, end, v);
+    if (ec != std::errc{} || p != end || p == s) return std::nullopt;
+    return v;
+}
+
+// A decimal number with '.' as the decimal point whatever the system
+// locale (the menu sends "1.5" and "2").
+std::optional<float> parse_float(const char* s) noexcept {
+    if (!s) return std::nullopt;
+    if (*s == '+') ++s;
+    const char* end = s + std::strlen(s);
+    float v = 0.0f;
+    const auto [p, ec] = std::from_chars(s, end, v, std::chars_format::fixed);
+    if (ec != std::errc{} || p != end || p == s) return std::nullopt;
+    return v;
+}
+
+// 0 or 1.
+std::optional<bool> parse_switch(const char* s) noexcept {
+    const auto n = parse_int(s);
+    if (!n || (*n != 0 && *n != 1)) return std::nullopt;
+    return *n == 1;
+}
+
+// Sets `field` and logs the change under its mothervr.json key path.
+// Returns whether the value changed.
+template <class T>
+bool assign(T& field, T value, const char* key, std::string_view text) {
+    if (field == value) return false;
+    field = value;
+    diag::logf("[script_bridge] {} changed to {} by command", key, text);
+    return true;
+}
+
+bool assign_switch(bool& field, bool value, const char* key) {
+    return assign(field, value, key, value ? "true" : "false");
 }
 
 } // namespace
@@ -120,7 +175,11 @@ void push_settings_to_game(void* ui) noexcept {
     diag::reassert_crash_log();
 
     if (!ui || !callbacks_ready()) {
-        diag::log_line("[script_bridge] push_settings_to_game: callbacks not installed yet");
+        // Once: the menu opens many times a session, and the reason does
+        // not change.
+        static bool s_logged = false;
+        if (!std::exchange(s_logged, true))
+            diag::log_line("[script_bridge] push_settings_to_game: callbacks not installed yet");
         return;
     }
 
@@ -190,8 +249,20 @@ void __fastcall on_menu_open(void* self, void* /*edx*/) noexcept {
 // the original also tokenised the others before forwarding them, which cut
 // their arguments off.
 
+//
+// One rule for bad values (spec 06 §4.2): a missing value, one that is not a
+// number of its kind, one outside the accepted set, or an unknown mvr_ name
+// changes nothing: no setting, no quit, no rebuild, no save. The original
+// read a missing or malformed value as 0 (atoi), so a hand-typed or
+// truncated command silently turned a switch off or quit the game.
+
 void __fastcall handle_mvr_command(void* self, void* /*edx*/, int ctx, char* cmd, int p3, int p4) noexcept {
-    if (!cmd) return;
+    // A null name is not ours to judge: the stock method gets the call
+    // unchanged, as every call that is not an mvr_ command does.
+    if (!cmd) {
+        if (g_original_cmd) g_original_cmd(self, nullptr, ctx, cmd, p3, p4);
+        return;
+    }
 
     // Non-mvr_ commands go to the original handler untouched.
     const char* first = cmd;
@@ -201,93 +272,140 @@ void __fastcall handle_mvr_command(void* self, void* /*edx*/, int ctx, char* cmd
         return;
     }
 
-    // First token = command name (strtok_s mutates cmd in place).
-    char* rest = nullptr;
-    const char* name = strtok_s(cmd, " ", &rest);
-    if (!name) return;
-
-    auto& cfg = config::current();
-
-    // Each branch: strtok_s(nullptr, ...) gets the value token; atoi/atof
-    // converts it. Mirrors the strtok-pair pattern throughout FUN_100202e0.
-
-    if (std::strcmp(name, "mvr_vrruntime") == 0) {
+    try {
+        // First token = command name (strtok_s mutates cmd in place), then
+        // the value token; text after it is ignored. Mirrors the strtok-pair
+        // pattern throughout FUN_100202e0.
+        char* rest = nullptr;
+        const char* name = strtok_s(cmd, " ", &rest);
+        if (!name) return;
         const char* val = strtok_s(nullptr, " ", &rest);
-        const int n = val ? std::atoi(val) : 0;
-        if (n >= 0 && n <= 2) {
-            cfg.vr_runtime = runtime_from_ui(n);
-            // The new runtime takes effect on the next launch, so the game
-            // quits, as in the original.
-            if (g_exit_request) *g_exit_request = 1;
+
+        auto& cfg = config::current();
+        bool accepted = true;
+        bool quit     = false;
+        auto& r = cfg.rendering;
+        auto& in = cfg.input;
+
+        if (std::strcmp(name, "mvr_vrruntime") == 0) {
+            const auto n = parse_int(val);
+            if (n && *n >= 0 && *n <= 2) {
+                const auto runtime = runtime_from_ui(*n);
+                assign(cfg.vr_runtime, runtime, "VRRuntime", config::to_string(runtime));
+                // The new runtime takes effect on the next launch, so the
+                // game quits, as in the original.
+                quit = true;
+            } else {
+                accepted = false;
+            }
+
+        } else if (std::strcmp(name, "mvr_debug") == 0) {
+            const auto v = parse_switch(val);
+            accepted = v.has_value();
+            if (accepted) assign_switch(cfg.debug.debug, *v, "DebugOptions");
+
+        } else if (std::strcmp(name, "mvr_skipintro") == 0) {
+            const auto v = parse_switch(val);
+            accepted = v.has_value();
+            if (accepted) assign_switch(cfg.debug.skip_startup_intro, *v, "SkipStartupIntro");
+
+        } else if (std::strcmp(name, "mvr_mirrorview") == 0) {
+            // 0 both eyes, 1 right eye, 2 left eye.
+            const auto n = parse_int(val);
+            accepted = n && *n >= 0 && *n <= static_cast<int>(config::MirrorViewType::LeftEye);
+            if (accepted) {
+                const auto m = static_cast<config::MirrorViewType>(*n);
+                assign(r.mirror_view_type, m, "Rendering.MirrorViewType", config::to_string(m));
+            }
+
+        } else if (std::strcmp(name, "mvr_mirrorviewsym") == 0) {
+            const auto v = parse_switch(val);
+            accepted = v.has_value();
+            if (accepted) assign_switch(r.symmetric_mirror_view, *v, "Rendering.SymmetricMirrorView");
+
+        } else if (std::strcmp(name, "mvr_pixelscale") == 0) {
+            // The range is the guard at FUN_100202e0 lines 183-185, which
+            // reset an out-of-range value to 1.0; here it is refused.
+            const auto v = parse_float(val);
+            accepted = v && *v >= 0.5f && *v <= 4.0f;
+            if (accepted)
+                assign(r.pixel_scale, *v, "Rendering.PixelScale", std::format("{:.2f}", *v));
+
+        } else if (std::strcmp(name, "mvr_clipblinding") == 0) {
+            const auto v = parse_switch(val);
+            accepted = v.has_value();
+            if (accepted) {
+                assign_switch(r.clipping_blinders, *v, "Rendering.ClippingBlinders");
+                // Takes effect at once: the game reads the threshold through
+                // a pointer patched into its head-in-wall check.
+                stereo::set_clipping_blinders(r.clipping_blinders);
+            }
+
+        } else if (std::strcmp(name, "mvr_snaprotation") == 0) {
+            const auto v = parse_switch(val);
+            accepted = v.has_value();
+            if (accepted) assign_switch(in.snap_rotation, *v, "Input.SnapRotation");
+
+        } else if (std::strcmp(name, "mvr_snaprotationsegments") == 0) {
+            // At least 2, then mapped down to 24/12/6/4/3/2 by sanitize().
+            const auto n = parse_int(val);
+            accepted = n && *n >= 2;
+            if (accepted) {
+                config::Config mapped{};
+                mapped.input.snap_rotation_segments = *n;
+                config::sanitize(mapped);
+                const int segments = mapped.input.snap_rotation_segments;
+                assign(in.snap_rotation_segments, segments, "Input.SnapRotationSegments", std::to_string(segments));
+            }
+
+        } else if (std::strcmp(name, "mvr_inputrelativewalking") == 0) {
+            const auto v = parse_switch(val);
+            accepted = v.has_value();
+            if (accepted) assign_switch(in.vr_input_relative_walking, *v, "Input.VRInputRelativeWalking");
+
+        } else if (std::strcmp(name, "mvr_inputstrafing") == 0) {
+            const auto v = parse_switch(val);
+            accepted = v.has_value();
+            if (accepted) assign_switch(in.vr_input_strafing, *v, "Input.VRInputStrafing");
+
+        } else if (std::strcmp(name, "mvr_togglegrips") == 0) {
+            const auto v = parse_switch(val);
+            accepted = v.has_value();
+            if (accepted) assign_switch(in.toggle_grips, *v, "Input.ToggleGrips");
+
+        } else if (std::strcmp(name, "mvr_togglecrouch") == 0) {
+            const auto v = parse_switch(val);
+            accepted = v.has_value();
+            if (accepted) assign_switch(in.toggle_crouch, *v, "Input.ToggleCrouch");
+
+        } else {
+            diag::logf("[script_bridge] unknown command {} ignored", name);
+            return;
         }
 
-    } else if (std::strcmp(name, "mvr_debug") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.debug.debug = val && std::atoi(val) != 0;
-
-    } else if (std::strcmp(name, "mvr_skipintro") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.debug.skip_startup_intro = val && std::atoi(val) != 0;
-
-    } else if (std::strcmp(name, "mvr_mirrorview") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        // 0 both eyes, 1 right eye, 2 left eye; anything else is ignored.
-        const int n = val ? std::atoi(val) : -1;
-        if (n >= 0 && n <= static_cast<int>(config::MirrorViewType::LeftEye)) {
-            cfg.rendering.mirror_view_type = static_cast<config::MirrorViewType>(n);
+        if (!accepted) {
+            diag::logf("[script_bridge] {} {}: value not accepted, nothing changed", name, val ? val : "(none)");
+            return;
         }
 
-    } else if (std::strcmp(name, "mvr_mirrorviewsym") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.rendering.symmetric_mirror_view = val && std::atoi(val) != 0;
+        config::sanitize(cfg);
+        // Pixel scale and mirror changes need the game's targets rebuilt.
+        reset_display_if_changed(cfg);
 
-    } else if (std::strcmp(name, "mvr_pixelscale") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        // Out of [0.5, 4.0] resets to 1.0 (config::sanitize below), the
-        // guard at FUN_100202e0 lines 183-185.
-        cfg.rendering.pixel_scale = val ? static_cast<float>(std::atof(val)) : 1.0f;
+        // Persist the updated config to disk. Mirrors the FUN_1000d150() tail
+        // call in FUN_100202e0 (an ofstream-based save wrapper). The original
+        // also calls FUN_10003490() just before, but the result is unused,
+        // likely an artefact of the compiler spilling ECX for a thiscall stub.
+        // We omit it.
+        config::save_current();
 
-    } else if (std::strcmp(name, "mvr_clipblinding") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.rendering.clipping_blinders = val && std::atoi(val) != 0;
-        // Takes effect at once: the game reads the threshold through a
-        // pointer patched into its head-in-wall check.
-        stereo::set_clipping_blinders(cfg.rendering.clipping_blinders);
-
-    } else if (std::strcmp(name, "mvr_snaprotation") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.input.snap_rotation = val && std::atoi(val) != 0;
-
-    } else if (std::strcmp(name, "mvr_snaprotationsegments") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.input.snap_rotation_segments = val ? std::atoi(val) : 12;
-
-    } else if (std::strcmp(name, "mvr_inputrelativewalking") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.input.vr_input_relative_walking = val && std::atoi(val) != 0;
-
-    } else if (std::strcmp(name, "mvr_inputstrafing") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.input.vr_input_strafing = val && std::atoi(val) != 0;
-
-    } else if (std::strcmp(name, "mvr_togglegrips") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.input.toggle_grips = val && std::atoi(val) != 0;
-
-    } else if (std::strcmp(name, "mvr_togglecrouch") == 0) {
-        const char* val = strtok_s(nullptr, " ", &rest);
-        cfg.input.toggle_crouch = val && std::atoi(val) != 0;
+        // After the save: the new runtime is in the file before the game's
+        // main loop reads the quit request.
+        if (quit && g_exit_request) *g_exit_request = 1;
+    } catch (...) {
+        // Nothing may escape into the game's dispatcher.
+        diag::log_line("[script_bridge] command failed: out of memory");
     }
-
-    config::sanitize(cfg);
-    // Pixel scale and mirror changes need the game's targets rebuilt.
-    reset_display_if_changed(cfg);
-
-    // Persist the updated config to disk. Mirrors the FUN_1000d150() tail call
-    // in FUN_100202e0 (an ofstream-based save wrapper). The original also calls
-    // FUN_10003490() just before, but the result is unused, likely an artefact
-    // of the compiler spilling ECX for a thiscall stub. We omit it.
-    config::save_current();
 }
 
 } // namespace mothervr::integration
