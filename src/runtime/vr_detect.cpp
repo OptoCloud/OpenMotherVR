@@ -23,8 +23,8 @@
 #include <format>
 #include <fstream>
 #include <optional>
+#include <string_view>
 #include <windows.h>
-#include <shellapi.h>
 
 namespace mothervr::runtime {
 
@@ -78,32 +78,53 @@ std::filesystem::path read_openvr_runtime_path(const char*& why) noexcept {
     }
 }
 
-// -vrforcenone / -vrforceopenvr / -vrforceoculus / -vrforceopenxr: an exact,
-// case-insensitive argument, as the original matches them. The Oculus backend
-// is served by OpenXR.
-// From: FUN_1001f700.
-std::optional<config::VRRuntime> forced_runtime() noexcept {
-    struct Switch { const wchar_t* name; config::VRRuntime runtime; };
-    static constexpr Switch kSwitches[] = {
-        {L"-vrforcenone",   config::VRRuntime::None},
-        {L"-vrforceopenvr", config::VRRuntime::OpenVR},
-        {L"-vrforceoculus", config::VRRuntime::OpenXR},
-        {L"-vrforceopenxr", config::VRRuntime::OpenXR},
-    };
-    int argc = 0;
-    wchar_t** argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
-    if (!argv) return {};
-    std::optional<config::VRRuntime> forced;
-    for (int i = 1; i < argc; ++i)
-        for (const auto& s : kSwitches)
-            if (::_wcsicmp(argv[i], s.name) == 0) forced = s.runtime;
-    ::LocalFree(argv);
-    return forced;
-}
-
 init_failure g_failure;
 
 } // namespace
+
+// -vrforcenone / -vrforceopenvr / -vrforceoculus / -vrforceopenxr: an exact,
+// case-insensitive argument, as the original matches them; the last one
+// wins. The Oculus backend is served by OpenXR. The command line is split by
+// hand rather than with CommandLineToArgvW, so the hook installer can call
+// this under the loader lock without bringing in shell32. The command line
+// does not change, so it is read once.
+// From: FUN_1001f700.
+std::optional<config::VRRuntime> forced_runtime() noexcept {
+    static const std::optional<config::VRRuntime> forced = [] {
+        struct Switch {
+            std::wstring_view name;
+            config::VRRuntime runtime;
+        };
+        static constexpr Switch kSwitches[] = {
+            {L"-vrforcenone",   config::VRRuntime::None},
+            {L"-vrforceopenvr", config::VRRuntime::OpenVR},
+            {L"-vrforceoculus", config::VRRuntime::OpenXR},
+            {L"-vrforceopenxr", config::VRRuntime::OpenXR},
+        };
+        std::optional<config::VRRuntime> chosen;
+        const wchar_t* line = ::GetCommandLineW();
+        const std::wstring_view cmd = line ? line : L"";
+        std::size_t i = 0;
+        while (i < cmd.size()) {
+            while (i < cmd.size() && (cmd[i] == L' ' || cmd[i] == L'\t')) ++i;
+            if (i == cmd.size()) break;
+            const bool quoted = cmd[i] == L'"';
+            if (quoted) ++i;
+            const std::size_t start = i;
+            while (i < cmd.size() && (quoted ? cmd[i] != L'"' : (cmd[i] != L' ' && cmd[i] != L'\t'))) ++i;
+            const std::wstring_view token = cmd.substr(start, i - start);
+            if (quoted && i < cmd.size()) ++i;   // the closing quote
+            for (const auto& s : kSwitches) {
+                if (token.size() == s.name.size() &&
+                    ::_wcsnicmp(token.data(), s.name.data(), token.size()) == 0) {
+                    chosen = s.runtime;
+                }
+            }
+        }
+        return chosen;
+    }();
+    return forced;
+}
 
 const char* to_string(detect_result::Chosen c) noexcept {
     switch (c) {

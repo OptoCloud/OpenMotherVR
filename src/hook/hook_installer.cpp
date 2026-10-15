@@ -27,6 +27,7 @@
 #include "stereo/game_hooks.h"
 #include "stereo/stereo_device.h"
 #include "input/gamepad.h"
+#include "runtime/vr_detect.h"
 #include "game/game_events.h"
 
 #include <algorithm>
@@ -145,39 +146,10 @@ constexpr std::string_view kFullSetAreas[] = {
 // The runtime the patch set is decided for: a -vrforce* switch, else the
 // config file's VRRuntime. runtime::detect() applies the same switches when
 // the game creates its stereo device; it cannot run here (it probes the
-// runtimes, which is not allowed under the loader lock), so the switches are
-// matched again. The command line is split by hand rather than with
-// CommandLineToArgvW, to keep shell32 out of the loader lock.
+// runtimes, which is not allowed under the loader lock), but reading the
+// switches alone can.
 config::VRRuntime runtime_for_this_run(bool& forced) noexcept {
-    struct Switch {
-        std::wstring_view name;
-        config::VRRuntime runtime;
-    };
-    static constexpr Switch kSwitches[] = {
-        {L"-vrforcenone",   config::VRRuntime::None},
-        {L"-vrforceopenvr", config::VRRuntime::OpenVR},
-        {L"-vrforceoculus", config::VRRuntime::OpenXR},
-        {L"-vrforceopenxr", config::VRRuntime::OpenXR},
-    };
-    std::optional<config::VRRuntime> chosen;
-    const wchar_t* line = ::GetCommandLineW();
-    const std::wstring_view cmd = line ? line : L"";
-    std::size_t i = 0;
-    while (i < cmd.size()) {
-        while (i < cmd.size() && (cmd[i] == L' ' || cmd[i] == L'\t')) ++i;
-        if (i == cmd.size()) break;
-        const bool quoted = cmd[i] == L'"';
-        if (quoted) ++i;
-        const std::size_t start = i;
-        while (i < cmd.size() && (quoted ? cmd[i] != L'"' : (cmd[i] != L' ' && cmd[i] != L'\t'))) ++i;
-        const std::wstring_view token = cmd.substr(start, i - start);
-        if (quoted && i < cmd.size()) ++i;   // the closing quote
-        // Exact, case-insensitive, the last one wins: as runtime::detect().
-        for (const auto& s : kSwitches) {
-            if (token.size() == s.name.size() && ::_wcsnicmp(token.data(), s.name.data(), token.size()) == 0)
-                chosen = s.runtime;
-        }
-    }
+    const auto chosen = runtime::forced_runtime();
     forced = chosen.has_value();
     return chosen.value_or(config::current().vr_runtime);
 }

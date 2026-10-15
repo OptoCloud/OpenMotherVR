@@ -3,6 +3,7 @@
 #include "../config/config.h"
 
 #include <filesystem>
+#include <optional>
 #include <string>
 
 namespace mothervr::runtime {
@@ -55,6 +56,11 @@ detect_result detect() noexcept;
 const detect_result& last_result() noexcept;
 
 const char* to_string(detect_result::Chosen c) noexcept;
+
+// The runtime a -vrforce* switch on the command line picks (rule 1 above),
+// or none. Probes nothing and loads nothing, so it is safe under the loader
+// lock: the hook installer decides the patch set with it at attach.
+std::optional<config::VRRuntime> forced_runtime() noexcept;
 
 // Why the chosen runtime failed to start: the runtime's error text and code,
 // set by the backend that failed, for the player-facing dialog.
