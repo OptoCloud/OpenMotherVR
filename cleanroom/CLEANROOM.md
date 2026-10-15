@@ -1,11 +1,14 @@
 # Clean-room process
 
-Revision r2. r1: roles, spec rules, provenance. r2 (with spec r5): no other
+Revision r3. r1: roles, spec rules, provenance. r2 (with spec r5): no other
 mod named in the spec and the compatibility exceptions; when "the earlier
 mod" may be mentioned; provenance classes, including facts taken from the
 earlier mod's data; the reconstruction is never a source; how the
 implementation side confirms facts in `AI.exe`; the questions and answers
-channel; spec-side labels for game code; the lint before every spec commit.
+channel; spec-side labels for game code; the lint before every spec commit. r3: what a
+player can see when using a mod (message and menu text, help texts, the log
+file, menu design and layout) may be stated exactly; only the files that
+produce it stay excluded.
 
 OpenMotherVR is a VR mod for Alien: Isolation (2015 Steam build of
 `AI.exe`), written from scratch. Its behaviour is modelled on MotherVR 0.8.1
@@ -68,6 +71,13 @@ Allowed:
 - Numeric parameters where they define behaviour (distances, thresholds),
   each with a reason or marked as a project decision.
 - Interfaces between parts of the mod, as prose or tables.
+- Anything a player can see when using a mod: the text of its message
+  boxes, menus, labels, help texts and log file, and the design and layout
+  of its menus and screens. These are observable results, like any other
+  behaviour a player sees, and the spec may state them exactly. The mod's
+  files that produce them (UI archives, images, shader bytecode) stay
+  excluded; the spec describes what they show, and the implementation makes
+  its own.
 - References to public APIs (OpenVR, OpenXR, D3D11) by name.
 - Labels for game functions, fields and sites that the game leaves unnamed
   (for example `StereoPushMode`). The spec side chooses them to describe
@@ -84,10 +94,6 @@ Not allowed:
   not require it (class names, file layout, internal vtables of the mod).
   This includes the order of the mod's steps: the spec states an order only
   where the game, Windows or a runtime API requires it, and says why.
-- The mod's own wording: message box and log text, menu labels and help
-  texts, and its visual layout. The spec says what a message or label must
-  convey; the implementation writes its own text. Strings the game itself
-  contains may be named.
 - Names MotherVR invented for its own internal use, such as the functions
   its menu calls in its DLL. The spec describes what such messages carry;
   the names are the implementation's choice. Names players or their files
