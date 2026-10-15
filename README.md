@@ -1,26 +1,42 @@
 # OpenMotherVR
 
-Reverse engineering of MotherVR 0.8.1, the unofficial VR mod for
-Alien: Isolation, and a C++ reconstruction of it that runs on Windows 11.
+A rebuild of MotherVR 0.8.1, the unofficial VR mod for Alien: Isolation,
+that runs on Windows 10 and 11 with SteamVR (OpenVR) or any OpenXR runtime.
+The project has two parts:
+
+- **The reconstruction** (`src/`): a `d3d11.dll` proxy reverse-engineered
+  from the original, with fixes for its problems. This is what releases
+  ship today.
+- **The clean-room specification** (`cleanroom/`): a complete description
+  of what the mod must do and how the game works, from which the mod is to
+  be reimplemented from scratch in a separate repository, without the
+  original's code.
 
 | Path | Contents |
 |---|---|
-| `src/`, `res/`, `CMakeLists.txt` | The reconstruction: a `d3d11.dll` proxy. See `BUILDING.md` to build |
-| `dumps/` | Analysis notes. Start with `dumps/03_*`, `04_*`, `05_*.md`; `09_*` maps every original function to the reconstruction |
-| `scripts/` | Ghidra headless scripts and Python tools (PAK2 archives, address tables) |
-| `archive/` | Not tracked: the original `dxgi.dll`, the raw Ghidra decompiles and metadata (`archive/dumps/`), the decompiled UI ActionScript and the Ghidra projects. Everything MotherVR does is ported, so these are only needed to re-check a detail |
+| `src/`, `res/`, `CMakeLists.txt`, `vcpkg.json`, `triplets/` | The reconstruction. See `BUILDING.md` to build |
+| `cleanroom/` | The clean-room process (`CLEANROOM.md`), the specification (`spec/`, v1 in 00 to 14, v2 in 20 to 24), the C++ style guide for the reimplementation and the spec lint |
+| `dumps/` | Analysis notes on the original and the game. Start with `dumps/03_*`, `04_*`, `05_*.md`; `09_*` maps every original function to the reconstruction |
+| `scripts/` | Ghidra headless scripts, Python tools (PAK2 archives, address tables, the UI patch, disassembly) and the build, packaging and in-game test scripts |
+| `packaging/` | The player guide shipped with each release |
+| `release-notes/` | One file per release tag |
+| `.github/` | CI (build, DLL checks, repository and commit checks) and the release workflow |
+| `archive/` | Not tracked: the original `dxgi.dll` and its Ghidra project, the original `MOTHER.PAK` (input for `scripts/ui_patch.py`) and a few raw analysis files. Only needed to re-check a detail or regenerate the UI patch |
 
 ## Tooling
 
 - Ghidra 12.0.4 (headless) with the scripts in `scripts/`. The Ghidra project
-  itself is not tracked; recreate it by importing MotherVR 0.8.1's `dxgi.dll`, running
+  is not tracked; recreate it by importing MotherVR 0.8.1's `dxgi.dll`, running
   auto-analysis, then `FillGaps.java` and `BulkDecompile.java`.
 - JPEXS FFDec for the Scaleform `.GFX` movies.
-- Python 3 with `pefile` for `scripts/*.py`.
+- Python 3 with `pefile` (and `capstone` for `scripts/disasm.py`).
 - Visual Studio 2022/2026 (C++ workload), CMake and vcpkg for the DLL; see
-  [BUILDING.md](BUILDING.md#building) for the build.
+  [BUILDING.md](BUILDING.md#building) for the build and
+  [Making a release](BUILDING.md#making-a-release).
 
-Large binaries (`*.dll`, `*.pak`) are stored with Git LFS.
+Large binaries (`*.dll`, `*.exe`, `*.pak`) are stored with Git LFS. The
+embedded `res/openvr_api.dll` is pinned by SHA-256; configure stops on a
+wrong file (run `pwsh scripts/fetch_openvr_api.ps1`).
 
 ## Roadmap
 
@@ -67,11 +83,34 @@ Fixes to original issues
 - [ ] Short delay before the head-in-wall blackout, so walking through
       doors does not flash black; implemented (600 ms), not yet confirmed in
       game
+- [x] Snap turn at 3 segments turned 180 degrees (integer division)
 - [x] Controls only fit the Vive wand under OpenVR: SteamVR Input with
       default bindings for Index, Touch, WMR and Vive wands, rebindable in
       SteamVR (verified on Index)
 
+From the first tester reports (implemented, not yet confirmed in game)
+- [ ] OpenXR runtime discovery prefers the runtime made active in SteamVR
+      or the vendor's app over a leftover 32-bit registration; failure
+      messages name the error and say how to get back to SteamVR, and the
+      options page shows the runtime actually running
+- [ ] Warning when SteamVR's Desktop Game Theatre shows the game flat
+      instead of in VR
+- [ ] An oversized desktop mirror window goes borderless over its monitor
+      instead of running past the screen
+- [ ] Losing the desktop focus (SteamVR, a streaming client) no longer
+      pauses the game or stalls loading screens
+- [ ] Desktop mirror modes crop each eye from its own half
+- [ ] Head pose held when tracking is lost; recenter waits for a valid pose
+- [ ] Runtime None leaves the game unmodded apart from the options page
+- [ ] Crash record in `mothervr.log` (module, offset, registers, callers)
+- [ ] Not yet understood: a crash on B in the pause menu, the old menu
+      lingering over the Continue video, the view sliding on snap turns
+      while walking (diagnostics added behind Dev. Debug Options)
+
 ### v2: enhanced mode
+
+Specified in `cleanroom/spec/20` to `24`; every option defaults to v1
+behaviour.
 
 Hands
 - Free 6DOF hand controllers: tracked hands in game, aiming with the hands
@@ -97,5 +136,5 @@ Rendering
 Quality of life
 - In-headset settings for the new options in the MotherVR menu
 - Test and support the 2020 build (current Steam, GOG, Epic)
-- Crash-safe logging and a hotkey to disable VR
+- A hotkey to disable VR (crash records are in v1)
 - Per-controller button glyphs (Index, Quest, WMR) in the UI

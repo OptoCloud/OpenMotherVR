@@ -21,4 +21,4 @@
 
 # Machine-generated: hide from GitHub language stats and collapse in diffs.
 dumps/** linguist-generated=true
-recon/src/hook/ai_address_tables.inc linguist-generated=true
+src/hook/ai_address_tables.inc linguist-generated=true

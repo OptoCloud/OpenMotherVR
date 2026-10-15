@@ -19,15 +19,19 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
 
 - CI builds with Ninja in a `vcvars32.bat` environment and `MOTHERVR_WERROR=ON`;
   a warning fails it.
-- CI also fails on a commit subject that is not Conventional Commits and on a
-  tracked game file (`scripts/check_repo.sh`).
+- CI also fails on a commit subject that is not Conventional Commits, on a
+  tracked game file (`scripts/check_repo.sh`), and on a built DLL with the
+  wrong exports, imports or version (`scripts/check_dll.ps1`). Each build
+  keeps its `d3d11.pdb` as a separate artifact.
 - Releases: push a `v*` tag on `master` with `release-notes/<tag>.md`
   committed; see "Making a release" in `BUILDING.md`.
-- Configure stops if `res/openvr_api.dll` is a Git LFS pointer: run
+- Configure stops if `res/openvr_api.dll` is not the pinned file (its
+  SHA-256 is in `CMakeLists.txt`; a Git LFS pointer fails too): run
   `pwsh scripts/fetch_openvr_api.ps1`.
 - In-game check (needs the game installed through Steam):
   `pwsh scripts/run_game.ps1 -Seconds 60` deploys the build, starts the game,
-  prints the new `mothervr.log` lines and disassembles any crash. `-Keep`
+  prints the new `mothervr.log` lines and disassembles any crash (the log
+  also has a `crash:` record with module, offset and callers). `-Keep`
   leaves the game running.
 - There are no unit tests.
 
@@ -46,8 +50,11 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
   launching, and when the test needs the headset worn or controllers held,
   run long enough for that (several minutes, or `-Keep`), then read the log.
 - With "Dev. Debug Options" on (`DebugOptions` in `mothervr.json`) the mod
-  logs extra diagnostics (pose age, hand poses, game events). Read the log
+  logs extra diagnostics (pose age, hand poses, game events, stereo mode
+  and frame-kind changes, the camera after each snap turn). Read the log
   instead of asking the user to describe what they saw.
+- Reports from other testers come with their `mothervr.log`; ask for it
+  with Dev. Debug Options on.
 
 ## Rules for patching the game
 
@@ -70,13 +77,16 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
   once per change, or every 900 frames behind `DebugOptions`.
 - Never link `d3d11.lib`: this DLL is `d3d11.dll` and would import itself.
   Use D3D11 through interfaces only.
+- Runtime None applies only the options-page (UI) patch set: no stereo,
+  camera, shader or window changes and no D3D11 wrapping.
 
 ## Content rules
 
 - Never commit game files (`UI.PAK`, `MOTHER.PAK`, `AI.exe`, shader caches)
   or other mods' files. Changes to game assets ship as deltas applied to the
   player's own copy (`res/ui_patch.bin`, built by `scripts/ui_patch.py`).
-- `archive/` is local reference material and is never committed.
+- `archive/` is local reference material and is never committed, and so
+  is `cleanroom-review/` (review reports that cite the original).
 - `mothervr.json` keeps the original mod's keys and layout; new settings are
   added, unknown keys are preserved on save.
 - Comments explain why. Keep `// From: FUN_xxxxxxxx` lines: they map code to
@@ -100,4 +110,7 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
   Read the relevant one before changing that subsystem.
 - `packaging/README.txt`: the player-facing guide; update it when a setting
   or control changes.
-- `cleanroom/`: the clean-room specification and its process.
+- `cleanroom/`: the clean-room specification and its process. Spec edits
+  follow `cleanroom/CLEANROOM.md` and pass
+  `python -I cleanroom/tools/spec_lint.py cleanroom/spec` before a commit.
+- `release-notes/<tag>.md`: what each release changes, for players.
