@@ -92,8 +92,15 @@ void write_controls(const Controls& c, bool near_head) noexcept {
     digital(a, 0x26, c.map);                   // Map
     digital(a, 0x27, c.grip_l);
     digital(a, 0x28, c.grip_r);
-    analog(a, 0, c.move.x * move_scale);       // Move
-    analog(a, 1, c.move.y * move_scale);
+    // The touchpad's scale reaches full speed short of the rim; keep the
+    // result on the unit disc the game expects of a stick.
+    float move_x = c.move.x * move_scale, move_y = c.move.y * move_scale;
+    if (const float len = std::hypot(move_x, move_y); len > 1.0f) {
+        move_x /= len;
+        move_y /= len;
+    }
+    analog(a, 0, move_x);                      // Move
+    analog(a, 1, move_y);
     analog(a, 3, turn);                        // Turn
 
     // UI map.
