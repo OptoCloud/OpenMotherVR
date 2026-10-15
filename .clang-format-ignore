@@ -1,0 +1,3 @@
+# Not formatted: the naked forwarder thunks are MSVC inline assembly, which
+# clang-format does not understand.
+src/loader/d3d11_forwarders.cpp

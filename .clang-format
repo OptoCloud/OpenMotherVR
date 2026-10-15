@@ -1,0 +1,35 @@
+# cleanroom/STYLEGUIDE.md section 1: 4-space indent, 110 columns, braces on
+# the same line, pointer `T* p`. Includes keep their order (some Windows
+# headers must come first); comments are not rewrapped, so `// From:` lines
+# stay whole.
+Language: Cpp
+BasedOnStyle: Google
+Standard: c++20
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 110
+BreakBeforeBraces: Attach
+PointerAlignment: Left
+DerivePointerAlignment: false
+ReferenceAlignment: Pointer
+AccessModifierOffset: -4
+IndentCaseLabels: true
+NamespaceIndentation: None
+FixNamespaceComments: true
+ShortNamespaceLines: 0
+SpacesBeforeTrailingComments: 1
+AlignTrailingComments: true
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: None
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Empty
+SortIncludes: Never
+IncludeBlocks: Preserve
+ReflowComments: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+Cpp11BracedListStyle: true
+InsertNewlineAtEOF: true
