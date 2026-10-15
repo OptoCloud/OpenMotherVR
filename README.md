@@ -51,8 +51,7 @@ Fixes to original issues
 - [x] Floors and walls lit differently in the right eye, worst at high
       resolution (looked like reflections moving against the head): the
       game's position-based shader dither, patched in the bytecode
-- [ ] Planar reflections per eye: implemented, not yet seen in game (the
-      tested scene had no planar reflection surface)
+- [x] Planar reflections per eye (verified in game)
 - [x] Desktop mirror only filled a corner of the window
 - [x] Render-target-view leak every frame; out-of-range reads in the input
       hooks
