@@ -84,7 +84,7 @@ struct StereoInterface {
     std::int32_t     handle_seed;         // +0x1FC
     std::uint32_t    unused_200;          // +0x200
     float            world_scale;         // +0x204  -vrscale
-    std::int32_t     pose_fetched;        // +0x208  head pose read since the last submit
+    std::int32_t     pose_fetched;        // +0x208  head pose read since the last submit (atomic)
     std::int32_t     mirror_width;        // +0x20C  desktop window size
     std::int32_t     mirror_height;       // +0x210
     std::int32_t     configured_width;    // +0x214  size of the eye texture in use
@@ -112,19 +112,33 @@ static_assert(offsetof(StereoInterface, rt_width) == 0x1EC);
 static_assert(offsetof(StereoInterface, backend) == 0x1F4);
 static_assert(offsetof(StereoInterface, world_scale) == 0x204);
 static_assert(offsetof(StereoInterface, mirror_width) == 0x20C);
+static_assert(offsetof(StereoInterface, pose_fetched) == 0x208);
 static_assert(offsetof(StereoInterface, mirror_vs) == 0x21C);
 static_assert(offsetof(StereoInterface, mirror_sampler) == 0x22C);
 static_assert(sizeof(StereoInterface) == 0x230);
 
-// The device state is read on the game's job threads (the cull hooks) while
-// the main thread changes it: writes, and reads off the main thread, go
-// through atomic_ref. Relaxed: a value one frame stale is harmless. The
+// The device state is read on the game's job threads (the cull hooks) and
+// the render thread while the main thread changes it, and a late detach
+// (slot 3, render thread) clears it: writes, and reads off the main thread,
+// go through atomic_ref. Relaxed: a value one frame stale is harmless. The
 // layout is the game's and stays as it is.
 inline DeviceState load_state(StereoInterface& si) noexcept {
     return std::atomic_ref(si.state).load(std::memory_order_relaxed);
 }
 inline void store_state(StereoInterface& si, DeviceState s) noexcept {
     std::atomic_ref(si.state).store(s, std::memory_order_relaxed);
+}
+
+// The backend is read on the game thread (head pose, recenter) and the
+// render thread (frames), and a late detach clears it on the render thread
+// (stereo_device.cpp, fail_runtime). A backend that was in use when it
+// was cleared is never deleted, so a call already under way finishes on a
+// live object; a call that loads null afterwards does nothing.
+inline runtime::HmdBackend* load_backend(StereoInterface& si) noexcept {
+    return std::atomic_ref(si.backend).load(std::memory_order_acquire);
+}
+inline void store_backend(StereoInterface& si, runtime::HmdBackend* b) noexcept {
+    std::atomic_ref(si.backend).store(b, std::memory_order_release);
 }
 
 // The stereo manager. +0x00..+0xAF is the game's layout.
@@ -161,6 +175,16 @@ inline void store_device(StereoManager& m, StereoInterface* device) noexcept {
 
 // The single instance the game is given.
 StereoManager& manager() noexcept;
+
+// Was the head pose requested since the last submit (slot 11 on the game
+// thread sets it, slot 6 on the render thread clears it)? Release/acquire
+// so a request made before the frame's begin is seen there.
+inline bool load_pose_fetched(StereoInterface& si) noexcept {
+    return std::atomic_ref(si.pose_fetched).load(std::memory_order_acquire) != 0;
+}
+inline void store_pose_fetched(StereoInterface& si, bool fetched) noexcept {
+    std::atomic_ref(si.pose_fetched).store(fetched ? 1 : 0, std::memory_order_release);
+}
 
 // True once the stereo device gave up on its VR runtime (init or session
 // failure). The player has been told and VR stays off for this run.

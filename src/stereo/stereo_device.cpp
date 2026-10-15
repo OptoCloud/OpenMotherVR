@@ -9,6 +9,7 @@
 #include "stereo_device.h"
 
 #include "game_hooks.h"
+#include "guard.h"
 
 #include "config/config.h"
 #include "diag/log.h"
@@ -20,6 +21,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <cwchar>
 #include <memory>
@@ -42,9 +44,12 @@ StereoManager g_manager{};
 // DLL_PROCESS_DETACH under the loader lock, where VR_Shutdown or
 // xrDestroyInstance (which wait on runtime threads) can deadlock. A session
 // still open at exit is left to the OS and the runtime, which both handle a
-// process that ends. Main thread only.
+// process that ends. Owns the backend; after a late detach (fail_runtime)
+// it keeps it, unused, until exit.
 runtime::HmdBackend* g_backend = nullptr;
-bool g_runtime_failed = false;
+// Set on the game thread (init) or the render thread (late detach); read
+// by the Present hook and the options page.
+std::atomic<bool> g_runtime_failed{false};
 
 void* g_device_vtable[22]{};
 void* g_manager_vtable[3]{};
@@ -87,19 +92,22 @@ void set_target_size(StereoInterface& si, int width, int height) noexcept {
 
 // ---- Device init (non-virtual) -------------------------------------------------
 
-// Deletes the backend, whose destructor shuts its runtime down.
-void drop_backend(StereoInterface& si) noexcept {
-    si.backend = nullptr;
-    delete std::exchange(g_backend, nullptr);
-}
-
 // The runtime cannot drive the headset after all: detach the device, as a
-// failed init leaves it, and tell the player.
-void fail_runtime(StereoInterface& si, runtime::detect_result::Chosen chosen) noexcept {
+// failed init leaves it, and tell the player. State and pointer are cleared
+// before the backend, so no new call starts using it.
+//
+// At init (game thread, before the device was ever attached) nothing else
+// can hold the backend: it is deleted, and its destructor shuts the runtime
+// down. A late failure (slot 3, on the render thread) can come while the
+// game thread is inside a call into the backend (head pose, recenter):
+// the backend is then only taken off the device and kept, unused, until
+// the process ends, so that call finishes on a live runtime.
+void fail_runtime(StereoInterface& si, runtime::detect_result::Chosen chosen, bool late) noexcept {
     store_state(si, DeviceState::None);
     if (load_device(g_manager) == &si) store_device(g_manager, nullptr);
     integration::g_vr_session_active = false;
-    drop_backend(si);
+    store_backend(si, nullptr);
+    if (!late) delete std::exchange(g_backend, nullptr);
     g_runtime_failed = true;
     runtime::report_init_failure(chosen);
 }
@@ -132,13 +140,13 @@ void init_device(StereoInterface& si) noexcept {
         diag::logf("[stereo] no stereo device for runtime {}", runtime::to_string(chosen));
         return;
     }
-    si.backend = g_backend;
-    if (!si.backend->init()) {
+    store_backend(si, g_backend);
+    if (!g_backend->init()) {
         diag::log_line("[stereo] HMD backend init failed, running without VR");
-        fail_runtime(si, chosen);
+        fail_runtime(si, chosen, false);
         return;
     }
-    si.backend->register_control_hints();
+    g_backend->register_control_hints();
 
     // A plausible ovrHmdDesc header for the game: a DK2.
     si.desc.handle          = reinterpret_cast<void*>(static_cast<std::uintptr_t>(si.handle_seed));
@@ -146,7 +154,7 @@ void init_device(StereoInterface& si) noexcept {
     si.desc.hmd_caps        = 0x83;
     si.desc.sensor_caps     = 0x70;
     si.desc.distortion_caps = 2;
-    si.backend->get_hmd_desc(si.desc);
+    g_backend->get_hmd_desc(si.desc);
     si.eye_fov[0] = si.desc.max_eye_fov[0];
     si.eye_fov[1] = si.desc.max_eye_fov[1];
     store_state(si, DeviceState::Ready);
@@ -328,14 +336,14 @@ void create_mirror(StereoInterface& si, ID3D11Device* device) noexcept {
 // [0] scalar deleting destructor. The object is static: never freed.
 void __fastcall dev_release(void* self, void*, unsigned /*flags*/) noexcept {
     auto& si = device_of(self);
-    if (si.state == DeviceState::Running) store_state(si, DeviceState::Ready);
+    if (load_state(si) == DeviceState::Running) store_state(si, DeviceState::Ready);
     if (si.hmd) store_state(si, DeviceState::None);
 }
 
 // [1] StartSensor: the game switches to stereo rendering.
 void __fastcall dev_start_sensor(void* self, void*) noexcept {
     auto& si = device_of(self);
-    if (si.state == DeviceState::Ready) {
+    if (load_state(si) == DeviceState::Ready) {
         store_state(si, DeviceState::Running);
         diag::log_line("[stereo] sensor started, stereo rendering on");
     }
@@ -344,15 +352,14 @@ void __fastcall dev_start_sensor(void* self, void*) noexcept {
 // [2] StopSensor.
 void __fastcall dev_stop_sensor(void* self, void*) noexcept {
     auto& si = device_of(self);
-    if (si.state == DeviceState::Running) store_state(si, DeviceState::Ready);
+    if (load_state(si) == DeviceState::Running) store_state(si, DeviceState::Ready);
 }
 
 // [3] ConfigureRendering(stereo render target): describe the eye texture,
 // create the mirror resources. If the backend cannot drive the headset with
 // the game's device (no OpenXR session), the device detaches here; the
 // mirror resources are still made for any call already on its way.
-bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noexcept {
-    auto& si = device_of(self);
+bool configure_rendering(StereoInterface& si, void* stereo_rt) {
     auto& t0 = si.eye_texture[0];
     t0.api      = 5;
     t0.size     = {si.rt_width, si.rt_height};
@@ -379,9 +386,9 @@ bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noex
 
     auto* device = renderer_get<ID3D11Device>(AiAddr::RendererDevice);
     auto* ctx    = renderer_get<ID3D11DeviceContext>(AiAddr::RendererContext);
-    if (si.backend && !si.backend->create_render_resources(device, ctx)) {
+    if (auto* backend = load_backend(si); backend && !backend->create_render_resources(device, ctx)) {
         diag::log_line("[stereo] HMD backend cannot render, running without VR");
-        fail_runtime(si, runtime::last_result().chosen);
+        fail_runtime(si, runtime::last_result().chosen, true);
     }
 
     create_mirror(si, device);
@@ -391,24 +398,29 @@ bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noex
     return true;
 }
 
+bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noexcept {
+    return guarded("ConfigureRendering", true, [&] { return configure_rendering(device_of(self), stereo_rt); });
+}
+
 // [4] ShutdownRendering.
 bool __fastcall dev_shutdown_rendering(void* self, void*) noexcept {
-    auto& si = device_of(self);
-    if (si.backend) si.backend->release_render_resources();
+    guarded("ShutdownRendering", [&] {
+        if (auto* backend = load_backend(device_of(self))) backend->release_render_resources();
+    });
     return true;
 }
 
 // [5] BeginFrame: poll the controllers, take the eye offsets.
-void __fastcall dev_begin_frame(void* self, void*) noexcept {
-    auto& si = device_of(self);
-    if (!si.backend) return;
-    si.backend->poll_input();
-    if (si.backend->refresh_hmd_desc(si.desc)) {
+void begin_frame(StereoInterface& si) {
+    auto* backend = load_backend(si);
+    if (!backend) return;
+    backend->poll_input();
+    if (backend->refresh_hmd_desc(si.desc)) {
         si.eye_fov[0] = si.desc.max_eye_fov[0];
         si.eye_fov[1] = si.desc.max_eye_fov[1];
     }
     float eye[6]{};
-    si.backend->begin_frame(eye, si.pose_fetched != 0);
+    backend->begin_frame(eye, load_pose_fetched(si));
     // The left eye's offset goes to the game's eye 1, as in the original.
     const float s = si.world_scale;
     for (int i = 0; i < 3; ++i) {
@@ -421,6 +433,10 @@ void __fastcall dev_begin_frame(void* self, void*) noexcept {
                    si.eye_desc[0].view_adjust[0], si.eye_desc[0].view_adjust[1], si.eye_desc[0].view_adjust[2],
                    si.eye_desc[1].view_adjust[0], si.eye_desc[1].view_adjust[1], si.eye_desc[1].view_adjust[2]);
     }
+}
+
+void __fastcall dev_begin_frame(void* self, void*) noexcept {
+    guarded("BeginFrame", [&] { begin_frame(device_of(self)); });
 }
 
 // [6] EndFrame: submit the eyes, draw the mirror, present. LibOVR's
@@ -474,13 +490,15 @@ void draw_mirror(StereoInterface& si, ID3D11DeviceContext* ctx, bool head_tracke
 
 void __fastcall dev_end_frame(void* self, void*) noexcept {
     auto& si = device_of(self);
-    if (si.backend) si.backend->submit_frame(si.eye_texture[0].texture);
+    guarded("EndFrame", [&] {
+        if (auto* backend = load_backend(si)) backend->submit_frame(si.eye_texture[0].texture);
+    });
     auto* swap = renderer_get<IDXGISwapChain>(AiAddr::RendererSwapChain);
     auto* ctx  = renderer_get<ID3D11DeviceContext>(AiAddr::RendererContext);
     // The frame kind, decided before the request is cleared.
-    draw_mirror(si, ctx, si.pose_fetched != 0);
+    draw_mirror(si, ctx, load_pose_fetched(si));
     swap->Present(0, 0);
-    si.pose_fetched = 0;
+    store_pose_fetched(si, false);
 }
 
 // [7] BeginEyeRender / [8] EndEyeRender: nothing to do.
@@ -495,8 +513,12 @@ bool __fastcall dev_is_ready(void*, void*) noexcept { return true; }
 // [11] GetHeadPose(float out[12]).
 float* __fastcall dev_head_pose(void* self, void*, float* out) noexcept {
     auto& si = device_of(self);
-    if (si.backend) si.backend->head_pose(*reinterpret_cast<runtime::Matrix34*>(out), si.world_scale);
-    si.pose_fetched = 1;
+    guarded("GetHeadPose", [&] {
+        if (auto* backend = load_backend(si)) {
+            backend->head_pose(*reinterpret_cast<runtime::Matrix34*>(out), si.world_scale);
+        }
+    });
+    store_pose_fetched(si, true);
     return out;
 }
 
@@ -521,23 +543,21 @@ void __fastcall dev_eye_viewport(void*, void*, int eye, int half_width, int heig
 // does not rebuild them when stereo starts, so the eyes stay at half
 // resolution. We use the configured pixel scale from the start; the
 // swapchain is kept windowed so the mode change cannot fail (d3d11_proxy).
-int* __fastcall dev_render_target_size(void* self, void*, int* w, int* h) noexcept {
-    auto& si = device_of(self);
-    if (!si.backend) return w;
+void render_target_size(StereoInterface& si, runtime::HmdBackend& backend, int* w, int* h) {
     // PixelScale multiplies the runtime's recommended size, which already
     // includes SteamVR's own resolution setting. Capped so the side-by-side
     // target stays within D3D11's 16384 texture limit.
     constexpr float kMaxTextureSize = 16384.0f;
-    const runtime::Sizei l1 = si.backend->eye_texture_size(0, 1.0f);
-    const runtime::Sizei r1 = si.backend->eye_texture_size(1, 1.0f);
+    const runtime::Sizei l1 = backend.eye_texture_size(0, 1.0f);
+    const runtime::Sizei r1 = backend.eye_texture_size(1, 1.0f);
     float scale = config::current().rendering.pixel_scale;
     if (l1.w + r1.w > 0 && l1.h > 0 && r1.h > 0) {
         const float max_scale = std::min(kMaxTextureSize / static_cast<float>(l1.w + r1.w),
                                          kMaxTextureSize / static_cast<float>(std::max(l1.h, r1.h)));
         scale = std::min(scale, max_scale);
     }
-    const runtime::Sizei l = si.backend->eye_texture_size(0, scale);
-    const runtime::Sizei r = si.backend->eye_texture_size(1, scale);
+    const runtime::Sizei l = backend.eye_texture_size(0, scale);
+    const runtime::Sizei r = backend.eye_texture_size(1, scale);
     const int width  = l.w + r.w;
     const int height = l.w <= r.w ? r.h : l.h;   // compares widths, as the original
 
@@ -553,10 +573,17 @@ int* __fastcall dev_render_target_size(void* self, void*, int* w, int* h) noexce
         s_last_h = height;
         diag::logf("[stereo] render target size {}x{} ({:.1f} MP, pixel scale {:.2f}; state {}, texture {}x{})",
                    width, height, static_cast<double>(width) * height / 1e6, scale,
-                   static_cast<int>(si.state), si.configured_width, si.configured_height);
+                   static_cast<int>(load_state(si)), si.configured_width, si.configured_height);
     }
     *w = width;
     *h = height;
+}
+
+int* __fastcall dev_render_target_size(void* self, void*, int* w, int* h) noexcept {
+    auto& si = device_of(self);
+    if (auto* backend = load_backend(si)) {
+        guarded("GetRenderTargetSize", [&] { render_target_size(si, *backend, w, h); });
+    }
     return w;
 }
 
@@ -577,7 +604,11 @@ void __fastcall dev_unused(void*, void*) noexcept {}
 // game's recenter call sites are redirected here from slot 11.
 float* __fastcall dev_recenter_pose(void* self, void*, float* out) noexcept {
     auto& si = device_of(self);
-    if (si.backend) si.backend->head_yaw_pose(*reinterpret_cast<runtime::Matrix34*>(out), si.world_scale);
+    guarded("RecenterAndGetHeadPose", [&] {
+        if (auto* backend = load_backend(si)) {
+            backend->head_yaw_pose(*reinterpret_cast<runtime::Matrix34*>(out), si.world_scale);
+        }
+    });
     return out;
 }
 
@@ -589,8 +620,9 @@ void __fastcall mgr_release(void*, void*, unsigned) noexcept {}
 // [1] OnEvent(Event*). Event 0x18 starts the sensor and switches four
 // graphics options off/on.
 void __fastcall mgr_on_event(StereoManager* self, void*, const std::int32_t* event) noexcept {
-    if (*event != 0x18 || !self->device) return;
-    reinterpret_cast<void (__fastcall*)(void*, void*)>(self->device->vtable[1])(self->device, nullptr);
+    StereoInterface* device = load_device(*self);
+    if (*event != 0x18 || !device) return;
+    reinterpret_cast<void (__fastcall*)(void*, void*)>(device->vtable[1])(device, nullptr);
 
     using SetOptionFn = void (__fastcall*)(void* settings, void* edx, int option, const char* value);
     auto set_option = reinterpret_cast<SetOptionFn>(ai_address(AiAddr::GraphicsSetOption));
@@ -661,8 +693,9 @@ void initialize() noexcept {
     si.world_scale = 1.0f;
 }
 
-void __fastcall create_device(StereoManager* self, void*, int enable) noexcept {
-    if (enable != 1) return;
+namespace {
+
+void create_device_impl(StereoManager* self) {
     auto& si = self->si;
     // The game can call this again (a display reset). A second VR_Init or
     // overlay would fail, and a runtime that failed has told the player
@@ -673,19 +706,27 @@ void __fastcall create_device(StereoManager* self, void*, int enable) noexcept {
         si.world_scale = world_scale_from_command_line();
         init_device(si);
     }
-    store_device(*self, si.state != DeviceState::None ? &si : nullptr);
-    integration::g_vr_session_active = self->device != nullptr;
-    diag::logf("[stereo] CreateDevice{}: {}", first ? "" : " again", self->device ? "HMD attached" : "no HMD");
-    if (first && self->device && si.state == DeviceState::Ready) {
+    StereoInterface* device = load_state(si) != DeviceState::None ? &si : nullptr;
+    store_device(*self, device);
+    integration::g_vr_session_active = device != nullptr;
+    diag::logf("[stereo] CreateDevice{}: {}", first ? "" : " again", device ? "HMD attached" : "no HMD");
+    if (first && device && load_state(si) == DeviceState::Ready) {
         dev_recenter_pose(&si, nullptr, self->reference_pose);
         // The headset may be lying on the desk at launch: take the
         // reference again once it is worn.
-        if (!si.backend->headset_in_use()) request_recenter();
+        if (auto* backend = load_backend(si); backend && !backend->headset_in_use()) request_recenter();
     }
 }
 
+} // namespace
+
+void __fastcall create_device(StereoManager* self, void*, int enable) noexcept {
+    if (enable != 1) return;
+    guarded("CreateDevice", [&] { create_device_impl(self); });
+}
+
 int* __fastcall get_render_target_size(StereoManager* self, void*, int* w, int* h) noexcept {
-    StereoInterface* si = self->device;
+    StereoInterface* si = load_device(*self);
     if (!si) return h;
     si->mirror_width  = *w;
     si->mirror_height = *h;

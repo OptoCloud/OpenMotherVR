@@ -19,7 +19,7 @@ bool on_present(IDXGISwapChain* swapchain) noexcept {
     // Only when OpenXR could not get a stereo device: the game's frame on a
     // virtual screen. With a stereo device the backend drives the frames.
     if (runtime::last_result().chosen != runtime::detect_result::Chosen::OpenXR) return false;
-    if (manager().device) return false;
+    if (load_device(manager())) return false;
     // The stereo device gave up on the runtime and the player was told VR
     // is off; do not start it again here for the virtual screen.
     if (runtime_failed()) return false;

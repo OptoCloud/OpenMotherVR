@@ -4,6 +4,8 @@
 
 #include "game_hooks.h"
 
+#include "guard.h"
+
 #include "config/config.h"
 #include "diag/log.h"
 #include "diag/texture_dump.h"
@@ -171,12 +173,10 @@ void set_clipping_blinders(bool on) noexcept {
 // cutscenes and loading. The game's own update (DK2 recenter, fade) is not
 // run. From: FUN_1001f8a0.
 
-int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept {
+namespace {
+
+void update_running(StereoManager* self, StereoInterface* device) {
     auto& u = g_update;
-    if (!self->device || self->device->state != DeviceState::Running) {
-        if (g_follow_active) field<std::uint8_t>(g_follow, kFollowLookEnabled) = 1;
-        return 0;
-    }
     const auto& input_cfg = config::current().input;
     void* pad      = input::pad_device();
     void* keyboard = input::keyboard_device();
@@ -232,11 +232,12 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
     // headset upright.
     using RecenterFn = float* (__fastcall*)(void*, void*, float*);
     auto recenter = [&] {
-        reinterpret_cast<RecenterFn>(self->device->vtable[21])(self->device, nullptr, self->reference_pose);
+        reinterpret_cast<RecenterFn>(device->vtable[21])(device, nullptr, self->reference_pose);
     };
     const bool chord = (lb && rb) || (ctrl && alt);
     bool handled = false;
-    if (u.recenter_request && self->device->backend && self->device->backend->headset_in_use()) {
+    runtime::HmdBackend* backend = load_backend(*device);
+    if (u.recenter_request && backend && backend->headset_in_use()) {
         recenter();
         u.recenter_request = false;
         u.recentered = true;
@@ -275,6 +276,17 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
         }
     }
     if (u.loading_blackout) self->game_64 = 0.0f;
+}
+
+} // namespace
+
+int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept {
+    StereoInterface* device = load_device(*self);
+    if (!device || load_state(*device) != DeviceState::Running) {
+        if (g_follow_active) field<std::uint8_t>(g_follow, kFollowLookEnabled) = 1;
+        return 0;
+    }
+    guarded("Stereo::Update", [&] { update_running(self, device); });
     return 0;
 }
 
@@ -438,7 +450,7 @@ void setup_eye(std::uint8_t* pov, int eye) noexcept {
 
 // Debug (F10): write what the reflection pass left bound as render target
 // to <game dir>/mothervr_reflection_<pass>.dds.
-void dump_bound_target(int pass) noexcept {
+void dump_bound_target(int pass) {
     void* renderer = *reinterpret_cast<void**>(ai_address(AiAddr::RendererPtr));
     if (!renderer) return;
     auto* ctx = game_fn<ID3D11DeviceContext* (__cdecl*)(void*)>(AiAddr::RendererContext)(renderer);
@@ -468,7 +480,8 @@ void __fastcall render_reflection(void* pov, void*) noexcept {
     auto render = reinterpret_cast<RenderFn>(g_reflection.render);
     auto* p = static_cast<std::uint8_t*>(pov);
 
-    const StereoInterface* dev = sm().device;
+    StereoInterface* dev = load_device(sm());
+    const DeviceState state = dev ? load_state(*dev) : DeviceState::None;
     {   // Diagnostics: each reflection POV and every change of its flags.
         static std::array<std::pair<const void*, int>, 8> s_seen{};
         static int s_lines = 0;
@@ -478,12 +491,12 @@ void __fastcall render_reflection(void* pov, void*) noexcept {
             ++s_lines;
             diag::logf("[stereo] reflection POV {} flags 0x{:02X} -> 0x{:02X} (state {}, size {}x{})",
                        pov, it->first ? it->second : -1, p[kPovFlags],
-                       dev ? static_cast<int>(dev->state) : -1,
+                       dev ? static_cast<int>(state) : -1,
                        field<std::int32_t>(p, 0x33C), field<std::int32_t>(p, 0x340));
             *it = {pov, p[kPovFlags]};
         }
     }
-    if (!g_reflection_ready || !dev || dev->state != DeviceState::Running ||
+    if (!g_reflection_ready || !dev || state != DeviceState::Running ||
         (p[kPovFlags] & 0x11) != 0x11) {
         render(pov, nullptr);   // flat, or nothing to render: as the game does
         return;
@@ -509,7 +522,7 @@ void __fastcall render_reflection(void* pov, void*) noexcept {
         g_skip_clears = eye == 1;   // keep the first half
         render(pov, nullptr);
         g_skip_clears = 0;
-        if (dump) dump_bound_target(eye);
+        if (dump) guarded("reflection capture", [&] { dump_bound_target(eye); });
     }
 
     std::memcpy(p, centre.data(), centre.size());
