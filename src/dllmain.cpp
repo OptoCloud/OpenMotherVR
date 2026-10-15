@@ -58,26 +58,33 @@ void attach(HINSTANCE self) {
             "If a new update to the game has just been released, or this check failed for some other "
             "reason, MotherVR may need to be updated.\n\n"
             "MotherVR will now be disabled, and Alien: Isolation will startup normally.",
-            stamp), MB_OK | MB_ICONWARNING);
+            stamp), MB_OK | MB_ICONWARNING, nullptr, "unsupported build");
+    }
+
+    const bool installed = mothervr::hook::install(self, dir);
+    if (!installed) {
+        // Either nothing was patched (unknown build, a failed preflight) or
+        // a write failed part way; the installer's own lines say which.
+        mothervr::diag::log_line("hooks not (fully) installed, see the [hook] lines above");
     }
 
     // The original's welcome. It defaulted to VR off; this build starts with
     // SteamVR, so the text says where to change that instead. The template
     // mothervr.json is written once it is closed, so a process that exits
     // first (a Steam relaunch) leaves the welcome to the next one.
+    // Only on a run where the mod is active: on an unknown build or a failed
+    // check it would promise VR and an options page that are not there, and
+    // writing the file would use up the welcome before the first run that
+    // has them.
     // From: FUN_1000ce80 (first-run branch).
-    if (first_launch) {
+    if (first_launch && installed) {
         mothervr::integration::post_message_box(
             "Welcome to MotherVR for Alien: Isolation!\n\n"
             "VR starts with SteamVR. To use OpenXR or turn VR off, go to Options->MotherVR after the "
             "game starts up. This message is only shown on the first launch of MotherVR.",
-            MB_OK | MB_ICONINFORMATION, &write_config_template);
-    }
-
-    if (!mothervr::hook::install(self, dir)) {
-        // Either nothing was patched (unknown build, a failed preflight) or
-        // a write failed part way; the installer's own lines say which.
-        mothervr::diag::log_line("hooks not (fully) installed, see the [hook] lines above");
+            MB_OK | MB_ICONINFORMATION, &write_config_template, "welcome");
+    } else if (first_launch) {
+        mothervr::diag::log_line("config: mod not active this run; welcome and mothervr.json left for a run where it is");
     }
 }
 
