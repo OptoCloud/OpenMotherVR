@@ -21,17 +21,64 @@
 #include "integration/dialogs.h"
 #include "integration/exe_check.h"
 #include "proxy/d3d11_proxy.h"
+#include "util/proc.h"
 
+#include <cstdint>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <format>
+#include <string>
 #include <windows.h>
 
 namespace {
 
 void write_config_template() { mothervr::config::save_current(); }
 
+// The release from the DLL's own version resource (FILEVERSION, which CMake
+// fills from MOTHERVR_VERSION), so a log names the build a player runs. The
+// fixed part of the resource is found by its signature; no version.dll.
+std::string mod_version(HINSTANCE self) {
+    HRSRC info = ::FindResourceW(self, MAKEINTRESOURCEW(1), RT_VERSION);
+    HGLOBAL data = info ? ::LoadResource(self, info) : nullptr;
+    const auto* bytes = data ? static_cast<const std::uint8_t*>(::LockResource(data)) : nullptr;
+    const DWORD size = bytes ? ::SizeofResource(self, info) : 0;
+    for (DWORD at = 0; at + sizeof(VS_FIXEDFILEINFO) <= size; at += 4) {
+        VS_FIXEDFILEINFO fixed{};
+        std::memcpy(&fixed, bytes + at, sizeof(fixed));
+        if (fixed.dwSignature == 0xFEEF04BD) {
+            return std::format("{}.{}.{}", HIWORD(fixed.dwFileVersionMS), LOWORD(fixed.dwFileVersionMS),
+                               HIWORD(fixed.dwFileVersionLS));
+        }
+    }
+    return "unknown";
+}
+
+// The Windows build number. RtlGetVersion, not GetVersionEx: the latter
+// answers what the game's manifest claims to support, not the real build.
+unsigned long windows_build() noexcept {
+    using RtlGetVersionFn = LONG(WINAPI*)(RTL_OSVERSIONINFOW*);
+    HMODULE ntdll = ::GetModuleHandleW(L"ntdll.dll");
+    const auto get = ntdll ? mothervr::util::proc<RtlGetVersionFn>(ntdll, "RtlGetVersion") : nullptr;
+    RTL_OSVERSIONINFOW v{};
+    v.dwOSVersionInfoSize = sizeof(v);
+    if (!get || get(&v) != 0) return 0;
+    return v.dwBuildNumber;
+}
+
+// Starting the game can run AI.exe twice, and both processes write this
+// log: the one Steam started (it sets these variables) is the game, the
+// other the launcher that asks Steam to relaunch it (spec 11 §1.8).
+const char* process_kind() noexcept {
+    const bool steam = ::GetEnvironmentVariableW(L"SteamGameId", nullptr, 0) != 0
+                    || ::GetEnvironmentVariableW(L"SteamAppId", nullptr, 0) != 0;
+    return steam ? "Game" : "Launcher";
+}
+
 void attach(HINSTANCE self) {
+    mothervr::diag::logf("session: {} process; mod {}; Windows build {}", process_kind(), mod_version(self),
+                         windows_build());
+
     const auto dir = mothervr::diag::module_directory();
     mothervr::diag::logf("install dir: {}", mothervr::diag::utf8(dir));
 
@@ -43,6 +90,8 @@ void attach(HINSTANCE self) {
                          cfg.input.snap_rotation,
                          cfg.debug.skip_startup_intro,
                          cfg.debug.debug);
+    mothervr::diag::logf("config: settings in effect ({}): {}", mothervr::config::load_source(),
+                         mothervr::config::describe(cfg));
 
     if (auto v = mothervr::integration::identify_ai_exe()) {
         mothervr::diag::logf("ai.exe: recognized build (timestamp=0x{:08X})",
@@ -104,7 +153,8 @@ void on_attach(HINSTANCE self) noexcept {
 }
 
 void on_detach(bool process_exit) noexcept {
-    mothervr::diag::log_line("== MotherVR detach ==");
+    mothervr::diag::log_line(process_exit ? "== MotherVR detach == (process exit)"
+                                          : "== MotherVR detach == (unload)");
     // At process exit the game's D3D objects are still alive and other
     // threads are gone: leave everything to the OS.
     if (process_exit) return;
