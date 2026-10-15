@@ -7,15 +7,20 @@
 namespace omvr::game::ui {
 
 // AI.exe's original console-command handler, chained for non-mvr_ tokens.
+// A __thiscall method, declared __fastcall with the unused EDX (STYLEGUIDE
+// 6).
 // From: DAT_10066c20.
-using PFN_CmdHandler = void (__fastcall*)(void* self, void* edx, int ctx, char* cmd, int p3, int p4);
+using CmdHandlerFn = void(__fastcall*)(void* self, void* edx, int ctx, char* cmd, int p3, int p4);
 
 // A no-argument menu method, the stock implementation behind a hooked slot.
 // From: DAT_10066c10.
-using PFN_MenuMethod = void (__fastcall*)(void* self, void* edx);
+using MenuMethodFn = void(__fastcall*)(void* self, void* edx);
+
+// The value the game's frame loop reads as "requested" in its request bytes.
+inline constexpr std::uint8_t kRequestRaised = 1;
 
 // The game's console command handler, its front-end menu's open method and
-// two request bytes its frame loop reads.
+// two request bytes its frame loop reads. Game thread.
 class Console final : public core::ui::ports::GameSignals {
 public:
     // AI.exe's exit-request byte: a plain global with a getter and setter
@@ -29,7 +34,9 @@ public:
     // push or console command changes the mirror or pixel scale, so those take
     // effect without a restart.
     // From: DAT_10066d44 (AI.exe table slot 0x5F).
-    void bind(PFN_CmdHandler original_cmd, PFN_MenuMethod original_menu_open, std::uint8_t* exit_request,
+    //
+    // Each pointer is null when the build's table has no address for it.
+    void bind(CmdHandlerFn original_cmd, MenuMethodFn original_menu_open, std::uint8_t* exit_request,
               std::uint8_t* display_reset_flag) noexcept;
 
     // The game's own handler, for every command that is not an mvr_ one.
@@ -42,10 +49,11 @@ public:
     bool can_reset_display() const noexcept override;
 
 private:
-    PFN_CmdHandler g_original_cmd       = nullptr;
-    PFN_MenuMethod g_original_menu_open = nullptr;
-    std::uint8_t*  g_exit_request       = nullptr;
-    std::uint8_t*  g_display_reset_flag = nullptr;
+    CmdHandlerFn  original_cmd_       = nullptr;
+    MenuMethodFn  original_menu_open_ = nullptr;
+    // Bytes in AI.exe's data; valid for the process's lifetime.
+    std::uint8_t* exit_request_       = nullptr;
+    std::uint8_t* display_reset_flag_ = nullptr;
 };
 
 } // namespace omvr::game::ui

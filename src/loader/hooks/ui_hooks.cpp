@@ -1,18 +1,16 @@
 #include "loader/hooks/ui_hooks.h"
 
-#include "core/diag/logger.h"
+#include "core/ui/commands.h"
 #include "game/ui/console.h"
 #include "loader/context.h"
 #include "loader/hooks/crash_hook.h"
+#include "util/sync/once_latch.h"
 
 #include <cstdint>
-#include <cstring>
+#include <string_view>
 #include <type_traits>
-#include <utility>
 
 namespace omvr::loader::hooks {
-
-namespace diag = core::diag;
 
 void push_settings(void* ui) noexcept {
     reassert_crash_hook();
@@ -20,11 +18,12 @@ void push_settings(void* ui) noexcept {
 }
 
 void __fastcall on_menu_open(void* self, void* /*edx*/) noexcept {
-    static bool s_logged = false;
-    if (!std::exchange(s_logged, true)) {
-        diag::logf("[script_bridge] menu opened (ui={}), pushing settings", self);
-    }
-    context().console.open_menu(self);
+    // Once: the menu opens many times a session. Trivially destructible, so
+    // nothing runs at exit.
+    static util::OnceLatch logged;
+    auto& ctx = context();
+    if (logged.first()) core::diag::ports::logf(ctx.log, "[script_bridge] menu opened (ui={}), pushing settings", self);
+    ctx.console.open_menu(self);
     push_settings(self);
 }
 
@@ -35,15 +34,7 @@ void __fastcall on_menu_open(void* self, void* /*edx*/) noexcept {
 void __fastcall handle_mvr_command(void* self, void* /*edx*/, int ctx, char* cmd, int p3, int p4) noexcept {
     // A null name is not ours to judge: the stock method gets the call
     // unchanged, as every call that is not an mvr_ command does.
-    if (!cmd) {
-        context().console.forward_command(self, ctx, cmd, p3, p4);
-        return;
-    }
-
-    // Non-mvr_ commands go to the original handler untouched.
-    const char* first = cmd;
-    while (*first == ' ') ++first;
-    if (std::strncmp(first, "mvr_", 4) != 0) {
+    if (!cmd || !core::ui::is_mod_command(std::string_view{cmd})) {
         context().console.forward_command(self, ctx, cmd, p3, p4);
         return;
     }
@@ -51,13 +42,14 @@ void __fastcall handle_mvr_command(void* self, void* /*edx*/, int ctx, char* cmd
 }
 
 void __fastcall pause_open_settings_only(void* self, void* /*edx*/) noexcept {
-    using game::ui::PFN_MenuMethod;
-    if (auto open = reinterpret_cast<PFN_MenuMethod>(context().originals.pause_open_settings_only)) open(self, nullptr);
+    // The stock method this replaces, as the installer recorded it.
+    if (auto open = reinterpret_cast<game::ui::MenuMethodFn>(context().targets.pause_open_settings_only))
+        open(self, nullptr);
     push_settings(self);
 }
 
-static_assert(std::is_convertible_v<decltype(&on_menu_open), game::ui::PFN_MenuMethod>);
-static_assert(std::is_convertible_v<decltype(&pause_open_settings_only), game::ui::PFN_MenuMethod>);
-static_assert(std::is_convertible_v<decltype(&handle_mvr_command), game::ui::PFN_CmdHandler>);
+static_assert(std::is_convertible_v<decltype(&on_menu_open), game::ui::MenuMethodFn>);
+static_assert(std::is_convertible_v<decltype(&pause_open_settings_only), game::ui::MenuMethodFn>);
+static_assert(std::is_convertible_v<decltype(&handle_mvr_command), game::ui::CmdHandlerFn>);
 
 } // namespace omvr::loader::hooks

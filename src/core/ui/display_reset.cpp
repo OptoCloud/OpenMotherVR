@@ -1,11 +1,17 @@
 #include "core/ui/display_reset.h"
 
-#include "core/diag/logger.h"
 #include "core/ui/runtime_menu.h"
 
 #include <utility>
 
 namespace omvr::core::ui {
+
+namespace {
+
+// The log names a changed setting by its mothervr.json key path.
+const char* changed(bool differs, const char* path) noexcept { return differs ? path : ""; }
+
+} // namespace
 
 TargetSettings target_settings(const config::Settings& cfg) noexcept {
     return {cfg.rendering.pixel_scale, cfg.rendering.mirror_view_type, cfg.rendering.symmetric_mirror_view};
@@ -19,12 +25,13 @@ void DisplayReset::reset_if_changed(const config::Settings& cfg) noexcept {
     const TargetSettings was = std::exchange(built, now);
     // With no VR this run there are no stereo targets to resize, and a
     // rebuild would only freeze the picture.
-    if (!signals_.can_reset_display() || running_runtime(cfg) == config::VRRuntime::None) return;
+    if (!signals_.can_reset_display() || running_runtime(cfg, runtime_) == config::VRRuntime::None) return;
     signals_.request_display_reset();
-    diag::logf("[script_bridge] display reset raised; changed:{}{}{}",
-               now.pixel_scale != was.pixel_scale ? " Rendering.PixelScale" : "",
-               now.mirror_view_type != was.mirror_view_type ? " Rendering.MirrorViewType" : "",
-               now.symmetric_mirror_view != was.symmetric_mirror_view ? " Rendering.SymmetricMirrorView" : "");
+    diag::ports::logf(log_, "[script_bridge] display reset raised; changed:{}{}{}",
+                      changed(now.pixel_scale != was.pixel_scale, " Rendering.PixelScale"),
+                      changed(now.mirror_view_type != was.mirror_view_type, " Rendering.MirrorViewType"),
+                      changed(now.symmetric_mirror_view != was.symmetric_mirror_view,
+                              " Rendering.SymmetricMirrorView"));
 }
 
 } // namespace omvr::core::ui

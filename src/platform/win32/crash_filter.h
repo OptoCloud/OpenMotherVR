@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/diag/ports/log.h"
+#include "core/diag/tuning.h"
 #include "platform/win32/constants.h"
 
 #include <atomic>
@@ -20,6 +22,8 @@ public:
     // An unhandled-exception filter (LPTOP_LEVEL_EXCEPTION_FILTER).
     using Filter = long(__stdcall*)(_EXCEPTION_POINTERS* info);
 
+    explicit CrashRecorder(core::diag::ports::Log& log) noexcept : log_(log) {}
+
     // Installs `ours` as the unhandled-exception filter. Call once, at attach.
     void install(Filter ours) noexcept;
 
@@ -31,34 +35,37 @@ public:
     // then, such as a menu opening or the first frame.
     void reassert(Filter ours) noexcept;
 
-    // The filter's work: the record (first crash only), then the chain.
+    // The filter's work: the record (first crash only), then the chain. On
+    // the faulting thread, in whatever state the process is.
     long on_crash(_EXCEPTION_POINTERS* info) noexcept;
 
 private:
     template <class... Args>
     void record(std::format_string<Args...> fmt, Args&&... args) noexcept;
     void write_record(const _EXCEPTION_POINTERS& info) noexcept;
+    void write_stack(const _EXCEPTION_POINTERS& info) noexcept;
     long chain(_EXCEPTION_POINTERS* info) noexcept;
 
-    Filter                     g_previous = nullptr;
-    std::atomic<bool>          g_logged{false};
+    core::diag::ports::Log& log_;
+    Filter                  previous_ = nullptr;
+    std::atomic<bool>       logged_{false};
     // A filter the game (or its C runtime) installed over ours after attach.
     // Ours is put back on top and this one runs after the record, so neither
     // the record nor the game's own handling is lost.
-    std::atomic<Filter>        g_game_filter{nullptr};
-    // The thread currently inside g_game_filter: if that filter chains to the
-    // one it replaced (ours), the nested call goes on to g_previous instead of
+    std::atomic<Filter>        game_filter_{nullptr};
+    // The thread currently inside game_filter_: if that filter chains to the
+    // one it replaced (ours), the nested call goes on to previous_ instead of
     // looping back into it.
-    std::atomic<unsigned long> g_chaining_thread{0};
+    std::atomic<unsigned long> chaining_thread_{0};
 
     // The record is rendered in storage allocated once at attach, not on the
     // faulting thread's stack: after a stack overflow only the guard region
-    // is left, too little for log_line's buffer plus two MAX_PATH names.
-    // g_logged makes the record a one-off, so one set of buffers is enough.
-    char    g_message[1024];
-    char    g_line[1280];
-    wchar_t g_path[kMaxPath];
-    char    g_name[kMaxPath * 3]; // UTF-8 of a MAX_PATH wide name
+    // is left, too little for a line buffer plus two MAX_PATH names.
+    // logged_ makes the record a one-off, so one set of buffers is enough.
+    char    message_[core::diag::kMessageBufferSize];
+    char    line_[core::diag::kLineBufferSize];
+    wchar_t path_[kMaxPath];
+    char    name_[kMaxPath * kUtf8BytesPerUtf16Unit]; // UTF-8 of a MAX_PATH wide name
 };
 
 } // namespace omvr::platform::win32

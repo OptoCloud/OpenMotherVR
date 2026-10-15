@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/ui/ports/archive_files.h"
+#include "platform/win32/unique_handle.h"
 
 #include <chrono>
 #include <string_view>
@@ -18,8 +19,8 @@ public:
     void unlock() noexcept;
 
 private:
-    void* mutex_ = nullptr; // HANDLE
-    bool  held_  = false;
+    UniqueHandle mutex_;
+    bool         held_ = false;
 };
 
 } // namespace omvr::platform::win32

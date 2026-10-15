@@ -6,10 +6,10 @@
 
 #include "core/config/settings_json.h"
 #include "core/config/settings_table.h"
-#include "core/diag/logger.h"
-#include "platform/win32/text.h" // R: config (A4): paths for the log without the platform
+#include "core/config/tuning.h"
+#include "core/diag/log_format.h"
 
-#include <atomic>
+#include <algorithm>
 #include <cstdint>
 #include <format>
 #include <sstream>
@@ -18,107 +18,102 @@ namespace omvr::core::config {
 
 namespace {
 
+using diag::path_text;
+using diag::ports::logf;
 using nlohmann::json;
-using platform::win32::utf8;
 
-constexpr const char* kFilename = "mothervr.json";
+// Error context of a save that failed while building the text.
+constexpr std::string_view kSerializeFailed = "serialize";
 
-std::atomic<SettingsStore*> g_process_settings{nullptr};
-
-// The parsed file, or nullopt with `why` set to the reason it is unusable.
-std::optional<json> read_document(ports::FileStore& files, const std::filesystem::path& path, std::string& why) {
-    const auto text = files.read(path / kFilename);
-    if (!text) {
-        why = std::format("cannot open it (err=0x{:08X})", static_cast<std::uint32_t>(text.error().code));
-        return std::nullopt;
-    }
-    try {
-        std::istringstream f(*text, std::ios::binary);
-        // Notepad and other Windows editors may save a UTF-8 byte-order
-        // mark; players edit this file by hand, so it must still load.
-        char bom[3] = {};
-        f.read(bom, 3);
-        if (!(f.gcount() == 3 && bom[0] == '\xEF' && bom[1] == '\xBB' && bom[2] == '\xBF')) {
-            f.clear();
-            f.seekg(0);
-        }
-        json j;
-        f >> j;
-        return j;
-    } catch (const std::exception& e) {
-        why = e.what();
-        return std::nullopt;
+// Moves `f` past a UTF-8 byte-order mark, or leaves it at the start.
+void skip_byte_order_mark(std::istream& f) {
+    char bom[kUtf8ByteOrderMark.size()] = {};
+    f.read(bom, sizeof(bom));
+    const bool found = f.gcount() == static_cast<std::streamsize>(sizeof(bom)) &&
+                       std::ranges::equal(bom, kUtf8ByteOrderMark, [](char a, unsigned char b) {
+                           return static_cast<unsigned char>(a) == b;
+                       });
+    if (!found) {
+        f.clear();
+        f.seekg(0);
     }
 }
 
 } // namespace
 
-bool SettingsStore::save(const std::filesystem::path& path, const Settings& cfg) {
-    const auto target = path / kFilename;
-    std::uint32_t error = 0;
-    bool ok = false;
+std::expected<json, std::string> SettingsStore::read_document(const std::filesystem::path& dir) {
+    const auto text = files_.read(dir / kSettingsFileName);
+    if (!text) {
+        return std::unexpected(
+            std::format("cannot open it (err=0x{:08X})", static_cast<std::uint32_t>(text.error().code)));
+    }
     try {
-        json j = g_document;
-        write_config(j, cfg);
-        const auto written = files_.write_atomically(target, j.dump(4));
-        ok = written.has_value();
-        if (!ok) error = static_cast<std::uint32_t>(written.error().code);
+        std::istringstream f(*text, std::ios::binary);
+        skip_byte_order_mark(f);
+        json j;
+        f >> j;
+        return j;
     } catch (const std::exception& e) {
-        diag::logf("config: saving settings to {} failed ({}); the change holds for this session",
-                   utf8(target), e.what());
-        return false;
+        return std::unexpected(std::string(e.what()));
     }
-    if (ok) {
-        diag::logf("config: settings saved to {}", utf8(target));
+}
+
+util::Result<void> SettingsStore::save(const std::filesystem::path& dir, const Settings& cfg) {
+    const auto target = dir / kSettingsFileName;
+    util::Result<void> written;
+    try {
+        json j = document_;
+        write_config(j, cfg);
+        written = files_.write_atomically(target, j.dump(kSettingsJsonIndent));
+    } catch (const std::exception& e) {
+        logf(log_, "config: saving settings to {} failed ({}); the change holds for this session", path_text(target),
+             e.what());
+        return std::unexpected(util::Error{0, kSerializeFailed});
+    }
+    if (written) {
+        logf(log_, "config: settings saved to {}", path_text(target));
     } else {
-        diag::logf("config: saving settings to {} failed err=0x{:08X}; the change holds for this session",
-                   utf8(target), error);
+        logf(log_, "config: saving settings to {} failed err=0x{:08X}; the change holds for this session",
+             path_text(target), static_cast<std::uint32_t>(written.error().code));
     }
-    return ok;
+    return written;
 }
 
 bool SettingsStore::initialize(const std::filesystem::path& dir) {
-    g_config_dir = dir;
-    const auto file = dir / kFilename;
-    std::string why;
-    if (auto doc = read_document(files_, dir, why)) {
-        current_ = read_config(*doc);
-        sanitize(current_);
-        g_document = std::move(*doc);
-        if (!g_document.is_object()) g_document = json::object();
-        g_source = "file";
-        return false;
-    }
+    config_dir_ = dir;
+    auto doc = read_document(dir);
+    if (!doc) return use_defaults(dir / kSettingsFileName, doc.error());
+    current_ = read_config(*doc);
+    sanitize(current_);
+    document_ = std::move(*doc);
+    if (!document_.is_object()) document_ = json::object();
+    source_ = "file";
+    return false;
+}
+
+bool SettingsStore::use_defaults(const std::filesystem::path& file, std::string_view why) {
     current_ = Settings{};
-    g_document = json::object();
+    document_ = json::object();
     // No file: the first launch. The caller writes the template (see
     // settings_store.h). A file that is there but does not parse is kept
     // until a setting changes. An error while checking is not "absent".
     const auto exists = files_.exists(file);
     const bool absent = exists.has_value() && !*exists;
     if (absent) {
-        g_source = "defaults, first launch";
-        diag::logf("config: {} absent: first launch, file follows the welcome message", utf8(file));
+        source_ = "defaults, first launch";
+        logf(log_, "config: {} absent: first launch, file follows the welcome message", path_text(file));
     } else {
-        g_source = "defaults, file unusable";
-        diag::logf("config: {} ignored, defaults apply: {}", utf8(file), why);
+        source_ = "defaults, file unusable";
+        logf(log_, "config: {} ignored, defaults apply: {}", path_text(file), why);
     }
     return absent;
 }
 
 void SettingsStore::save_current() {
-    if (!g_config_dir.empty())
-        save(g_config_dir, current());
-}
-
-void set_process_settings(SettingsStore* store) noexcept {
-    g_process_settings.store(store, std::memory_order_release);
-}
-
-Settings& current() noexcept { return g_process_settings.load(std::memory_order_acquire)->current(); }
-
-void save_current() {
-    if (SettingsStore* store = g_process_settings.load(std::memory_order_acquire)) store->save_current();
+    // The outcome is logged by save(); a failed save leaves the settings in
+    // memory, which is all a caller could do about it.
+    if (config_dir_.empty()) return;
+    [[maybe_unused]] const auto saved = save(config_dir_, current());
 }
 
 } // namespace omvr::core::config

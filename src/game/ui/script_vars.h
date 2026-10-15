@@ -18,27 +18,26 @@ namespace omvr::game::ui {
 
 // Registers a view-control item (menu row) with two display strings.
 // From: DAT_10066bf0. Used for resolution-picker rows in the VR options menu.
-using PFN_FireStr2   = void (__fastcall*)(void* ui, void* edx, const char* name,
-                                          const char* label, const char* value);
+using FireStr2Fn = void(__fastcall*)(void* ui, void* edx, const char* name, const char* label, const char* value);
 
 // Sets a boolean script variable by name.
 // From: DAT_10066bf4.
-using PFN_FireBool   = void (__fastcall*)(void* ui, void* edx, const char* name, int bool_val);
+using FireBoolFn = void(__fastcall*)(void* ui, void* edx, const char* name, int bool_val);
 
 // Sets an integer script variable by name.
 // From: DAT_10066bf8.
-using PFN_FireInt    = void (__fastcall*)(void* ui, void* edx, const char* name, int value);
+using FireIntFn = void(__fastcall*)(void* ui, void* edx, const char* name, int value);
 
 // Sets a float script variable by name.
 // From: DAT_10066bfc.
-using PFN_FireFloat  = void (__fastcall*)(void* ui, void* edx, const char* name, float value);
+using FireFloatFn = void(__fastcall*)(void* ui, void* edx, const char* name, float value);
 
 // The game's UI script-variable setters (the Fire* methods), resolved from
-// the address table by the hook installer.
+// the address table by the hook installer. Game thread.
 class ScriptVars final : public core::ui::ports::ScriptVariables {
 public:
     // Takes the setters. All null before the hook installer runs.
-    void bind(PFN_FireStr2 str2, PFN_FireBool b, PFN_FireInt i, PFN_FireFloat f) noexcept;
+    void bind(FireStr2Fn str2, FireBoolFn b, FireIntFn i, FireFloatFn f) noexcept;
 
     // True when the setters every push needs have been installed by the
     // hook installer, so early or late calls are safe. The row setter (the
@@ -49,15 +48,16 @@ public:
     void set_float(core::ui::ports::UiHandle ui, const char* name, float value) noexcept override;
     bool add_row(core::ui::ports::UiHandle ui, const char* name, const char* a, const char* b) noexcept override;
 
-    PFN_FireBool  fire_bool() const noexcept { return g_fire_bool; }
-    PFN_FireInt   fire_int() const noexcept { return g_fire_int; }
-    PFN_FireFloat fire_float() const noexcept { return g_fire_float; }
+    // The setters, for the installer's log line.
+    FireBoolFn  fire_bool() const noexcept { return fire_bool_; }
+    FireIntFn   fire_int() const noexcept { return fire_int_; }
+    FireFloatFn fire_float() const noexcept { return fire_float_; }
 
 private:
-    PFN_FireStr2  g_fire_str2  = nullptr;
-    PFN_FireBool  g_fire_bool  = nullptr;
-    PFN_FireInt   g_fire_int   = nullptr;
-    PFN_FireFloat g_fire_float = nullptr;
+    FireStr2Fn  fire_str2_  = nullptr;
+    FireBoolFn  fire_bool_  = nullptr;
+    FireIntFn   fire_int_   = nullptr;
+    FireFloatFn fire_float_ = nullptr;
 };
 
 } // namespace omvr::game::ui

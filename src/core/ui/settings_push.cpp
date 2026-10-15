@@ -7,65 +7,71 @@
 
 #include "core/ui/settings_push.h"
 
-#include "core/config/settings_store.h"
-#include "core/diag/logger.h"
-#include "core/stereo/stereo_device.h"
 #include "core/ui/runtime_menu.h"
+#include "core/ui/ui_contract.h"
 
 #include <string>
-#include <string_view>
 #include <utility>
 
 namespace omvr::core::ui {
 
+namespace {
+
+// A help line: the action, a tab, the control.
+constexpr char kHelpSeparator = '\t';
+
+} // namespace
+
 void SettingsPush::push(ports::UiHandle ui) noexcept {
-    if (ui == ports::UiHandle{} || !vars_.ready()) {
+    if (ui == ports::UiHandle{} || !deps_.vars.ready()) {
         // Once: the menu opens many times a session, and the reason does
         // not change.
-        if (!std::exchange(s_logged, true))
-            diag::log_line("[script_bridge] push_settings_to_game: callbacks not installed yet");
+        if (not_ready_logged_.first())
+            deps_.log.line("[script_bridge] push_settings_to_game: callbacks not installed yet");
         return;
     }
-
-    const auto& cfg = config::current();
-
-    // "setMotherVROptionsEnabled" mirrors the check:
-    //   *(StereoManager + 0x04) != nullptr &&
-    //   *(*(StereoManager + 0x04) + 0x04) != 0
-    // which tests whether the VR runtime object exists and its session is live.
-    vars_.set_bool (ui, "setMotherVROptionsEnabled",       stereo::vr_session_active());
-
-    // VR backend selector and debug/startup flags
-    vars_.set_int  (ui, "setMotherSetVRRuntime",           ui_runtime_value(running_runtime(cfg)));
-    vars_.set_int  (ui, "setMotherDebug",                  cfg.debug.debug ? 1 : 0);
-    vars_.set_bool (ui, "setMotherSkipIntro",              cfg.debug.skip_startup_intro);
-
-    // Rendering: mirror mode, pixel scale, blinders
-    vars_.set_int  (ui, "setMotherMirrorView",             static_cast<int>(cfg.rendering.mirror_view_type));
-    vars_.set_bool (ui, "setMotherMirrorViewSym",          cfg.rendering.symmetric_mirror_view);
-    vars_.set_float(ui, "setMotherPixelScale",             cfg.rendering.pixel_scale);
-    vars_.set_bool (ui, "setMotherClipBlinding",           cfg.rendering.clipping_blinders);
-
+    push_runtime_and_debug(ui);
+    push_rendering(ui);
     // Seeds the record of what the render targets were built with.
-    display_reset_.reset_if_changed(cfg);
+    deps_.display_reset.reset_if_changed(deps_.settings);
+    push_input(ui);
+    push_controls_help(ui);
+}
 
-    // Input / snap rotation
-    vars_.set_bool (ui, "setMotherSnapRotation",           cfg.input.snap_rotation);
-    vars_.set_int  (ui, "setMotherSnapRotationSegments",   cfg.input.snap_rotation_segments);
-    vars_.set_bool (ui, "setMotherInputRelativeWalking",   cfg.input.vr_input_relative_walking);
-    vars_.set_bool (ui, "setMotherInputStrafing",          cfg.input.vr_input_strafing);
-    vars_.set_bool (ui, "setMotherToggleGrips",            cfg.input.toggle_grips);
-    vars_.set_bool (ui, "setMotherToggleCrouch",           cfg.input.toggle_crouch);
+void SettingsPush::push_runtime_and_debug(ports::UiHandle ui) noexcept {
+    const config::Settings& cfg = deps_.settings;
+    // Whether the VR runtime object exists and its session is live.
+    deps_.vars.set_bool(ui, script::kOptionsEnabled, deps_.runtime.session_active());
+    deps_.vars.set_int(ui, script::kRuntime, std::to_underlying(ui_runtime_value(running_runtime(cfg, deps_.runtime))));
+    deps_.vars.set_int(ui, script::kDebug, cfg.debug.debug ? 1 : 0);
+    deps_.vars.set_bool(ui, script::kSkipIntro, cfg.debug.skip_startup_intro);
+}
 
-    // The controls help on the options page: one row per "Action\tControl"
-    // line of the layout in use. Nothing when the game's row function is
-    // unknown.
-    for (const char* line : schemes_.control_help()) {
+void SettingsPush::push_rendering(ports::UiHandle ui) noexcept {
+    const config::RenderingSettings& r = deps_.settings.rendering;
+    deps_.vars.set_int(ui, script::kMirrorView, std::to_underlying(r.mirror_view_type));
+    deps_.vars.set_bool(ui, script::kMirrorViewSymmetric, r.symmetric_mirror_view);
+    deps_.vars.set_float(ui, script::kPixelScale, r.pixel_scale);
+    deps_.vars.set_bool(ui, script::kClipBlinding, r.clipping_blinders);
+}
+
+void SettingsPush::push_input(ports::UiHandle ui) noexcept {
+    const config::InputSettings& in = deps_.settings.input;
+    deps_.vars.set_bool(ui, script::kSnapRotation, in.snap_rotation);
+    deps_.vars.set_int(ui, script::kSnapRotationSegments, in.snap_rotation_segments);
+    deps_.vars.set_bool(ui, script::kInputRelativeWalking, in.vr_input_relative_walking);
+    deps_.vars.set_bool(ui, script::kInputStrafing, in.vr_input_strafing);
+    deps_.vars.set_bool(ui, script::kToggleGrips, in.toggle_grips);
+    deps_.vars.set_bool(ui, script::kToggleCrouch, in.toggle_crouch);
+}
+
+void SettingsPush::push_controls_help(ports::UiHandle ui) noexcept {
+    for (const char* line : deps_.schemes.control_help()) {
         const std::string_view s(line);
-        const auto tab = s.find('\t');
+        const auto tab = s.find(kHelpSeparator);
         const std::string action(s.substr(0, tab));
         const std::string control(tab == std::string_view::npos ? std::string_view{} : s.substr(tab + 1));
-        if (!vars_.add_row(ui, "addMotherViewControl", action.c_str(), control.c_str())) break;
+        if (!deps_.vars.add_row(ui, script::kAddControlRow, action.c_str(), control.c_str())) break;
     }
 }
 

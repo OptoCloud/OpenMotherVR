@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/diag/ports/log.h"
 #include "core/ui/ports/archive_files.h"
 #include "core/ui/ports/dialogs.h"
 
@@ -8,11 +9,11 @@
 
 namespace omvr::core::ui {
 
-// The mod's UI archive, DATA\MOTHER.PAK.
+// The mod's UI archive, DATA\MOTHER.PAK. Game thread, at attach.
 class UiArchiveDeployer {
 public:
-    UiArchiveDeployer(ports::ArchiveFiles& files, ports::Dialogs& dialogs) noexcept
-        : files_(files), dialogs_(dialogs) {}
+    UiArchiveDeployer(ports::ArchiveFiles& files, ports::Dialogs& dialogs, diag::ports::Log& log) noexcept
+        : files_(files), dialogs_(dialogs), log_(log) {}
 
     // Build the mod's UI archive at <game_dir>\DATA\MOTHER.PAK from the stock
     // DATA\UI.PAK and the embedded patch (see ui_patch.h), unless a copy
@@ -39,6 +40,7 @@ private:
 
     ports::ArchiveFiles& files_;
     ports::Dialogs&      dialogs_;
+    diag::ports::Log&    log_;
 };
 
 } // namespace omvr::core::ui

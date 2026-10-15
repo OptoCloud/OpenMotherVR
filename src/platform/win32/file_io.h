@@ -1,8 +1,11 @@
 #pragma once
 
 #include "core/config/ports/file_store.h"
+#include "util/base/error.h"
 
+#include <cstddef>
 #include <filesystem>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -17,13 +20,16 @@ public:
     util::Result<bool> exists(const std::filesystem::path& path) override;
 };
 
-// The file written whole under a temporary name (`target` + ".tmp"),
+// The one atomic file writer (mothervr.json and MOTHER.PAK): the file is
+// written whole under a temporary name (`target` + core::config::kTemporaryFileSuffix),
 // flushed, then moved over the old one in one step, so a process ended
 // mid-write (a crash, a Steam relaunch) leaves the old file or the new one,
 // never a partial one. A leftover temporary file is never read and is
-// replaced by the next write. False with `error` set on failure;
-// `created`, if given, says whether the temporary file could be created.
-bool write_file_atomically(const std::filesystem::path& target, const void* data, std::size_t size,
-                           unsigned long& error, bool* created = nullptr);
+// replaced by the next write. The error's context is "create" when the
+// temporary file could not be created, "write" for a later failure.
+util::Result<void> write_file_atomically(const std::filesystem::path& target, std::span<const std::byte> data) noexcept;
+
+// The temporary file write_file_atomically writes `target` through.
+std::filesystem::path temporary_path_for(const std::filesystem::path& target);
 
 } // namespace omvr::platform::win32

@@ -4,57 +4,63 @@
 // The original threads file I/O through std::ifstream/std::ofstream and lets
 // nlohmann::json do the heavy lifting; we follow the same shape. Reading is
 // per key (see settings.h for the layouts read); writing merges into the
-// document last loaded so unknown keys survive.
+// document last loaded so unknown keys survive. Every key comes from the
+// settings table (settings_table.h).
 
 #include "core/config/settings_json.h"
 
 #include "core/config/settings_table.h"
+
+#include <type_traits>
 
 namespace omvr::core::config {
 
 namespace {
 
 using nlohmann::json;
-using Config = Settings;
 
-constexpr const char* kKey_Settings           = "Settings";
-constexpr const char* kKey_VRRuntime          = "VRRuntime";
-constexpr const char* kKey_Rendering          = "Rendering";
-constexpr const char* kKey_MirrorViewType     = "MirrorViewType";
-constexpr const char* kKey_SymmetricMirrorView = "SymmetricMirrorView";
-constexpr const char* kKey_PixelScale         = "PixelScale";
-constexpr const char* kKey_ClippingBlinders   = "ClippingBlinders";
-constexpr const char* kKey_StereoAntiAliasing = "StereoAntiAliasing";
-constexpr const char* kKey_Input              = "Input";
-constexpr const char* kKey_SnapRotation       = "SnapRotation";
-constexpr const char* kKey_SnapRotationSegments = "SnapRotationSegments";
-constexpr const char* kKey_VRInputRelativeWalking = "VRInputRelativeWalking";
-constexpr const char* kKey_VRInputStrafing    = "VRInputStrafing";
-constexpr const char* kKey_ToggleGrips        = "ToggleGrips";
-constexpr const char* kKey_ToggleCrouch       = "ToggleCrouch";
-constexpr const char* kKey_DebugOptions       = "DebugOptions";      // Settings: bool; legacy top level: object
-constexpr const char* kKey_SkipStartupIntro   = "SkipStartupIntro";
-constexpr const char* kKey_DevDebugOptions    = "DevDebugOptions";   // legacy, inside the top-level object
+// The object holding the settings, and the objects of its sections.
+constexpr const char* kSettingsKey  = "Settings";
+constexpr const char* kRenderingKey = "Rendering";
+constexpr const char* kInputKey     = "Input";
+
+// The layout earlier builds of this project wrote: a top-level object
+// "DebugOptions" holding "SkipStartupIntro" and "DevDebugOptions".
+constexpr const char* kLegacyDebugKey     = "DebugOptions";
+constexpr const char* kLegacySkipIntroKey = "SkipStartupIntro";
+constexpr const char* kLegacyDevDebugKey  = "DevDebugOptions";
+
+const char* section_key(Section s) noexcept {
+    switch (s) {
+        case Section::Rendering: return kRenderingKey;
+        case Section::Input:     return kInputKey;
+        case Section::Settings:  break;
+    }
+    return nullptr;
+}
 
 // Tolerant lookup: returns `fallback` if `key` is missing or has the wrong
 // type, so older or hand-edited files load with defaults for what they lack.
 template <class T>
-T get_or(const json& j, const char* key, const T& fallback) {
+T get_or(const json& j, std::string_view key, const T& fallback) {
     auto it = j.find(key);
     if (it == j.end()) return fallback;
-    try { return it->get<T>(); } catch (...) { return fallback; }
+    try {
+        return it->get<T>();
+    } catch (...) {
+        return fallback;
+    }
 }
 
-// An enum stored as its string, or as the original's integer 0..`last`.
+// An enum stored as its string, or as the original's integer 0..last.
 template <class E>
-E get_enum_or(const json& j, const char* key, E fallback,
-              std::optional<E> (*parse)(std::string_view) noexcept, E last) {
+E get_enum_or(const json& j, std::string_view key, E fallback) {
     auto it = j.find(key);
     if (it == j.end()) return fallback;
-    if (it->is_string()) return parse(it->get_ref<const std::string&>()).value_or(fallback);
+    if (it->is_string()) return EnumTraits<E>::parse(it->get_ref<const std::string&>()).value_or(fallback);
     if (it->is_number_integer()) {
         const auto n = it->get<long long>();
-        if (n >= 0 && n <= static_cast<long long>(last)) return static_cast<E>(n);
+        if (n >= 0 && n <= static_cast<long long>(EnumTraits<E>::kLast)) return static_cast<E>(n);
     }
     return fallback;
 }
@@ -66,99 +72,98 @@ json& object_at(json& j, const char* key) {
     return v;
 }
 
-} // namespace
-
-namespace {
-
-void read_rendering(const json& j, RenderingSettings& r) {
-    r.mirror_view_type      = get_enum_or(j, kKey_MirrorViewType, r.mirror_view_type,
-                                          &parse_mirror_view_type, MirrorViewType::LeftEye);
-    r.symmetric_mirror_view = get_or(j, kKey_SymmetricMirrorView, r.symmetric_mirror_view);
-    r.pixel_scale           = get_or(j, kKey_PixelScale, r.pixel_scale);
-    r.clipping_blinders     = get_or(j, kKey_ClippingBlinders, r.clipping_blinders);
-    r.stereo_aa             = get_enum_or(j, kKey_StereoAntiAliasing, r.stereo_aa, &parse_stereo_aa, StereoAA::Off);
+// The section object of `settings` a row reads from, or null when it is
+// missing or not an object.
+const json* section_in(const json& settings, Section section) {
+    const char* key = section_key(section);
+    if (!key) return &settings;
+    const auto it = settings.find(key);
+    return it != settings.end() && it->is_object() ? &*it : nullptr;
 }
 
-void read_input(const json& j, InputSettings& i) {
-    i.snap_rotation             = get_or(j, kKey_SnapRotation, i.snap_rotation);
-    i.snap_rotation_segments    = get_or(j, kKey_SnapRotationSegments, i.snap_rotation_segments);
-    i.vr_input_relative_walking = get_or(j, kKey_VRInputRelativeWalking, i.vr_input_relative_walking);
-    i.vr_input_strafing         = get_or(j, kKey_VRInputStrafing, i.vr_input_strafing);
-    i.toggle_grips              = get_or(j, kKey_ToggleGrips, i.toggle_grips);
-    i.toggle_crouch             = get_or(j, kKey_ToggleCrouch, i.toggle_crouch);
+template <class T>
+constexpr bool kIsEnum = std::is_enum_v<T>;
+
+// Reads one row's value from `section` into `cfg`.
+void read_row(const json& section, const SettingRow& row, Settings& cfg) {
+    std::visit(
+        [&](auto field) {
+            auto& value = field(cfg);
+            using T = std::remove_reference_t<decltype(value)>;
+            if constexpr (kIsEnum<T>) {
+                value = get_enum_or(section, row.key, value);
+            } else {
+                value = get_or(section, row.key, value);
+            }
+        },
+        row.field);
+}
+
+// One row's value as JSON: an enum as its string.
+json value_of(const SettingRow& row, Settings& cfg) {
+    return std::visit(
+        [&](auto field) -> json {
+            const auto& value = field(cfg);
+            using T = std::remove_cvref_t<decltype(value)>;
+            if constexpr (kIsEnum<T>) {
+                return to_string(value);
+            } else {
+                return value;
+            }
+        },
+        row.field);
+}
+
+// The runtime as written: never "Oculus", which older tools would start a
+// LibOVR backend from. Oculus means OpenXR here (spec 06 §1.1).
+VRRuntime written_runtime(VRRuntime r) noexcept { return r == VRRuntime::Oculus ? VRRuntime::OpenXR : r; }
+
+void read_legacy_debug(const json& root, Settings& c) {
+    if (auto d = root.find(kLegacyDebugKey); d != root.end() && d->is_object()) {
+        c.debug.skip_startup_intro = get_or(*d, kLegacySkipIntroKey, c.debug.skip_startup_intro);
+        c.debug.debug              = get_or(*d, kLegacyDevDebugKey, c.debug.debug);
+    }
 }
 
 } // namespace
 
-Config read_config(const json& root) {
-    Config c{};
+Settings read_config(const json& root) {
+    Settings c{};
     if (!root.is_object()) return c;
 
     // Our earlier layout first, so the original's keys win when both exist.
-    if (auto d = root.find(kKey_DebugOptions); d != root.end() && d->is_object()) {
-        c.debug.skip_startup_intro = get_or(*d, kKey_SkipStartupIntro, c.debug.skip_startup_intro);
-        c.debug.debug              = get_or(*d, kKey_DevDebugOptions, c.debug.debug);
-    }
+    read_legacy_debug(root, c);
 
-    auto s = root.find(kKey_Settings);
+    auto s = root.find(kSettingsKey);
     if (s == root.end() || !s->is_object()) return c;
-    c.vr_runtime = get_enum_or(*s, kKey_VRRuntime, c.vr_runtime, &parse_vr_runtime, VRRuntime::OpenXR);
-    if (auto r = s->find(kKey_Rendering); r != s->end() && r->is_object()) read_rendering(*r, c.rendering);
-    if (auto in = s->find(kKey_Input); in != s->end() && in->is_object()) read_input(*in, c.input);
-    c.debug.debug              = get_or(*s, kKey_DebugOptions, c.debug.debug);
-    c.debug.skip_startup_intro = get_or(*s, kKey_SkipStartupIntro, c.debug.skip_startup_intro);
+    for (const SettingRow& row : settings_table()) {
+        if (const json* section = section_in(*s, row.section)) read_row(*section, row, c);
+    }
     return c;
 }
 
-// Writes `c` into `root` in the original's layout, keeping other keys.
-void write_config(json& root, const Config& c) {
+void write_config(json& root, const Settings& c) {
     if (!root.is_object()) root = json::object();
     // Migrated into Settings; left in place it would override them on the
     // next read by an older build of ours.
-    if (auto d = root.find(kKey_DebugOptions); d != root.end() && d->is_object()) root.erase(d);
+    if (auto d = root.find(kLegacyDebugKey); d != root.end() && d->is_object()) root.erase(d);
 
-    json& s = object_at(root, kKey_Settings);
-    // Never "Oculus": older tools would start a LibOVR backend from it.
-    // Oculus means OpenXR here (spec 06 §1.1).
-    s[kKey_VRRuntime] = to_string(c.vr_runtime == VRRuntime::Oculus ? VRRuntime::OpenXR : c.vr_runtime);
-
-    json& r = object_at(s, kKey_Rendering);
-    r[kKey_MirrorViewType]      = to_string(c.rendering.mirror_view_type);
-    r[kKey_SymmetricMirrorView] = c.rendering.symmetric_mirror_view;
-    r[kKey_PixelScale]          = c.rendering.pixel_scale;
-    r[kKey_ClippingBlinders]    = c.rendering.clipping_blinders;
-    r[kKey_StereoAntiAliasing]  = to_string(c.rendering.stereo_aa);
-
-    json& in = object_at(s, kKey_Input);
-    in[kKey_SnapRotation]           = c.input.snap_rotation;
-    in[kKey_SnapRotationSegments]   = c.input.snap_rotation_segments;
-    in[kKey_VRInputRelativeWalking] = c.input.vr_input_relative_walking;
-    in[kKey_VRInputStrafing]        = c.input.vr_input_strafing;
-    in[kKey_ToggleGrips]            = c.input.toggle_grips;
-    in[kKey_ToggleCrouch]           = c.input.toggle_crouch;
-
-    s[kKey_DebugOptions]     = c.debug.debug;
-    s[kKey_SkipStartupIntro] = c.debug.skip_startup_intro;
+    Settings written = c;
+    written.vr_runtime = written_runtime(c.vr_runtime);
+    json& s = object_at(root, kSettingsKey);
+    for (const SettingRow& row : settings_table()) {
+        const char* key = section_key(row.section);
+        json& section = key ? object_at(s, key) : s;
+        section[std::string(row.key)] = value_of(row, written);
+    }
 }
 
-std::string describe(const Config& c) {
+std::string describe(const Settings& c) {
     // Key paths as in mothervr.json, so a tester can hold the line against
     // the player's file.
+    Settings shown = c;
     json j = json::object();
-    j["VRRuntime"]                     = to_string(c.vr_runtime);
-    j["Rendering.MirrorViewType"]      = to_string(c.rendering.mirror_view_type);
-    j["Rendering.SymmetricMirrorView"] = c.rendering.symmetric_mirror_view;
-    j["Rendering.PixelScale"]          = c.rendering.pixel_scale;
-    j["Rendering.ClippingBlinders"]    = c.rendering.clipping_blinders;
-    j["Rendering.StereoAntiAliasing"]  = to_string(c.rendering.stereo_aa);
-    j["Input.SnapRotation"]            = c.input.snap_rotation;
-    j["Input.SnapRotationSegments"]    = c.input.snap_rotation_segments;
-    j["Input.VRInputRelativeWalking"]  = c.input.vr_input_relative_walking;
-    j["Input.VRInputStrafing"]         = c.input.vr_input_strafing;
-    j["Input.ToggleGrips"]             = c.input.toggle_grips;
-    j["Input.ToggleCrouch"]            = c.input.toggle_crouch;
-    j["DebugOptions"]                  = c.debug.debug;
-    j["SkipStartupIntro"]              = c.debug.skip_startup_intro;
+    for (const SettingRow& row : settings_table()) j[std::string(row.path)] = value_of(row, shown);
     return j.dump();
 }
 

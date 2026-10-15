@@ -7,11 +7,38 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <optional>
+#include <span>
 
 namespace omvr::platform::win32 {
 
+namespace {
+
+// The version resource of `module`, empty when it has none.
+std::span<const std::uint8_t> version_resource(HINSTANCE module) noexcept {
+    HRSRC info = ::FindResourceW(module, MAKEINTRESOURCEW(kVersionResourceId), RT_VERSION);
+    HGLOBAL data = info ? ::LoadResource(module, info) : nullptr;
+    const auto* bytes = data ? static_cast<const std::uint8_t*>(::LockResource(data)) : nullptr;
+    if (!bytes) return {};
+    return {bytes, ::SizeofResource(module, info)};
+}
+
+// The fixed part of a version resource, found by its signature, so no
+// version.dll is needed.
+std::optional<VS_FIXEDFILEINFO> fixed_file_info(std::span<const std::uint8_t> resource) noexcept {
+    for (std::size_t at = 0; at + sizeof(VS_FIXEDFILEINFO) <= resource.size(); at += kVersionInfoAlignment) {
+        VS_FIXEDFILEINFO fixed{};
+        std::memcpy(&fixed, resource.data() + at, sizeof(fixed));
+        if (fixed.dwSignature == VS_FFI_SIGNATURE) return fixed;
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
 std::filesystem::path module_directory() noexcept {
     HMODULE self = nullptr;
+    // Any address inside this DLL names it; the function's own will do.
     if (!::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                               reinterpret_cast<LPCWSTR>(&module_directory), &self))
         return {};
@@ -31,20 +58,10 @@ std::filesystem::path module_directory() noexcept {
     }
 }
 
-// The fixed part of the resource is found by its signature; no version.dll.
 std::string version_string(void* module) {
-    const auto self = static_cast<HINSTANCE>(module);
-    HRSRC info = ::FindResourceW(self, MAKEINTRESOURCEW(1), RT_VERSION);
-    HGLOBAL data = info ? ::LoadResource(self, info) : nullptr;
-    const auto* bytes = data ? static_cast<const std::uint8_t*>(::LockResource(data)) : nullptr;
-    const DWORD size = bytes ? ::SizeofResource(self, info) : 0;
-    for (DWORD at = 0; at + sizeof(VS_FIXEDFILEINFO) <= size; at += 4) {
-        VS_FIXEDFILEINFO fixed{};
-        std::memcpy(&fixed, bytes + at, sizeof(fixed));
-        if (fixed.dwSignature == 0xFEEF04BD) {
-            return std::format("{}.{}.{}", HIWORD(fixed.dwFileVersionMS), LOWORD(fixed.dwFileVersionMS),
-                               HIWORD(fixed.dwFileVersionLS));
-        }
+    if (const auto fixed = fixed_file_info(version_resource(static_cast<HINSTANCE>(module)))) {
+        return std::format("{}.{}.{}", HIWORD(fixed->dwFileVersionMS), LOWORD(fixed->dwFileVersionMS),
+                           HIWORD(fixed->dwFileVersionLS));
     }
     return "unknown";
 }

@@ -22,6 +22,7 @@
 #include "core/ui/settings_push.h"
 #include "core/ui/ui_archive.h"
 #include "core/vr/runtime_detector.h"
+#include "core/vr/runtime_failure.h"
 #include "game/addresses.h"
 #include "game/input/input_manager.h"
 #include "game/layout.h"
@@ -29,7 +30,10 @@
 #include "game/ui/console.h"
 #include "game/ui/script_vars.h"
 #include "loader/headset_audio.h"
-#include "loader/hook_originals.h"
+#include "loader/hook_targets.h"
+#include "loader/launch_options.h"
+#include "loader/runtime_state.h"
+#include "platform/d3d11/render/mirror_renderer.h"
 #include "platform/d3d11/system_d3d11.h"
 #include "platform/openvr/runtime_probe.h"
 #include "platform/openxr/runtime_probe.h"
@@ -49,7 +53,9 @@ namespace omvr::loader {
 
 // Every long-lived object of the mod, built and wired once at attach. The
 // hooks the game, COM and the OS call reach it through context(). Member
-// order is construction order; no member does work in its constructor.
+// order is construction order; no member does work in its constructor. A
+// member may take a reference to one declared after it, as long as it does
+// not use it before attach.
 struct Context {
     explicit Context(void* module) noexcept;
     Context(const Context&) = delete;
@@ -63,6 +69,7 @@ struct Context {
     core::diag::Logger              log;
     platform::win32::CrashRecorder  crash;
     // config, ui
+    ProcessLaunchSwitches           launch;  // the command-line switches, read at attach
     platform::win32::FileStore      files;
     core::config::SettingsStore     settings;
     platform::win32::DialogThread   dialogs;
@@ -73,6 +80,7 @@ struct Context {
     game::StereoManager             manager{};  // the object whose address the game is given
     game::ui::ScriptVars            script_vars;
     game::ui::Console               console;
+    RuntimeStateView                runtime_state;  // over `runtimes` and `stereo`, declared below
     core::ui::DisplayReset          display_reset;
     // input
     game::input::InputManager       input_manager;
@@ -85,6 +93,7 @@ struct Context {
     core::ui::SettingsPush          settings_push;
     core::ui::Commands              commands;
     // vr
+    core::vr::RuntimeFailure        failure;  // why the runtime of this run failed to start
     platform::openxr::Session       xr;  // shared by the OpenXR runtime and the virtual screen
     platform::openvr::RuntimeProbe  openvr_probe;
     platform::openxr::RuntimeProbe  openxr_probe;
@@ -98,6 +107,7 @@ struct Context {
     core::stereo::ModePolicy        modes;
     core::stereo::StereoUpdate      update;
     core::stereo::StereoDevice      stereo;  // owns the VrRuntime through a factory
+    platform::d3d11::MirrorRenderer mirror;  // the desktop mirror on the stereo device's objects
     core::stereo::HeadClipDelay     head_clip;
     core::stereo::StereoAa          stereo_aa;
     core::stereo::ReflectionPass    reflections;
@@ -107,7 +117,7 @@ struct Context {
     // proxy, hooks
     platform::d3d11::SystemD3d11    system_d3d11;
     std::atomic<bool>               ui_set_only{false};
-    HookOriginals                   originals;
+    HookTargets                     targets;
 };
 
 // Builds the context once, in DLL_PROCESS_ATTACH, before the first log line.

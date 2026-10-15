@@ -11,9 +11,13 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/dll_main.cpp
     ${CMAKE_CURRENT_LIST_DIR}/headset_audio.cpp
     ${CMAKE_CURRENT_LIST_DIR}/headset_audio.h
-    ${CMAKE_CURRENT_LIST_DIR}/hook_originals.h
+    ${CMAKE_CURRENT_LIST_DIR}/hook_targets.h
     ${CMAKE_CURRENT_LIST_DIR}/install.cpp
     ${CMAKE_CURRENT_LIST_DIR}/install.h
+    ${CMAKE_CURRENT_LIST_DIR}/launch_options.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/launch_options.h
     ${CMAKE_CURRENT_LIST_DIR}/resource_ids.h
     ${CMAKE_CURRENT_LIST_DIR}/resources.rc
+    ${CMAKE_CURRENT_LIST_DIR}/runtime_state.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/runtime_state.h
 )

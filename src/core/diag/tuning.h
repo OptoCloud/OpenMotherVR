@@ -5,6 +5,9 @@
 
 namespace omvr::core::diag {
 
+// The log, next to the DLL in the game's install directory (spec 11 §1).
+inline constexpr const wchar_t* kLogFileName = L"mothervr.log";
+
 // A formatted message is cut to fit this buffer (spec 11: about 1 KB a line).
 inline constexpr std::size_t kMessageBufferSize = 1024;
 // A whole line, prefix and line ending included.

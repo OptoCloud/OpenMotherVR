@@ -55,12 +55,11 @@ enum class MirrorViewType { BothEyes = 0, RightEye = 1, LeftEye = 2 };
 // supersampled enough that it costs about 0.6 ms GPU for little gain.
 enum class StereoAA { Auto = 0, On = 1, Off = 2 };
 
-
 // Defaults are the original's, except the runtime (see Config).
 struct RenderingSettings {
     MirrorViewType mirror_view_type     = MirrorViewType::RightEye;
     bool           symmetric_mirror_view = true;
-    float          pixel_scale           = 1.0f;
+    float          pixel_scale           = kPixelScaleDefault;
     bool           clipping_blinders     = true;
     StereoAA       stereo_aa             = StereoAA::Auto;
 };
@@ -73,7 +72,7 @@ inline bool stereo_aa_enabled(const RenderingSettings& r) noexcept {
 
 struct InputSettings {
     bool snap_rotation             = true;
-    int  snap_rotation_segments    = 12;
+    int  snap_rotation_segments    = kSnapSegmentsDefault;
     bool vr_input_relative_walking = true;
     bool vr_input_strafing         = true;
     bool toggle_grips              = false;

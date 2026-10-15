@@ -1,7 +1,9 @@
 #pragma once
 
 #include "core/config/settings.h"
+#include "core/diag/ports/log.h"
 #include "core/ui/ports/game_signals.h"
+#include "core/ui/ports/runtime_state.h"
 
 #include <optional>
 
@@ -25,13 +27,16 @@ TargetSettings target_settings(const config::Settings& cfg) noexcept;
 // thread.
 class DisplayReset {
 public:
-    explicit DisplayReset(ports::GameSignals& signals) noexcept : signals_(signals) {}
+    DisplayReset(ports::GameSignals& signals, ports::RuntimeState& runtime, diag::ports::Log& log) noexcept
+        : signals_(signals), runtime_(runtime), log_(log) {}
 
     // The first call records what the targets were made with.
     void reset_if_changed(const config::Settings& cfg) noexcept;
 
 private:
     ports::GameSignals&           signals_;
+    ports::RuntimeState&          runtime_;
+    diag::ports::Log&             log_;
     std::optional<TargetSettings> built_;
 };
 

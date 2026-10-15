@@ -5,12 +5,13 @@
 
 #include "platform/win32/payload_files.h"
 
-#include "core/diag/logger.h" // R: ui (A4): log through an injected Log&
 #include "platform/win32/build_stamp.h"
+#include "platform/win32/constants.h"
 #include "platform/win32/file_io.h"
 #include "platform/win32/module.h"
 #include "platform/win32/resources.h"
 #include "platform/win32/text.h"
+#include "platform/win32/unique_handle.h"
 
 #include <windows.h>
 
@@ -23,68 +24,79 @@ namespace omvr::platform::win32 {
 
 namespace {
 
-namespace diag {
-using core::diag::logf;
-using win32::module_directory;
-using win32::utf8;
-} // namespace diag
-
+using core::diag::ports::logf;
 using core::ui::ports::FileIdentity;
+using core::ui::ports::FileTime;
 
-FILETIME to_filetime(std::int64_t v) noexcept {
-    return FILETIME{static_cast<DWORD>(v), static_cast<DWORD>(static_cast<std::uint64_t>(v) >> 32)};
+FILETIME to_filetime(FileTime v) noexcept {
+    const auto bits = static_cast<std::uint64_t>(v);
+    return FILETIME{static_cast<DWORD>(bits), static_cast<DWORD>(bits >> kDwordBits)};
+}
+
+std::uint64_t join(DWORD high, DWORD low) noexcept { return (std::uint64_t{high} << kDwordBits) | low; }
+
+UniqueHandle open_existing(const std::filesystem::path& file, DWORD access, DWORD share) noexcept {
+    return UniqueHandle{
+        ::CreateFileW(file.c_str(), access, share, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+}
+
+UniqueHandle create_always(const std::filesystem::path& file, DWORD access) noexcept {
+    return UniqueHandle{
+        ::CreateFileW(file.c_str(), access, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
 }
 
 bool up_to_date(const std::filesystem::path& file, const FILETIME& stamp) noexcept {
-    HANDLE h = ::CreateFileW(file.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
-                             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return false;
+    const UniqueHandle h = open_existing(file, GENERIC_READ, FILE_SHARE_READ);
+    if (!h) return false;
     FILETIME written{};
-    const bool ok = ::GetFileTime(h, nullptr, nullptr, &written) != 0;
-    ::CloseHandle(h);
-    return ok && ::CompareFileTime(&written, &stamp) == 0;
+    return ::GetFileTime(h.get(), nullptr, nullptr, &written) != 0 && ::CompareFileTime(&written, &stamp) == 0;
 }
 
-bool write_resource(HMODULE self, int id, const std::filesystem::path& target,
-                    std::int64_t build_stamp) noexcept {
-    const FILETIME stamp = to_filetime(build_stamp);
-    const auto bytes = resource_bytes(self, id);
-    if (bytes.empty()) {
-        diag::logf("payload: resource {} missing from module", id);
-        return false;
-    }
-
-    HANDLE h = ::CreateFileW(target.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
-                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) {
-        diag::logf("payload: cannot create {} err=0x{:08X}", diag::utf8(target), ::GetLastError());
-        return false;
-    }
+// Writes all of `data` to `file`.
+bool write_all(const UniqueHandle& file, const void* data, std::size_t size) noexcept {
     DWORD written = 0;
-    const bool ok = ::WriteFile(h, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr)
-                    && written == bytes.size();
-    const DWORD error = ok ? 0 : ::GetLastError();
-    // Stamp only a complete file: the stamp is what marks it up to date.
-    if (ok) ::SetFileTime(h, &stamp, &stamp, &stamp);
-    ::CloseHandle(h);
-
-    if (!ok) {
-        diag::logf("payload: write to {} failed err=0x{:08X}", diag::utf8(target), error);
-        ::DeleteFileW(target.c_str());
-        return false;
-    }
-    diag::logf("payload: wrote {} ({} bytes)", diag::utf8(target), bytes.size());
-    return true;
+    return ::WriteFile(file.get(), data, static_cast<DWORD>(size), &written, nullptr) && written == size;
 }
 
 } // namespace
+
+bool ArchiveFiles::write_resource(int id, const std::filesystem::path& target, FileTime build_stamp) noexcept {
+    const FILETIME stamp = to_filetime(build_stamp);
+    const auto bytes = resource_bytes(module_, id);
+    if (bytes.empty()) {
+        logf(log_, "payload: resource {} missing from module", id);
+        return false;
+    }
+
+    bool ok = false;
+    DWORD error = 0;
+    {
+        const UniqueHandle h = create_always(target, GENERIC_READ | GENERIC_WRITE);
+        if (!h) {
+            logf(log_, "payload: cannot create {} err=0x{:08X}", utf8(target), ::GetLastError());
+            return false;
+        }
+        ok = write_all(h, bytes.data(), bytes.size());
+        // Captured before the handle is closed.
+        error = ok ? 0 : ::GetLastError();
+        // Stamp only a complete file: the stamp is what marks it up to date.
+        if (ok) ::SetFileTime(h.get(), &stamp, &stamp, &stamp);
+    }
+    if (!ok) {
+        logf(log_, "payload: write to {} failed err=0x{:08X}", utf8(target), error);
+        ::DeleteFileW(target.c_str());
+        return false;
+    }
+    logf(log_, "payload: wrote {} ({} bytes)", utf8(target), bytes.size());
+    return true;
+}
 
 std::optional<FileIdentity> ArchiveFiles::identity(const std::filesystem::path& file) noexcept {
     WIN32_FILE_ATTRIBUTE_DATA a{};
     if (!::GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &a)) return std::nullopt;
     if (a.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) return std::nullopt;
-    return FileIdentity{(std::uint64_t{a.nFileSizeHigh} << 32) | a.nFileSizeLow,
-                        (std::uint64_t{a.ftLastWriteTime.dwHighDateTime} << 32) | a.ftLastWriteTime.dwLowDateTime};
+    return FileIdentity{join(a.nFileSizeHigh, a.nFileSizeLow),
+                        join(a.ftLastWriteTime.dwHighDateTime, a.ftLastWriteTime.dwLowDateTime)};
 }
 
 util::Result<std::vector<std::byte>> ArchiveFiles::read(const std::filesystem::path& path) {
@@ -100,45 +112,38 @@ util::Result<std::vector<std::byte>> ArchiveFiles::read(const std::filesystem::p
 
 util::Result<void> ArchiveFiles::write_atomically(const std::filesystem::path& path,
                                                   std::span<const std::byte> data) {
-    unsigned long error = 0;
-    bool created = false;
-    if (!write_file_atomically(path, data.data(), data.size(), error, &created))
-        return std::unexpected(util::Error{static_cast<std::int32_t>(error), created ? "write" : "create"});
-    return {};
+    return write_file_atomically(path, data);
 }
 
-bool ArchiveFiles::stamped(const std::filesystem::path& file, core::ui::ports::FileTime time) noexcept {
+bool ArchiveFiles::stamped(const std::filesystem::path& file, FileTime time) noexcept {
     return up_to_date(file, to_filetime(time));
 }
 
-void ArchiveFiles::stamp(const std::filesystem::path& target, core::ui::ports::FileTime build_stamp) noexcept {
-    HANDLE h = ::CreateFileW(target.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr, OPEN_EXISTING,
-                             FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h != INVALID_HANDLE_VALUE) {
+void ArchiveFiles::stamp(const std::filesystem::path& target, FileTime build_stamp) noexcept {
+    if (const UniqueHandle h = open_existing(target, FILE_WRITE_ATTRIBUTES, 0)) {
         const FILETIME time = to_filetime(build_stamp);
-        ::SetFileTime(h, &time, &time, &time);
-        ::CloseHandle(h);
+        ::SetFileTime(h.get(), &time, &time, &time);
     }
 }
 
+// The sidecar holds the FileIdentity's bytes as they are (16 bytes: size,
+// then last-write time, little-endian).
 std::optional<FileIdentity> ArchiveFiles::read_sidecar(const std::filesystem::path& file) noexcept {
-    HANDLE h = ::CreateFileW(file.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                             FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return std::nullopt;
+    const UniqueHandle h = open_existing(file, GENERIC_READ, FILE_SHARE_READ);
+    if (!h) return std::nullopt;
     FileIdentity id{};
     DWORD got = 0;
-    const bool ok = ::ReadFile(h, &id, sizeof(id), &got, nullptr) && got == sizeof(id);
-    ::CloseHandle(h);
+    const bool ok = ::ReadFile(h.get(), &id, sizeof(id), &got, nullptr) && got == sizeof(id);
     return ok ? std::optional{id} : std::nullopt;
 }
 
 void ArchiveFiles::write_sidecar(const std::filesystem::path& file, const FileIdentity& id) noexcept {
-    HANDLE h = ::CreateFileW(file.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
-                             FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return;
-    DWORD written = 0;
-    const bool ok = ::WriteFile(h, &id, sizeof(id), &written, nullptr) && written == sizeof(id);
-    ::CloseHandle(h);
+    bool ok = false;
+    {
+        const UniqueHandle h = create_always(file, GENERIC_WRITE);
+        if (!h) return;
+        ok = write_all(h, &id, sizeof(id));
+    }
     if (!ok) ::DeleteFileW(file.c_str());
 }
 
@@ -155,14 +160,13 @@ std::span<const std::byte> ArchiveFiles::payload(core::ui::ports::ResourceId id)
 }
 
 bool ArchiveFiles::deploy_openvr_api() noexcept {
-    const auto self = static_cast<HMODULE>(module_);
-    const std::int64_t build_stamp = this_module_build_filetime();
-    const auto target = diag::module_directory() / "openvr_api.dll";
+    const FileTime build_stamp = this_module_build_filetime();
+    const auto target = module_directory() / kOpenVrApiFileName;
     if (up_to_date(target, to_filetime(build_stamp))) {
-        diag::logf("payload: {} is current", diag::utf8(target));
+        logf(log_, "payload: {} is current", utf8(target));
         return true;
     }
-    return write_resource(self, openvr_api_id_, target, build_stamp);
+    return write_resource(openvr_api_id_, target, build_stamp);
 }
 
 } // namespace omvr::platform::win32

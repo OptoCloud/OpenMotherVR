@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/diag/ports/log.h"
 #include "core/ui/ports/archive_files.h"
 #include "platform/win32/named_mutex.h"
 
@@ -12,11 +13,12 @@ namespace omvr::platform::win32 {
 // equivalent. Both compare the target's last-write time against the mod's own
 // PE build stamp and skip the write when they match; MOTHER.PAK must also
 // still match the UI.PAK it was built from (a sidecar file records which).
+// Game thread at attach; deploy_openvr_api on the thread that starts OpenVR.
 class ArchiveFiles final : public core::ui::ports::ArchiveFiles {
 public:
     // `module` is this DLL; the ids are its BINARY resources.
-    ArchiveFiles(void* module, int openvr_api_id, int ui_patch_id) noexcept
-        : module_(module), openvr_api_id_(openvr_api_id), ui_patch_id_(ui_patch_id) {}
+    ArchiveFiles(void* module, int openvr_api_id, int ui_patch_id, core::diag::ports::Log& log) noexcept
+        : module_(module), openvr_api_id_(openvr_api_id), ui_patch_id_(ui_patch_id), log_(log) {}
 
     std::optional<core::ui::ports::FileIdentity> identity(const std::filesystem::path& path) noexcept override;
     util::Result<std::vector<std::byte>> read(const std::filesystem::path& path) override;
@@ -40,10 +42,14 @@ public:
     bool deploy_openvr_api() noexcept;
 
 private:
-    void*      module_;
-    int        openvr_api_id_;
-    int        ui_patch_id_;
-    NamedMutex mutex_;
+    // Writes resource `id` to `target` and stamps it with `build_stamp`.
+    bool write_resource(int id, const std::filesystem::path& target, core::ui::ports::FileTime build_stamp) noexcept;
+
+    void*                   module_;
+    int                     openvr_api_id_;
+    int                     ui_patch_id_;
+    core::diag::ports::Log& log_;
+    NamedMutex              mutex_;
 };
 
 } // namespace omvr::platform::win32
