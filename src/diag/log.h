@@ -42,8 +42,10 @@ inline void logf(std::format_string<Args...> fmt, Args&&... args) {
 
 // A message box captioned "MotherVR" for the cases the original reports to
 // the player (first launch, unknown game build, VR runtime failures). `text`
-// is UTF-8; `type` is MB_* flags. Returns the button pressed.
+// is UTF-8; `type` is MB_* flags. `kind`, if given, names which message it
+// is in the log line (a tester searches the log for it; spec 11 §2.6).
+// Returns the button pressed, or 0 if the box could not be shown (logged).
 // From: FUN_1001d540 / FUN_1001d5b0.
-int message_box(std::string_view text, unsigned type) noexcept;
+int message_box(std::string_view text, unsigned type, const char* kind = nullptr) noexcept;
 
 } // namespace mothervr::diag

@@ -104,17 +104,29 @@ void log_line_in(std::string_view msg, char* buf, std::size_t cap) noexcept {
     ::WriteFile(g_file, buf, static_cast<DWORD>(n + take + 2), &written, nullptr);
 }
 
-int message_box(std::string_view text, unsigned type) noexcept {
-    log_line(std::string{"message box: "}.append(text));
-    const int n = ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
-    std::wstring wide(static_cast<std::size_t>(n), L'\0');
-    ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), wide.data(), n);
-    return ::MessageBoxW(nullptr, wide.c_str(), L"MotherVR", type);
-}
-
 void log_line(std::string_view msg) noexcept {
     char buf[1280];
     log_line_in(msg, buf, sizeof(buf));
+}
+
+int message_box(std::string_view text, unsigned type, const char* kind) noexcept {
+    try {
+        // The kind names the message for a tester searching the log; a box
+        // without one keeps the plain prefix.
+        std::string line = kind ? std::string{"message box ("}.append(kind).append("): ")
+                                : std::string{"message box: "};
+        log_line(line.append(text));
+        const int n = ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+        std::wstring wide(static_cast<std::size_t>(n), L'\0');
+        ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), wide.data(), n);
+        const int pressed = ::MessageBoxW(nullptr, wide.c_str(), L"MotherVR", type);
+        // The text is in the log already; record that the player never saw it.
+        if (pressed == 0) logf("message box could not be shown err=0x{:08X}", ::GetLastError());
+        return pressed;
+    } catch (...) {
+        log_line("message box could not be shown: out of memory");
+        return 0;
+    }
 }
 
 } // namespace mothervr::diag
