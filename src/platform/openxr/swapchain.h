@@ -1,5 +1,9 @@
 #pragma once
 
+// A runtime swapchain the game's images are copied into (09 §5.2).
+// Internal to this adapter: only its .cpp files include it.
+
+#include "platform/openxr/xr_handle.h"
 #include "platform/openxr/xr_headers.h"
 
 #include <cstdint>
@@ -20,7 +24,7 @@ struct ChainResults {
 };
 
 struct Swapchain {
-    XrSwapchain handle = XR_NULL_HANDLE;
+    SwapchainOwner handle;
     std::uint32_t width = 0, height = 0;
     DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
     std::vector<XrSwapchainImageD3D11KHR> images;

@@ -1,16 +1,27 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace omvr::core::vr {
 
 // Why the chosen runtime failed to start: the runtime's error text and code,
-// set by the backend that failed, for the player-facing dialog.
-struct init_failure {
-    std::string what;
-    int         code = 0;
+// for the player-facing message (03 §6.4, 13 §5.3).
+struct InitFailure {
+    std::string  what;
+    std::int32_t code = 0;
 };
-void set_init_failure(std::string what, int code) noexcept;
-const init_failure& last_init_failure() noexcept;
+
+// The start-up failure of this run, reported by the runtime that failed and
+// read by the stereo device for the player's message. Game thread (the
+// runtime starts in CreateDevice).
+class RuntimeFailure {
+public:
+    void report(std::string what, std::int32_t code) noexcept;
+    const InitFailure& last() const noexcept { return last_; }
+
+private:
+    InitFailure last_;
+};
 
 } // namespace omvr::core::vr

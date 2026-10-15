@@ -9,20 +9,19 @@
 // The original talks to openvr 1.0.10 interfaces (IVRSystem_017,
 // IVRCompositor_021, IVROverlay_016). We request the versions of the SDK
 // header we build against; SteamVR serves both, and the calls used here
-// exist in both.
+// exist in both (03 §6.4).
 
 #include "platform/openvr/openvr_runtime.h"
 
-#include "core/config/settings_store.h" // R: vr (A1): settings and debug flag handed in
-#include "core/diag/logger.h"           // R: vr (A1): log through an injected Log&
 #include "core/diag/tuning.h"
-#include "core/input/touchpad.h"
-#include "core/input/tuning.h"
+#include "core/input/controller_mapping.h"
 #include "core/stereo/tuning.h"
 #include "core/ui/notices.h"
+#include "core/vr/fov.h"
 #include "core/vr/hand_offsets.h"
+#include "core/vr/heading.h"
 #include "core/vr/pose_convert.h"
-#include "core/vr/runtime_detector.h"   // R: vr (A1): the runtime root handed in
+#include "core/vr/pose_hold.h"
 #include "core/vr/runtime_failure.h"
 #include "core/vr/tuning.h"
 #include "platform/d3d11/handles.h"
@@ -32,50 +31,74 @@
 #include "platform/openvr/input_actions.h"
 #include "platform/win32/module.h"
 #include "platform/win32/process_info.h"
+#include "util/math/angle.h"
 #include "util/math/vec.h"
+#include "util/sync/change_latch.h"
+#include "util/sync/frame_period.h"
 #include "util/sync/seqlock.h"
 
 #include <openvr.h>
 #include <windows.h>
 
-#include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <filesystem>
 #include <format>
 #include <string>
+#include <string_view>
 #include <utility>
-#include <vector>
 
 namespace omvr::platform::openvr {
 
 namespace {
 
-namespace config = core::config;
 namespace input = core::input;
-namespace diag {
-using core::diag::log_line;
-using core::diag::logf;
-using win32::module_directory;
-} // namespace diag
+using core::diag::ports::logf;
 using core::stereo::kCinemaDistance;
 using core::stereo::kCinemaWidth;
 using core::vr::FovTangents;
 using core::vr::HeadsetDesc;
+using core::vr::HeadTracking;
+using core::vr::kHandCount;
+using core::vr::RawProjection;
+using core::vr::RenderTangents;
 using core::vr::TextureSize;
-using core::vr::head_local_offset;
-using core::vr::kMinForwardLength;
-using core::vr::kSceneCheckFrame;
-using core::vr::kStartupWaitMs;
-using core::vr::set_init_failure;
 using core::vr::to_game_pose;
 using core::vr::to_game_velocity;
-using util::length;
 using util::Matrix34;
 using util::SeqLock;
-using win32::process_name;
-constexpr auto kHandLogFrames = core::diag::kDebugLogPeriodFrames;
+using Clock = std::chrono::steady_clock;
+
+constexpr std::string_view kLogMissingInterface = "openvr: runtime lacks interface {} (error {})";
+constexpr std::string_view kLogInterfaces       = "openvr: interfaces {}, {}, {}";
+constexpr std::string_view kLogCompositorReady  = "openvr: compositor ready, headset pose {}";
+constexpr std::string_view kLogHeadset          = "openvr: {} {}, render tangents v={:.3f} h={:.3f}";
+constexpr std::string_view kLogOverlayFailed    = "openvr: CreateOverlay failed ({})";
+constexpr std::string_view kLogHeadTracking     = "[diag] headset pose {} (tracking result {})";
+constexpr std::string_view kLogRecenterSkipped =
+    "openvr: recenter skipped: headset pose invalid, the previous reference stays";
+constexpr std::string_view kLogRecenter =
+    "openvr: recenter: head x=({:.2f} {:.2f} {:.2f}) y=({:.2f} {:.2f} {:.2f}) z=({:.2f} {:.2f} {:.2f}) "
+    "pos=({:.2f} {:.2f} {:.2f}) yaw={:.1f} deg{}, activity={}";
+constexpr std::string_view kLogFrameKind        = "[diag] frames now {}";
+constexpr std::string_view kLogNoApplications   =
+    "openvr: no {}: cannot check which application the headset shows; VR is otherwise unaffected";
+constexpr std::string_view kLogShowsGame        = "openvr: the headset shows the game";
+constexpr std::string_view kLogShowsOther       = "openvr: the headset shows process {} ({}), not the game";
+constexpr std::string_view kLogController       = "openvr: {} hand controller: {} (device {})";
+constexpr std::string_view kLogHandsPrefix      = "openvr: hands (head-local m, +x right +y up -z fwd):";
+
+// The player's start-up failure text for a missing interface (13 §5.3).
+constexpr std::string_view kFailMissingInterface = "SteamVR does not provide {}";
+// The log label of the headset-not-showing-the-game warning (03 §6.7).
+constexpr std::string_view kNotShowingLabel = "headset not showing the game";
+
+// SteamVR's controller type names that pick a control scheme.
+constexpr std::string_view kViveController  = "vive_controller";
+constexpr std::string_view kIndexController = "knuckles";
 
 // The neutral pose: the reference before any recenter (03 §7) and the head
 // before any valid pose (03 §1).
@@ -90,17 +113,67 @@ bool all_finite(const vr::HmdMatrix34_t& m) noexcept {
     return true;
 }
 
-class OpenVrHmd final : public core::vr::ports::VrRuntime {
+bool valid_hand(int hand) noexcept { return hand >= 0 && static_cast<std::size_t>(hand) < kHandCount; }
+
+vr::VRTextureBounds_t to_vr(const core::vr::TextureBounds& b) noexcept {
+    return {b.u_min, b.v_min, b.u_max, b.v_max};
+}
+
+// The level reference of a recenter: rotation by `yaw_rad` about +Y, at the
+// head's position `m`.
+vr::HmdMatrix34_t yaw_only(float yaw_rad, const float (&m)[3][4]) noexcept {
+    const float s = std::sin(yaw_rad), c = std::cos(yaw_rad);
+    return {{
+        {   c, 0.0f,    s, m[0][3]},
+        {0.0f, 1.0f, 0.0f, m[1][3]},
+        {  -s, 0.0f,    c, m[2][3]},
+    }};
+}
+
+const char* tracking_text(HeadTracking t) noexcept {
+    switch (t) {
+        case HeadTracking::Invalid:  return "invalid, holding the last valid pose";
+        case HeadTracking::Degraded: return "degraded, holding the last valid position";
+        case HeadTracking::Tracked:  return "tracked";
+    }
+    return "tracked";
+}
+
+input::ControlScheme scheme_for(std::string_view controller_type) noexcept {
+    if (controller_type == kViveController) return input::ControlScheme::Touchpad;
+    if (controller_type == kIndexController) return input::ControlScheme::Index;
+    return input::ControlScheme::Thumbstick;
+}
+
+void sleep_for(std::chrono::milliseconds d) noexcept { ::Sleep(static_cast<DWORD>(d.count())); }
+
+// One hand of the legacy controller state as the touchpad scheme reads it
+// (04 §5.8.3): axis 0 is the touchpad, axis 1 the trigger.
+input::HandInput legacy_hand(const vr::VRControllerState_t& s) noexcept {
+    return {.stick         = {s.rAxis[0].x, s.rAxis[0].y},
+            .stick_touched = (s.ulButtonTouched & kButtonTouchpad) != 0,
+            .stick_click   = (s.ulButtonPressed & kButtonTouchpad) != 0,
+            .trigger       = s.rAxis[1].x,
+            .grip          = (s.ulButtonPressed & kButtonGrip) != 0,
+            .menu          = (s.ulButtonPressed & kButtonMenu) != 0};
+}
+
+// The translation column of a 3x4 tracking matrix.
+util::Vec3 translation(const float (&m)[3][4]) noexcept { return {m[0][3], m[1][3], m[2][3]}; }
+
+class OpenVrRuntime final : public core::vr::ports::VrRuntime {
 public:
-    explicit OpenVrHmd(const OpenVrRuntimeDeps& deps) noexcept
-        : payloads_(deps.payloads), controls_(deps.controls), dialogs_(deps.dialogs) {
+    explicit OpenVrRuntime(const OpenVrRuntimeDeps& deps) noexcept
+        : log_(deps.log), clock_(deps.clock), failure_(deps.failure), payloads_(deps.payloads),
+          controls_(deps.controls), dialogs_(deps.dialogs), runtime_root_(deps.runtime_root),
+          api_(deps.log, deps.failure), actions_(deps.log) {
         render_pose_.store(kIdentity34);
         yaw_matrix_.store(kIdentity34);
     }
 
     // Closes the session init() opened. Only reached through the stereo
     // device's explicit teardown, never at process exit.
-    ~OpenVrHmd() override { openvr::shutdown(); }
+    ~OpenVrRuntime() override { api_.shutdown(); }
 
     bool init() override;
     void headset_desc(HeadsetDesc& desc) override;
@@ -118,19 +191,32 @@ public:
     bool hand_pose(int hand, Matrix34& out, float world_scale) override;
     bool hand_velocity(int hand, float (&out)[3], float world_scale) override;
 
-
 private:
+    using Hands = std::array<HandPose, kHandCount>;
+
+    bool acquire_interfaces(Clock::time_point deadline);
+    bool missing(const char* version, std::int32_t error);
+    bool wait_for_pose(Clock::time_point deadline);
+    const Hands& hands_now();
+    void read_hands();
+    void log_hands(const Hands& h);
+    void submit_eyes(const vr::VRTextureWithPose_t& tex);
+    void show_screen(void* side_by_side, const vr::VRTextureWithPose_t& tex);
+    void write_controls();
+    void note_controller(std::size_t hand, vr::TrackedDeviceIndex_t index);
+    void check_scene_app();
+    Controls legacy_controls(const vr::TrackedDeviceIndex_t (&index)[kHandCount]);
+    const vr::HmdMatrix34_t& read_head();
+    void log_recenter(const float (&m)[3][4], core::vr::Heading heading);
+
+    core::diag::ports::Log&           log_;
+    const core::diag::ports::Clock&   clock_;
+    core::vr::RuntimeFailure&         failure_;
     win32::ArchiveFiles&              payloads_;
     core::input::ports::ControlsSink& controls_;
     core::ui::ports::Dialogs&         dialogs_;
-
-    using Hands = std::array<openvr::HandPose, 2>;
-    const Hands& hands_now();
-    void read_hands();
-    void write_controls();
-    void check_scene_app();
-    openvr::Controls legacy_controls(const vr::TrackedDeviceIndex_t (&index)[2]);
-    const vr::HmdMatrix34_t& read_head();
+    const std::filesystem::path       runtime_root_;
+    ApiLoader                         api_;
 
     vr::IVRSystem*     system_     = nullptr;
     vr::IVRCompositor* compositor_ = nullptr;
@@ -143,7 +229,7 @@ private:
     // position while position tracking is degraded (03 §1).
     vr::HmdMatrix34_t       head_ = kIdentity34;
     bool                    head_valid_ = false;   // the latest read was valid
-    int                     head_state_ = -1;      // debug log once per change
+    util::ChangeLatch<HeadTracking> head_state_;   // debug log once per change
     float                   yaw_ = 0.0f;           // the latest reference's heading
     bool                    recenter_taken_ = true;   // the last head_yaw_pose took a new one
     // Written on the game thread, read on the render thread (03 §11): the
@@ -154,14 +240,14 @@ private:
     bool                    cinema_mode_ = false;
     vr::VROverlayHandle_t   overlay_handle_ = vr::k_ulOverlayHandleInvalid;
 
-    vr::VRTextureBounds_t bounds_[2]{};         // crop of each eye's half of the texture
-    char manufacturer_[64]{};
-    char model_[64]{};
+    vr::VRTextureBounds_t bounds_[core::vr::kEyeCount]{};   // crop of each eye's half of the texture
+    char manufacturer_[kPropertyBufferSize]{};
+    char model_[kPropertyBufferSize]{};
 
-    vr::TrackedDeviceIndex_t logged_controller_[2] = {vr::k_unTrackedDeviceIndexInvalid,
-                                                     vr::k_unTrackedDeviceIndexInvalid};
+    vr::TrackedDeviceIndex_t logged_controller_[kHandCount] = {vr::k_unTrackedDeviceIndexInvalid,
+                                                               vr::k_unTrackedDeviceIndexInvalid};
 
-    openvr::Actions actions_;
+    Actions actions_;
     bool glyphs_chosen_ = false;
     // Render thread: submit_frame handed the game this frame's controls, so
     // the next poll_input has nothing to do.
@@ -172,7 +258,7 @@ private:
     // to the game thread through the seqlock.
     SeqLock<Hands>     hands_;
     int                tracking_origin_ = vr::TrackingUniverseStanding;  // WaitGetPoses' universe
-    std::uint32_t      hand_log_frames_ = 0;                             // render thread
+    util::FramePeriod  hand_log_{core::diag::kDebugLogPeriodFrames};     // render thread
     std::uint32_t      submitted_frames_ = 0;                            // render thread
     // Game thread: the hands as of this frame's head_pose, and whether
     // head_pose ran since the last submit.
@@ -183,114 +269,116 @@ private:
 
 // ---- slot 0 ------------------------------------------------------------------
 
-bool OpenVrHmd::init() {
-    if (!openvr::init(core::vr::last_result().openvr_runtime_path, payloads_)) return false;
+bool OpenVrRuntime::init() {
+    if (!api_.init(runtime_root_, payloads_)) return false;
 
     // The original spins until the compositor is up. One bound covers the
     // compositor and the first valid pose together (03 §6.4).
-    const ULONGLONG deadline = ::GetTickCount64() + kStartupWaitMs;
-    int system_err = 0, overlay_err = 0, compositor_err = 0;
-    system_ = static_cast<vr::IVRSystem*>(openvr::generic_interface(vr::IVRSystem_Version, &system_err));
-    overlay_ = static_cast<vr::IVROverlay*>(openvr::generic_interface(vr::IVROverlay_Version, &overlay_err));
-    for (;;) {
-        compositor_ = static_cast<vr::IVRCompositor*>(
-            openvr::generic_interface(vr::IVRCompositor_Version, &compositor_err));
-        if (compositor_ || ::GetTickCount64() >= deadline) break;
-        ::Sleep(50);
-    }
-    // A missing interface is a start-up failure that names the interface and
-    // carries the runtime's error code (03 §6.4, 13 §5.3).
-    const auto missing = [](const char* version, int err) {
-        diag::logf("openvr: runtime lacks interface {} (error {})", version, err);
-        set_init_failure(std::format("SteamVR does not provide {}", version), err);
-        openvr::shutdown();
-        return false;
-    };
-    if (!system_) return missing(vr::IVRSystem_Version, system_err);
-    if (!compositor_) return missing(vr::IVRCompositor_Version, compositor_err);
-    if (!overlay_) return missing(vr::IVROverlay_Version, overlay_err);
-    diag::logf("openvr: interfaces {}, {}, {}", vr::IVRSystem_Version, vr::IVRCompositor_Version,
-               vr::IVROverlay_Version);
+    const auto deadline = clock_.now() + core::vr::kStartupWait;
+    if (!acquire_interfaces(deadline)) return false;
 
-    // Wait, within the same bound, for a valid headset pose. None in time is
-    // not a failure: slot 11 then returns the neutral pose and the first
-    // reference is queued until the headset is in use.
+    // None in time is not a failure: slot 11 then returns the neutral pose
+    // and the first reference is queued until the headset is in use.
+    const bool pose_valid = wait_for_pose(deadline);
+    tracking_origin_ = compositor_->GetTrackingSpace();
+    logf(log_, kLogCompositorReady, pose_valid ? "valid" : "not yet valid");
+    actions_.init(api_, win32::module_directory() / kInputDirectory);
+    return true;
+}
+
+// A missing interface is a start-up failure that names the interface and
+// carries the runtime's error code (03 §6.4, 13 §5.3).
+bool OpenVrRuntime::missing(const char* version, std::int32_t error) {
+    logf(log_, kLogMissingInterface, version, error);
+    failure_.report(std::format(kFailMissingInterface, version), error);
+    api_.shutdown();
+    return false;
+}
+
+// The three required interfaces; the compositor is asked for again until
+// it is served or the start-up wait is over.
+bool OpenVrRuntime::acquire_interfaces(Clock::time_point deadline) {
+    const auto system  = api_.generic_interface(vr::IVRSystem_Version);
+    const auto overlay = api_.generic_interface(vr::IVROverlay_Version);
+    auto compositor    = api_.generic_interface(vr::IVRCompositor_Version);
+    while (!compositor && clock_.now() < deadline) {
+        sleep_for(core::vr::kCompositorPollInterval);
+        compositor = api_.generic_interface(vr::IVRCompositor_Version);
+    }
+    if (!system) return missing(vr::IVRSystem_Version, system.error().code);
+    if (!compositor) return missing(vr::IVRCompositor_Version, compositor.error().code);
+    if (!overlay) return missing(vr::IVROverlay_Version, overlay.error().code);
+    system_     = static_cast<vr::IVRSystem*>(*system);
+    compositor_ = static_cast<vr::IVRCompositor*>(*compositor);
+    overlay_    = static_cast<vr::IVROverlay*>(*overlay);
+    logf(log_, kLogInterfaces, vr::IVRSystem_Version, vr::IVRCompositor_Version, vr::IVROverlay_Version);
+    return true;
+}
+
+// Within the same bound, a valid headset pose (03 §6.4).
+bool OpenVrRuntime::wait_for_pose(Clock::time_point deadline) {
     bool pose_valid = false;
-    while (!pose_valid && ::GetTickCount64() < deadline) {
+    while (!pose_valid && clock_.now() < deadline) {
         const auto err = compositor_->WaitGetPoses(poses_, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
         pose_valid = poses_[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid;
         // A failing call may return at once; do not spin on it.
-        if (!pose_valid && err != vr::VRCompositorError_None) ::Sleep(10);
+        if (!pose_valid && err != vr::VRCompositorError_None) sleep_for(core::vr::kPoseRetryInterval);
     }
-    tracking_origin_ = compositor_->GetTrackingSpace();
-    diag::logf("openvr: compositor ready, headset pose {}", pose_valid ? "valid" : "not yet valid");
-    actions_.init(diag::module_directory() / "mothervr_input");
-    return true;
+    return pose_valid;
 }
 
 // ---- slot 1 ------------------------------------------------------------------
 
-
-void OpenVrHmd::headset_desc(HeadsetDesc& desc) {
-    float l[2], r[2], t[2], b[2];
-    for (int eye = 0; eye < 2; ++eye) {
-        system_->GetProjectionRaw(static_cast<vr::EVREye>(eye), &l[eye], &r[eye], &t[eye], &b[eye]);
-        // OpenVR's raw t is negative and b positive; in image terms (v = 0
-        // at the top) b is the upward extent (03 §3.1). The original stores
-        // -t as Up, which the game never sees (it reads only the symmetric
-        // EyeFov) but which crops the mirror's eye modes on the wrong rows
-        // on a vertically asymmetric headset.
-        desc.default_eye_fov[eye] = {b[eye], -t[eye], -l[eye], r[eye]};
+void OpenVrRuntime::headset_desc(HeadsetDesc& desc) {
+    RawProjection raw[core::vr::kEyeCount]{};
+    for (int eye = 0; eye < static_cast<int>(core::vr::kEyeCount); ++eye) {
+        system_->GetProjectionRaw(static_cast<vr::EVREye>(eye), &raw[eye].left, &raw[eye].right, &raw[eye].top,
+                                  &raw[eye].bottom);
+        // The original stores -top as Up, which the game never sees (it
+        // reads only the symmetric EyeFov) but which crops the mirror's eye
+        // modes on the wrong rows on a vertically asymmetric headset.
+        desc.default_eye_fov[eye] = core::vr::tangents_from_raw(raw[eye]);
     }
-    const float max_v = std::max({-t[0], b[0], -t[1], b[1]});
-    const float max_h = std::max({-l[0], r[0], -l[1], r[1]});
-    desc.max_eye_fov[0] = desc.max_eye_fov[1] = FovTangents{max_v, max_v, max_h, max_h};
+    const RenderTangents t = core::vr::render_tangents(desc.default_eye_fov[0], desc.default_eye_fov[1]);
+    desc.max_eye_fov[0] = desc.max_eye_fov[1] = core::vr::symmetric_tangents(t);
 
-    // Each eye renders a symmetric frustum into its half of the texture;
-    // crop it back to the eye's real FOV (the SteamVR Unity plugin formula).
-    for (int eye = 0; eye < 2; ++eye) {
-        const float half = eye == 0 ? 0.0f : 0.5f;
-        bounds_[eye].uMin = (0.5f + 0.5f * l[eye] / max_h) * 0.5f + half;
-        bounds_[eye].uMax = (0.5f + 0.5f * r[eye] / max_h) * 0.5f + half;
-        bounds_[eye].vMin = 0.5f - 0.5f * b[eye] / max_v;
-        bounds_[eye].vMax = 0.5f - 0.5f * t[eye] / max_v;
+    // Each eye renders the symmetric frustum into its half of the texture;
+    // crop it back to the eye's real FOV.
+    for (int eye = 0; eye < static_cast<int>(core::vr::kEyeCount); ++eye) {
+        bounds_[eye] = to_vr(core::vr::crop_bounds(eye, raw[eye], t));
     }
 
-    system_->GetStringTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd,
-                                            vr::Prop_ManufacturerName_String,
+    system_->GetStringTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_ManufacturerName_String,
                                             manufacturer_, sizeof(manufacturer_));
-    system_->GetStringTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd,
-                                            vr::Prop_ModelNumber_String,
-                                            model_, sizeof(model_));
+    system_->GetStringTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_ModelNumber_String, model_,
+                                            sizeof(model_));
     desc.manufacturer = manufacturer_;
     desc.product_name = model_;
-    diag::logf("openvr: {} {}, render tangents v={:.3f} h={:.3f}", manufacturer_, model_, max_v, max_h);
+    logf(log_, kLogHeadset, manufacturer_, model_, t.vertical, t.horizontal);
 }
 
 // ---- slots 2-4 ---------------------------------------------------------------
 
-
-TextureSize OpenVrHmd::eye_texture_size(int /*eye*/, float pixel_scale) {
+TextureSize OpenVrRuntime::eye_texture_size(int /*eye*/, float pixel_scale) {
     std::uint32_t w = 0, h = 0;
     system_->GetRecommendedRenderTargetSize(&w, &h);
-    return {static_cast<std::int32_t>(static_cast<float>(w) * pixel_scale),
-            static_cast<std::int32_t>(static_cast<float>(h) * pixel_scale)};
+    return core::vr::scaled_size(w, h, pixel_scale);
 }
 
-// Never fails: without the overlay only the virtual screen is missing.
-
-bool OpenVrHmd::create_render_resources(core::vr::GpuDevice, core::vr::GpuContext) {
+// Never fails: without the overlay only the virtual screen is missing
+// (03 §7).
+bool OpenVrRuntime::create_render_resources(core::vr::GpuDevice, core::vr::GpuContext) {
     // The game may reconfigure rendering more than once; one overlay will do.
     if (overlay_handle_ != vr::k_ulOverlayHandleInvalid) return true;
     const auto err = overlay_->CreateOverlay(kOverlayKey, kOverlayKey, &overlay_handle_);
     if (err != vr::VROverlayError_None) {
-        diag::logf("openvr: CreateOverlay failed ({})", static_cast<int>(err));
+        logf(log_, kLogOverlayFailed, static_cast<int>(err));
         overlay_handle_ = vr::k_ulOverlayHandleInvalid;
     }
     return true;
 }
 
-void OpenVrHmd::release_render_resources() {
+void OpenVrRuntime::release_render_resources() {
     if (overlay_handle_ == vr::k_ulOverlayHandleInvalid) return;
     overlay_->DestroyOverlay(overlay_handle_);
     overlay_handle_ = vr::k_ulOverlayHandleInvalid;
@@ -302,30 +390,21 @@ void OpenVrHmd::release_render_resources() {
 // 03 §1: an invalid (or non-finite) pose leaves the last valid one; a valid
 // pose with degraded tracking takes the new orientation and keeps the last
 // valid position. Before any valid pose that is the neutral pose.
-const vr::HmdMatrix34_t& OpenVrHmd::read_head() {
+const vr::HmdMatrix34_t& OpenVrRuntime::read_head() {
     compositor_->GetLastPoses(poses_, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
     const auto& p = poses_[vr::k_unTrackedDeviceIndex_Hmd];
     head_valid_ = p.bPoseIsValid && all_finite(p.mDeviceToAbsoluteTracking);
     const bool position_ok = p.eTrackingResult == vr::TrackingResult_Running_OK;
-    if (head_valid_) {
-        for (int r = 0; r < 3; ++r) {
-            for (int c = 0; c < 3; ++c) head_.m[r][c] = p.mDeviceToAbsoluteTracking.m[r][c];
-            if (position_ok) head_.m[r][3] = p.mDeviceToAbsoluteTracking.m[r][3];
-        }
-    }
+    core::vr::hold_pose(head_.m, p.mDeviceToAbsoluteTracking.m, head_valid_, position_ok);
     // Dev. Debug Options: tracking lost or degraded, once per change.
-    const int state = !head_valid_ ? 0 : position_ok ? 2 : 1;
-    if (state != head_state_ && config::current().debug.debug) {
-        diag::logf("[diag] headset pose {} (tracking result {})",
-                   state == 0 ? "invalid, holding the last valid pose"
-                   : state == 1 ? "degraded, holding the last valid position" : "tracked",
-                   static_cast<int>(p.eTrackingResult));
+    const HeadTracking state = core::vr::head_tracking(head_valid_, position_ok);
+    if (head_state_.changed(state) && log_.debug_enabled()) {
+        logf(log_, kLogHeadTracking, tracking_text(state), static_cast<int>(p.eTrackingResult));
     }
-    head_state_ = state;
     return head_;
 }
 
-void OpenVrHmd::head_pose(Matrix34& out, float world_scale) {
+void OpenVrRuntime::head_pose(Matrix34& out, float world_scale) {
     const vr::HmdMatrix34_t& m = read_head();
     render_pose_.store(m);   // the pose this frame renders with and is declared with
     out = to_game_pose(m.m, world_scale);
@@ -333,27 +412,56 @@ void OpenVrHmd::head_pose(Matrix34& out, float world_scale) {
     head_read_.store(true, std::memory_order_relaxed);
 }
 
+void OpenVrRuntime::head_yaw_pose(Matrix34& out, float world_scale) {
+    const auto& m = read_head().m;
+    // Never from an invalid pose (03 §2.1): the previous reference stays. The
+    // stereo device's queued retake waits for headset_in_use, which needs a
+    // valid pose, so a retake is taken once tracking is back.
+    recenter_taken_ = head_valid_;
+    if (!head_valid_) {
+        out = to_game_pose(yaw_matrix_.load().m, world_scale);
+        log_.line(kLogRecenterSkipped);
+        return;
+    }
+    // Yaw about +Y: the original goes through a quaternion,
+    // atan2(2(wy + xz), w^2 - x^2 - y^2 + z^2), which is this. Looking
+    // straight up or down leaves no heading: keep the previous one.
+    const core::vr::Heading heading = core::vr::heading_from_forward(m[0][2], m[2][2], yaw_);
+    yaw_ = heading.yaw_rad;
+    const vr::HmdMatrix34_t y = yaw_only(heading.yaw_rad, m);
+    yaw_matrix_.store(y);
+    out = to_game_pose(y.m, world_scale);
+    log_recenter(m, heading);
+}
+
+void OpenVrRuntime::log_recenter(const float (&m)[3][4], core::vr::Heading heading) {
+    logf(log_, kLogRecenter, m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2],
+         m[0][3], m[1][3], m[2][3], heading.yaw_rad * util::kRadToDeg,
+         heading.vertical ? " (kept: looking straight up or down)" : "",
+         static_cast<int>(system_->GetTrackedDeviceActivityLevel(vr::k_unTrackedDeviceIndex_Hmd)));
+}
+
 // ---- hands (extension) ---------------------------------------------------------
 
 // Game thread. The hands of the frame head_pose was read for, else (menus,
 // or a call before head_pose this frame) the newest.
-const OpenVrHmd::Hands& OpenVrHmd::hands_now() {
+const OpenVrRuntime::Hands& OpenVrRuntime::hands_now() {
     if (head_read_.load(std::memory_order_relaxed)) return hands_rendered_;
     hands_scratch_ = hands_.load();
     return hands_scratch_;
 }
 
-bool OpenVrHmd::hand_pose(int hand, Matrix34& out, float world_scale) {
-    if (hand < 0 || hand > 1) return false;
-    const auto& h = hands_now()[hand];
+bool OpenVrRuntime::hand_pose(int hand, Matrix34& out, float world_scale) {
+    if (!valid_hand(hand)) return false;
+    const auto& h = hands_now()[static_cast<std::size_t>(hand)];
     if (!h.valid) return false;
     out = to_game_pose(h.m, world_scale);
     return true;
 }
 
-bool OpenVrHmd::hand_velocity(int hand, float (&out)[3], float world_scale) {
-    if (hand < 0 || hand > 1) return false;
-    const auto& h = hands_now()[hand];
+bool OpenVrRuntime::hand_velocity(int hand, float (&out)[3], float world_scale) {
+    if (!valid_hand(hand)) return false;
+    const auto& h = hands_now()[static_cast<std::size_t>(hand)];
     if (!h.valid) return false;
     to_game_velocity(h.velocity, world_scale, out);
     return true;
@@ -364,79 +472,48 @@ bool OpenVrHmd::hand_velocity(int hand, float (&out)[3], float world_scale) {
 // frame the game renders next, as GetLastPoses gives the head. (A head_pose
 // landing between WaitGetPoses and the store below pairs the new head with
 // the previous hands for that one frame; the window is microseconds.)
-void OpenVrHmd::read_hands() {
+void OpenVrRuntime::read_hands() {
     const Hands h = actions_.hand_poses(tracking_origin_);
     hands_.store(h);
+    if (hand_log_.tick() && log_.debug_enabled()) log_hands(h);
+}
 
-    // Dev. Debug Options: each hand's offset from the head, so moving the
-    // controllers can be checked against the log.
-    if (++hand_log_frames_ < kHandLogFrames) return;
-    hand_log_frames_ = 0;
-    if (!config::current().debug.debug) return;
+// Dev. Debug Options: each hand's offset from the head, so moving the
+// controllers can be checked against the log (11 §4.2). Render thread.
+void OpenVrRuntime::log_hands(const Hands& h) {
     vr::TrackedDevicePose_t hmd{};
     compositor_->GetLastPoses(&hmd, 1, nullptr, 0);
-    std::string line = "openvr: hands (head-local m, +x right +y up -z fwd):";
-    for (int i = 0; i < 2; ++i) {
-        line += i == 0 ? " L " : " R ";
+    core::vr::HandLogLine line(kLogHandsPrefix);
+    for (std::size_t i = 0; i < h.size(); ++i) {
+        line.begin_hand(i);
         if (!h[i].valid) {
-            line += actions_.ready() ? "untracked" : "no SteamVR Input";
+            line.append("{}", actions_.ready() ? "untracked" : "no SteamVR Input");
             continue;
         }
         float d[3];
-        head_local_offset(hmd.mDeviceToAbsoluteTracking.m, h[i].m, d);
-        line += std::format("({:+.2f} {:+.2f} {:+.2f})", d[0], d[1], d[2]);
+        core::vr::head_local_offset(hmd.mDeviceToAbsoluteTracking.m, h[i].m, d);
+        line.offset(d);
     }
-    diag::log_line(line);
-}
-
-void OpenVrHmd::head_yaw_pose(Matrix34& out, float world_scale) {
-    const auto& m = read_head().m;
-    // Never from an invalid pose (03 §2.1): the previous reference stays. The
-    // stereo device's queued retake waits for headset_in_use, which needs a
-    // valid pose, so a retake is taken once tracking is back.
-    recenter_taken_ = head_valid_;
-    if (!head_valid_) {
-        out = to_game_pose(yaw_matrix_.load().m, world_scale);
-        diag::log_line("openvr: recenter skipped: headset pose invalid, the previous reference stays");
-        return;
-    }
-    // Yaw about +Y: the original goes through a quaternion,
-    // atan2(2(wy + xz), w^2 - x^2 - y^2 + z^2), which is this. Looking
-    // straight up or down leaves no heading: keep the previous one.
-    const bool vertical = std::sqrt(m[0][2] * m[0][2] + m[2][2] * m[2][2]) < kMinForwardLength;
-    const float yaw = vertical ? yaw_ : std::atan2(m[0][2], m[2][2]);
-    yaw_ = yaw;
-    const float s = std::sin(yaw), c = std::cos(yaw);
-    const vr::HmdMatrix34_t y{{
-        {   c, 0.0f,    s, m[0][3]},
-        {0.0f, 1.0f, 0.0f, m[1][3]},
-        {  -s, 0.0f,    c, m[2][3]},
-    }};
-    yaw_matrix_.store(y);
-    out = to_game_pose(y.m, world_scale);
-    diag::logf("openvr: recenter: head x=({:.2f} {:.2f} {:.2f}) y=({:.2f} {:.2f} {:.2f}) z=({:.2f} {:.2f} {:.2f}) "
-               "pos=({:.2f} {:.2f} {:.2f}) yaw={:.1f} deg{}, activity={}",
-               m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2],
-               m[0][3], m[1][3], m[2][3], yaw * 57.29578f, vertical ? " (kept: looking straight up or down)" : "",
-               static_cast<int>(system_->GetTrackedDeviceActivityLevel(vr::k_unTrackedDeviceIndex_Hmd)));
+    log_.line(line.text());
 }
 
 // ---- slots 7-8 ---------------------------------------------------------------
 
-void OpenVrHmd::begin_frame(float eye_offsets[6], bool head_tracked) {
-    for (int eye = 0; eye < 2; ++eye) {
+void OpenVrRuntime::begin_frame(float eye_offsets[6], bool head_tracked) {
+    constexpr int kAxes = 3;
+    constexpr int kPositionColumn = 3;
+    for (int eye = 0; eye < static_cast<int>(core::vr::kEyeCount); ++eye) {
         const vr::HmdMatrix34_t e = system_->GetEyeToHeadTransform(static_cast<vr::EVREye>(eye));
-        for (int i = 0; i < 3; ++i) eye_offsets[eye * 3 + i] = e.m[i][3];
+        for (int i = 0; i < kAxes; ++i) eye_offsets[eye * kAxes + i] = e.m[i][kPositionColumn];
     }
     // Debug: screen frames (menus, videos, loading) against tracked ones,
     // once per change.
-    if (cinema_mode_ != !head_tracked && config::current().debug.debug)
-        diag::logf("[diag] frames now {}", head_tracked ? "tracked" : "on the screen");
+    if (cinema_mode_ != !head_tracked && log_.debug_enabled())
+        logf(log_, kLogFrameKind, head_tracked ? "tracked" : "on the screen");
     cinema_mode_ = !head_tracked;
 }
 
-
-void OpenVrHmd::submit_frame(core::vr::GpuTexture texture) {
+void OpenVrRuntime::submit_frame(core::vr::GpuTexture texture) {
     void* const side_by_side = d3d11::to_d3d(texture);
     head_read_.store(false, std::memory_order_relaxed);   // the next frame's head pose is yet to come
     if (!side_by_side) return;
@@ -446,116 +523,124 @@ void OpenVrHmd::submit_frame(core::vr::GpuTexture texture) {
     tex.eColorSpace = vr::ColorSpace_Gamma;
     tex.mDeviceToAbsoluteTracking = render_pose_.load();   // the pose head_pose gave the game
 
-    if (!cinema_mode_) {
-        if (overlay_handle_ != vr::k_ulOverlayHandleInvalid && overlay_->IsOverlayVisible(overlay_handle_)) {
-            overlay_->HideOverlay(overlay_handle_);
-        }
-        compositor_->Submit(vr::Eye_Left,  &tex, &bounds_[0], vr::Submit_TextureWithPose);
-        compositor_->Submit(vr::Eye_Right, &tex, &bounds_[1], vr::Submit_TextureWithPose);
-    } else {
-        // Menus, videos, loading: the left eye's image on a screen 1.5 m in
-        // front of where the head was facing, the 3D view left black.
-        if (overlay_handle_ != vr::k_ulOverlayHandleInvalid) {
-            vr::Texture_t plain{side_by_side, vr::TextureType_DirectX, vr::ColorSpace_Gamma};
-            overlay_->SetOverlayTexture(overlay_handle_, &plain);
-            vr::HmdMatrix34_t m = yaw_matrix_.load();
-            m.m[0][3] -= kCinemaDistance * m.m[0][2];
-            m.m[2][3] -= kCinemaDistance * m.m[2][2];
-            overlay_->SetOverlayTransformAbsolute(overlay_handle_, vr::TrackingUniverseStanding, &m);
-            overlay_->SetOverlayWidthInMeters(overlay_handle_, kCinemaWidth);
-            const vr::VRTextureBounds_t screen{0.0f, 0.25f, 0.5f, 0.75f};
-            overlay_->SetOverlayTextureBounds(overlay_handle_, &screen);
-            overlay_->ShowOverlay(overlay_handle_);
-        }
-        const vr::VRTextureBounds_t nothing{0.0f, 0.0f, 1e-5f, 1e-5f};
-        compositor_->Submit(vr::Eye_Left,  &tex, &nothing, vr::Submit_TextureWithPose);
-        compositor_->Submit(vr::Eye_Right, &tex, &nothing, vr::Submit_TextureWithPose);
-    }
-    // Running start: block until the next frame's poses are due.
+    if (!cinema_mode_) submit_eyes(tex);
+    else show_screen(side_by_side, tex);
+
+    // Running start: block until the next frame's poses are due (03 §6.3).
     compositor_->WaitGetPoses(nullptr, 0, nullptr, 0);
     read_hands();
     // The controllers as of this WaitGetPoses go to the game now, before its
     // next simulation step, not at the next BeginFrame (P10, as OpenXR).
     write_controls();
-    if (++submitted_frames_ == kSceneCheckFrame) check_scene_app();
+    if (++submitted_frames_ == core::vr::kSceneCheckFrame) check_scene_app();
+}
+
+// A head-tracked frame: both eyes, cropped to their real FOV.
+void OpenVrRuntime::submit_eyes(const vr::VRTextureWithPose_t& tex) {
+    if (overlay_handle_ != vr::k_ulOverlayHandleInvalid && overlay_->IsOverlayVisible(overlay_handle_)) {
+        overlay_->HideOverlay(overlay_handle_);
+    }
+    compositor_->Submit(vr::Eye_Left, &tex, &bounds_[0], vr::Submit_TextureWithPose);
+    compositor_->Submit(vr::Eye_Right, &tex, &bounds_[1], vr::Submit_TextureWithPose);
+}
+
+// Menus, videos, loading: the left eye's image on a screen in front of where
+// the head was facing at the last recenter, the 3D view left black (03 §7).
+void OpenVrRuntime::show_screen(void* side_by_side, const vr::VRTextureWithPose_t& tex) {
+    if (overlay_handle_ != vr::k_ulOverlayHandleInvalid) {
+        vr::Texture_t plain{side_by_side, vr::TextureType_DirectX, vr::ColorSpace_Gamma};
+        overlay_->SetOverlayTexture(overlay_handle_, &plain);
+        vr::HmdMatrix34_t m = yaw_matrix_.load();
+        m.m[0][3] -= kCinemaDistance * m.m[0][2];
+        m.m[2][3] -= kCinemaDistance * m.m[2][2];
+        overlay_->SetOverlayTransformAbsolute(overlay_handle_, vr::TrackingUniverseStanding, &m);
+        overlay_->SetOverlayWidthInMeters(overlay_handle_, kCinemaWidth);
+        const vr::VRTextureBounds_t screen{0.0f, core::vr::kScreenTopV, core::vr::kScreenLeftHalfU,
+                                           core::vr::kScreenBottomV};
+        overlay_->SetOverlayTextureBounds(overlay_handle_, &screen);
+        overlay_->ShowOverlay(overlay_handle_);
+    }
+    compositor_->Submit(vr::Eye_Left, &tex, &kNoImageBounds, vr::Submit_TextureWithPose);
+    compositor_->Submit(vr::Eye_Right, &tex, &kNoImageBounds, vr::Submit_TextureWithPose);
 }
 
 // SteamVR shows one scene application. If it is not this process (SteamVR's
 // Desktop Game Theatre showing the game as a flat window, or an application
-// that has not exited), the frames submitted here never reach the headset.
-// Render thread, once.
-void OpenVrHmd::check_scene_app() {
-    auto* apps = static_cast<vr::IVRApplications*>(openvr::generic_interface(vr::IVRApplications_Version));
-    if (!apps) {
+// that has not exited), the frames submitted here never reach the headset
+// (03 §6.7). Render thread, once.
+void OpenVrRuntime::check_scene_app() {
+    const auto served = api_.generic_interface(vr::IVRApplications_Version);
+    if (!served) {
         // Advisory check only; say why no warning can come (03 §6.7).
-        diag::logf("openvr: no {}: cannot check which application the headset shows; VR is otherwise unaffected",
-                   vr::IVRApplications_Version);
+        logf(log_, kLogNoApplications, vr::IVRApplications_Version);
         return;
     }
+    auto* apps = static_cast<vr::IVRApplications*>(*served);
     const DWORD scene = apps->GetCurrentSceneProcessId();
     const DWORD self  = ::GetCurrentProcessId();
     if (scene == self) {
-        diag::log_line("openvr: the headset shows the game");
+        log_.line(kLogShowsGame);
         return;
     }
-    const std::string name = scene ? process_name(scene) : std::string{};
-    diag::logf("openvr: the headset shows process {} ({}), not the game", scene, name.empty() ? "unknown" : name);
+    const std::string name = scene ? win32::process_name(scene) : std::string{};
+    logf(log_, kLogShowsOther, scene, name.empty() ? "unknown" : name);
     dialogs_.show_async(core::ui::openvr_not_showing_game(name), core::ui::ports::DialogKind::Warning,
-                        "headset not showing the game");
+                        kNotShowingLabel);
 }
-
 
 // ---- extension -----------------------------------------------------------------
 
-bool OpenVrHmd::headset_in_use() {
+bool OpenVrRuntime::headset_in_use() {
     // Moving (or worn, with a proximity sensor) and the head's up axis
     // within ~45 degrees of vertical, on a valid pose: a queued recenter
-    // must wait for tracking (03 §2.1). Read fresh: in menus head_pose is
+    // must wait for tracking (03 §2.3). Read fresh: in menus head_pose is
     // not called, and a pose from the last gameplay frame would be stale.
-    const bool active = system_->GetTrackedDeviceActivityLevel(vr::k_unTrackedDeviceIndex_Hmd)
-                        == vr::k_EDeviceActivityLevel_UserInteraction;
+    const bool active = system_->GetTrackedDeviceActivityLevel(vr::k_unTrackedDeviceIndex_Hmd) ==
+                        vr::k_EDeviceActivityLevel_UserInteraction;
     if (!active) return false;
     const auto& m = read_head().m;
-    return head_valid_ && m[1][1] > 0.7f;
+    return head_valid_ && core::vr::is_upright(m[1][1]);
 }
 
 // ---- slots 9-10 --------------------------------------------------------------
 
-void OpenVrHmd::register_control_hints() {
+void OpenVrRuntime::register_control_hints() {
     controls_.set_scheme(input::ControlScheme::Touchpad);   // until a controller shows up
 }
 
 // BeginFrame. Only when no submit has handed over the controls since the
 // last one (before the first frame, or a frame without an eye texture).
-void OpenVrHmd::poll_input() {
+void OpenVrRuntime::poll_input() {
     if (!std::exchange(controls_written_, false)) write_controls();
+}
+
+// A hand's controller, logged once per device; the right one's type picks
+// the control scheme (04 §5.5).
+void OpenVrRuntime::note_controller(std::size_t hand, vr::TrackedDeviceIndex_t index) {
+    if (index == vr::k_unTrackedDeviceIndexInvalid || logged_controller_[hand] == index) return;
+    logged_controller_[hand] = index;
+    char type[kPropertyBufferSize]{};
+    system_->GetStringTrackedDeviceProperty(index, vr::Prop_ControllerType_String, type, sizeof(type));
+    logf(log_, kLogController, hand == 0 ? "left" : "right", type, index);
+    if (hand == 1 && actions_.ready() && !glyphs_chosen_) {
+        glyphs_chosen_ = true;
+        controls_.set_scheme(scheme_for(type));
+    }
 }
 
 // Render thread. Reads its own copy of the device poses: poses_ belongs to
 // the game thread (head_pose).
-void OpenVrHmd::write_controls() {
+void OpenVrRuntime::write_controls() {
     controls_written_ = true;
     vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};
     compositor_->GetLastPoses(poses, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
 
-    const vr::ETrackedControllerRole roles[2] = {vr::TrackedControllerRole_LeftHand,
-                                                 vr::TrackedControllerRole_RightHand};
-    vr::TrackedDeviceIndex_t index[2]{};
-    for (int i = 0; i < 2; ++i) {
-        index[i] = system_->GetTrackedDeviceIndexForControllerRole(roles[i]);
-        if (index[i] != vr::k_unTrackedDeviceIndexInvalid && logged_controller_[i] != index[i]) {
-            logged_controller_[i] = index[i];
-            char type[64]{};
-            system_->GetStringTrackedDeviceProperty(index[i], vr::Prop_ControllerType_String, type, sizeof(type));
-            diag::logf("openvr: {} hand controller: {} (device {})", i == 0 ? "left" : "right", type, index[i]);
-            if (i == 1 && actions_.ready() && !glyphs_chosen_) {
-                glyphs_chosen_ = true;
-                const std::string_view t(type);
-                controls_.set_scheme(t == "vive_controller" ? input::ControlScheme::Touchpad
-                                          : t == "knuckles"      ? input::ControlScheme::Index
-                                                                 : input::ControlScheme::Thumbstick);
-            }
-        }
+    constexpr vr::ETrackedControllerRole kRoles[kHandCount] = {vr::TrackedControllerRole_LeftHand,
+                                                               vr::TrackedControllerRole_RightHand};
+    vr::TrackedDeviceIndex_t index[kHandCount]{};
+    for (std::size_t i = 0; i < kHandCount; ++i) {
+        index[i] = system_->GetTrackedDeviceIndexForControllerRole(kRoles[i]);
+        note_controller(i, index[i]);
     }
 
     // The right hand near the head turns Interact into the flashlight.
@@ -563,50 +648,27 @@ void OpenVrHmd::write_controls() {
     if (index[1] != vr::k_unTrackedDeviceIndexInvalid && index[1] < vr::k_unMaxTrackedDeviceCount) {
         const auto& head = poses[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking.m;
         const auto& hand = poses[index[1]].mDeviceToAbsoluteTracking.m;
-        near_head = poses[index[1]].bPoseIsValid &&
-                    length(hand[0][3] - head[0][3], hand[1][3] - head[1][3], hand[2][3] - head[2][3]) < input::kNearHead;
+        near_head = poses[index[1]].bPoseIsValid && input::near_head(translation(hand), translation(head));
     }
 
-    openvr::Controls c = actions_.ready() ? actions_.poll() : legacy_controls(index);
+    const Controls c = actions_.ready() ? actions_.poll() : legacy_controls(index);
     controls_.write(c, near_head);
 }
 
-// The original's reading: legacy controller state, everything a touchpad.
-openvr::Controls OpenVrHmd::legacy_controls(const vr::TrackedDeviceIndex_t (&index)[2]) {
-    vr::VRControllerState_t state[2]{};
-    for (int i = 0; i < 2; ++i) {
+// The legacy reading: controller state, everything a touchpad (04 §5.8.3).
+Controls OpenVrRuntime::legacy_controls(const vr::TrackedDeviceIndex_t (&index)[kHandCount]) {
+    vr::VRControllerState_t state[kHandCount]{};
+    for (std::size_t i = 0; i < kHandCount; ++i) {
         if (index[i] == vr::k_unTrackedDeviceIndexInvalid) continue;
         system_->GetControllerState(index[i], &state[i], sizeof(state[i]));
     }
-    const auto& L = state[0];
-    const auto& R = state[1];
-    const bool click_r = R.ulButtonPressed & kButtonTouchpad;
-    const input::Vec2 pad_r{R.rAxis[0].x, R.rAxis[0].y};
-    const auto regions = input::decode_touchpad(pad_r, click_r);
-
-    openvr::Controls c;
-    c.touchpad_scheme = true;
-    if (L.ulButtonTouched & kButtonTouchpad) c.move = {L.rAxis[0].x, L.rAxis[0].y};
-    if (R.ulButtonTouched & kButtonTouchpad) c.turn = pad_r;
-    c.turn_engaged = click_r;
-    c.trigger_l = L.rAxis[1].x;
-    c.trigger_r = R.rAxis[1].x;
-    c.grip_l = L.ulButtonPressed & kButtonGrip;
-    c.grip_r = R.ulButtonPressed & kButtonGrip;
-    c.sprint = L.ulButtonPressed & kButtonTouchpad;
-    c.interact = regions.interact;
-    c.reload = regions.reload;
-    c.radial = regions.radial;
-    c.map = L.ulButtonPressed & kButtonMenu;
-    c.pause = R.ulButtonPressed & kButtonMenu;
-    return c;
+    return input::touchpad_controls(legacy_hand(state[0]), legacy_hand(state[1]));
 }
-
 
 } // namespace
 
 std::unique_ptr<core::vr::ports::VrRuntime> make_openvr_runtime(const OpenVrRuntimeDeps& deps) {
-    return std::make_unique<OpenVrHmd>(deps);
+    return std::make_unique<OpenVrRuntime>(deps);
 }
 
 } // namespace omvr::platform::openvr

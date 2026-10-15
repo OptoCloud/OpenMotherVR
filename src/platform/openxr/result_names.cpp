@@ -1,17 +1,23 @@
 #include "platform/openxr/result_names.h"
 
-#include "core/diag/logger.h"        // R: vr (A1): log through an injected Log&
-#include "core/vr/runtime_failure.h" // R: vr (A1): the failure travels in the result
-#include "platform/openxr/session.h"
+#include "core/vr/runtime_failure.h"
+#include "platform/openxr/session_impl.h"
 
 #include <openxr/openxr_reflection.h>
 
 #include <string>
+#include <string_view>
 
 namespace omvr::platform::openxr {
 
-namespace diag = core::diag;
-using core::vr::set_init_failure;
+namespace {
+
+using core::diag::ports::logf;
+
+constexpr std::string_view kLogFailed       = "openxr: {} failed: {} ({})";
+constexpr std::string_view kLogSucceedsAgain = "openxr: {} succeeds again";
+
+} // namespace
 
 const char* result_name(XrResult r) noexcept {
     switch (r) {
@@ -32,20 +38,20 @@ const char* state_name(XrSessionState s) noexcept {
 }
 
 // The result's text, never empty (09 §7).
-void Session::result_text(XrResult r, char (&text)[XR_MAX_RESULT_STRING_SIZE]) noexcept {
+void Session::Impl::result_text(XrResult r, char (&text)[XR_MAX_RESULT_STRING_SIZE]) noexcept {
     text[0] = '\0';
-    if (g.instance != XR_NULL_HANDLE) xrResultToString(g.instance, r, text);
+    if (state.instance) xrResultToString(state.instance.get(), r, text);
     if (text[0] == '\0') strncpy_s(text, result_name(r), _TRUNCATE);
 }
 
 // Start-up and session calls: a failure is logged and becomes the reason the
-// player's start-up message gives.
-bool Session::check(XrResult r, const char* what) {
+// player's start-up message gives (09 §2.3).
+bool Session::Impl::check(XrResult r, const char* what) {
     if (XR_SUCCEEDED(r)) return true;
     char text[XR_MAX_RESULT_STRING_SIZE];
     result_text(r, text);
-    diag::logf("openxr: {} failed: {} ({})", what, static_cast<int>(r), text);
-    set_init_failure(std::string{what} + ": " + text, static_cast<int>(r));
+    logf(log, kLogFailed, what, static_cast<int>(r), text);
+    failure.report(std::string{what} + ": " + text, static_cast<std::int32_t>(r));
     return false;
 }
 
@@ -53,14 +59,14 @@ bool Session::check(XrResult r, const char* what) {
 // the result changes, never on every frame, and without allocating (11 §3,
 // 12 §6.1). A failure during frames is not a start-up failure, so the
 // player's start-up message is left alone.
-bool Session::check_frame(XrResult r, const char* what, XrResult& last) noexcept {
+bool Session::Impl::check_frame(XrResult r, const char* what, XrResult& last) noexcept {
     if (r != last) {
         if (XR_FAILED(r)) {
             char text[XR_MAX_RESULT_STRING_SIZE];
             result_text(r, text);
-            diag::logf("openxr: {} failed: {} ({})", what, static_cast<int>(r), text);
+            logf(log, kLogFailed, what, static_cast<int>(r), text);
         } else if (XR_FAILED(last)) {
-            diag::logf("openxr: {} succeeds again", what);
+            logf(log, kLogSucceedsAgain, what);
         }
         last = r;
     }

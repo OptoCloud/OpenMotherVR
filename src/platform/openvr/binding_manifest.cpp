@@ -1,29 +1,23 @@
 #include "platform/openvr/binding_manifest.h"
 
-#include "core/diag/logger.h" // R: vr (A1): log through an injected Log&
+#include "platform/openvr/compat_names.h"
 #include "platform/openvr/constants.h"
 #include "platform/win32/text.h"
 
 #include <windows.h>
 
 #include <fstream>
+#include <string_view>
 
 namespace omvr::platform::openvr {
 
 namespace {
 
-namespace diag {
-using core::diag::logf;
-using win32::utf8;
-} // namespace diag
-
+using core::diag::ports::logf;
 using nlohmann::json;
 
-} // namespace
-
-std::string action_path(const char* name) { return std::string(kSet) + "/in/" + name; }
-
-namespace {
+constexpr std::string_view kLogCannotWrite = "openvr input: cannot write {} (error {}), using legacy input";
+constexpr std::string_view kLogWriteFailed = "openvr input: writing {} failed (error {}), using legacy input";
 
 // ---- Default bindings ---------------------------------------------------------
 
@@ -39,25 +33,35 @@ std::string hand(const char* side, const char* input) {
     return std::string("/user/hand/") + side + "/input/" + input;
 }
 
-// Thumbstick controllers (Index, Touch, WMR): the layout of the original's
-// Oculus Touch scheme, so its button glyphs fit.
-json stick_sources(const char* stick, const char* grip_mode, const char* grip_input,
-                   const char* button_a, const char* button_b, const char* button_x,
-                   const char* button_y, const std::string& pause_path, const char* pause_mode) {
+// The controls of a thumbstick controller (Index, Touch, WMR) that the
+// default layout uses. A face button left null is not bound.
+struct StickLayout {
+    const char* stick;
+    const char* grip_mode;
+    const char* grip_input;
+    const char* button_a;
+    const char* button_b;
+    const char* button_x;
+    const char* button_y;
+    std::string pause_path;
+    const char* pause_mode;
+};
+
+// Thumbstick controllers: the layout of the original's Oculus Touch scheme,
+// so its button glyphs fit.
+json stick_sources(const StickLayout& l) {
     json s = json::array();
-    s.push_back(source(hand("left", stick), "joystick",
-                       {{"position", out("move")}, {"click", out("sprint")}}));
-    s.push_back(source(hand("right", stick), "joystick",
-                       {{"position", out("turn")}, {"click", out("radial")}}));
+    s.push_back(source(hand("left", l.stick), "joystick", {{"position", out("move")}, {"click", out("sprint")}}));
+    s.push_back(source(hand("right", l.stick), "joystick", {{"position", out("turn")}, {"click", out("radial")}}));
     s.push_back(source(hand("left", "trigger"), "trigger", {{"pull", out("crouch")}}));
     s.push_back(source(hand("right", "trigger"), "trigger", {{"pull", out("fire")}}));
-    s.push_back(source(hand("left", "grip"), grip_mode, {{grip_input, out("tracker")}}));
-    s.push_back(source(hand("right", "grip"), grip_mode, {{grip_input, out("aim")}}));
-    if (button_a) s.push_back(source(hand("right", button_a), "button", {{"click", out("interact")}}));
-    if (button_b) s.push_back(source(hand("right", button_b), "button", {{"click", out("reload")}}));
-    if (button_x) s.push_back(source(hand("left", button_x), "button", {{"click", out("map")}}));
-    if (button_y) s.push_back(source(hand("left", button_y), "button", {{"click", out("flashlight")}}));
-    s.push_back(source(pause_path, pause_mode, {{"click", out("pause")}}));
+    s.push_back(source(hand("left", "grip"), l.grip_mode, {{l.grip_input, out("tracker")}}));
+    s.push_back(source(hand("right", "grip"), l.grip_mode, {{l.grip_input, out("aim")}}));
+    if (l.button_a) s.push_back(source(hand("right", l.button_a), "button", {{"click", out("interact")}}));
+    if (l.button_b) s.push_back(source(hand("right", l.button_b), "button", {{"click", out("reload")}}));
+    if (l.button_x) s.push_back(source(hand("left", l.button_x), "button", {{"click", out("map")}}));
+    if (l.button_y) s.push_back(source(hand("left", l.button_y), "button", {{"click", out("flashlight")}}));
+    s.push_back(source(l.pause_path, l.pause_mode, {{"click", out("pause")}}));
     return s;
 }
 
@@ -79,7 +83,7 @@ json stick_sources(const char* stick, const char* grip_mode, const char* grip_in
 // fit for a palm origin.
 json hand_poses(const char* component) {
     json p = json::array();
-    for (int h = 0; h < 2; ++h) {
+    for (std::size_t h = 0; h < kPoseActions.size(); ++h) {
         p.push_back({{"output", action_path(kPoseActions[h])},
                      {"path", std::string("/user/hand/") + (h == 0 ? "left" : "right") + "/pose/" + component}});
     }
@@ -92,45 +96,30 @@ json binding_file(const char* controller, const char* description, json sources,
             {"bindings", {{kSet, {{"sources", std::move(sources)}, {"poses", hand_poses(pose)}}}}},
             {"controller_type", controller},
             {"description", description},
-            {"name", std::string("MotherVR revived: ") + description}};
+            {"name", std::string(kBindingNamePrefix) + description}};
 }
 
-} // namespace
-
-std::vector<std::pair<std::string, json>> default_bindings() {
-    std::vector<std::pair<std::string, json>> files;
-
-    files.emplace_back("knuckles", binding_file("knuckles", "Valve Index controllers",
-        stick_sources("thumbstick", "grab", "grab", "a", "b", "a", "b",
-                      hand("left", "trackpad"), "button"), "grip"));
-    // Index has no menu button: the left trackpad press pauses, and the left
-    // A/B stand in for Touch's X/Y.
-
-    files.emplace_back("oculus_touch", binding_file("oculus_touch", "Oculus Touch",
-        stick_sources("joystick", "button", "click", "a", "b", "x", "y",
-                      hand("left", "application_menu"), "button"), "openxr_grip"));
-
-    // WMR: thumbsticks and touchpads, no face buttons. The right touchpad
-    // carries the touchpad scheme's interact/reload; the left one map and
-    // flashlight.
-    json wmr = stick_sources("joystick", "button", "click", nullptr, nullptr, nullptr, nullptr,
-                             hand("left", "application_menu"), "button");
-    wmr.push_back(source(hand("right", "trackpad"), "dpad",
-                         {{"south", out("interact")}, {"north", out("reload")}},
+// WMR: thumbsticks and touchpads, no face buttons. The right touchpad
+// carries the touchpad scheme's interact/reload; the left one map and
+// flashlight.
+json wmr_sources() {
+    json wmr = stick_sources({.stick = "joystick", .grip_mode = "button", .grip_input = "click",
+                              .button_a = nullptr, .button_b = nullptr, .button_x = nullptr, .button_y = nullptr,
+                              .pause_path = hand("left", "application_menu"), .pause_mode = "button"});
+    wmr.push_back(source(hand("right", "trackpad"), "dpad", {{"south", out("interact")}, {"north", out("reload")}},
                          {{"sub_mode", "click"}}));
-    wmr.push_back(source(hand("left", "trackpad"), "dpad",
-                         {{"south", out("map")}, {"north", out("flashlight")}},
+    wmr.push_back(source(hand("left", "trackpad"), "dpad", {{"south", out("map")}, {"north", out("flashlight")}},
                          {{"sub_mode", "click"}}));
     wmr.push_back(source(hand("right", "application_menu"), "button", {{"click", out("pause")}}));
-    files.emplace_back("holographic_controller",
-                       binding_file("holographic_controller", "Windows Mixed Reality", std::move(wmr), "grip"));
+    return wmr;
+}
 
-    // Vive wands: the original touchpad scheme. Moving needs a touch,
-    // snap turning a click; the right pad's click regions interact (down),
-    // reload (up) and open the radial menu (centre).
+// Vive wands: the original touchpad scheme. Moving needs a touch, snap
+// turning a click; the right pad's click regions interact (down), reload
+// (up) and open the radial menu (centre).
+json wand_sources() {
     json wand = json::array();
-    wand.push_back(source(hand("left", "trackpad"), "trackpad",
-                          {{"position", out("move")}, {"click", out("sprint")}}));
+    wand.push_back(source(hand("left", "trackpad"), "trackpad", {{"position", out("move")}, {"click", out("sprint")}}));
     wand.push_back(source(hand("right", "trackpad"), "trackpad",
                           {{"position", out("turn")}, {"click", out("turn_engage")}}));
     wand.push_back(source(hand("right", "trackpad"), "dpad",
@@ -142,7 +131,46 @@ std::vector<std::pair<std::string, json>> default_bindings() {
     wand.push_back(source(hand("right", "grip"), "button", {{"click", out("aim")}}));
     wand.push_back(source(hand("left", "application_menu"), "button", {{"click", out("map")}}));
     wand.push_back(source(hand("right", "application_menu"), "button", {{"click", out("pause")}}));
-    files.emplace_back("vive_controller", binding_file("vive_controller", "Vive wands", std::move(wand), "grip"));
+    return wand;
+}
+
+const char* type_name(Kind kind) noexcept {
+    switch (kind) {
+        case Kind::Boolean: return "boolean";
+        case Kind::Vector1: return "vector1";
+        case Kind::Vector2: return "vector2";
+    }
+    return "vector2";
+}
+
+} // namespace
+
+std::string action_path(const char* name) { return std::string(kSet) + "/in/" + name; }
+
+std::string binding_file_name(const std::string& controller) {
+    return kBindingFilePrefix + controller + kBindingFileSuffix;
+}
+
+std::vector<std::pair<std::string, json>> default_bindings() {
+    std::vector<std::pair<std::string, json>> files;
+
+    // Index has no menu button: the left trackpad press pauses, and the left
+    // A/B stand in for Touch's X/Y.
+    files.emplace_back("knuckles", binding_file("knuckles", "Valve Index controllers",
+        stick_sources({.stick = "thumbstick", .grip_mode = "grab", .grip_input = "grab", .button_a = "a",
+                       .button_b = "b", .button_x = "a", .button_y = "b",
+                       .pause_path = hand("left", "trackpad"), .pause_mode = "button"}),
+        "grip"));
+
+    files.emplace_back("oculus_touch", binding_file("oculus_touch", "Oculus Touch",
+        stick_sources({.stick = "joystick", .grip_mode = "button", .grip_input = "click", .button_a = "a",
+                       .button_b = "b", .button_x = "x", .button_y = "y",
+                       .pause_path = hand("left", "application_menu"), .pause_mode = "button"}),
+        "openxr_grip"));
+
+    files.emplace_back("holographic_controller",
+                       binding_file("holographic_controller", "Windows Mixed Reality", wmr_sources(), "grip"));
+    files.emplace_back("vive_controller", binding_file("vive_controller", "Vive wands", wand_sources(), "grip"));
     return files;
 }
 
@@ -150,8 +178,7 @@ json manifest(const std::vector<std::pair<std::string, json>>& bindings) {
     json actions = json::array();
     json localization = {{"language_tag", "en_US"}, {kSet, "Alien: Isolation"}};
     for (const auto& a : kActions) {
-        const char* type = a.kind == Kind::Boolean ? "boolean" : a.kind == Kind::Vector1 ? "vector1" : "vector2";
-        actions.push_back({{"name", action_path(a.name)}, {"type", type}});
+        actions.push_back({{"name", action_path(a.name)}, {"type", type_name(a.kind)}});
         localization[action_path(a.name)] = a.label;
     }
     for (std::size_t h = 0; h < kPoseActions.size(); ++h) {
@@ -160,7 +187,7 @@ json manifest(const std::vector<std::pair<std::string, json>>& bindings) {
     }
     json defaults = json::array();
     for (const auto& [controller, _] : bindings) {
-        defaults.push_back({{"controller_type", controller}, {"binding_url", "bindings_" + controller + ".json"}});
+        defaults.push_back({{"controller_type", controller}, {"binding_url", binding_file_name(controller)}});
     }
     return {{"default_bindings", defaults},
             {"actions", actions},
@@ -168,18 +195,18 @@ json manifest(const std::vector<std::pair<std::string, json>>& bindings) {
             {"localization", json::array({localization})}};
 }
 
-bool write_json(const std::filesystem::path& path, const json& j) {
+bool write_json(core::diag::ports::Log& log, const std::filesystem::path& path, const json& j) {
     std::ofstream f(path, std::ios::trunc);
     if (!f) {
         const DWORD error = ::GetLastError();
-        diag::logf("openvr input: cannot write {} (error {}), using legacy input", diag::utf8(path), error);
+        logf(log, kLogCannotWrite, win32::utf8(path), error);
         return false;
     }
-    f << j.dump(2);
+    f << j.dump(kJsonIndent);
     f.flush();
     if (!f.good()) {
         const DWORD error = ::GetLastError();
-        diag::logf("openvr input: writing {} failed (error {}), using legacy input", diag::utf8(path), error);
+        logf(log, kLogWriteFailed, win32::utf8(path), error);
         return false;
     }
     return true;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/diag/ports/log.h"
+
 #include <nlohmann/json.hpp>
 
 #include <array>
@@ -11,7 +13,7 @@
 
 // The SteamVR Input action manifest and default bindings per controller
 // type, written next to the game; players can rebind everything in
-// SteamVR's binding UI.
+// SteamVR's binding UI (04 §5.8.2).
 namespace omvr::platform::openvr {
 
 // The semantic game actions, in manifest order.
@@ -65,6 +67,9 @@ inline constexpr std::size_t index(Action a) noexcept { return static_cast<std::
 
 std::string action_path(const char* name);
 
+// The file name of a controller type's default binding file.
+std::string binding_file_name(const std::string& controller);
+
 // The default binding file of each controller type, by controller name.
 std::vector<std::pair<std::string, nlohmann::json>> default_bindings();
 
@@ -74,6 +79,6 @@ nlohmann::json manifest(const std::vector<std::pair<std::string, nlohmann::json>
 // False, logged with the Windows error, when the file cannot be written: the
 // caller then falls back to the legacy controller path, and the log must say
 // why (04 §5.8.2, 11 §2.5).
-bool write_json(const std::filesystem::path& path, const nlohmann::json& j);
+bool write_json(core::diag::ports::Log& log, const std::filesystem::path& path, const nlohmann::json& j);
 
 } // namespace omvr::platform::openvr

@@ -1,39 +1,43 @@
 // The OpenXR instance and system: what the stereo device needs before the
-// game has a D3D11 device.
+// game has a D3D11 device (09 §2.2).
 
-#include "core/diag/logger.h" // R: vr (A1): log through an injected Log&
 #include "platform/openxr/constants.h"
-#include "platform/openxr/runtime_probe.h"
-#include "platform/openxr/session.h"
+#include "platform/openxr/session_impl.h"
 
 #include <cstring>
+#include <string_view>
 #include <vector>
 
 namespace omvr::platform::openxr {
 
-namespace diag = core::diag;
+static_assert(kSystemNameSize == std::size_t{XR_MAX_SYSTEM_NAME_SIZE});
+static_assert(kRuntimeNameSize == std::size_t{XR_MAX_RUNTIME_NAME_SIZE});
 
-bool Session::init_system() noexcept {
-    if (g.instance != XR_NULL_HANDLE) return true;
+namespace {
 
-    // Instance with the D3D11 binding, and the per-eye FOV query where the
-    // runtime offers it (the FOV is needed before a session can exist).
-    set_runtime_environment(g_manifest);
-    point_loader_at(g_manifest);
-    std::uint32_t n_ext = 0;
-    xrEnumerateInstanceExtensionProperties(nullptr, 0, &n_ext, nullptr);
-    std::vector<XrExtensionProperties> props(n_ext, {XR_TYPE_EXTENSION_PROPERTIES});
-    xrEnumerateInstanceExtensionProperties(nullptr, n_ext, &n_ext, props.data());
-    const auto offered = [&](const char* name) {
-        for (const auto& p : props)
-            if (std::strcmp(p.extensionName, name) == 0) return true;
-        return false;
-    };
-    const bool fov_ext   = offered(XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
-    const bool audio_ext = offered(XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
-    std::vector<const char*> extensions{XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
-    if (fov_ext) extensions.push_back(XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
-    if (audio_ext) extensions.push_back(XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
+using core::diag::ports::logf;
+
+constexpr std::string_view kLogRuntime = "openxr: runtime {} {}.{}.{}";
+constexpr std::string_view kLogSystem  = "openxr: {} per eye {}x{}, FOV {}";
+
+// The instance extensions the runtime offers.
+std::vector<XrExtensionProperties> offered_extensions() {
+    std::uint32_t n = 0;
+    xrEnumerateInstanceExtensionProperties(nullptr, 0, &n, nullptr);
+    std::vector<XrExtensionProperties> props(n, {XR_TYPE_EXTENSION_PROPERTIES});
+    xrEnumerateInstanceExtensionProperties(nullptr, n, &n, props.data());
+    return props;
+}
+
+bool offered(const std::vector<XrExtensionProperties>& props, const char* name) noexcept {
+    for (const auto& p : props)
+        if (std::strcmp(p.extensionName, name) == 0) return true;
+    return false;
+}
+
+} // namespace
+
+bool Session::Impl::create_instance(const std::vector<const char*>& extensions) {
     XrInstanceCreateInfo ci{XR_TYPE_INSTANCE_CREATE_INFO};
     strncpy_s(ci.applicationInfo.applicationName, kApplicationName, _TRUNCATE);
     strncpy_s(ci.applicationInfo.engineName, kEngineName, _TRUNCATE);
@@ -42,60 +46,88 @@ bool Session::init_system() noexcept {
     ci.applicationInfo.apiVersion         = XR_API_VERSION_1_0;
     ci.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
     ci.enabledExtensionNames = extensions.data();
-    if (!check(xrCreateInstance(&ci, &g.instance), "xrCreateInstance")) {
-        teardown();
-        return false;
-    }
+    return check(xrCreateInstance(&ci, state.instance.put()), "xrCreateInstance");
+}
+
+// The runtime's name and version for the log, and the headset's audio
+// output where the runtime names it (10).
+void Session::Impl::read_instance_properties(bool audio_ext) {
     XrInstanceProperties ip{XR_TYPE_INSTANCE_PROPERTIES};
-    if (XR_SUCCEEDED(xrGetInstanceProperties(g.instance, &ip))) {
-        diag::logf("openxr: runtime {} {}.{}.{}", ip.runtimeName,
-                   XR_VERSION_MAJOR(ip.runtimeVersion), XR_VERSION_MINOR(ip.runtimeVersion),
-                   XR_VERSION_PATCH(ip.runtimeVersion));
-        strncpy_s(g.info.runtime_name, ip.runtimeName, _TRUNCATE);
+    if (XR_SUCCEEDED(xrGetInstanceProperties(state.instance.get(), &ip))) {
+        logf(log, kLogRuntime, ip.runtimeName, XR_VERSION_MAJOR(ip.runtimeVersion),
+             XR_VERSION_MINOR(ip.runtimeVersion), XR_VERSION_PATCH(ip.runtimeVersion));
+        strncpy_s(state.info.runtime_name, ip.runtimeName, _TRUNCATE);
     }
     PFN_xrGetAudioOutputDeviceGuidOculus get_audio_output = nullptr;
     if (audio_ext &&
-        XR_SUCCEEDED(xrGetInstanceProcAddr(g.instance, "xrGetAudioOutputDeviceGuidOculus",
+        XR_SUCCEEDED(xrGetInstanceProcAddr(state.instance.get(), "xrGetAudioOutputDeviceGuidOculus",
                                            reinterpret_cast<PFN_xrVoidFunction*>(&get_audio_output)))) {
         wchar_t id[XR_MAX_AUDIO_DEVICE_STR_SIZE_OCULUS] = {};
-        if (XR_SUCCEEDED(get_audio_output(g.instance, id))) g.info.audio_output = id;
+        if (XR_SUCCEEDED(get_audio_output(state.instance.get(), id))) state.info.audio_output = id;
     }
+}
 
+// The headset system, its name, and each eye's recommended size and, with
+// XR_EPIC_view_configuration_fov, its FOV (09 §4.1).
+bool Session::Impl::read_system(bool fov_ext) {
     XrSystemGetInfo si{XR_TYPE_SYSTEM_GET_INFO};
     si.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-    if (!check(xrGetSystem(g.instance, &si, &g.system), "xrGetSystem (is the headset on?)")) {
-        teardown();
+    if (!check(xrGetSystem(state.instance.get(), &si, &state.system), "xrGetSystem (is the headset on?)")) {
         return false;
     }
     XrSystemProperties sp{XR_TYPE_SYSTEM_PROPERTIES};
-    if (XR_SUCCEEDED(xrGetSystemProperties(g.instance, g.system, &sp))) {
-        strncpy_s(g.info.system_name, sp.systemName, _TRUNCATE);
+    if (XR_SUCCEEDED(xrGetSystemProperties(state.instance.get(), state.system, &sp))) {
+        strncpy_s(state.info.system_name, sp.systemName, _TRUNCATE);
     }
 
-    std::array<XrViewConfigurationViewFovEPIC, 2> fov{{{XR_TYPE_VIEW_CONFIGURATION_VIEW_FOV_EPIC},
-                                                       {XR_TYPE_VIEW_CONFIGURATION_VIEW_FOV_EPIC}}};
-    g.config_views.fill({XR_TYPE_VIEW_CONFIGURATION_VIEW});
+    std::array<XrViewConfigurationViewFovEPIC, core::vr::kEyeCount> fov{
+        {{XR_TYPE_VIEW_CONFIGURATION_VIEW_FOV_EPIC}, {XR_TYPE_VIEW_CONFIGURATION_VIEW_FOV_EPIC}}};
+    state.config_views.fill({XR_TYPE_VIEW_CONFIGURATION_VIEW});
     if (fov_ext) {
-        g.config_views[0].next = &fov[0];
-        g.config_views[1].next = &fov[1];
+        state.config_views[0].next = &fov[0];
+        state.config_views[1].next = &fov[1];
     }
     std::uint32_t n = 0;
-    if (!check(xrEnumerateViewConfigurationViews(g.instance, g.system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
-                                                 2, &n, g.config_views.data()),
+    if (!check(xrEnumerateViewConfigurationViews(state.instance.get(), state.system,
+                                                 XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+                                                 static_cast<std::uint32_t>(state.config_views.size()), &n,
+                                                 state.config_views.data()),
                "xrEnumerateViewConfigurationViews")) {
-        teardown();
         return false;
     }
-    g.config_views[0].next = g.config_views[1].next = nullptr;
-    g.info.recommended_w = g.config_views[0].recommendedImageRectWidth;
-    g.info.recommended_h = g.config_views[0].recommendedImageRectHeight;
-    g.info.has_fov = fov_ext;
-    if (fov_ext) g.info.fov = {fov[0].recommendedFov, fov[1].recommendedFov};
-    diag::logf("openxr: {} per eye {}x{}, FOV {}", g.info.system_name, g.info.recommended_w,
-               g.info.recommended_h, fov_ext ? "reported" : "not reported (from the first frame)");
+    state.config_views[0].next = state.config_views[1].next = nullptr;
+    state.info.recommended_w = state.config_views[0].recommendedImageRectWidth;
+    state.info.recommended_h = state.config_views[0].recommendedImageRectHeight;
+    state.info.has_fov = fov_ext;
+    if (fov_ext) state.info.fov = {from_xr(fov[0].recommendedFov), from_xr(fov[1].recommendedFov)};
+    logf(log, kLogSystem, state.info.system_name, state.info.recommended_w, state.info.recommended_h,
+         fov_ext ? "reported" : "not reported (from the first frame)");
     return true;
 }
 
-const SystemInfo& Session::system_info() const noexcept { return g.info; }
+bool Session::Impl::init_system() noexcept {
+    if (state.instance) return true;
+
+    // Instance with the D3D11 binding, and the per-eye FOV query where the
+    // runtime offers it (the FOV is needed before a session can exist).
+    set_runtime_environment(manifest);
+    point_loader_at(manifest);
+    const auto props     = offered_extensions();
+    const bool fov_ext   = offered(props, XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
+    const bool audio_ext = offered(props, XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
+    std::vector<const char*> extensions{XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
+    if (fov_ext) extensions.push_back(XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
+    if (audio_ext) extensions.push_back(XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
+    if (!create_instance(extensions)) {
+        teardown();
+        return false;
+    }
+    read_instance_properties(audio_ext);
+    if (!read_system(fov_ext)) {
+        teardown();
+        return false;
+    }
+    return true;
+}
 
 } // namespace omvr::platform::openxr
