@@ -123,6 +123,11 @@ bool              g_vr_glyphs = true;
 std::atomic<bool> g_vr_activity{false};
 bool              g_device_pulse = false;
 
+// False when the mod's UI archive is not in use this run: the stock movies
+// register no VR glyph ids, so a VR name would show no button at all
+// (spec 04 section 4.2). Set at attach, read on the game thread.
+std::atomic<bool> g_vr_glyphs_allowed{true};
+
 // All five pad slots were replaced (install()). The helpers for the stereo
 // update answer from the stock pad alone when they were not.
 std::atomic<bool> g_installed{false};
@@ -302,7 +307,9 @@ const char* __fastcall pad_control_name(void* self, void* /*edx*/, std::uint32_t
     const auto code = static_cast<std::int16_t>(raw);
     if (code < 0x100) return nullptr;
     const int o = original_code(code);
-    if (!g_vr_glyphs) return g_game.name(self, nullptr, static_cast<std::uint16_t>(o));
+    if (!g_vr_glyphs || !g_vr_glyphs_allowed.load(std::memory_order_relaxed)) {
+        return g_game.name(self, nullptr, static_cast<std::uint16_t>(o));
+    }
     if (o < 0 || static_cast<std::size_t>(o) >= g_glyphs.size()) return "VR_MENU"; // original throws past the end
     return g_glyphs[static_cast<std::size_t>(o)].load(std::memory_order_relaxed);
 }
@@ -316,23 +323,30 @@ bool __fastcall pad_has_activity(void* self, void* /*edx*/) noexcept {
     const bool game = g_game.activity(self, nullptr);
     const bool vr   = g_vr_activity.exchange(false);
     const bool any  = game || vr;
+    // Without the mod's UI archive the prompts stay in stock-glyph mode.
+    const bool want_vr = vr && g_vr_glyphs_allowed.load(std::memory_order_relaxed);
 
     std::uint8_t* mgr = input_manager();
     if (!mgr) return any;
     // The player map's pad and keyboard devices (device_by_type[0], [1]).
+    // An entry stays null until the game has registered a device of that
+    // type, so neither is written through unless it exists; without both,
+    // the mode still changes and the prompts pick it up at the game's next
+    // device change (spec 04 section 4.2).
     void* const* devices = action_map(mgr, 0).device_by_type;
-    auto active = [devices](int type) -> std::uint8_t& {
-        return static_cast<std::uint8_t*>(devices[type])[kDeviceActive];
-    };
-    if (any && g_vr_glyphs != vr) {
-        g_vr_glyphs    = vr;
-        g_device_pulse = true;
-        active(0) = 0;
-        active(1) = 1;
+    auto* const pad      = static_cast<std::uint8_t*>(devices[0]);
+    auto* const keyboard = static_cast<std::uint8_t*>(devices[1]);
+    if (any && g_vr_glyphs != want_vr) {
+        g_vr_glyphs = want_vr;
+        if (pad && keyboard) {
+            g_device_pulse          = true;
+            pad[kDeviceActive]      = 0;
+            keyboard[kDeviceActive] = 1;
+        }
     } else if (g_device_pulse) {
         g_device_pulse = false;
-        active(0) = 1;
-        active(1) = 0;
+        if (pad) pad[kDeviceActive] = 1;
+        if (keyboard) keyboard[kDeviceActive] = 0;
     }
     return any;
 }
@@ -356,6 +370,12 @@ void note_vr_activity() noexcept { g_vr_activity.store(true); }
 void set_glyph(int pad_code, const char* name) noexcept {
     if (name && pad_code >= 0 && static_cast<std::size_t>(pad_code) < g_glyphs.size()) {
         g_glyphs[static_cast<std::size_t>(pad_code)].store(name, std::memory_order_relaxed);
+    }
+}
+
+void use_stock_glyphs_only() noexcept {
+    if (g_vr_glyphs_allowed.exchange(false)) {
+        diag::log_line("[input] no mod UI archive: button prompts keep the game's pad glyphs");
     }
 }
 

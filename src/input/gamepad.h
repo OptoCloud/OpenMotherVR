@@ -53,6 +53,12 @@ void note_vr_activity() noexcept;
 // read on the game thread: each name is swapped as one pointer.
 void set_glyph(int pad_code, const char* name) noexcept;
 
+// The mod's UI archive (MOTHER.PAK) is not in use this run, so the movies
+// register no VR glyph ids: prompts stay in stock-glyph mode for the rest of
+// the process (spec 04 section 4.2). Call once, from attach, when the
+// archive redirect was not made.
+void use_stock_glyphs_only() noexcept;
+
 // The game's input devices, read from its input manager: the pad, keyboard
 // and mouse the stereo update polls. Null until the game has created the
 // manager, or before install().
