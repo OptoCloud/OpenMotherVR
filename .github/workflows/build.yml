@@ -88,6 +88,11 @@ jobs:
       - name: Build
         run: cmake --build build
 
+      # The unit tests of util and core (tests/), built with the DLL; a
+      # failing test stops the job before anything is packaged.
+      - name: Run the unit tests
+        run: ctest --test-dir build --output-on-failure
+
       # Exports, imports, architecture and the version resource; a failure
       # stops the job before anything is packaged.
       - name: Check the DLL
