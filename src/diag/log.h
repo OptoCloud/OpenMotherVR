@@ -27,6 +27,11 @@ void init(HINSTANCE self) noexcept;
 // Append one line. Prefixed with timestamp + pid, line-terminated with \r\n.
 void log_line(std::string_view msg) noexcept;
 
+// log_line, rendering the line into `scratch` (`cap` bytes) instead of a
+// buffer on the stack. For the crash record: after a stack overflow the
+// faulting thread has too little stack left for log_line's own buffer.
+void log_line_in(std::string_view msg, char* scratch, std::size_t cap) noexcept;
+
 // std::format-style. Bounded to ~1 KB per line; longer messages are truncated.
 template <class... Args>
 inline void logf(std::format_string<Args...> fmt, Args&&... args) {

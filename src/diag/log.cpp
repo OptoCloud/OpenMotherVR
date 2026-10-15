@@ -89,13 +89,12 @@ void init(HINSTANCE /*self*/) noexcept {
     g_ready.store(true, std::memory_order_release);
 }
 
-void log_line(std::string_view msg) noexcept {
-    if (!g_ready.load(std::memory_order_acquire)) return;
+void log_line_in(std::string_view msg, char* buf, std::size_t cap) noexcept {
+    if (!g_ready.load(std::memory_order_acquire) || !buf || cap < 3) return;
 
-    char buf[1280];
-    int n = format_prefix(buf, sizeof(buf));
-    if (n < 0 || n >= static_cast<int>(sizeof(buf) - 2)) return;
-    const std::size_t room = sizeof(buf) - static_cast<std::size_t>(n) - 2;
+    int n = format_prefix(buf, cap);
+    if (n < 0 || n >= static_cast<int>(cap - 2)) return;
+    const std::size_t room = cap - static_cast<std::size_t>(n) - 2;
     const std::size_t take = msg.size() < room ? msg.size() : room;
     std::memcpy(buf + n, msg.data(), take);
     buf[n + take]     = '\r';
@@ -111,6 +110,11 @@ int message_box(std::string_view text, unsigned type) noexcept {
     std::wstring wide(static_cast<std::size_t>(n), L'\0');
     ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), wide.data(), n);
     return ::MessageBoxW(nullptr, wide.c_str(), L"MotherVR", type);
+}
+
+void log_line(std::string_view msg) noexcept {
+    char buf[1280];
+    log_line_in(msg, buf, sizeof(buf));
 }
 
 } // namespace mothervr::diag
