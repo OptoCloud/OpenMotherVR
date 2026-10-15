@@ -71,7 +71,15 @@ float pad_axis_value(void* pad, int virtual_code) noexcept;
 // past the destructor), `input_manager` the AI.exe global holding the input
 // manager pointer.
 //
+// The five slots are one patch (spec 04 section 3.3): with only some of
+// them replaced, the first raw IsDown query would virtualise the maps and
+// the stock methods left in place would get codes they do not know, so the
+// real pad's sticks, triggers or prompts would stop working. If a slot
+// cannot be written, the slots already written are restored and false is
+// returned; the caller must then leave the pad's other patches (connected
+// flag, left-stick prompt redirect) unapplied.
+//
 // From: FUN_1001d6f0 lines 368-397.
-void install(std::uint8_t* pad_vtable, void** input_manager) noexcept;
+bool install(std::uint8_t* pad_vtable, void** input_manager) noexcept;
 
 } // namespace mothervr::input

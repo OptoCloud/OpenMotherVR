@@ -14,6 +14,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <iterator>
 #include <utility>
 
 namespace mothervr::input {
@@ -121,6 +122,10 @@ std::array<ActionTier, 3> g_tiers = [] {
 bool              g_vr_glyphs = true;
 std::atomic<bool> g_vr_activity{false};
 bool              g_device_pulse = false;
+
+// All five pad slots were replaced (install()). The helpers for the stereo
+// update answer from the stock pad alone when they were not.
+std::atomic<bool> g_installed{false};
 
 // Original: the std::vector<std::string> at DAT_100686d4, built by
 // FUN_10001090. Literals here, so the pointers handed to the game stay valid
@@ -326,8 +331,8 @@ Fn read_slot(const std::uint8_t* slot) noexcept {
 }
 
 // A failed write is logged by write_dword; that slot keeps the game's function.
-void write_slot(std::uint8_t* slot, const void* fn) noexcept {
-    (void) hook::write_dword(slot, static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(fn)));
+bool write_slot(std::uint8_t* slot, const void* fn) noexcept {
+    return hook::write_dword(slot, static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(fn)));
 }
 
 } // namespace
@@ -350,13 +355,18 @@ bool pad_button(void* pad, int pad_code) noexcept {
     return g_game.is_down && g_game.is_down(pad, nullptr, pad_code);
 }
 
-bool pad_activity(void* pad) noexcept { return g_game.activity && pad_has_activity(pad, nullptr); }
-
-float pad_axis_value(void* pad, int virtual_code) noexcept {
-    return g_game.axis ? pad_axis(pad, nullptr, virtual_code, 0) : 0.0f;
+// Without the replacements in place, VR has no effect on the pad: activity
+// is the stock pad's own and there is no merged turn value.
+bool pad_activity(void* pad) noexcept {
+    if (!g_game.activity) return false;
+    return g_installed.load() ? pad_has_activity(pad, nullptr) : g_game.activity(pad, nullptr);
 }
 
-void install(std::uint8_t* pad_vtable, void** input_manager) noexcept {
+float pad_axis_value(void* pad, int virtual_code) noexcept {
+    return g_game.axis && g_installed.load() ? pad_axis(pad, nullptr, virtual_code, 0) : 0.0f;
+}
+
+bool install(std::uint8_t* pad_vtable, void** input_manager) noexcept {
     g_input_manager = input_manager;
 
     // The original keeps these in DAT_10066c6c..c7c (the same addresses,
@@ -367,13 +377,43 @@ void install(std::uint8_t* pad_vtable, void** input_manager) noexcept {
     g_game.name     = read_slot<NameFn>(pad_vtable + 0x10);
     g_game.activity = read_slot<ActivityFn>(pad_vtable + 0x28);
 
-    write_slot(pad_vtable + 0x00, reinterpret_cast<const void*>(&pad_is_down));
-    write_slot(pad_vtable + 0x04, reinterpret_cast<const void*>(&pad_value));
-    write_slot(pad_vtable + 0x08, reinterpret_cast<const void*>(&pad_axis));
-    write_slot(pad_vtable + 0x10, reinterpret_cast<const void*>(&pad_control_name));
-    write_slot(pad_vtable + 0x28, reinterpret_cast<const void*>(&pad_has_activity));
+    struct Slot {
+        std::ptrdiff_t offset;
+        const void*    fn;
+    };
+    const Slot slots[] = {
+        {0x00, reinterpret_cast<const void*>(&pad_is_down)},
+        {0x04, reinterpret_cast<const void*>(&pad_value)},
+        {0x08, reinterpret_cast<const void*>(&pad_axis)},
+        {0x10, reinterpret_cast<const void*>(&pad_control_name)},
+        {0x28, reinterpret_cast<const void*>(&pad_has_activity)},
+    };
+    std::uint32_t saved[std::size(slots)] = {};
+    for (std::size_t i = 0; i < std::size(slots); ++i) {
+        saved[i] = *reinterpret_cast<const std::uint32_t*>(pad_vtable + slots[i].offset);
+    }
 
+    // All or nothing (see gamepad.h): on a failed write, put back the slots
+    // already written so the game runs with its stock pad.
+    std::size_t written = 0;
+    while (written < std::size(slots) &&
+           write_slot(pad_vtable + slots[written].offset, slots[written].fn)) {
+        ++written;
+    }
+    if (written < std::size(slots)) {
+        bool restored = true;
+        for (std::size_t i = 0; i < written; ++i) {
+            restored = hook::write_dword(pad_vtable + slots[i].offset, saved[i]) && restored;
+        }
+        diag::logf("[input] gamepad vtable slot +0x{:X} could not be written; {}: VR controls are off, "
+                   "the game keeps its stock pad",
+                   slots[written].offset, restored ? "earlier slots restored" : "restoring earlier slots FAILED");
+        return false;
+    }
+
+    g_installed.store(true);
     diag::logf("[input] gamepad vtable at {} hooked", static_cast<void*>(pad_vtable));
+    return true;
 }
 
 } // namespace mothervr::input
