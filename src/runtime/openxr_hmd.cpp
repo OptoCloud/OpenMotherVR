@@ -31,6 +31,9 @@ namespace xr = openxr;
 
 constexpr float kDefaultTangent = 1.2f;          // until the runtime tells us
 constexpr float kDefaultEyeX    = 0.032f;
+// Below this horizontal length of the head's forward axis the heading is
+// undefined (looking straight up or down); the previous yaw is kept (09 §5.5).
+constexpr float kMinForwardLength = 1e-4f;
 
 // ---- Small vector maths --------------------------------------------------------
 
@@ -151,23 +154,41 @@ public:
     }
 
     void head_yaw_pose(Matrix34& out, float world_scale) override {
-        const xr::Pose head = xr::views().head;
-        const float yaw = yaw_of(head.orientation);
-        const xr::Pose ref{{0, std::sin(yaw * 0.5f), 0, std::cos(yaw * 0.5f)}, head.position};
-        yaw_ref_.store(ref);
+        const xr::FrameViews v = xr::views();
         float m[3][4];
+        // Never from an invalid head (09 §5.5): the previous reference stays
+        // (identity before any). A queued retake waits for headset_in_use,
+        // which needs a valid head, so it happens once tracking is back.
+        recenter_taken_ = v.head_valid;
+        if (!v.head_valid) {
+            pose_matrix(yaw_ref_.load(), m);
+            out = to_game_pose(m, world_scale);
+            diag::log_line("openxr: recenter skipped: head not tracked, the previous reference stays");
+            return;
+        }
+        // Looking straight up or down leaves no heading: keep the previous yaw.
+        const auto& q = v.head.orientation;
+        const float fx = 2 * (q.w * q.y + q.x * q.z), fz = 1 - 2 * (q.x * q.x + q.y * q.y);
+        if (std::sqrt(fx * fx + fz * fz) >= kMinForwardLength) yaw_ = yaw_of(q);
+        const xr::Pose ref{{0, std::sin(yaw_ * 0.5f), 0, std::cos(yaw_ * 0.5f)}, v.head.position};
+        yaw_ref_.store(ref);
         pose_matrix(ref, m);
         out = to_game_pose(m, world_scale);
     }
 
     void begin_frame(float eye_offsets[6], bool head_tracked) override {
         const xr::FrameViews v = xr::views();
+        // Only from views whose eye and head positions are this frame's;
+        // otherwise the previous offsets stay (09 §5.4, §5.5), the 32 mm
+        // default until then.
+        if (v.valid && v.eye_positions_valid && v.head_valid) {
+            for (int e = 0; e < 2; ++e)
+                eye_offset_[e] = rotate(conjugate(v.head.orientation), sub(v.eyes[e].pose.position, v.head.position));
+        }
         for (int e = 0; e < 2; ++e) {
-            xr::Vec3 o{e == 0 ? -kDefaultEyeX : kDefaultEyeX, 0, 0};
-            if (v.valid) o = rotate(conjugate(v.head.orientation), sub(v.eyes[e].pose.position, v.head.position));
-            eye_offsets[e * 3 + 0] = o.x;
-            eye_offsets[e * 3 + 1] = o.y;
-            eye_offsets[e * 3 + 2] = o.z;
+            eye_offsets[e * 3 + 0] = eye_offset_[e].x;
+            eye_offsets[e * 3 + 1] = eye_offset_[e].y;
+            eye_offsets[e * 3 + 2] = eye_offset_[e].z;
         }
         if (cinema_ != !head_tracked && config::current().debug.debug)
             diag::logf("[diag] frames now {}", head_tracked ? "tracked" : "on the screen");
@@ -230,10 +251,12 @@ public:
         // where they are synced, one frame earlier than BeginFrame would.
     }
 
+    bool recenter_taken() const override { return recenter_taken_; }
+
     bool headset_in_use() override {
         if (!xr::running()) return false;
         const xr::FrameViews v = xr::views();
-        if (!v.valid) return false;
+        if (!v.valid || !v.head_valid) return false;   // a recenter needs a tracked head (09 §6.2)
         const auto& q = v.head.orientation;
         return 1 - 2 * (q.x * q.x + q.z * q.z) > 0.7f;   // head's up axis near vertical
     }
@@ -345,6 +368,11 @@ private:
     bool fov_known_ = false;
     FovPort eye_fov_[2]{};
     float max_v_ = kDefaultTangent, max_h_ = kDefaultTangent;
+    // Render thread: each eye's offset from the head, kept while the views
+    // have no valid positions.
+    xr::Vec3 eye_offset_[2] = {{-kDefaultEyeX, 0, 0}, {kDefaultEyeX, 0, 0}};
+    float yaw_ = 0.0f;   // game thread: the latest reference's heading
+    bool recenter_taken_ = true;   // game thread: the last head_yaw_pose took a new one
     // Written on the game thread (head_pose, head_yaw_pose), read on the
     // render thread (submit_frame).
     xr::SeqLock<xr::FrameViews> render_;

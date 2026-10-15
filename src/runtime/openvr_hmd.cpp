@@ -61,8 +61,30 @@ std::string process_name(DWORD pid) {
 
 float length(float x, float y, float z) noexcept { return std::sqrt(x * x + y * y + z * z); }
 
+// The neutral pose: the reference before any recenter (03 §7) and the head
+// before any valid pose (03 §1).
+constexpr vr::HmdMatrix34_t kIdentity34{{{1.0f, 0.0f, 0.0f, 0.0f},
+                                          {0.0f, 1.0f, 0.0f, 0.0f},
+                                          {0.0f, 0.0f, 1.0f, 0.0f}}};
+
+// Below this horizontal length of the head's forward axis the heading is
+// undefined (looking straight up or down); the previous yaw is kept (03 §2.1).
+constexpr float kMinForwardLength = 1e-4f;
+
+bool all_finite(const vr::HmdMatrix34_t& m) noexcept {
+    for (const auto& row : m.m)
+        for (float v : row)
+            if (!std::isfinite(v)) return false;
+    return true;
+}
+
 class OpenVrHmd final : public HmdBackend {
 public:
+    OpenVrHmd() noexcept {
+        render_pose_.store(kIdentity34);
+        yaw_matrix_.store(kIdentity34);
+    }
+
     // Closes the session init() opened. Only reached through the stereo
     // device's explicit teardown, never at process exit.
     ~OpenVrHmd() override { openvr::shutdown(); }
@@ -79,6 +101,7 @@ public:
     void register_control_hints() override;
     void poll_input() override;
     bool headset_in_use() override;
+    bool recenter_taken() const override { return recenter_taken_; }
     bool hand_pose(int hand, Matrix34& out, float world_scale) override;
     bool hand_velocity(int hand, float (&out)[3], float world_scale) override;
 
@@ -89,17 +112,27 @@ private:
     void write_controls();
     void check_scene_app();
     openvr::Controls legacy_controls(const vr::TrackedDeviceIndex_t (&index)[2]);
-
-    const vr::HmdMatrix34_t& hmd_matrix() const noexcept {
-        return poses_[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking;
-    }
+    const vr::HmdMatrix34_t& read_head();
 
     vr::IVRSystem*     system_     = nullptr;
     vr::IVRCompositor* compositor_ = nullptr;
     vr::IVROverlay*    overlay_    = nullptr;
 
+    // Game thread (head_pose, head_yaw_pose, headset_in_use; init before).
     vr::TrackedDevicePose_t poses_[vr::k_unMaxTrackedDeviceCount]{};
-    vr::HmdMatrix34_t       yaw_matrix_{};      // unscaled, OpenVR space (cinema placement)
+    // The last valid headset pose (OpenVR space, unscaled): what the game
+    // gets while the pose is invalid, with the new orientation but this
+    // position while position tracking is degraded (03 §1).
+    vr::HmdMatrix34_t       head_ = kIdentity34;
+    bool                    head_valid_ = false;   // the latest read was valid
+    int                     head_state_ = -1;      // debug log once per change
+    float                   yaw_ = 0.0f;           // the latest reference's heading
+    bool                    recenter_taken_ = true;   // the last head_yaw_pose took a new one
+    // Written on the game thread, read on the render thread (03 §11): the
+    // pose head_pose returned, which submit_frame declares, and the
+    // unconverted yaw-only reference Y, which places the virtual screen.
+    SeqLock<vr::HmdMatrix34_t> render_pose_;
+    SeqLock<vr::HmdMatrix34_t> yaw_matrix_;
     bool                    cinema_mode_ = false;
     vr::VROverlayHandle_t   overlay_handle_ = vr::k_ulOverlayHandleInvalid;
 
@@ -227,9 +260,37 @@ void OpenVrHmd::release_render_resources() {
 
 // ---- slots 5-6 ---------------------------------------------------------------
 
-void OpenVrHmd::head_pose(Matrix34& out, float world_scale) {
+// Game thread. The headset's latest pose with the invalid-pose rules of
+// 03 §1: an invalid (or non-finite) pose leaves the last valid one; a valid
+// pose with degraded tracking takes the new orientation and keeps the last
+// valid position. Before any valid pose that is the neutral pose.
+const vr::HmdMatrix34_t& OpenVrHmd::read_head() {
     compositor_->GetLastPoses(poses_, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
-    out = to_game_pose(hmd_matrix().m, world_scale);
+    const auto& p = poses_[vr::k_unTrackedDeviceIndex_Hmd];
+    head_valid_ = p.bPoseIsValid && all_finite(p.mDeviceToAbsoluteTracking);
+    const bool position_ok = p.eTrackingResult == vr::TrackingResult_Running_OK;
+    if (head_valid_) {
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 3; ++c) head_.m[r][c] = p.mDeviceToAbsoluteTracking.m[r][c];
+            if (position_ok) head_.m[r][3] = p.mDeviceToAbsoluteTracking.m[r][3];
+        }
+    }
+    // Dev. Debug Options: tracking lost or degraded, once per change.
+    const int state = !head_valid_ ? 0 : position_ok ? 2 : 1;
+    if (state != head_state_ && config::current().debug.debug) {
+        diag::logf("[diag] headset pose {} (tracking result {})",
+                   state == 0 ? "invalid, holding the last valid pose"
+                   : state == 1 ? "degraded, holding the last valid position" : "tracked",
+                   static_cast<int>(p.eTrackingResult));
+    }
+    head_state_ = state;
+    return head_;
+}
+
+void OpenVrHmd::head_pose(Matrix34& out, float world_scale) {
+    const vr::HmdMatrix34_t& m = read_head();
+    render_pose_.store(m);   // the pose this frame renders with and is declared with
+    out = to_game_pose(m.m, world_scale);
     hands_rendered_ = hands_.load();
     head_read_.store(true, std::memory_order_relaxed);
 }
@@ -291,22 +352,34 @@ void OpenVrHmd::read_hands() {
 }
 
 void OpenVrHmd::head_yaw_pose(Matrix34& out, float world_scale) {
-    compositor_->GetLastPoses(poses_, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
-    const auto& m = hmd_matrix().m;
+    const auto& m = read_head().m;
+    // Never from an invalid pose (03 §2.1): the previous reference stays. The
+    // stereo device's queued retake waits for headset_in_use, which needs a
+    // valid pose, so a retake is taken once tracking is back.
+    recenter_taken_ = head_valid_;
+    if (!head_valid_) {
+        out = to_game_pose(yaw_matrix_.load().m, world_scale);
+        diag::log_line("openvr: recenter skipped: headset pose invalid, the previous reference stays");
+        return;
+    }
     // Yaw about +Y: the original goes through a quaternion,
-    // atan2(2(wy + xz), w^2 - x^2 - y^2 + z^2), which is this.
-    const float yaw = std::atan2(m[0][2], m[2][2]);
+    // atan2(2(wy + xz), w^2 - x^2 - y^2 + z^2), which is this. Looking
+    // straight up or down leaves no heading: keep the previous one.
+    const bool vertical = std::sqrt(m[0][2] * m[0][2] + m[2][2] * m[2][2]) < kMinForwardLength;
+    const float yaw = vertical ? yaw_ : std::atan2(m[0][2], m[2][2]);
+    yaw_ = yaw;
     const float s = std::sin(yaw), c = std::cos(yaw);
-    yaw_matrix_ = {{
+    const vr::HmdMatrix34_t y{{
         {   c, 0.0f,    s, m[0][3]},
         {0.0f, 1.0f, 0.0f, m[1][3]},
         {  -s, 0.0f,    c, m[2][3]},
     }};
-    out = to_game_pose(yaw_matrix_.m, world_scale);
+    yaw_matrix_.store(y);
+    out = to_game_pose(y.m, world_scale);
     diag::logf("openvr: recenter: head x=({:.2f} {:.2f} {:.2f}) y=({:.2f} {:.2f} {:.2f}) z=({:.2f} {:.2f} {:.2f}) "
-               "pos=({:.2f} {:.2f} {:.2f}) yaw={:.1f} deg, activity={}",
+               "pos=({:.2f} {:.2f} {:.2f}) yaw={:.1f} deg{}, activity={}",
                m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2],
-               m[0][3], m[1][3], m[2][3], yaw * 57.29578f,
+               m[0][3], m[1][3], m[2][3], yaw * 57.29578f, vertical ? " (kept: looking straight up or down)" : "",
                static_cast<int>(system_->GetTrackedDeviceActivityLevel(vr::k_unTrackedDeviceIndex_Hmd)));
 }
 
@@ -331,7 +404,7 @@ void OpenVrHmd::submit_frame(ID3D11Texture2D* side_by_side) {
     tex.handle      = side_by_side;
     tex.eType       = vr::TextureType_DirectX;
     tex.eColorSpace = vr::ColorSpace_Gamma;
-    tex.mDeviceToAbsoluteTracking = hmd_matrix();
+    tex.mDeviceToAbsoluteTracking = render_pose_.load();   // the pose head_pose gave the game
 
     if (!cinema_mode_) {
         if (overlay_handle_ != vr::k_ulOverlayHandleInvalid && overlay_->IsOverlayVisible(overlay_handle_)) {
@@ -345,7 +418,7 @@ void OpenVrHmd::submit_frame(ID3D11Texture2D* side_by_side) {
         if (overlay_handle_ != vr::k_ulOverlayHandleInvalid) {
             vr::Texture_t plain{side_by_side, vr::TextureType_DirectX, vr::ColorSpace_Gamma};
             overlay_->SetOverlayTexture(overlay_handle_, &plain);
-            vr::HmdMatrix34_t m = yaw_matrix_;
+            vr::HmdMatrix34_t m = yaw_matrix_.load();
             m.m[0][3] -= kCinemaDistance * m.m[0][2];
             m.m[2][3] -= kCinemaDistance * m.m[2][2];
             overlay_->SetOverlayTransformAbsolute(overlay_handle_, vr::TrackingUniverseStanding, &m);
@@ -395,10 +468,14 @@ void OpenVrHmd::check_scene_app() {
 
 bool OpenVrHmd::headset_in_use() {
     // Moving (or worn, with a proximity sensor) and the head's up axis
-    // within ~45 degrees of vertical.
+    // within ~45 degrees of vertical, on a valid pose: a queued recenter
+    // must wait for tracking (03 §2.1). Read fresh: in menus head_pose is
+    // not called, and a pose from the last gameplay frame would be stale.
     const bool active = system_->GetTrackedDeviceActivityLevel(vr::k_unTrackedDeviceIndex_Hmd)
                         == vr::k_EDeviceActivityLevel_UserInteraction;
-    return active && hmd_matrix().m[1][1] > 0.7f;
+    if (!active) return false;
+    const auto& m = read_head().m;
+    return head_valid_ && m[1][1] > 0.7f;
 }
 
 // ---- slots 9-10 --------------------------------------------------------------

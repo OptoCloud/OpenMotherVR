@@ -94,12 +94,17 @@ struct HandPose {
 };
 
 // Per-frame view state, valid after a frame() that returned true.
+// Invalid locations follow 09 §5.5: `head` is always usable (the last valid
+// orientation and position held where the runtime reports them invalid, the
+// neutral pose before any), and the eyes keep their last valid positions.
 struct FrameViews {
     std::array<EyeView, 2> eyes{};
     Pose                   head{};
     std::array<HandPose, 2> hands{};   // left, right; located with the views
     XrTime                 display_time = 0; // the predictedDisplayTime they were located for
-    bool                   valid = false;
+    bool                   valid = false;    // eye orientations valid: a projection layer may use them
+    bool                   eye_positions_valid = false; // eye positions are this frame's, not held
+    bool                   head_valid = false;  // head orientation and position both this frame's
 };
 
 // The seqlock, shared with the OpenVR backend.

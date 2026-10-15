@@ -174,6 +174,13 @@ struct State {
     SystemInfo       info{};
     bool         ipd_logged = false;
 
+    // The last valid head and eye positions in the base space (09 §5.5):
+    // what is published while tracking is lost. Neutral before any: the
+    // identity head, the eyes half an average IPD to each side.
+    Pose                 last_head{};
+    std::array<Vec3, 2>  last_eye_pos{{{-0.032f, 0.0f, 0.0f}, {0.032f, 0.0f, 0.0f}}};
+    float                anchor_yaw = 0.0f;   // the base space's yaw at the latest anchor
+
     // Pose-age probe: how many display periods before the frame's own
     // display time the declared (and rendered) views were predicted for.
     // 0 is right; the old loop measured 1. Logged with Dev. Debug Options.
@@ -314,13 +321,33 @@ bool copy_into(Swapchain& sc, ID3D11Texture2D* src, D3D11_BOX box) {
     return check(xrReleaseSwapchainImage(sc.handle, &ri), "xrReleaseSwapchainImage");
 }
 
-bool locate(XrSpace space, XrSpace base, XrTime t, Pose& out) {
+bool all_finite(const Pose& p) noexcept {
+    const float v[7] = {p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w,
+                        p.position.x, p.position.y, p.position.z};
+    for (float f : v)
+        if (!std::isfinite(f)) return false;
+    return true;
+}
+
+// `space` in `base` at `t`, and its location flags; flags 0 when the call
+// fails or the pose is not finite, so nothing NaN is ever handed on (09 §5.5).
+XrSpaceLocationFlags locate_flags(XrSpace space, XrSpace base, XrTime t, Pose& out) {
     XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
-    if (XR_FAILED(xrLocateSpace(space, base, t, &loc))) return false;
-    constexpr XrSpaceLocationFlags kValid =
-        XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_POSITION_VALID_BIT;
-    if ((loc.locationFlags & kValid) != kValid) return false;
-    out = from_xr(loc.pose);
+    if (XR_FAILED(xrLocateSpace(space, base, t, &loc))) return 0;
+    const Pose p = from_xr(loc.pose);
+    if (!all_finite(p)) return 0;
+    out = p;
+    return loc.locationFlags;
+}
+
+constexpr XrSpaceLocationFlags kOrientationAndPosition =
+    XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_POSITION_VALID_BIT;
+
+// Both orientation and position valid: what a re-anchor needs.
+bool locate(XrSpace space, XrSpace base, XrTime t, Pose& out) {
+    Pose p{};
+    if ((locate_flags(space, base, t, p) & kOrientationAndPosition) != kOrientationAndPosition) return false;
+    out = p;
     return true;
 }
 
@@ -339,16 +366,22 @@ constexpr XrPosef kIdentity{{0, 0, 0, 1}, {0, 0, 0}};
 // roll ignored so the world stays level).
 bool do_recenter(XrTime t) {
     Pose head{};
-    if (!locate(g.view, g.local, t, head)) return false;
+    if (!locate(g.view, g.local, t, head)) return false;   // stays pending (09 §6.3)
     const Quat& q = head.orientation;
-    const float yaw = std::atan2(2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.x * q.x + q.y * q.y));
+    // Looking straight up or down leaves no heading: keep the previous
+    // anchor's yaw with the new position, as a game recenter does (09 §5.5).
+    const float fx = 2.0f * (q.w * q.y + q.x * q.z), fz = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
+    const bool vertical = std::sqrt(fx * fx + fz * fz) < 1e-4f;
+    const float yaw = vertical ? g.anchor_yaw : std::atan2(fx, fz);
     const XrPosef origin{{0, std::sin(yaw * 0.5f), 0, std::cos(yaw * 0.5f)},
                          {head.position.x, head.position.y, head.position.z}};
     XrSpace s = make_reference_space(XR_REFERENCE_SPACE_TYPE_LOCAL, origin);
     if (s == XR_NULL_HANDLE) return false;
     if (g.seated != XR_NULL_HANDLE) xrDestroySpace(g.seated);
     g.seated = s;
-    diag::logf("openxr: recentered (yaw {:.1f} deg)", yaw * 57.29578f);
+    g.anchor_yaw = yaw;
+    diag::logf("openxr: recentered (yaw {:.1f} deg{})", yaw * 57.29578f,
+               vertical ? ", kept: looking straight up or down" : "");
     return true;
 }
 
@@ -815,16 +848,36 @@ bool begin_frame() {
     XrViewState vs{XR_TYPE_VIEW_STATE};
     std::array<XrView, 2> xv{{{XR_TYPE_VIEW}, {XR_TYPE_VIEW}}};
     std::uint32_t nv = 0;
-    g.views.valid = XR_SUCCEEDED(xrLocateViews(g.session, &li, &vs, 2, &nv, xv.data())) &&
-                    (vs.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT);
-    for (int i = 0; i < 2; ++i) {
-        g.views.eyes[i] = {from_xr(xv[i].pose), xv[i].fov.angleLeft, xv[i].fov.angleRight,
-                           xv[i].fov.angleUp, xv[i].fov.angleDown};
+    const bool located = XR_SUCCEEDED(xrLocateViews(g.session, &li, &vs, 2, &nv, xv.data())) && nv == 2 &&
+                         all_finite(from_xr(xv[0].pose)) && all_finite(from_xr(xv[1].pose));
+    // Invalid-pose rules (09 §5.5). Views without a valid orientation are
+    // not valid (no projection layer, no FOV, eye offsets kept) and keep
+    // the previous values rather than whatever the runtime wrote. Views
+    // whose positions alone are invalid stay valid with each eye at its
+    // last valid position, matching the held head below.
+    g.views.valid = located && (vs.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT);
+    g.views.eye_positions_valid = g.views.valid && (vs.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT);
+    if (g.views.valid) {
+        for (int i = 0; i < 2; ++i) {
+            g.views.eyes[i] = {from_xr(xv[i].pose), xv[i].fov.angleLeft, xv[i].fov.angleRight,
+                               xv[i].fov.angleUp, xv[i].fov.angleDown};
+            if (g.views.eye_positions_valid) g.last_eye_pos[i] = g.views.eyes[i].pose.position;
+            else g.views.eyes[i].pose.position = g.last_eye_pos[i];
+        }
     }
-    locate(g.view, g.seated, t, g.views.head);
+    // The head: without a valid orientation the last head stays whole; with
+    // the orientation alone, the new orientation at the last valid position.
+    Pose head{};
+    const XrSpaceLocationFlags hf = locate_flags(g.view, g.seated, t, head);
+    if (hf & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) {
+        g.last_head.orientation = head.orientation;
+        if (hf & XR_SPACE_LOCATION_POSITION_VALID_BIT) g.last_head.position = head.position;
+    }
+    g.views.head = g.last_head;
+    g.views.head_valid = (hf & kOrientationAndPosition) == kOrientationAndPosition;
     g.views.display_time = t;
     g_views.store(g.views);
-    if (g.views.valid && !g.ipd_logged) {
+    if (g.views.eye_positions_valid && !g.ipd_logged) {
         const Vec3 a = g.views.eyes[0].pose.position, b = g.views.eyes[1].pose.position;
         diag::logf("openxr: IPD {:.4f} m", std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y) +
                                                      (b.z - a.z) * (b.z - a.z)));

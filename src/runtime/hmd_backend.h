@@ -93,6 +93,11 @@ public:
     // whatever the headset is doing.)
     virtual bool headset_in_use() { return true; }
 
+    // Whether the last head_yaw_pose took a new reference. False when the
+    // head pose was invalid: the previous reference was handed back, and the
+    // caller queues a retake (03 §2.1, 09 §5.5). Game thread.
+    virtual bool recenter_taken() const { return true; }
+
     // When the FOV only became known after init (OpenXR runtimes that do not
     // report it up front), updates `desc` and returns true once.
     virtual bool refresh_hmd_desc(HmdDesc& /*desc*/) { return false; }
