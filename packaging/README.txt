@@ -82,6 +82,17 @@ Playing
     by Controller Sensitivity.
   - "SnapTurnRepeatMs": how often a held stick repeats a snap turn, 150
     to 1000 ms (default 300). 0 turns once per push.
+  - "SnapTurnFade": true hides each snap turn behind a quick fade from
+    black (about 0.1 s). Default false.
+  - "Vignette": 0 to 1 darkens the edge of the view while you move with
+    the stick or turn smoothly, and clears it when you stop; higher
+    narrows the clear area more. 0 (the default) is off.
+- Controls (preview, mothervr.json only for now), in a "Controls" object
+  under "Settings":
+  - "InteractionAwareTurning": true stops the right stick turning you
+    while you use a keypad, terminal, lever or other interaction, during
+    the breathing game while hiding, and in cutscenes; mouse look still
+    works. Default false.
 
 If something goes wrong
 - The headset shows the game as a flat screen (Theatre), or the game
