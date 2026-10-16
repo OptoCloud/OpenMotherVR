@@ -11,6 +11,7 @@ add_executable(omvr_tests
     core/config_test.cpp
     core/crash_log_test.cpp
     core/diag_test.cpp
+    core/hands_test.cpp
     core/input_test.cpp
     core/render_test.cpp
     core/stereo_test.cpp

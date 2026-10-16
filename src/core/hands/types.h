@@ -1,0 +1,78 @@
+// OpenMotherVR-Provenance: clean
+#pragma once
+
+#include "core/vr/types.h"
+#include "util/math/matrix.h"
+#include "util/math/vec.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+
+// Values the hand features work on (spec 21 §3). Poses from the runtime are
+// in the convention of the head pose the stereo device returns
+// (core/vr/pose_convert.h: to_game_pose, metres times the world scale), so a
+// hand and the head of one frame compare directly.
+namespace omvr::core::hands {
+
+inline constexpr std::size_t kLeft  = 0;
+inline constexpr std::size_t kRight = 1;
+using vr::kHandCount;
+
+// One hand as the runtime reported it for a frame (21 §3.1, §16): the grip
+// pose, the aim (pointing) pose and the grip's linear velocity. A pose that
+// is not valid is never converted or used (03 §1 rule).
+struct HandSample {
+    util::Matrix34 grip{};
+    util::Matrix34 aim{};
+    util::Vec3 velocity{}; // game units per second
+    bool grip_valid     = false;
+    bool aim_valid      = false;
+    bool velocity_valid = false;
+};
+
+// The head pose the game was given for a frame and both hands of the same
+// prediction (21 §3.1, §3.4).
+struct HandFrame {
+    util::Matrix34 head{};
+    std::array<HandSample, kHandCount> hands{};
+};
+
+// A pose relative to the eye the player sees from, in the game camera's own
+// axes (x right, y up, +z forward): what §3.1 calls d' and Rrel.
+struct HeadLocalPose {
+    util::Vec3 offset{};
+    util::Quat rotation{};
+};
+
+// The active camera's world pose (21 §2.4): orientation quaternion (local +Z
+// forward, +Y up) and position in world metres.
+struct CameraPose {
+    util::Quat orientation{};
+    util::Vec3 position{};
+};
+
+// A pose in the game's world. Local +Z is the direction the pose points.
+struct WorldPose {
+    util::Vec3 position{};
+    util::Quat orientation{};
+};
+
+// The weapon classes of 21 §5.2, from the game's weapon type (21 §2.5).
+enum class WeaponClass : std::uint8_t {
+    NoWeapon, // NO_WEAPON or no weapon object: throwables, flare, medikit
+    Barrel,   // PISTOL, SHOTGUN, BOLTGUN
+    Nozzle,   // FLAMETHROWER
+    Contact,  // MELEE, CATTLEPROD: the game's ray is kept
+    Unknown,  // any other value: the game's ray is kept
+};
+
+// The player's aim ray as the game keeps it in the weapon component
+// (21 §2.5): start, unit direction, end.
+struct AimRay {
+    util::Vec3 start{};
+    util::Vec3 direction{};
+    util::Vec3 end{};
+};
+
+} // namespace omvr::core::hands

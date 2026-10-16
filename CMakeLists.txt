@@ -151,7 +151,7 @@ set(MOTHERVR_SOURCE_DIRS
     platform/d3d11 platform/d3d11/render platform/openvr platform/openxr platform/audio platform/discord
     game game/sites game/stereo game/input game/ui game/audio
     core/diag core/diag/ports core/config core/config/ports core/ui core/ui/ports
-    core/vr core/vr/ports core/input core/input/ports core/stereo core/stereo/ports core/render
+    core/vr core/vr/ports core/input core/input/ports core/stereo core/stereo/ports core/render core/hands
     loader loader/hooks
 )
 foreach(_dir IN LISTS MOTHERVR_SOURCE_DIRS)
