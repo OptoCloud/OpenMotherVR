@@ -93,6 +93,13 @@ Playing
     while you use a keypad, terminal, lever or other interaction, during
     the breathing game while hiding, and in cutscenes; mouse look still
     works. Default false.
+  - "VrOffHotkey": true lets you turn VR off for the rest of the session
+    by holding right Ctrl + right Shift + F10 for one second; the game
+    goes on flat on the monitor. VR comes back at the next launch.
+    Default false.
+  - "CrashSafeLog": true writes mothervr.log to disk as it goes, and adds
+    the mod's state to a crash record, so the log survives even a PC
+    crash. Applies from the next launch. Default false.
 
 If something goes wrong
 - The headset shows the game as a flat screen (Theatre), or the game
