@@ -7,6 +7,7 @@
 #include "core/stereo/tuning.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace omvr::core::stereo {
 
@@ -14,20 +15,31 @@ UpdateOutput StereoUpdate::run(const UpdateInput& in) noexcept {
     UpdateOutput out;
     const config::ComfortSettings comfort = settings_.comfort;
     const Turning turn                    = turning(comfort);
-    bool smoothed                         = false;
+    const TurnBlock blocked               = block(in, out);
+    report_turning(turn, comfort, out);
+    bool smoothed = false;
     if (in.pad) {
         // 05 §3.2b: the pad in use switches game look off again.
         if (in.pad_activity) keyboard_mouse_ = false;
-        if (turn == Turning::Snap) snap_turn(in, out, comfort);
-        if (turn == Turning::Smooth) smoothed = smooth_turn(in, out, comfort.smooth_turn_speed);
+        if (turn == Turning::Snap && blocked != TurnBlock::None) hold_snap(in);
+        if (turn == Turning::Snap && blocked == TurnBlock::None) snap_turn(in, out, comfort);
+        if (turn == Turning::Smooth && blocked == TurnBlock::None)
+            smoothed = smooth_turn(in, out, comfort.smooth_turn_speed);
     }
+    // Spec 22 §4.2, §4.4: smooth turn resumes with no step after anything
+    // that stopped it, a block included.
     if (!smoothed) smooth_time_.reset();
     if (in.keyboard_and_mouse && in.key_or_mouse_activity) keyboard_mouse_ = true;
     // Spec 22 §4.1: the game's own stick look only when it is the turning,
-    // so the stick never turns twice.
-    if (in.follow_active) out.look_enabled = turn == Turning::GameLook || keyboard_mouse_;
-    out.last_snap      = last_snap_;
-    out.keyboard_mouse = keyboard_mouse_;
+    // so the stick never turns twice, and not while turning is blocked
+    // (§4.4; mouse look stays).
+    if (in.follow_active)
+        out.look_enabled = (turn == Turning::GameLook && blocked == TurnBlock::None) || keyboard_mouse_;
+    // Spec 22 §4.3: the fade follows the step the yaw write makes.
+    out.snap_fade       = turn == Turning::Snap && out.yaw.has_value() && comfort.snap_turn_fade;
+    out.vignette_target = vignette_motion(in, turn, blocked, out) ? comfort.vignette : 0.0f;
+    out.last_snap       = last_snap_;
+    out.keyboard_mouse  = keyboard_mouse_;
 
     recenter(in, out);
 
@@ -38,9 +50,56 @@ UpdateOutput StereoUpdate::run(const UpdateInput& in) noexcept {
     return out;
 }
 
-StereoUpdate::Turning StereoUpdate::turning(const config::ComfortSettings& comfort) const noexcept {
+Turning StereoUpdate::turning(const config::ComfortSettings& comfort) const noexcept {
     if (settings_.input.snap_rotation) return Turning::Snap;
     return comfort.smooth_turn_speed > 0.0f ? Turning::Smooth : Turning::GameLook;
+}
+
+TurnBlock StereoUpdate::block(const UpdateInput& in, UpdateOutput& out) noexcept {
+    TurnBlockChange now{};
+    if (settings_.controls.interaction_aware_turning) {
+        now.block = turn_block({.in_interaction   = in.in_interaction,
+                                .interaction_kind = in.interaction_kind,
+                                .breathing_game   = in.breathing_game,
+                                .cutscene_or_fade = scene_.cutscene_or_fade()});
+        if (now.block == TurnBlock::Interaction) now.kind = in.interaction_kind;
+    }
+    if (now != reported_block_) {
+        reported_block_   = now;
+        out.block_changed = now;
+    }
+    return now.block;
+}
+
+// Spec 22 §4.4: as when the camera becomes inactive (04 §6), a stick held
+// through the block must come back inside the threshold before it steps.
+void StereoUpdate::hold_snap(const UpdateInput& in) noexcept {
+    snap_latch_ = turn_out(in.turn);
+    snap_hold_  = snap_latch_;
+    snap_time_  = {};
+}
+
+void StereoUpdate::report_turning(Turning turn, const config::ComfortSettings& comfort,
+                                  UpdateOutput& out) noexcept {
+    const TurningInUse now{.turning     = turn,
+                           .repeat_ms   = turn == Turning::Snap ? comfort.snap_turn_repeat_ms : 0,
+                           .speed_deg_s = turn == Turning::Smooth ? comfort.smooth_turn_speed : 0.0f};
+    if (reported_turning_ != now) {
+        reported_turning_   = now;
+        out.turning_changed = now;
+    }
+}
+
+// Spec 22 §5: the merged stick movement past its threshold, smooth turn
+// changing the yaw, or the game's own look turning with the stick. Not
+// snap steps (they have the fade), not the keyboard, and never without a
+// first-person camera or in the menu screen's mode.
+bool StereoUpdate::vignette_motion(const UpdateInput& in, Turning turn, TurnBlock blocked,
+                                   const UpdateOutput& out) noexcept {
+    if (!in.pad || !in.follow_active || in.mode == StereoMode::Screen) return false;
+    if (std::hypot(in.move_x, in.move_y) > kVignetteMoveThreshold) return true;
+    if (turn == Turning::Smooth) return out.yaw.has_value();
+    return turn == Turning::GameLook && blocked == TurnBlock::None && std::abs(in.turn) > kSmoothTurnDeadZone;
 }
 
 // 05 §3.2c: one step per push of the stick; a held stick repeats after the
@@ -52,13 +111,15 @@ void StereoUpdate::snap_turn(const UpdateInput& in, UpdateOutput& out,
     const bool out_of_dead_zone = turn_out(in.turn);
     const auto repeat           = std::chrono::milliseconds(comfort.snap_turn_repeat_ms);
     const bool repeats          = comfort.snap_turn_repeat_ms > 0;
+    if (!out_of_dead_zone) snap_hold_ = false;
     if (in.follow_active && input.snap_rotation && out_of_dead_zone && in.mode != StereoMode::Screen &&
         !snap_latch_) {
         snap_time_ = last_snap_ = in.now;
         out.yaw                 = snapped_yaw(in.follow_yaw, in.turn, input.snap_rotation_segments);
         snap_latch_             = true;
-    } else if ((!out_of_dead_zone && snap_latch_) || (repeats && in.follow_active && out_of_dead_zone &&
-                                                      snap_latch_ && in.now - snap_time_ > repeat)) {
+    } else if ((!out_of_dead_zone && snap_latch_) ||
+               (repeats && !snap_hold_ && in.follow_active && out_of_dead_zone && snap_latch_ &&
+                in.now - snap_time_ > repeat)) {
         // Stick released, or held long enough to repeat.
         snap_latch_ = false;
         snap_time_  = {};

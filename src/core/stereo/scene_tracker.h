@@ -23,6 +23,9 @@ public:
     // player is back.
     std::optional<float> update(bool follow_active, StereoMode mode) noexcept;
 
+    // A cutscene or level fade is in progress (spec 22 §4.4 blocks turning).
+    bool cutscene_or_fade() const noexcept { return cutscene_or_fade_; }
+
 private:
     bool cutscene_or_fade_ = false;
     bool took_camera_      = false;

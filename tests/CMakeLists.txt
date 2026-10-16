@@ -7,6 +7,7 @@ find_package(doctest CONFIG REQUIRED)
 add_executable(omvr_tests
     main.cpp
     util/util_test.cpp
+    core/comfort_test.cpp
     core/config_test.cpp
     core/diag_test.cpp
     core/input_test.cpp

@@ -48,6 +48,25 @@ inline constexpr auto kSnapTraceTime = std::chrono::milliseconds(600);
 // forward on this many updates (05 §3.2e).
 inline constexpr int kScreenReplaceFrames = 2;
 
+// ---- Comfort vignette and snap-turn fade (spec 22 §4.3, §5) ----------------
+
+// The merged movement value drives the vignette above this magnitude, so
+// stick noise does not.
+inline constexpr float kVignetteMoveThreshold = 0.1f;
+// The shown strength takes this long from 0 to full (a fast onset covers
+// the start of motion) and from full to 0 (a slower release avoids flicker
+// when the stick is briefly let go).
+inline constexpr auto kVignetteRiseTime = std::chrono::milliseconds(150);
+inline constexpr auto kVignetteFallTime = std::chrono::milliseconds(300);
+// Inner radius in degrees from the eye's forward axis: kVignetteInnerDeg
+// minus kVignetteInnerPerStrengthDeg times the strength; the outer radius
+// is kVignetteBandDeg further out. Full strength leaves a clear 25 degrees.
+inline constexpr float kVignetteInnerDeg            = 60.0f;
+inline constexpr float kVignetteInnerPerStrengthDeg = 35.0f;
+inline constexpr float kVignetteBandDeg             = 15.0f;
+// Each snap step's frame is black, then the view returns over this long.
+inline constexpr auto kSnapFadeTime = std::chrono::milliseconds(100);
+
 // ---- Head-in-wall blackout delay (08 §4.2) ---------------------------------
 
 // The fade counts as clear at or above this, and a fade that starts is

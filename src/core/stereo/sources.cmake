@@ -3,6 +3,8 @@
 target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/blinders.cpp
     ${CMAKE_CURRENT_LIST_DIR}/blinders.h
+    ${CMAKE_CURRENT_LIST_DIR}/comfort_view.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/comfort_view.h
     ${CMAKE_CURRENT_LIST_DIR}/cull_policy.h
     ${CMAKE_CURRENT_LIST_DIR}/desktop_window.cpp
     ${CMAKE_CURRENT_LIST_DIR}/desktop_window.h
@@ -28,6 +30,8 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/stereo_update.cpp
     ${CMAKE_CURRENT_LIST_DIR}/stereo_update.h
     ${CMAKE_CURRENT_LIST_DIR}/tuning.h
+    ${CMAKE_CURRENT_LIST_DIR}/turn_block.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/turn_block.h
     ${CMAKE_CURRENT_LIST_DIR}/types.h
     ${CMAKE_CURRENT_LIST_DIR}/ui_placement.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ui_placement.h

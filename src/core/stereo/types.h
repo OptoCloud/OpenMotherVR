@@ -47,6 +47,20 @@ struct MirrorConstants {
 };
 static_assert(sizeof(MirrorConstants) == 0x40);
 
+// The constant buffer of vignette.hlsl (spec 22 §5): the tangents of each
+// eye's symmetric half FOV (03 §3.2), the vignette's inner and outer radius
+// as angles from the eye's forward axis, and the brightness the snap-turn
+// fade leaves (1 none, 0 black).
+struct VignetteConstants {
+    float tan_h      = 0.0f;
+    float tan_v      = 0.0f;
+    float inner_rad  = 0.0f;
+    float outer_rad  = 0.0f;
+    float brightness = 1.0f;
+    float padding[3] = {};
+};
+static_assert(sizeof(VignetteConstants) == 0x20);
+
 // The name hashes of the UI entity messages that start and finish a
 // cutscene or a level fade (05 §6.2): game data, read by the thunk.
 struct SceneMessages {
