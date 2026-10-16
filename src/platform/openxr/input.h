@@ -6,6 +6,7 @@
 // adapter: only its .cpp files include it.
 
 #include "core/diag/ports/log.h"
+#include "core/vr/ports/haptic_source.h"
 #include "platform/openxr/controller_state.h"
 #include "platform/openxr/xr_convert.h"
 #include "platform/openxr/xr_handle.h"
@@ -29,6 +30,10 @@ public:
     // subaction paths, suggested to /input/aim/pose (spec 21 §16), and sync
     // locates it. Before create().
     void set_aim_poses(bool on) noexcept { aim_poses_ = on; }
+    // With `on`, create() also makes the vibration output action with both
+    // hands' subaction paths, suggested to /output/haptic (spec 21 §14.3).
+    // Before create().
+    void set_haptics(bool on) noexcept { haptics_ = on; }
     void destroy() noexcept;
 
     // Sync actions and locate the hands at `time` in `base`. Call once per frame
@@ -39,6 +44,10 @@ public:
     void on_interaction_profile_changed() noexcept;
 
     const ControllerState& state() const noexcept { return state_; }
+
+    // Plays this frame's vibration (21 §14.3): each hand's start or stop.
+    // After sync(), on the same thread.
+    void play_haptics(const core::vr::ports::HapticFrame& frame) noexcept;
 
 private:
     // One binding: action + component path under /user/hand/<side>/input or /output.
@@ -58,6 +67,7 @@ private:
         XrAction secondary   = XR_NULL_HANDLE;
         XrAction menu        = XR_NULL_HANDLE;
         XrAction aim_pose    = XR_NULL_HANDLE; // only with aim_poses_
+        XrAction haptic      = XR_NULL_HANDLE; // only with haptics_
     };
 
     // Why a hand's grip was not located, logged once per hand and change.
@@ -84,6 +94,7 @@ private:
     void locate_grip(int hand, XrSpace space, XrSpace base, XrTime t, HandState& s) noexcept;
     void locate_aim(XrSpace space, XrSpace base, XrTime t, HandState& s) noexcept;
     void log_untracked_grip(int hand, XrResult located, XrSpaceLocationFlags flags) noexcept;
+    void log_haptic_binding() noexcept;
 
     core::diag::ports::Log& log_;
     XrInstance instance_ = XR_NULL_HANDLE;
@@ -95,6 +106,7 @@ private:
     std::array<SpaceOwner, core::vr::kHandCount> grip_space_{};
     std::array<SpaceOwner, core::vr::kHandCount> aim_space_{};
     bool aim_poses_ = false;
+    bool haptics_   = false;
     ControllerState state_{};
 
     // Logged on change; kept across destroy(), as the log is per process.

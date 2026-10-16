@@ -1,6 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #include "platform/openvr/input_actions.h"
 
+#include "core/hands/tuning.h"
 #include "platform/openvr/api_loader.h"
 #include "platform/openvr/constants.h"
 #include "platform/win32/text.h"
@@ -25,6 +26,12 @@ constexpr std::string_view kLogManifestFailed =
 constexpr std::string_view kLogReady =
     "openvr input: SteamVR Input with {} actions + {} hand poses, manifest {}";
 constexpr std::string_view kLogException = "openvr input: {}";
+constexpr std::string_view kLogHapticsReady =
+    "openvr input: haptic output actions {} and {} declared (21 §14.3)";
+constexpr std::string_view kLogHapticsBound = "openvr input: haptic outputs bound: left {}, right {}";
+constexpr std::string_view kLogHapticsUnbound =
+    "openvr input: a haptic output is unbound (left {}, right {}); a custom SteamVR binding for this game "
+    "from before the haptics lacks them (reset it to the default binding)";
 constexpr std::string_view kLogPosesUnbound =
     "openvr input: hand pose actions unbound; a custom SteamVR binding for this game "
     "from an older version lacks them (reset it to the default binding)";
@@ -59,11 +66,11 @@ Actions::Analog Actions::analog(Action a) noexcept {
 bool Actions::write_files(const std::filesystem::path& dir, const std::filesystem::path& manifest_path) {
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
-    const auto bindings = default_bindings(aim_poses_);
+    const auto bindings = default_bindings(aim_poses_, haptics_);
     for (const auto& [controller, file] : bindings) {
         if (!write_json(log_, dir / binding_file_name(controller), file)) return false;
     }
-    return write_json(log_, manifest_path, manifest(bindings, aim_poses_));
+    return write_json(log_, manifest_path, manifest(bindings, aim_poses_, haptics_));
 }
 
 void Actions::register_actions(vr::IVRInput* input) {
@@ -76,6 +83,9 @@ void Actions::register_actions(vr::IVRInput* input) {
     }
     for (std::size_t h = 0; aim_poses_ && h < kAimPoseActions.size(); ++h) {
         input->GetActionHandle(action_path(kAimPoseActions[h]).c_str(), &aim_handles_[h]);
+    }
+    for (std::size_t h = 0; haptics_ && h < kHapticActions.size(); ++h) {
+        input->GetActionHandle(output_path(kHapticActions[h]).c_str(), &haptic_handles_[h]);
     }
 }
 
@@ -100,6 +110,7 @@ bool Actions::init(ApiLoader& api, const std::filesystem::path& dir) noexcept {
         input_ = input;
         logf(log_, kLogReady, kActions.size(),
              kPoseActions.size() + (aim_poses_ ? kAimPoseActions.size() : 0), win32::utf8(manifest_path));
+        if (haptics_) logf(log_, kLogHapticsReady, kHapticActions[0], kHapticActions[1]);
         return true;
     } catch (const std::exception& e) {
         logf(log_, kLogException, e.what());
@@ -136,6 +147,7 @@ Controls Actions::poll() noexcept {
                                  vr::k_ulInvalidInputValueHandle);
     c.touchpad_scheme = engage.bActive;
     c.turn_engaged    = !engage.bActive || engage.bState;
+    if (haptics_ && !haptics_logged_) report_haptic_binding();
     return c;
 }
 
@@ -179,6 +191,37 @@ void Actions::read_aim(std::size_t hand, int origin, HandPose& p) noexcept {
     for (int r = 0; r < kPoseRows; ++r)
         for (int c = 0; c < kPoseColumns; ++c) p.aim[r][c] = d.pose.mDeviceToAbsoluteTracking.m[r][c];
     p.aim_valid = true;
+}
+
+void Actions::vibrate(std::size_t hand, float seconds, float amplitude) noexcept {
+    if (!haptics_ready() || hand >= haptic_handles_.size()) return;
+    input_->TriggerHapticVibrationAction(haptic_handles_[hand], 0.0f, seconds,
+                                         core::hands::kVibrationFrequencyDefault, amplitude,
+                                         vr::k_ulInvalidInputValueHandle);
+}
+
+// 21 §14.3, §18: whether each vibration output has a bound haptic device,
+// once the controllers are bound (fire reads active). A saved binding from
+// before the haptics leaves them unbound: said once, like the hand poses.
+void Actions::report_haptic_binding() noexcept {
+    vr::InputAnalogActionData_t fire{};
+    if (input_->GetAnalogActionData(handles_[index(Action::Fire)], &fire, sizeof(fire),
+                                    vr::k_ulInvalidInputValueHandle) != vr::VRInputError_None ||
+        !fire.bActive) {
+        return;
+    }
+    haptics_logged_ = true;
+    std::array<bool, core::vr::kHandCount> bound{};
+    for (std::size_t h = 0; h < bound.size(); ++h) {
+        vr::VRInputValueHandle_t origins[vr::k_unMaxActionOriginCount]{};
+        bound[h] = input_->GetActionOrigins(set_, haptic_handles_[h], origins,
+                                            vr::k_unMaxActionOriginCount) == vr::VRInputError_None &&
+                   origins[0] != vr::k_ulInvalidInputValueHandle;
+    }
+    if (bound[0] && bound[1])
+        logf(log_, kLogHapticsBound, bound[0], bound[1]);
+    else
+        logf(log_, kLogHapticsUnbound, bound[0], bound[1]);
 }
 
 // Controllers bound (fire reads active) but a hand pose not: a binding

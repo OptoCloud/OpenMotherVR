@@ -55,4 +55,8 @@ inline constexpr std::size_t kPropertyBufferSize = 64;
 // (03 §7, "around the screen").
 inline constexpr vr::VRTextureBounds_t kNoImageBounds{0.0f, 0.0f, 1e-5f, 1e-5f};
 
+// IVRSystem::TriggerHapticPulse's axis: 0, the controller's one haptic
+// actuator on every controller the legacy path serves (21 §14.3).
+inline constexpr std::uint32_t kLegacyHapticAxis = 0;
+
 } // namespace omvr::platform::openvr

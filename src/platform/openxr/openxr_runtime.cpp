@@ -99,7 +99,8 @@ public:
           controls_(deps.controls),
           audio_(deps.audio),
           signals_(deps.signals),
-          aim_poses_(deps.aim_poses) {}
+          aim_poses_(deps.aim_poses),
+          haptics_(deps.haptics) {}
 
     // Ends the session and destroys the instance. Only reached through the
     // stereo device's explicit teardown, never at process exit.
@@ -107,6 +108,7 @@ public:
 
     bool init() override {
         xr_.set_aim_poses(aim_poses_);
+        xr_.set_haptics(haptics_ != nullptr);
         if (!xr_.init_system()) return false;
         const auto& info = xr_.system_info();
         if (info.has_fov)
@@ -247,6 +249,16 @@ public:
             write_controls();
         else
             controls_.write(input::Controls{}, false);
+        if (begun) play_haptics();
+    }
+
+    // 21 §14.3: this frame's vibration, right after the controls: nothing
+    // without input focus (the runtime's dashboard) or for a hand whose
+    // grip is not tracked.
+    void play_haptics() {
+        if (!haptics_) return;
+        const ControllerState& s = xr_.controllers();
+        xr_.play_haptics(haptics_->next(s.focused, {s.hands[0].grip_valid, s.hands[1].grip_valid}));
     }
 
     void register_control_hints() override { controls_.set_scheme(input::ControlScheme::Thumbstick); }
@@ -414,6 +426,8 @@ private:
     core::vr::ports::HeadsetAudio& audio_;
     core::ui::ports::GameSignals& signals_;
     const bool aim_poses_; // the hands' aim pose action (spec 21 §16)
+    // The haptic output (21 §14); null: off.
+    core::vr::ports::HapticSource* const haptics_;
     bool session_       = false;
     bool cinema_        = true;
     bool glyphs_chosen_ = false;

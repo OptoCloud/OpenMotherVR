@@ -82,20 +82,30 @@ inline constexpr std::array<const char*, 2> kPoseLabels  = {"Left hand", "Right 
 inline constexpr std::array<const char*, 2> kAimPoseActions = {"aim_left", "aim_right"};
 inline constexpr std::array<const char*, 2> kAimPoseLabels  = {"Left hand aim", "Right hand aim"};
 
+// The hands' vibration outputs (spec 21 §14.3), one per hand, bound to
+// /user/hand/<side>/output/haptic. Only in the manifest while the haptics
+// are on at start (Hands.Haptics.Enabled).
+inline constexpr std::array<const char*, 2> kHapticActions = {"haptic_left", "haptic_right"};
+inline constexpr std::array<const char*, 2> kHapticLabels  = {"Left hand vibration", "Right hand vibration"};
+
 inline constexpr std::size_t index(Action a) noexcept { return static_cast<std::size_t>(a); }
 
 std::string action_path(const char* name);
+// An output action's path (/actions/main/out/<name>).
+std::string output_path(const char* name);
 
 // The file name of a controller type's default binding file.
 std::string binding_file_name(const std::string& controller);
 
 // The default binding file of each controller type, by controller name;
-// with `aim_poses`, the aim pose actions are bound too.
-std::vector<std::pair<std::string, nlohmann::json>> default_bindings(bool aim_poses);
+// with `aim_poses`, the aim pose actions are bound too, with `haptics` the
+// vibration outputs.
+std::vector<std::pair<std::string, nlohmann::json>> default_bindings(bool aim_poses, bool haptics = false);
 
 // The action manifest naming `bindings` as the defaults; with `aim_poses`
-// it declares the aim pose actions.
-nlohmann::json manifest(const std::vector<std::pair<std::string, nlohmann::json>>& bindings, bool aim_poses);
+// it declares the aim pose actions, with `haptics` the vibration outputs.
+nlohmann::json manifest(const std::vector<std::pair<std::string, nlohmann::json>>& bindings, bool aim_poses,
+                        bool haptics = false);
 
 // False, logged with the Windows error, when the file cannot be written: the
 // caller then falls back to the legacy controller path, and the log must say

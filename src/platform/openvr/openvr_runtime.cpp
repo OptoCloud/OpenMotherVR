@@ -14,6 +14,7 @@
 #include "platform/openvr/openvr_runtime.h"
 
 #include "core/diag/tuning.h"
+#include "core/hands/tuning.h"
 #include "core/input/controller_mapping.h"
 #include "core/stereo/tuning.h"
 #include "core/ui/notices.h"
@@ -173,7 +174,8 @@ public:
           dialogs_(deps.dialogs),
           runtime_root_(deps.runtime_root),
           api_(deps.log, deps.failure),
-          actions_(deps.log, deps.aim_poses) {
+          actions_(deps.log, deps.aim_poses, deps.haptics != nullptr),
+          haptics_(deps.haptics) {
         render_pose_.store(kIdentity34);
         yaw_matrix_.store(kIdentity34);
     }
@@ -212,6 +214,8 @@ private:
     void submit_eyes(const vr::VRTextureWithPose_t& tex);
     void show_screen(void* side_by_side, const vr::VRTextureWithPose_t& tex);
     void write_controls();
+    void play_haptics(const vr::TrackedDevicePose_t (&poses)[vr::k_unMaxTrackedDeviceCount],
+                      const vr::TrackedDeviceIndex_t (&index)[kHandCount]);
     void note_controller(std::size_t hand, vr::TrackedDeviceIndex_t index);
     void check_scene_app();
     Controls legacy_controls(const vr::TrackedDeviceIndex_t (&index)[kHandCount]);
@@ -257,6 +261,8 @@ private:
                                                                vr::k_unTrackedDeviceIndexInvalid};
 
     Actions actions_;
+    // The haptic output (21 §14); null: off.
+    core::vr::ports::HapticSource* const haptics_;
     bool glyphs_chosen_ = false;
     // Render thread: submit_frame handed the game this frame's controls, so
     // the next poll_input has nothing to do.
@@ -686,6 +692,31 @@ void OpenVrRuntime::write_controls() {
 
     const Controls c = actions_.ready() ? actions_.poll() : legacy_controls(index);
     controls_.write(c, near_head);
+    play_haptics(poses, index);
+}
+
+// 21 §14.3: this frame's vibration, right after the controls are read:
+// SteamVR Input's vibration actions, or on legacy input a pulse each frame
+// on the hand's device. Nothing while the dashboard holds input focus, or
+// for a hand that is not tracked.
+void OpenVrRuntime::play_haptics(const vr::TrackedDevicePose_t (&poses)[vr::k_unMaxTrackedDeviceCount],
+                                 const vr::TrackedDeviceIndex_t (&index)[kHandCount]) {
+    if (!haptics_) return;
+    std::array<bool, kHandCount> tracked{};
+    for (std::size_t h = 0; h < kHandCount; ++h) {
+        tracked[h] = index[h] < vr::k_unMaxTrackedDeviceCount && poses[index[h]].bPoseIsValid;
+    }
+    const core::vr::ports::HapticFrame frame = haptics_->next(system_->IsInputAvailable(), tracked);
+    for (std::size_t h = 0; h < kHandCount; ++h) {
+        const auto& out = frame[h];
+        if (actions_.haptics_ready()) {
+            if (out.play) actions_.vibrate(h, out.seconds, out.amplitude);
+            if (out.stop) actions_.vibrate(h, 0.0f, 0.0f);
+        } else if (out.level > 0.0f && tracked[h]) {
+            const float us = out.level * core::hands::kLegacyPulseMicrosecondsPerAmplitude;
+            system_->TriggerHapticPulse(index[h], kLegacyHapticAxis, static_cast<unsigned short>(us));
+        }
+    }
 }
 
 // The legacy reading: controller state, everything a touchpad (04 §5.8.3).

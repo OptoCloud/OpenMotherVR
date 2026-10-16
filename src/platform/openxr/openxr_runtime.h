@@ -3,6 +3,7 @@
 #include "core/diag/ports/log.h"
 #include "core/input/ports/controls_sink.h"
 #include "core/ui/ports/game_signals.h"
+#include "core/vr/ports/haptic_source.h"
 #include "core/vr/ports/headset_audio.h"
 #include "core/vr/ports/vr_runtime.h"
 
@@ -20,6 +21,9 @@ struct OpenXrRuntimeDeps {
     core::vr::ports::HeadsetAudio& audio;
     core::ui::ports::GameSignals& signals; // the runtime's quit request
     bool aim_poses = false;                // add the hands' aim pose action (spec 21 §16)
+    // The haptic output (spec 21 §14), asked each frame; null: no vibration
+    // action is made and nothing vibrates.
+    core::vr::ports::HapticSource* haptics = nullptr;
 };
 
 // The stereo device on any OpenXR runtime (Meta / Quest Link, SteamVR, WMR,

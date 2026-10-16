@@ -40,8 +40,9 @@ struct HandPose {
 class Actions final {
 public:
     // `aim_poses`: declare and read the aim pose actions (Hands.Enabled at
-    // start, 21 §1).
-    Actions(core::diag::ports::Log& log, bool aim_poses) noexcept : log_(log), aim_poses_(aim_poses) {}
+    // start, 21 §1). `haptics`: declare the vibration outputs (21 §14.3).
+    Actions(core::diag::ports::Log& log, bool aim_poses, bool haptics) noexcept
+        : log_(log), aim_poses_(aim_poses), haptics_(haptics) {}
 
     // Writes the manifest and bindings to `dir` and registers them. False
     // if SteamVR Input is unavailable (the caller keeps legacy input).
@@ -54,6 +55,11 @@ public:
     // compositor's tracking universe `origin` (vr::ETrackingUniverseOrigin).
     // Call on the thread that runs poll() and WaitGetPoses, after the latter.
     std::array<HandPose, core::vr::kHandCount> hand_poses(int origin) noexcept;
+    // The vibration outputs are declared and registered.
+    bool haptics_ready() const noexcept { return input_ != nullptr && haptics_; }
+    // Vibrates `hand` (0 left) now: `amplitude` 0 to 1 for `seconds`, at the
+    // runtime's default frequency (21 §14.3). Replaces what is playing.
+    void vibrate(std::size_t hand, float seconds, float amplitude) noexcept;
 
 private:
     struct Analog {
@@ -64,6 +70,7 @@ private:
     bool write_files(const std::filesystem::path& dir, const std::filesystem::path& manifest_path);
     void register_actions(vr::IVRInput* input);
     void report_unbound_poses() noexcept;
+    void report_haptic_binding() noexcept;
     void read_aim(std::size_t hand, int origin, HandPose& p) noexcept;
 
     core::diag::ports::Log& log_;
@@ -72,8 +79,11 @@ private:
     std::array<std::uint64_t, static_cast<std::size_t>(Action::Count)> handles_{}; // VRActionHandle_t
     std::array<std::uint64_t, core::vr::kHandCount> pose_handles_{};               // hand_left, hand_right
     std::array<std::uint64_t, core::vr::kHandCount> aim_handles_{};                // aim_left, aim_right
+    std::array<std::uint64_t, core::vr::kHandCount> haptic_handles_{}; // haptic_left, haptic_right
     bool aim_poses_      = false;
+    bool haptics_        = false;
     bool unbound_logged_ = false;
+    bool haptics_logged_ = false;
 };
 
 } // namespace omvr::platform::openvr

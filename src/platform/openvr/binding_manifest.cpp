@@ -103,11 +103,24 @@ json hand_poses(const char* component, const char* aim_component) {
     return p;
 }
 
+// The vibration outputs (21 §14.3): each hand's action to its own
+// controller's haptic output.
+json haptic_outputs() {
+    json o = json::array();
+    for (std::size_t h = 0; h < kHapticActions.size(); ++h) {
+        o.push_back({{"output", output_path(kHapticActions[h])},
+                     {"path", std::string("/user/hand/") + (h == 0 ? "left" : "right") + "/output/haptic"}});
+    }
+    return o;
+}
+
 json binding_file(const char* controller, const char* description, json sources, const char* pose,
-                  const char* aim_pose) {
+                  const char* aim_pose, bool haptics) {
+    json set = {{"sources", std::move(sources)}, {"poses", hand_poses(pose, aim_pose)}};
+    if (haptics) set["haptics"] = haptic_outputs();
     return {{"action_manifest_version", kManifestVersion},
             {"alias_info", json::object()},
-            {"bindings", {{kSet, {{"sources", std::move(sources)}, {"poses", hand_poses(pose, aim_pose)}}}}},
+            {"bindings", {{kSet, std::move(set)}}},
             {"controller_type", controller},
             {"description", description},
             {"name", std::string(kBindingNamePrefix) + description}};
@@ -168,11 +181,13 @@ const char* type_name(Kind kind) noexcept {
 
 std::string action_path(const char* name) { return std::string(kSet) + "/in/" + name; }
 
+std::string output_path(const char* name) { return std::string(kSet) + "/out/" + name; }
+
 std::string binding_file_name(const std::string& controller) {
     return kBindingFilePrefix + controller + kBindingFileSuffix;
 }
 
-std::vector<std::pair<std::string, json>> default_bindings(bool aim_poses) {
+std::vector<std::pair<std::string, json>> default_bindings(bool aim_poses, bool haptics) {
     const char* tip   = aim_poses ? "tip" : nullptr;
     const char* touch = aim_poses ? "openxr_aim" : nullptr;
     std::vector<std::pair<std::string, json>> files;
@@ -189,7 +204,7 @@ std::vector<std::pair<std::string, json>> default_bindings(bool aim_poses) {
                                                                .button_y   = "b",
                                                                .pause_path = hand("left", "trackpad"),
                                                                .pause_mode = "button"}),
-                                                "grip", tip));
+                                                "grip", tip, haptics));
 
     files.emplace_back("oculus_touch",
                        binding_file("oculus_touch", "Oculus Touch",
@@ -202,17 +217,17 @@ std::vector<std::pair<std::string, json>> default_bindings(bool aim_poses) {
                                                    .button_y   = "y",
                                                    .pause_path = hand("left", "application_menu"),
                                                    .pause_mode = "button"}),
-                                    "openxr_grip", touch));
+                                    "openxr_grip", touch, haptics));
 
     files.emplace_back(
         "holographic_controller",
-        binding_file("holographic_controller", "Windows Mixed Reality", wmr_sources(), "grip", tip));
+        binding_file("holographic_controller", "Windows Mixed Reality", wmr_sources(), "grip", tip, haptics));
     files.emplace_back("vive_controller",
-                       binding_file("vive_controller", "Vive wands", wand_sources(), "grip", tip));
+                       binding_file("vive_controller", "Vive wands", wand_sources(), "grip", tip, haptics));
     return files;
 }
 
-json manifest(const std::vector<std::pair<std::string, json>>& bindings, bool aim_poses) {
+json manifest(const std::vector<std::pair<std::string, json>>& bindings, bool aim_poses, bool haptics) {
     json actions      = json::array();
     json localization = {{"language_tag", "en_US"}, {kSet, "Alien: Isolation"}};
     for (const auto& a : kActions) {
@@ -226,6 +241,10 @@ json manifest(const std::vector<std::pair<std::string, json>>& bindings, bool ai
     for (std::size_t h = 0; aim_poses && h < kAimPoseActions.size(); ++h) {
         actions.push_back({{"name", action_path(kAimPoseActions[h])}, {"type", "pose"}});
         localization[action_path(kAimPoseActions[h])] = kAimPoseLabels[h];
+    }
+    for (std::size_t h = 0; haptics && h < kHapticActions.size(); ++h) {
+        actions.push_back({{"name", output_path(kHapticActions[h])}, {"type", "vibration"}});
+        localization[output_path(kHapticActions[h])] = kHapticLabels[h];
     }
     json defaults = json::array();
     for (const auto& [controller, _] : bindings) {

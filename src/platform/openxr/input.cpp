@@ -26,6 +26,12 @@ constexpr std::string_view kLogAttached        = "openxr input: actions attached
 constexpr std::string_view kLogSync            = "openxr input: xrSyncActions -> {}";
 constexpr std::string_view kLogNoProfile       = "openxr input: no controller profile bound";
 constexpr std::string_view kLogProfile         = "openxr input: controller profile {}";
+constexpr std::string_view kLogHapticCreated =
+    "openxr input: haptic output action created for both hands (21 §14.3)";
+constexpr std::string_view kLogHapticBound   = "openxr input: haptic output bound to {} source(s)";
+constexpr std::string_view kLogHapticUnbound = "openxr input: haptic output not bound by this profile ({})";
+
+constexpr float kNanosecondsPerSecond = 1e9f;
 
 // The interaction profile of the Vive wands, the one touchpad family.
 constexpr const char* kViveProfile = "htc/vive_controller";
@@ -63,7 +69,8 @@ bool Input::make_actions() noexcept {
            make_action(a.primary, XR_ACTION_TYPE_BOOLEAN_INPUT, "primary", "A / X") &&
            make_action(a.secondary, XR_ACTION_TYPE_BOOLEAN_INPUT, "secondary", "B / Y") &&
            make_action(a.menu, XR_ACTION_TYPE_BOOLEAN_INPUT, "menu", "Menu") &&
-           (!aim_poses_ || make_action(a.aim_pose, XR_ACTION_TYPE_POSE_INPUT, "aim_pose", "Hand aim"));
+           (!aim_poses_ || make_action(a.aim_pose, XR_ACTION_TYPE_POSE_INPUT, "aim_pose", "Hand aim")) &&
+           (!haptics_ || make_action(a.haptic, XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic", "Vibration"));
 }
 
 void Input::suggest(const char* profile, const std::vector<Bind>& binds) noexcept {
@@ -89,6 +96,8 @@ void Input::suggest_all() noexcept {
         {&a.grip_pose, "input/grip/pose", "input/grip/pose"},
     };
     if (aim_poses_) common.push_back({&a.aim_pose, "input/aim/pose", "input/aim/pose"});
+    // 21 §14.3: every profile here has a haptic output on each hand.
+    if (haptics_) common.push_back({&a.haptic, "output/haptic", "output/haptic"});
     auto with_common = [&](std::vector<Bind> v) {
         v.insert(v.end(), common.begin(), common.end());
         return v;
@@ -268,6 +277,7 @@ bool Input::create(XrInstance instance, XrSession session) noexcept {
         if (aim_poses_) aim_space_[h].reset(make_action_space(actions_.aim_pose, hand_path_[h]));
     }
     log_.line(kLogAttached);
+    if (haptics_) log_.line(kLogHapticCreated);
     return true;
 }
 
@@ -311,6 +321,7 @@ void Input::sync(XrTime time, XrSpace base) noexcept {
         sync_logged_ = synced;
         logf(log_, kLogSync, static_cast<int>(synced));
     }
+    state_.focused = synced == XR_SUCCESS;
     if (XR_FAILED(synced)) {
         state_.hands = {}; // nothing this frame, rather than last frame's poses
         return;
@@ -335,6 +346,40 @@ void Input::on_interaction_profile_changed() noexcept {
     state_.family =
         std::strstr(name, kViveProfile) ? ControllerFamily::Touchpad : ControllerFamily::Thumbstick;
     logf(log_, kLogProfile, name);
+    log_haptic_binding();
+}
+
+// 21 §18: whether the profile now in use binds the haptic output.
+void Input::log_haptic_binding() noexcept {
+    if (actions_.haptic == XR_NULL_HANDLE) return;
+    XrBoundSourcesForActionEnumerateInfo info{XR_TYPE_BOUND_SOURCES_FOR_ACTION_ENUMERATE_INFO};
+    info.action         = actions_.haptic;
+    std::uint32_t count = 0;
+    const XrResult r    = xrEnumerateBoundSourcesForAction(session_, &info, 0, &count, nullptr);
+    if (XR_FAILED(r) || count == 0) {
+        logf(log_, kLogHapticUnbound, static_cast<int>(r));
+        return;
+    }
+    logf(log_, kLogHapticBound, count);
+}
+
+void Input::play_haptics(const core::vr::ports::HapticFrame& frame) noexcept {
+    if (actions_.haptic == XR_NULL_HANDLE) return;
+    for (std::size_t h = 0; h < frame.size(); ++h) {
+        const auto& out = frame[h];
+        XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};
+        info.action        = actions_.haptic;
+        info.subactionPath = hand_path_[h];
+        if (out.play) {
+            XrHapticVibration v{XR_TYPE_HAPTIC_VIBRATION};
+            v.duration  = static_cast<XrDuration>(out.seconds * kNanosecondsPerSecond);
+            v.frequency = XR_FREQUENCY_UNSPECIFIED;
+            v.amplitude = out.amplitude;
+            xrApplyHapticFeedback(session_, &info, reinterpret_cast<const XrHapticBaseHeader*>(&v));
+        } else if (out.stop) {
+            xrStopHapticFeedback(session_, &info);
+        }
+    }
 }
 
 } // namespace omvr::platform::openxr

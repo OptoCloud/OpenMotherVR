@@ -328,6 +328,8 @@ void Session::end_on_request() noexcept { impl_->end_on_request(); }
 
 void Session::set_aim_poses(bool on) noexcept { impl_->input.set_aim_poses(on); }
 
+void Session::set_haptics(bool on) noexcept { impl_->input.set_haptics(on); }
+
 bool Session::running() const noexcept { return impl_->state.running && !impl_->state.lost; }
 
 bool Session::exit_requested() const noexcept { return impl_->state.exit_requested; }
@@ -359,5 +361,9 @@ void Session::set_screen_pose(const util::Pose& pose, float width_m) noexcept {
 }
 
 const ControllerState& Session::controllers() const noexcept { return impl_->input.state(); }
+
+void Session::play_haptics(const core::vr::ports::HapticFrame& frame) noexcept {
+    impl_->input.play_haptics(frame);
+}
 
 } // namespace omvr::platform::openxr

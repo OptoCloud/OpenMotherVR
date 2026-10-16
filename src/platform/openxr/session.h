@@ -25,6 +25,7 @@
 #include "core/diag/ports/log.h"
 #include "core/stereo/types.h"
 #include "core/ui/ports/dialogs.h"
+#include "core/vr/ports/haptic_source.h"
 #include "core/vr/types.h"
 #include "platform/openxr/constants.h"
 #include "platform/openxr/controller_state.h"
@@ -139,6 +140,9 @@ public:
     // Whether init() also creates the hands' aim pose action (spec 21 §16:
     // Hands.Enabled at start). Before init().
     void set_aim_poses(bool on) noexcept;
+    // Whether init() also creates the vibration output action (spec 21
+    // §14.3: Hands.Haptics.Enabled at start). Before init().
+    void set_haptics(bool on) noexcept;
 
     const SystemInfo& system_info() const noexcept;
 
@@ -196,6 +200,10 @@ public:
 
     // The controllers, synced at the start of each frame. Render thread.
     const ControllerState& controllers() const noexcept;
+
+    // Plays this frame's vibration on the controllers (21 §14.3), after
+    // the controllers were synced. Render thread.
+    void play_haptics(const core::vr::ports::HapticFrame& frame) noexcept;
 
     struct Impl;
 

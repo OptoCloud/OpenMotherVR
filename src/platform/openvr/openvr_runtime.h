@@ -4,6 +4,7 @@
 #include "core/diag/ports/log.h"
 #include "core/input/ports/controls_sink.h"
 #include "core/ui/ports/dialogs.h"
+#include "core/vr/ports/haptic_source.h"
 #include "core/vr/ports/vr_runtime.h"
 
 #include <filesystem>
@@ -28,6 +29,9 @@ struct OpenVrRuntimeDeps {
     core::ui::ports::Dialogs& dialogs;
     std::filesystem::path runtime_root; // as the runtime probe found it
     bool aim_poses = false;             // add the hands' aim pose actions (spec 21 §16)
+    // The haptic output (spec 21 §14), asked each frame; null: no vibration
+    // actions are declared and nothing vibrates.
+    core::vr::ports::HapticSource* haptics = nullptr;
 };
 
 // MotherVR::OpenVR, the OpenVR runtime behind the stereo device.

@@ -41,6 +41,9 @@ struct HandState {
 struct ControllerState {
     std::array<HandState, core::vr::kHandCount> hands{};
     ControllerFamily family = ControllerFamily::Unknown;
+    // The session has input focus: the last xrSyncActions returned
+    // XR_SUCCESS, not XR_SESSION_NOT_FOCUSED (a dashboard over the game).
+    bool focused = false;
 
     const HandState& operator[](Hand h) const noexcept { return hands[static_cast<std::size_t>(h)]; }
 };
