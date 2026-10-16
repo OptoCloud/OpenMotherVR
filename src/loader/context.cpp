@@ -19,13 +19,17 @@ Context* the_context = nullptr;
 
 // The runtime the stereo device drives, made when the game creates its
 // stereo device.
+// Spec 21 §1, §16: the hands' aim pose actions only when Hands.Enabled is
+// on as the runtime starts.
 std::unique_ptr<core::vr::ports::VrRuntime> make_runtime(Context& c, core::vr::DetectResult::Chosen chosen) {
+    const bool aim_poses = c.settings.current().hands.enabled;
     if (chosen == core::vr::DetectResult::Chosen::OpenVR) {
         return platform::openvr::make_openvr_runtime({c.log, c.clock, c.failure, c.archive_files, c.controls,
-                                                      c.dialogs,
-                                                      c.runtimes.last_result().openvr_runtime_path});
+                                                      c.dialogs, c.runtimes.last_result().openvr_runtime_path,
+                                                      aim_poses});
     }
-    return platform::openxr::make_openxr_runtime({c.log, c.xr, c.controls, c.headset_audio, c.console});
+    return platform::openxr::make_openxr_runtime(
+        {c.log, c.xr, c.controls, c.headset_audio, c.console, aim_poses});
 }
 
 } // namespace

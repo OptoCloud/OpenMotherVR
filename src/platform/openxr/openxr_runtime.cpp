@@ -98,13 +98,15 @@ public:
           xr_(deps.session),
           controls_(deps.controls),
           audio_(deps.audio),
-          signals_(deps.signals) {}
+          signals_(deps.signals),
+          aim_poses_(deps.aim_poses) {}
 
     // Ends the session and destroys the instance. Only reached through the
     // stereo device's explicit teardown, never at process exit.
     ~OpenXrRuntime() override { xr_.shutdown(); }
 
     bool init() override {
+        xr_.set_aim_poses(aim_poses_);
         if (!xr_.init_system()) return false;
         const auto& info = xr_.system_info();
         if (info.has_fov)
@@ -176,6 +178,15 @@ public:
         const HandPose h = hand_state(hand);
         if (!h.velocity_valid) return false;
         to_game_velocity({h.velocity.x, h.velocity.y, h.velocity.z}, world_scale, out);
+        return true;
+    }
+
+    // Game thread. The aim pose located with the grip (21 §5.2, §16).
+    bool aim_pose(int hand, Matrix34& out, float world_scale) override {
+        if (!valid_hand(hand)) return false;
+        const HandPose h = hand_state(hand);
+        if (!h.aim_valid) return false;
+        out = game_pose(h.aim, world_scale);
         return true;
     }
 
@@ -402,6 +413,7 @@ private:
     core::input::ports::ControlsSink& controls_;
     core::vr::ports::HeadsetAudio& audio_;
     core::ui::ports::GameSignals& signals_;
+    const bool aim_poses_; // the hands' aim pose action (spec 21 §16)
     bool session_       = false;
     bool cinema_        = true;
     bool glyphs_chosen_ = false;

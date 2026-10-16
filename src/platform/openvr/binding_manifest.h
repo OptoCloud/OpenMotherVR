@@ -77,6 +77,11 @@ static_assert(
 inline constexpr std::array<const char*, 2> kPoseActions = {"hand_left", "hand_right"};
 inline constexpr std::array<const char*, 2> kPoseLabels  = {"Left hand", "Right hand"};
 
+// The hands' aim (pointing) poses (spec 21 §5.2, §16), likewise one per
+// hand. Only in the manifest while Hands.Enabled is on at start (21 §1).
+inline constexpr std::array<const char*, 2> kAimPoseActions = {"aim_left", "aim_right"};
+inline constexpr std::array<const char*, 2> kAimPoseLabels  = {"Left hand aim", "Right hand aim"};
+
 inline constexpr std::size_t index(Action a) noexcept { return static_cast<std::size_t>(a); }
 
 std::string action_path(const char* name);
@@ -84,11 +89,13 @@ std::string action_path(const char* name);
 // The file name of a controller type's default binding file.
 std::string binding_file_name(const std::string& controller);
 
-// The default binding file of each controller type, by controller name.
-std::vector<std::pair<std::string, nlohmann::json>> default_bindings();
+// The default binding file of each controller type, by controller name;
+// with `aim_poses`, the aim pose actions are bound too.
+std::vector<std::pair<std::string, nlohmann::json>> default_bindings(bool aim_poses);
 
-// The action manifest naming `bindings` as the defaults.
-nlohmann::json manifest(const std::vector<std::pair<std::string, nlohmann::json>>& bindings);
+// The action manifest naming `bindings` as the defaults; with `aim_poses`
+// it declares the aim pose actions.
+nlohmann::json manifest(const std::vector<std::pair<std::string, nlohmann::json>>& bindings, bool aim_poses);
 
 // False, logged with the Windows error, when the file cannot be written: the
 // caller then falls back to the legacy controller path, and the log must say

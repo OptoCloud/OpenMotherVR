@@ -23,7 +23,7 @@ constexpr std::string_view kLogNoInput = "openvr input: IVRInput unavailable, us
 constexpr std::string_view kLogManifestFailed =
     "openvr input: SetActionManifestPath failed ({}), using legacy input";
 constexpr std::string_view kLogReady =
-    "openvr input: SteamVR Input with {} actions + 2 hand poses, manifest {}";
+    "openvr input: SteamVR Input with {} actions + {} hand poses, manifest {}";
 constexpr std::string_view kLogException = "openvr input: {}";
 constexpr std::string_view kLogPosesUnbound =
     "openvr input: hand pose actions unbound; a custom SteamVR binding for this game "
@@ -59,11 +59,11 @@ Actions::Analog Actions::analog(Action a) noexcept {
 bool Actions::write_files(const std::filesystem::path& dir, const std::filesystem::path& manifest_path) {
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
-    const auto bindings = default_bindings();
+    const auto bindings = default_bindings(aim_poses_);
     for (const auto& [controller, file] : bindings) {
         if (!write_json(log_, dir / binding_file_name(controller), file)) return false;
     }
-    return write_json(log_, manifest_path, manifest(bindings));
+    return write_json(log_, manifest_path, manifest(bindings, aim_poses_));
 }
 
 void Actions::register_actions(vr::IVRInput* input) {
@@ -73,6 +73,9 @@ void Actions::register_actions(vr::IVRInput* input) {
     }
     for (std::size_t h = 0; h < kPoseActions.size(); ++h) {
         input->GetActionHandle(action_path(kPoseActions[h]).c_str(), &pose_handles_[h]);
+    }
+    for (std::size_t h = 0; aim_poses_ && h < kAimPoseActions.size(); ++h) {
+        input->GetActionHandle(action_path(kAimPoseActions[h]).c_str(), &aim_handles_[h]);
     }
 }
 
@@ -95,7 +98,8 @@ bool Actions::init(ApiLoader& api, const std::filesystem::path& dir) noexcept {
         }
         register_actions(input);
         input_ = input;
-        logf(log_, kLogReady, kActions.size(), win32::utf8(manifest_path));
+        logf(log_, kLogReady, kActions.size(),
+             kPoseActions.size() + (aim_poses_ ? kAimPoseActions.size() : 0), win32::utf8(manifest_path));
         return true;
     } catch (const std::exception& e) {
         logf(log_, kLogException, e.what());
@@ -150,15 +154,31 @@ std::array<HandPose, core::vr::kHandCount> Actions::hand_poses(int origin) noexc
             unbound = true;
             continue;
         }
-        if (!d.pose.bPoseIsValid) continue;
+        // 21 §3.3: a pose SteamVR marks as running out of range counts as lost.
+        if (!d.pose.bPoseIsValid || d.pose.eTrackingResult == vr::TrackingResult_Running_OutOfRange) continue;
         auto& p = out[h];
         for (int r = 0; r < kPoseRows; ++r)
             for (int c = 0; c < kPoseColumns; ++c) p.m[r][c] = d.pose.mDeviceToAbsoluteTracking.m[r][c];
         for (int i = 0; i < kAxes; ++i) p.velocity[i] = d.pose.vVelocity.v[i];
         p.valid = true;
+        if (aim_poses_) read_aim(h, origin, p);
     }
     if (unbound && !unbound_logged_) report_unbound_poses();
     return out;
+}
+
+// The hand's aim pose with the same prediction as its grip (21 §5.2).
+void Actions::read_aim(std::size_t hand, int origin, HandPose& p) noexcept {
+    vr::InputPoseActionData_t d{};
+    if (input_->GetPoseActionDataForNextFrame(aim_handles_[hand],
+                                              static_cast<vr::ETrackingUniverseOrigin>(origin), &d, sizeof(d),
+                                              vr::k_ulInvalidInputValueHandle) != vr::VRInputError_None ||
+        !d.bActive || !d.pose.bPoseIsValid) {
+        return;
+    }
+    for (int r = 0; r < kPoseRows; ++r)
+        for (int c = 0; c < kPoseColumns; ++c) p.aim[r][c] = d.pose.mDeviceToAbsoluteTracking.m[r][c];
+    p.aim_valid = true;
 }
 
 // Controllers bound (fire reads active) but a hand pose not: a binding

@@ -25,6 +25,10 @@ public:
     // Create the action set, suggest bindings for every supported profile and
     // attach it to the session. Must run before the session begins.
     bool create(XrInstance instance, XrSession session) noexcept;
+    // With `on`, create() also makes the aim pose action with both hands'
+    // subaction paths, suggested to /input/aim/pose (spec 21 §16), and sync
+    // locates it. Before create().
+    void set_aim_poses(bool on) noexcept { aim_poses_ = on; }
     void destroy() noexcept;
 
     // Sync actions and locate the hands at `time` in `base`. Call once per frame
@@ -53,6 +57,7 @@ private:
         XrAction primary     = XR_NULL_HANDLE;
         XrAction secondary   = XR_NULL_HANDLE;
         XrAction menu        = XR_NULL_HANDLE;
+        XrAction aim_pose    = XR_NULL_HANDLE; // only with aim_poses_
     };
 
     // Why a hand's grip was not located, logged once per hand and change.
@@ -77,6 +82,7 @@ private:
     Vec2 get_vec2(XrAction a, int hand, bool& active) noexcept;
     HandState read_hand(int hand, XrSpace base, XrTime t) noexcept;
     void locate_grip(int hand, XrSpace space, XrSpace base, XrTime t, HandState& s) noexcept;
+    void locate_aim(XrSpace space, XrSpace base, XrTime t, HandState& s) noexcept;
     void log_untracked_grip(int hand, XrResult located, XrSpaceLocationFlags flags) noexcept;
 
     core::diag::ports::Log& log_;
@@ -87,6 +93,8 @@ private:
     std::array<XrPath, core::vr::kHandCount> hand_path_{};
     Actions actions_{};
     std::array<SpaceOwner, core::vr::kHandCount> grip_space_{};
+    std::array<SpaceOwner, core::vr::kHandCount> aim_space_{};
+    bool aim_poses_ = false;
     ControllerState state_{};
 
     // Logged on change; kept across destroy(), as the log is per process.

@@ -173,7 +173,7 @@ public:
           dialogs_(deps.dialogs),
           runtime_root_(deps.runtime_root),
           api_(deps.log, deps.failure),
-          actions_(deps.log) {
+          actions_(deps.log, deps.aim_poses) {
         render_pose_.store(kIdentity34);
         yaw_matrix_.store(kIdentity34);
     }
@@ -197,6 +197,7 @@ public:
     bool recenter_taken() const override { return recenter_taken_; }
     bool hand_pose(int hand, Matrix34& out, float world_scale) override;
     bool hand_velocity(int hand, float (&out)[3], float world_scale) override;
+    bool aim_pose(int hand, Matrix34& out, float world_scale) override;
     void stop() override;
 
 private:
@@ -487,13 +488,23 @@ bool OpenVrRuntime::hand_velocity(int hand, float (&out)[3], float world_scale) 
     return true;
 }
 
+bool OpenVrRuntime::aim_pose(int hand, Matrix34& out, float world_scale) {
+    if (!valid_hand(hand)) return false;
+    const auto& h = hands_now()[static_cast<std::size_t>(hand)];
+    if (!h.aim_valid) return false;
+    out = to_game_pose(h.aim, world_scale);
+    return true;
+}
+
 // Render thread, right after WaitGetPoses: GetPoseActionDataForNextFrame
 // gives the hands with that call's prediction, the display time of the
 // frame the game renders next, as GetLastPoses gives the head. (A head_pose
 // landing between WaitGetPoses and the store below pairs the new head with
 // the previous hands for that one frame; the window is microseconds.)
 void OpenVrRuntime::read_hands() {
-    const Hands h = actions_.hand_poses(tracking_origin_);
+    Hands h = actions_.hand_poses(tracking_origin_);
+    // 21 §3.3: with the dashboard up (no input focus) the hands count as lost.
+    if (!system_->IsInputAvailable()) h = {};
     hands_.store(h);
     if (hand_log_.tick() && log_.debug_enabled()) log_hands(h);
 }

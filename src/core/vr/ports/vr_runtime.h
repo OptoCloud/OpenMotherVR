@@ -87,6 +87,13 @@ public:
     // velocity v to -world_scale * v): game units per second. Both runtimes
     // report it with the pose. False, `out` untouched, when not tracked.
     virtual bool hand_velocity(int /*hand*/, float (& /*out*/)[3], float /*world_scale*/) { return false; }
+
+    // The controller's aim (pointing) pose (OpenXR /input/aim/pose; on
+    // OpenVR the pose action bound to the controller's pointing pose,
+    // spec 21 §5.2, §16), in hand_pose's space, convention and prediction.
+    // Only while the runtime was started with the aim pose actions (Hands
+    // Enabled at start, 21 §1). False, `out` untouched, when not tracked.
+    virtual bool aim_pose(int /*hand*/, util::Matrix34& /*out*/, float /*world_scale*/) { return false; }
 };
 
 } // namespace omvr::core::vr::ports

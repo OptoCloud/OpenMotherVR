@@ -26,17 +26,22 @@ class ApiLoader;
 
 using Controls = core::input::Controls;
 
-// A hand's grip pose as SteamVR reports it: runtime convention, unscaled.
+// A hand's grip pose, and its aim pose when the aim pose actions exist
+// (spec 21 §16), as SteamVR reports them: runtime convention, unscaled.
 struct HandPose {
     float m[3][4]{};     // row-major, m[r][3] = position, metres
     float velocity[3]{}; // metres per second
-    bool valid = false;
+    bool valid = false;  // tracked: a valid pose not out of range (21 §3.3)
+    float aim[3][4]{};   // row-major, the pointing pose (21 §5.2)
+    bool aim_valid = false;
 };
 
 // Render thread, after init.
 class Actions final {
 public:
-    explicit Actions(core::diag::ports::Log& log) noexcept : log_(log) {}
+    // `aim_poses`: declare and read the aim pose actions (Hands.Enabled at
+    // start, 21 §1).
+    Actions(core::diag::ports::Log& log, bool aim_poses) noexcept : log_(log), aim_poses_(aim_poses) {}
 
     // Writes the manifest and bindings to `dir` and registers them. False
     // if SteamVR Input is unavailable (the caller keeps legacy input).
@@ -59,12 +64,15 @@ private:
     bool write_files(const std::filesystem::path& dir, const std::filesystem::path& manifest_path);
     void register_actions(vr::IVRInput* input);
     void report_unbound_poses() noexcept;
+    void read_aim(std::size_t hand, int origin, HandPose& p) noexcept;
 
     core::diag::ports::Log& log_;
     vr::IVRInput* input_ = nullptr;                                                // set once init() succeeds
     std::uint64_t set_   = 0;                                                      // VRActionSetHandle_t
     std::array<std::uint64_t, static_cast<std::size_t>(Action::Count)> handles_{}; // VRActionHandle_t
     std::array<std::uint64_t, core::vr::kHandCount> pose_handles_{};               // hand_left, hand_right
+    std::array<std::uint64_t, core::vr::kHandCount> aim_handles_{};                // aim_left, aim_right
+    bool aim_poses_      = false;
     bool unbound_logged_ = false;
 };
 

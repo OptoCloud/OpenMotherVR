@@ -74,6 +74,8 @@ struct HandPose {
     util::Vec3 velocity{}; // metres per second
     bool valid          = false;
     bool velocity_valid = false;
+    util::Pose aim{}; // the aim pose (spec 21 §5.2), when aim_valid
+    bool aim_valid = false;
 };
 
 // Per-frame view state, valid after a frame() that returned true.
@@ -133,6 +135,10 @@ public:
     // the stereo device needs before the game has created its D3D11 device.
     // init() runs it first if it has not run.
     bool init_system() noexcept;
+
+    // Whether init() also creates the hands' aim pose action (spec 21 §16:
+    // Hands.Enabled at start). Before init().
+    void set_aim_poses(bool on) noexcept;
 
     const SystemInfo& system_info() const noexcept;
 

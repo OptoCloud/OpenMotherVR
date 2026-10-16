@@ -27,6 +27,8 @@ struct HandState {
     util::Pose grip{};       // seated space; the palm
     bool grip_velocity_valid = false;
     util::Vec3 grip_velocity{}; // seated space, metres per second
+    bool aim_valid = false;     // aim pose tracked this frame (only with the aim action, 21 §16)
+    util::Pose aim{};           // seated space; /input/aim/pose
     float trigger = 0.0f;       // 0..1
     float squeeze = 0.0f;       // grip button, 0..1
     util::Vec2 stick{};         // thumbstick, or touchpad on Vive wands

@@ -27,6 +27,7 @@ struct OpenVrRuntimeDeps {
     core::input::ports::ControlsSink& controls;
     core::ui::ports::Dialogs& dialogs;
     std::filesystem::path runtime_root; // as the runtime probe found it
+    bool aim_poses = false;             // add the hands' aim pose actions (spec 21 §16)
 };
 
 // MotherVR::OpenVR, the OpenVR runtime behind the stereo device.

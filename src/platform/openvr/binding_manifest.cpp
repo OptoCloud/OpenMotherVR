@@ -83,20 +83,31 @@ json stick_sources(const StickLayout& l) {
 // "handgrip" has the same orientation but sits elsewhere on the handle
 // (Index: 5 cm further forward, Vive: 1.8 cm higher), so grip is the better
 // fit for a palm origin.
-json hand_poses(const char* component) {
-    json p = json::array();
-    for (std::size_t h = 0; h < kPoseActions.size(); ++h) {
-        p.push_back(
-            {{"output", action_path(kPoseActions[h])},
-             {"path", std::string("/user/hand/") + (h == 0 ? "left" : "right") + "/pose/" + component}});
-    }
+//
+// The aim poses (21 §5.2, §16) go to the controller's pointing pose: the
+// component SteamVR's OpenXR runtime pairs with /input/aim/pose,
+// /pose/openxr_aim, where the input profile lists it (Touch), else
+// /pose/tip, the controller's nose (Index, Vive wands, WMR). Null: the aim
+// poses are not bound (Hands.Enabled off at start).
+json hand_poses(const char* component, const char* aim_component) {
+    json p   = json::array();
+    auto add = [&p](const std::array<const char*, 2>& actions, const char* pose) {
+        for (std::size_t h = 0; h < actions.size(); ++h) {
+            p.push_back(
+                {{"output", action_path(actions[h])},
+                 {"path", std::string("/user/hand/") + (h == 0 ? "left" : "right") + "/pose/" + pose}});
+        }
+    };
+    add(kPoseActions, component);
+    if (aim_component) add(kAimPoseActions, aim_component);
     return p;
 }
 
-json binding_file(const char* controller, const char* description, json sources, const char* pose) {
+json binding_file(const char* controller, const char* description, json sources, const char* pose,
+                  const char* aim_pose) {
     return {{"action_manifest_version", kManifestVersion},
             {"alias_info", json::object()},
-            {"bindings", {{kSet, {{"sources", std::move(sources)}, {"poses", hand_poses(pose)}}}}},
+            {"bindings", {{kSet, {{"sources", std::move(sources)}, {"poses", hand_poses(pose, aim_pose)}}}}},
             {"controller_type", controller},
             {"description", description},
             {"name", std::string(kBindingNamePrefix) + description}};
@@ -161,7 +172,9 @@ std::string binding_file_name(const std::string& controller) {
     return kBindingFilePrefix + controller + kBindingFileSuffix;
 }
 
-std::vector<std::pair<std::string, json>> default_bindings() {
+std::vector<std::pair<std::string, json>> default_bindings(bool aim_poses) {
+    const char* tip   = aim_poses ? "tip" : nullptr;
+    const char* touch = aim_poses ? "openxr_aim" : nullptr;
     std::vector<std::pair<std::string, json>> files;
 
     // Index has no menu button: the left trackpad press pauses, and the left
@@ -176,7 +189,7 @@ std::vector<std::pair<std::string, json>> default_bindings() {
                                                                .button_y   = "b",
                                                                .pause_path = hand("left", "trackpad"),
                                                                .pause_mode = "button"}),
-                                                "grip"));
+                                                "grip", tip));
 
     files.emplace_back("oculus_touch",
                        binding_file("oculus_touch", "Oculus Touch",
@@ -189,17 +202,17 @@ std::vector<std::pair<std::string, json>> default_bindings() {
                                                    .button_y   = "y",
                                                    .pause_path = hand("left", "application_menu"),
                                                    .pause_mode = "button"}),
-                                    "openxr_grip"));
+                                    "openxr_grip", touch));
 
     files.emplace_back(
         "holographic_controller",
-        binding_file("holographic_controller", "Windows Mixed Reality", wmr_sources(), "grip"));
+        binding_file("holographic_controller", "Windows Mixed Reality", wmr_sources(), "grip", tip));
     files.emplace_back("vive_controller",
-                       binding_file("vive_controller", "Vive wands", wand_sources(), "grip"));
+                       binding_file("vive_controller", "Vive wands", wand_sources(), "grip", tip));
     return files;
 }
 
-json manifest(const std::vector<std::pair<std::string, json>>& bindings) {
+json manifest(const std::vector<std::pair<std::string, json>>& bindings, bool aim_poses) {
     json actions      = json::array();
     json localization = {{"language_tag", "en_US"}, {kSet, "Alien: Isolation"}};
     for (const auto& a : kActions) {
@@ -209,6 +222,10 @@ json manifest(const std::vector<std::pair<std::string, json>>& bindings) {
     for (std::size_t h = 0; h < kPoseActions.size(); ++h) {
         actions.push_back({{"name", action_path(kPoseActions[h])}, {"type", "pose"}});
         localization[action_path(kPoseActions[h])] = kPoseLabels[h];
+    }
+    for (std::size_t h = 0; aim_poses && h < kAimPoseActions.size(); ++h) {
+        actions.push_back({{"name", action_path(kAimPoseActions[h])}, {"type", "pose"}});
+        localization[action_path(kAimPoseActions[h])] = kAimPoseLabels[h];
     }
     json defaults = json::array();
     for (const auto& [controller, _] : bindings) {

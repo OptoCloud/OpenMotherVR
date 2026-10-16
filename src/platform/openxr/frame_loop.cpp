@@ -141,7 +141,9 @@ void Session::Impl::read_hands(XrTime t) {
     input.sync(t, state.seated.get());
     for (std::size_t h = 0; h < core::vr::kHandCount; ++h) {
         const auto& s        = input.state().hands[h];
-        state.views.hands[h] = {s.grip, s.grip_velocity, s.grip_valid, s.grip_valid && s.grip_velocity_valid};
+        state.views.hands[h] = {s.grip,       s.grip_velocity,
+                                s.grip_valid, s.grip_valid && s.grip_velocity_valid,
+                                s.aim,        s.grip_valid && s.aim_valid};
     }
 }
 

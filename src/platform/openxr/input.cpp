@@ -62,7 +62,8 @@ bool Input::make_actions() noexcept {
            make_action(a.stick_click, XR_ACTION_TYPE_BOOLEAN_INPUT, "stick_click", "Thumbstick click") &&
            make_action(a.primary, XR_ACTION_TYPE_BOOLEAN_INPUT, "primary", "A / X") &&
            make_action(a.secondary, XR_ACTION_TYPE_BOOLEAN_INPUT, "secondary", "B / Y") &&
-           make_action(a.menu, XR_ACTION_TYPE_BOOLEAN_INPUT, "menu", "Menu");
+           make_action(a.menu, XR_ACTION_TYPE_BOOLEAN_INPUT, "menu", "Menu") &&
+           (!aim_poses_ || make_action(a.aim_pose, XR_ACTION_TYPE_POSE_INPUT, "aim_pose", "Hand aim"));
 }
 
 void Input::suggest(const char* profile, const std::vector<Bind>& binds) noexcept {
@@ -82,10 +83,12 @@ void Input::suggest(const char* profile, const std::vector<Bind>& binds) noexcep
 // The suggested bindings of 04 §5.8.4, one table per interaction profile.
 void Input::suggest_all() noexcept {
     Actions& a = actions_;
-    // The grip pose is the same on every profile.
-    const std::vector<Bind> common = {
+    // The grip pose is the same on every profile, and so is the aim pose
+    // (21 §16) when it is wanted.
+    std::vector<Bind> common = {
         {&a.grip_pose, "input/grip/pose", "input/grip/pose"},
     };
+    if (aim_poses_) common.push_back({&a.aim_pose, "input/aim/pose", "input/aim/pose"});
     auto with_common = [&](std::vector<Bind> v) {
         v.insert(v.end(), common.begin(), common.end());
         return v;
@@ -219,6 +222,18 @@ void Input::locate_grip(int hand, XrSpace space, XrSpace base, XrTime t, HandSta
     }
 }
 
+// The aim pose (21 §5.2), located like the grip; untracked leaves aim_valid
+// false, without a log line of its own (the grip's says why a hand is out).
+void Input::locate_aim(XrSpace space, XrSpace base, XrTime t, HandState& s) noexcept {
+    XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
+    if (space == XR_NULL_HANDLE || XR_FAILED(xrLocateSpace(space, base, t, &loc)) ||
+        (loc.locationFlags & kOrientationAndPosition) != kOrientationAndPosition) {
+        return;
+    }
+    s.aim       = from_xr(loc.pose);
+    s.aim_valid = true;
+}
+
 bool Input::create(XrInstance instance, XrSession session) noexcept {
     instance_  = instance;
     session_   = session;
@@ -250,6 +265,7 @@ bool Input::create(XrInstance instance, XrSession session) noexcept {
 
     for (std::size_t h = 0; h < grip_space_.size(); ++h) {
         grip_space_[h].reset(make_action_space(actions_.grip_pose, hand_path_[h]));
+        if (aim_poses_) aim_space_[h].reset(make_action_space(actions_.aim_pose, hand_path_[h]));
     }
     log_.line(kLogAttached);
     return true;
@@ -257,6 +273,7 @@ bool Input::create(XrInstance instance, XrSession session) noexcept {
 
 void Input::destroy() noexcept {
     for (auto& s : grip_space_) s.reset();
+    for (auto& s : aim_space_) s.reset();
     set_.reset(); // destroys its actions too
     actions_ = {};
     state_   = {};
@@ -275,6 +292,7 @@ HandState Input::read_hand(int hand, XrSpace base, XrTime t) noexcept {
     s.secondary   = get_bool(a.secondary, hand, any);
     s.menu        = get_bool(a.menu, hand, any);
     locate_grip(hand, grip_space_[static_cast<std::size_t>(hand)].get(), base, t, s);
+    if (aim_poses_) locate_aim(aim_space_[static_cast<std::size_t>(hand)].get(), base, t, s);
     s.active = any || s.grip_valid;
     return s;
 }

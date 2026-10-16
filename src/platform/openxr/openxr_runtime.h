@@ -19,6 +19,7 @@ struct OpenXrRuntimeDeps {
     core::input::ports::ControlsSink& controls;
     core::vr::ports::HeadsetAudio& audio;
     core::ui::ports::GameSignals& signals; // the runtime's quit request
+    bool aim_poses = false;                // add the hands' aim pose action (spec 21 §16)
 };
 
 // The stereo device on any OpenXR runtime (Meta / Quest Link, SteamVR, WMR,
