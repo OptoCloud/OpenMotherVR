@@ -31,4 +31,8 @@ void __fastcall aim_ray_update(void* component, void* edx) noexcept;
 // tracker, no args, bool in AL.
 bool __fastcall tracker_scan(void* tracker, void* edx) noexcept;
 
+// tracker_scan's address, for the haptics' install of the same call
+// (21 §14).
+const void* tracker_scan_hook() noexcept;
+
 } // namespace omvr::loader::hooks

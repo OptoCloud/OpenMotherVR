@@ -15,6 +15,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/file_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/hand_hooks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/hand_hooks.h
+    ${CMAKE_CURRENT_LIST_DIR}/haptic_hooks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/haptic_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/guard.h
     ${CMAKE_CURRENT_LIST_DIR}/menu_hooks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/menu_hooks.h

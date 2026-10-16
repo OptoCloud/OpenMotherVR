@@ -7,6 +7,7 @@
 #include "core/diag/logger.h"
 #include "core/diag/thread_roles.h"
 #include "core/hands/hands.h"
+#include "core/hands/haptics.h"
 #include "core/input/control_mapper.h"
 #include "core/input/control_scheme.h"
 #include "core/input/glyphs.h"
@@ -111,6 +112,9 @@ struct Context {
     core::input::InteractionState interactions;
     // hands (21): the tracked hands, aim from the hand, the tracker in hand
     core::hands::Hands hands;
+    // haptics (21 §14): the game's feedback on the controllers, game
+    // threads to the render thread
+    core::hands::Haptics haptics;
     // ui
     core::ui::SettingsPush settings_push;
     core::ui::Commands commands;

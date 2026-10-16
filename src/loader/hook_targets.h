@@ -3,6 +3,7 @@
 
 #include "game/event_tap.h"
 #include "game/hands/hand_objects.h"
+#include "game/hands/haptic_sites.h"
 #include "game/input/input_manager.h"
 #include "game/sites/game_behaviour.h"
 #include "game/sites/render_fixes.h"
@@ -35,6 +36,8 @@ struct HookTargets {
     // The hand features' game functions (spec 21 §20), set when their
     // sites go in.
     game::hands::HandTargets hands{};
+    // The haptics' game functions (21 §14), set when their sites go in.
+    game::hands::HapticTargets haptics{};
 
     // The script event tap's trampoline.
     game::TapFn event_tap = nullptr;

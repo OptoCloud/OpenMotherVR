@@ -2,6 +2,7 @@
 #include "loader/hooks/event_tap_hook.h"
 
 #include "loader/context.h"
+#include "loader/hooks/haptic_hooks.h"
 
 #include <string_view>
 #include <type_traits>
@@ -18,6 +19,7 @@ void* __fastcall tap(void* self, void* edx, const char* text) noexcept {
         const std::string_view event{text};
         const bool changed = ctx.interactions.on_event(event);
         ctx.play.on_event(event);
+        if (changed) haptics_on_interaction(); // 21 §14.2: hacking starts or ends
         if (ctx.settings.current().debug.debug) ctx.interactions.log_event(event, changed);
     }
     return ctx.targets.event_tap(self, edx, text);

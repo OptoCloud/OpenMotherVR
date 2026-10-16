@@ -14,6 +14,7 @@
 #include "game/stereo/stereo_objects.h"
 #include "loader/context.h"
 #include "loader/hooks/guard.h"
+#include "loader/hooks/haptic_hooks.h"
 
 #include <atomic>
 #include <optional>
@@ -151,7 +152,10 @@ bool __fastcall tracker_scan(void* tracker, void*) noexcept {
     });
     const bool result = game::hands::call_tracker_scan(t, tracker);
     if (saved) game::hands::write_tracker_facing(tracker, *saved);
+    guarded("TrackerScan haptics", [] { haptics_on_tracker_scan(); });
     return result;
 }
+
+const void* tracker_scan_hook() noexcept { return game::code_pointer(&tracker_scan); }
 
 } // namespace omvr::loader::hooks

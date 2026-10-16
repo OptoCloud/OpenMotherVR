@@ -2,6 +2,7 @@
 #include "loader/context.h"
 
 #include "core/ui/ui_contract.h"
+#include "loader/hooks/haptic_hooks.h"
 #include "loader/resource_ids.h"
 #include "platform/openvr/openvr_runtime.h"
 #include "platform/openxr/openxr_runtime.h"
@@ -20,16 +21,19 @@ Context* the_context = nullptr;
 // The runtime the stereo device drives, made when the game creates its
 // stereo device.
 // Spec 21 §1, §16: the hands' aim pose actions only when Hands.Enabled is
-// on as the runtime starts.
+// on as the runtime starts; 21 §14.3: the haptic output only when
+// Hands.Haptics.Enabled was on at attach and its game sources went in.
 std::unique_ptr<core::vr::ports::VrRuntime> make_runtime(Context& c, core::vr::DetectResult::Chosen chosen) {
     const bool aim_poses = c.settings.current().hands.enabled;
+    core::vr::ports::HapticSource* haptics =
+        c.settings.current().hands.haptics.enabled && hooks::haptics_installed() ? &c.haptics : nullptr;
     if (chosen == core::vr::DetectResult::Chosen::OpenVR) {
         return platform::openvr::make_openvr_runtime({c.log, c.clock, c.failure, c.archive_files, c.controls,
                                                       c.dialogs, c.runtimes.last_result().openvr_runtime_path,
-                                                      aim_poses});
+                                                      aim_poses, haptics});
     }
     return platform::openxr::make_openxr_runtime(
-        {c.log, c.xr, c.controls, c.headset_audio, c.console, aim_poses});
+        {c.log, c.xr, c.controls, c.headset_audio, c.console, aim_poses, haptics});
 }
 
 } // namespace
@@ -52,6 +56,7 @@ Context::Context(void* self) noexcept
       controls(pad, schemes, settings.current().input),
       interactions(log),
       hands(settings.current().hands, log),
+      haptics(settings.current().hands.haptics, clock, log),
       settings_push({script_vars, display_reset, schemes, settings.current(), runtime_state, log}),
       commands(settings, display_reset, console, log),
       xr(log, clock, dialogs, failure),

@@ -14,6 +14,7 @@
 #include "loader/context.h"
 #include "loader/hooks/guard.h"
 #include "loader/hooks/hand_hooks.h"
+#include "loader/hooks/haptic_hooks.h"
 #include "platform/d3d11/handles.h"
 #include "platform/d3d11/render/mirror_renderer.h"
 #include "util/math/matrix.h"
@@ -190,6 +191,8 @@ float* __fastcall dev_head_pose(void* self, void*, float* out) noexcept {
         if (auto* backend = load_backend(si)) {
             backend->head_pose(pose_out(out), si.world_scale);
             hands_on_head_pose(si, *backend, pose_out(out)); // 21 §3.4: the hands of this pose
+            // 21 §14: the health and the firing of this frame.
+            haptics_on_head_pose();
             context().head_clip_pivot.on_head_pose(pose_out(out));
         }
     });
