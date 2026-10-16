@@ -251,4 +251,20 @@ inline constexpr std::uint32_t kDk2DistortionCaps = 0x02;
 // far past the back-buffer size.
 inline constexpr std::uint8_t kUiReferenceSizeOffset = 0x10;
 
+// ---- Hands (21) --------------------------------------------------------------
+
+// The game's weapon type enumeration (21 §2.5): the integer its
+// `weapon_type` names parse to (0x4B5F80), held at weapon object +0xD4.
+// Anything else is -1.
+enum class WeaponType : std::int32_t {
+    Unknown      = -1,
+    NoWeapon     = 0,
+    Flamethrower = 1,
+    Pistol       = 2,
+    Shotgun      = 3,
+    Melee        = 4,
+    Boltgun      = 5,
+    Cattleprod   = 6,
+};
+
 } // namespace omvr::game

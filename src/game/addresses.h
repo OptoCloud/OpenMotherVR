@@ -201,6 +201,58 @@ inline const ReconRvas& recon_rvas(GameBuild version) noexcept {
     return version == GameBuild::Patched2020 ? kReconRvas2020 : kReconRvas2015;
 }
 
+// v2 hands (spec 21 §20). 2015 RVAs, checked in the 2015 AI.exe (timestamp
+// 0x54E3199D) against the bytes the spec gives; the 2020 ones are unknown
+// (21 §20), so every hand feature stays off on that build (20 §6).
+struct HandRvas {
+    // 21 §2.2: global pointer to the character registry; the player is
+    // element 0 of the list at [[registry] + 8] (count +0x84, data +0x80).
+    // The game's own player getter, whose first bytes hold the registry's
+    // address, is checked to confirm it.
+    std::uint32_t character_registry;
+    std::uint32_t player_getter;
+    // 21 §2.5: AimRayUpdate (thiscall on the weapon component, no args)
+    // and its one call for the player in the weapon component's update.
+    std::uint32_t aim_ray_update;
+    std::uint32_t aim_ray_call;
+    // 21 §2.5: CurrentItem (thiscall on the weapon component, no args).
+    std::uint32_t current_item;
+    // 21 §2.5, §5.3: the fire alignment test, `comiss xmm0, [threshold]`
+    // then `jbe`, and the 0.75 threshold it reads.
+    std::uint32_t fire_gate_compare;
+    std::uint32_t fire_gate_threshold;
+    // 21 §2.6: TrackerScan (thiscall on the tracker, no args, bool in AL)
+    // and its call in the tracker's timed update 0x4327D0.
+    std::uint32_t tracker_scan;
+    std::uint32_t tracker_scan_call;
+};
+
+inline constexpr HandRvas kHandRvas2015 = {
+    .character_registry  = 0x012F0C88,
+    .player_getter       = 0x0000F6B0,
+    .aim_ray_update      = 0x00382210,
+    .aim_ray_call        = 0x003CD410,
+    .current_item        = 0x003829E0,
+    .fire_gate_compare   = 0x003ABD6C,
+    .fire_gate_threshold = 0x00DC6780,
+    .tracker_scan        = 0x00431E40,
+    .tracker_scan_call   = 0x0043287D,
+};
+
+inline constexpr HandRvas kHandRvas2020 = {};
+
+static_assert(
+    [] {
+        constexpr std::size_t kRows = sizeof(HandRvas) / sizeof(std::uint32_t);
+        const auto rows             = std::bit_cast<std::array<std::uint32_t, kRows>>(kHandRvas2015);
+        return std::ranges::none_of(rows, [](std::uint32_t rva) { return rva == 0; });
+    }(),
+    "every hand row has its 2015 RVA");
+
+inline const HandRvas& hand_rvas(GameBuild version) noexcept {
+    return version == GameBuild::Patched2020 ? kHandRvas2020 : kHandRvas2015;
+}
+
 // Sites and bytes the original writes but codes inline in FUN_1001d6f0
 // instead of keeping them in its address table.
 struct InlineSites {
