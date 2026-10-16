@@ -1,5 +1,9 @@
-# Build output
+# Build output (build-*/: extra build directories, one per parallel task)
 build/
+build-*/
+
+# Clean-room review reports: they cite the original, never committed (AGENTS.md)
+cleanroom-review/
 
 # Ghidra databases (rebuild with analyzeHeadless + scripts/FillGaps.java)
 ghidra_project*/
