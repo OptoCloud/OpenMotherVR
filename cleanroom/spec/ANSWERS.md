@@ -1,9 +1,9 @@
-<!-- Provenance: spec side's answers to the implementation side's QUESTIONS.md r1 (questions on spec r2); user decisions for spec r3; AI.exe 2015 analysis (mode-stack container); DXGI public API semantics; user decisions for spec r4 (2026-10-14); project decisions for spec r5 (clean-room review of every document); a tester's report on SteamVR with a Steam Frame headset and project decisions for spec r6 (2026-10-15); AI.exe 2015 analysis by the spec side for spec r6 (the game's window procedure on focus loss and deactivation; the five pointer-table slots holding ScriptEventTap's address); for spec r7: the second clean-room review, the coverage review and the cross-document check of every document, with their project decisions, and AI.exe 2015 analysis by the spec side (the single call site of the device creation function, the C runtime's own exception filter and its fail-fast paths, the game window's procedure and size handler, the event tap's padding and pointer-table slots, the follow camera's position fields and yaw setter, the pad helper's code range, the action map's composite flag, the pass set-up's type argument, the setting-name table), each re-read for this revision; for spec r8, the clean-room process r3 (what a player sees when using a mod may be stated exactly) and the exact-wording pass over every document that follows it, with its project decisions, and the game's own menu texts in `DATA\TEXT\ENGLISH\UI.TXT` read by the spec side for the v2 pages. 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; spec r7 and r8 add none. Revision: r6 -->
+<!-- Provenance: spec side's answers to the implementation side's QUESTIONS.md r1 (questions on spec r2); user decisions for spec r3; AI.exe 2015 analysis (mode-stack container); DXGI public API semantics; user decisions for spec r4 (2026-10-14); project decisions for spec r5 (clean-room review of every document); a tester's report on SteamVR with a Steam Frame headset and project decisions for spec r6 (2026-10-15); AI.exe 2015 analysis by the spec side for spec r6 (the game's window procedure on focus loss and deactivation; the five pointer-table slots holding ScriptEventTap's address); for spec r7: the second clean-room review, the coverage review and the cross-document check of every document, with their project decisions, and AI.exe 2015 analysis by the spec side (the single call site of the device creation function, the C runtime's own exception filter and its fail-fast paths, the game window's procedure and size handler, the event tap's padding and pointer-table slots, the follow camera's position fields and yaw setter, the pad helper's code range, the action map's composite flag, the pass set-up's type argument, the setting-name table), each re-read for this revision; for spec r8, the clean-room process r3 (what a player sees when using a mod may be stated exactly) and the exact-wording pass over every document that follows it, with its project decisions, and the game's own menu texts in `DATA\TEXT\ENGLISH\UI.TXT` read by the spec side for the v2 pages. 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; spec r7 and r8 add none; for spec r9, the user decision of 2026-10-16 that v2 has no master switch, and spec r9 adds no 2020 value. Revision: r7 -->
 
-# Answers and decisions (spec r3 to r8)
+# Answers and decisions (spec r3 to r9)
 
 This file records the spec side's answers to the implementation side's
-questions (spec r3) and the decisions taken for spec r4 to r8. Each entry
+questions (spec r3) and the decisions taken for spec r4 to r9. Each entry
 names the documents and sections it changed. Where an entry is a decision
 rather than a game fact, the reason is given. Section numbers in the
 "Changed" lines are those of the revision that made the change; a later
@@ -348,7 +348,7 @@ cross-document check renumbered only 01 §4.8 (now §4.9, after a new
 | Each release names where its complete corresponding source is. | GPL-3.0 requires it when object code is conveyed. | 13 §8, §8.3 |
 | Package: notices cover transitive libraries and the exact OpenVR release; text files use CR LF; packaging fails on a missing notice; the guide lists every file the mod writes, both runtime options, the `-vrforce*` switches, where to report and what to attach, and where the source is. | Testable rules for what was already required in prose. | 13 §8, §9 items 15, 19 |
 | The runtime control shows the runtime running in this session (a rewording of the r6 decision). | Clean-room rewording. | 06 §1.1, §4.3, §5.2 |
-| 06 §1 points to the v2 keys (`EnhancedMode`, `Comfort`, `Controls`, `Hands`, `Body`, `Interaction`, `Hud`, `Graphics`), read and written by 06 §3's rules, gated by `EnhancedMode`, kept as unknown keys by v1; the v2 documents own their commands. | One place for a reader of 06 to find them. | 06 §1; README |
+| 06 §1 points to the v2 keys (`EnhancedMode`, `Comfort`, `Controls`, `Hands`, `Body`, `Interaction`, `Hud`, `Graphics`), read and written by 06 §3's rules, gated by `EnhancedMode` (replaced in spec r9: no `EnhancedMode` key and no gating; see Spec r9), kept as unknown keys by v1; the v2 documents own their commands. | One place for a reader of 06 to find them. | 06 §1; README |
 | Acceptance checks added where an implementation can lag a correct spec: `-vrscale` parsing, skip intro without the options archive, more bad command values, no display reset with runtime None, settings changes crossing threads, diagnostic dumps in the game folder. | Each requirement was already stated; its check was missing. | 06 §8 items 5, 14, 16, 20, 21; 13 §9 item 24 |
 
 ### OpenXR, diagnostics and threads (09, 11, 12)
@@ -376,7 +376,7 @@ cross-document check renumbered only 01 §4.8 (now §4.9, after a new
 
 | Decision | Reason | Where |
 |---|---|---|
-| `EnhancedMode` (22 §3.1) is the single master switch for every v2 key of 21 to 24; while off, every v2 key reads as its v1 value and stored values are kept; a next-launch key follows the value at that launch. `VRRuntime`'s default is not gated. [proposal, pending user] | One switch tells a v2 problem from a v1 one and keeps an upgrade at v1. | 20 §1.3, §8, §9; 21 §1, §15; 22 §1, §3.1; 23 intro; 24 §10 |
+| `EnhancedMode` (22 §3.1) is the single master switch for every v2 key of 21 to 24; while off, every v2 key reads as its v1 value and stored values are kept; a next-launch key follows the value at that launch. `VRRuntime`'s default is not gated. [proposal, pending user] (replaced in spec r9 by the user's decision: no master switch; see Spec r9) | One switch tells a v2 problem from a v1 one and keeps an upgrade at v1. | 20 §1.3, §8, §9; 21 §1, §15; 22 §1, §3.1; 23 intro; 24 §10 |
 | Seated and standing play and the height calibration have one owner, 22 (`Comfort.PlayMode`, `Comfort.StandingEyeHeight`; the mode applies at the next recenter; a 3 s countdown and an automatic first calibration). 21 drops its posture and standing-height keys, reads 22's and keeps only the seated eye raise. | The same settings were defined twice with different rules; one key per setting (20 §5). | 20 §2, §4, §5, §10 item 4; 21 §1, §11.4, §11.5, §15, §18, §21, §22 item 22, §23; 22 §3.1, §6.1 |
 | The engine settings override (24 §6) is the one v2 feature that still applies after a runtime failure. [proposal] | It changes the game's option list at start-up, before the runtime's outcome is known, cannot be undone after the parse, and is useful in flat play. | 20 §1.2; 24 §11.1 |
 | v2 game addresses are listed in the address table of the v2 document that uses them; 01 §4 collects them in a later revision. | Each v2 document keeps its own table while it is revised. | 01 §4.8; 20 §5, §11 |
@@ -482,8 +482,9 @@ and pause menu lists move 140 px lower (14 §7). Open for the spec side:
 the letter case of labels in the menu font, the sub-page titles and the
 fit of the longest description line at the VR layout scale (06 §9,
 22 §19); the v1 changes that 20 to 24 list for 04 §5.7, 06 §5 and 13 §5.3
-(the `Enhanced Mode` entry, the v2 help rows, the welcome with OpenXR as
-default of 22 §11), applied when v2's changes are merged into v1.
+(the `Enhanced Mode` entry, replaced in spec r9 by the v2 sub-page
+entries; the v2 help rows; the welcome with OpenXR as default of 22 §11),
+applied when v2's changes are merged into v1.
 
 Documents in spec r8:
 
@@ -511,3 +512,27 @@ Documents in spec r8:
 | `24-rendering-v2.md` | r4 |
 | `README.md` | r9 |
 | `ANSWERS.md` | r6 |
+
+## Spec r9
+
+Spec r9 records one user decision (2026-10-16) about v2.
+
+| Decision | Reason | Where |
+|---|---|---|
+| v2 has no master switch. There is no `EnhancedMode` key: each v2 key of 21 to 24 applies on its own, as stored, and its default is its v1 value, so with every v2 key at its default (or absent) the mod behaves exactly as v1. A key that applies at the next launch follows its own value at that launch. Replaces the spec r7 proposal of a master switch. | User decision. The per-key v1 defaults already give what the switch was for: a player who upgrades and changes nothing gets v1, and a v2 problem is told from a v1 one by setting the v2 keys concerned back to their defaults, which the settings event in the log lists. | 20 §1.3, §2, §3.2, §5, §7, §8, §9, §10 item 6, §11; 06 §1; 21 §1, §15, §15.3; 22 §1, §3.1, §3.2, §10.3, §12.1, §12.3, §16, §18 items 1 and 14, §20; 23 intro, §8; 24 §10; README |
+| The options page has no `Enhanced Mode` entry, toggle or page. The `MotherVR` page gains the seven v2 sub-page entries directly (`Comfort`, `Controls`, `Hands`, `Body`, `Interaction`, `HUD`, `Graphics`), after `Input` and before `Dev. Debug Options`, each greyed while VR is not running like `Rendering` and `Input`; nothing on them is greyed by a master toggle. [proposal for the place, as before] | Without a master switch the entry would only add a level of pages; the entries sit with v1's other sub-pages and leave every v1 item in its place and order. | 22 §12.1, §12.3, §18 item 14, §20; 20 §3.2, §10 item 6, §11; 21 §15.3; 23 §8; 24 §10 |
+
+Documents in spec r9:
+
+| Document | Revision |
+|---|---|
+| `06-options-and-config.md` | r9 |
+| `20-v2-overview.md` | r4 |
+| `21-hands-and-body.md` | r5 |
+| `22-controls-and-comfort.md` | r6 |
+| `23-interactions-and-hud.md` | r5 |
+| `24-rendering-v2.md` | r5 |
+| `README.md` | r10 |
+| `ANSWERS.md` | r7 |
+
+Every other document keeps its spec r8 revision.

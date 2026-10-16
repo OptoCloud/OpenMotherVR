@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6); r3: second clean-room review: the crash event stated as the state that must hold, at the level of v1's crash record; the gestures and d-pad emulation stated as results with this project's reasons; the HUD game facts of 2.4 re-read by the spec side in the 2015 `AI.exe` and reconciled with 23 (the pending flag of each HUD object, the objects the game's own hide and show touch); this document is the one owner of seated and standing play and the calibration (21 reads them); `EnhancedMode` gates 21 to 24 (20 §1.3); lever interactions own the grips, the move action and turning (23 §3.2). r4 (spec r7 cross-check): the game's event tap function named `ScriptEventTap` and the tracked state the logging of game script events, as 11 §5 now does; the flush thread's exit rule follows 12 §7 (at process exit only the detach line is logged); the change listed for 11 states the crash event's level and timing as §14 does. r5 (CLEANROOM r3, what a player sees may be stated exactly): the v2 options pages given exactly (the `Enhanced Mode` entry and its place on the `MotherVR` page, one sub-page per settings section, item order, labels, control kinds, value names, display formats, description lines, greying and hiding rules, the calibration's texts), the glyph designs per controller family in v1's look with a hand mark, the controls help rows per family and for v2 features, and the welcome text once OpenXR is the default, each a project text in the style of the v1 page players know, with its reason; the game's own Camera Speed label and description and its longest stock menu description read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the stock menu movies of the player's `UI.PAK`; the VR-off hotkey's page state stated as v1's (no new text). Revision: r5 -->
+<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6); r3: second clean-room review: the crash event stated as the state that must hold, at the level of v1's crash record; the gestures and d-pad emulation stated as results with this project's reasons; the HUD game facts of 2.4 re-read by the spec side in the 2015 `AI.exe` and reconciled with 23 (the pending flag of each HUD object, the objects the game's own hide and show touch); this document is the one owner of seated and standing play and the calibration (21 reads them); `EnhancedMode` gates 21 to 24 (20 §1.3; removed in r6); lever interactions own the grips, the move action and turning (23 §3.2). r4 (spec r7 cross-check): the game's event tap function named `ScriptEventTap` and the tracked state the logging of game script events, as 11 §5 now does; the flush thread's exit rule follows 12 §7 (at process exit only the detach line is logged); the change listed for 11 states the crash event's level and timing as §14 does. r5 (CLEANROOM r3, what a player sees may be stated exactly): the v2 options pages given exactly (the `Enhanced Mode` entry and its place on the `MotherVR` page, replaced in r6 by one entry per page, one sub-page per settings section, item order, labels, control kinds, value names, display formats, description lines, greying and hiding rules, the calibration's texts), the glyph designs per controller family in v1's look with a hand mark, the controls help rows per family and for v2 features, and the welcome text once OpenXR is the default, each a project text in the style of the v1 page players know, with its reason; the game's own Camera Speed label and description and its longest stock menu description read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the stock menu movies of the player's `UI.PAK`; the VR-off hotkey's page state stated as v1's (no new text). r6 (user decision of 2026-10-16): no master switch: the `EnhancedMode` key, its toggle, the `Enhanced Mode` entry and page and the greying that depended on it are removed; each key applies on its own with its v1 value as default (20 §1.3); the `MotherVR` page gains the seven v2 sub-page entries directly, after `Input` and before `Dev. Debug Options` (12.1). Revision: r6 -->
 
 # 22. Controls and comfort (v2)
 
@@ -44,7 +44,6 @@ marked **[proposal]** with a one-line reason.
 
 | Feature | Key (section 3) | v1 value | Section |
 |---|---|---|---|
-| all v2 features of 21 to 24 at once (20 §1.3) | `EnhancedMode` | false | 3.1 |
 | smooth turning at a set speed, time-based | `Comfort.SmoothTurnSpeed` | 0 (the game's own look, as v1) | 4.2 |
 | snap-turn repeat interval | `Comfort.SnapTurnRepeatMs` | 300 | 4.3 |
 | a short fade at each snap step | `Comfort.SnapTurnFade` | false | 4.3 |
@@ -243,8 +242,7 @@ found. 23 §2.7 cites this section for these facts.
 ### 3.1 Keys
 
 New keys go in two new objects inside `Settings`: `Comfort` and
-`Controls`, plus one key in `Settings` itself. The key names are this
-project's own. Reading, writing and sanitising follow 06 §3: each key is
+`Controls`. The key names are this project's own. Reading, writing and sanitising follow 06 §3: each key is
 read on its own, a missing key or one of the wrong type gives its default,
 unknown keys are kept on save, and `Comfort` or `Controls` that is not an
 object is replaced by an object on the next write. The file is still not
@@ -254,7 +252,6 @@ keys with their values.
 
 | Key | JSON type | Default (v1 value) | Values / range, sanitise | Takes effect |
 |---|---|---|---|---|
-| `EnhancedMode` | bool | false | | at once (see below) |
 | `Comfort.SmoothTurnSpeed` | number | 0 | 0, or 30 to 360 (degrees per second); a value in (0, 30) becomes 30, above 360 becomes 360, NaN or negative becomes 0 | at once |
 | `Comfort.SnapTurnRepeatMs` | integer | 300 | 0 (no repeat), or 150 to 1000; a value in (0, 150) becomes 150, above 1000 becomes 1000, negative becomes 300 | at once |
 | `Comfort.SnapTurnFade` | bool | false | | at once |
@@ -273,14 +270,12 @@ keys with their values.
 | `Controls.VrOffHotkey` | bool | false | | at once |
 | `Controls.CrashSafeLog` | bool | false | | next launch (14) |
 
-**`EnhancedMode`** is the single v2 switch of 20 §1.3 [proposal: one
-switch tells a v2 problem from a v1 one, and keeps an upgrade at v1]. While
-it is false every key of this table except `EnhancedMode`, and every key of
-21, 23 and 24, is treated as its v1 value, whatever the file holds; the
-stored values are kept and written back unchanged, so turning it on again
-restores the player's choices. While it is true each key applies as
-stored. (`VRRuntime`'s default, section 11, is not a v2 key and is not
-gated.)
+There is no master switch (20 §1.3, user decision of 2026-10-16): each
+key of this table applies on its own, as stored, and its default is its
+v1 value, so a file without these keys, or with each at its default,
+gives v1, and a v2 problem is told from a v1 one by setting the keys
+concerned back to their defaults. (`VRRuntime`'s default, section 11, is
+not a v2 key.)
 
 `Comfort.PlayMode` and `Comfort.StandingEyeHeight` are the only keys for
 seated and standing play and the calibration; 21 §11 reads them for its
@@ -330,8 +325,8 @@ With the v2 defaults the two new objects parse to:
 }
 ```
 
-next to `"EnhancedMode": false` in `Settings`. Formatting and order are the
-implementation's choice (06 §3.2).
+inside `Settings`. Formatting and order are the implementation's choice
+(06 §3.2).
 
 ### 3.3 Commands and pushes
 
@@ -992,7 +987,7 @@ thumbstick families' rows, `L` / `R` in the wand's.
 
 **Rows of v2 features** [proposal], whatever `Controls.ControllerGlyphs`
 says: appended after the set's rows, in this order, each only while its
-key is in effect (`EnhancedMode` on, 3.1). The function text follows v1's
+key is on (3.1). The function text follows v1's
 `Flashlight [Press Interact near Head]` pattern (the condition in
 brackets). The control text is given for the thumbstick style; the wand
 style is in brackets.
@@ -1059,25 +1054,23 @@ Before the decision: v1's default (OpenVR) stays.
 
 ### 12.1 Where they are and how they look
 
-The `MotherVR` page (06 §5, 00 §2.6) gains one sub-page entry,
-`Enhanced Mode`, after `Input` and before `Dev. Debug Options`, with no
-description line, like v1's other sub-page entries [proposal: it sits with
-the other sub-pages and leaves every v1 item in its place and order]. It
-is shown in the front end and the pause menu, wherever the `MotherVR`
-page is (06 §5.1).
-
-The `Enhanced Mode` page, in order:
+The `MotherVR` page (06 §5, 00 §2.6) gains seven sub-page entries, after
+`Input` and before `Dev. Debug Options`, each with no description line,
+like v1's other sub-page entries [proposal: they sit with the other
+sub-pages and leave every v1 item in its place and order]. There is no
+`Enhanced Mode` entry or toggle: each setting applies on its own (20
+§1.3). The entries are shown in the front end and the pause menu, wherever
+the `MotherVR` page is (06 §5.1). In order:
 
 | # | Label | Kind | Values shown | Key | Description line |
 |---|---|---|---|---|---|
-| 1 | `Enhanced Mode` | toggle | on / off | `EnhancedMode` | `Turns on the settings on these pages. While off, they are kept but have no effect` |
-| 2 | `Comfort` | sub-page entry | | | none |
-| 3 | `Controls` | sub-page entry | | | none |
-| 4 | `Hands` | sub-page entry (21 §15.3) | | | none |
-| 5 | `Body` | sub-page entry (21 §15.3) | | | none |
-| 6 | `Interaction` | sub-page entry (23 §8) | | | none |
-| 7 | `HUD` | sub-page entry (23 §8) | | | none |
-| 8 | `Graphics` | sub-page entry (24 §10) | | | none |
+| 1 | `Comfort` | sub-page entry | | | none |
+| 2 | `Controls` | sub-page entry | | | none |
+| 3 | `Hands` | sub-page entry (21 §15.3) | | | none |
+| 4 | `Body` | sub-page entry (21 §15.3) | | | none |
+| 5 | `Interaction` | sub-page entry (23 §8) | | | none |
+| 6 | `HUD` | sub-page entry (23 §8) | | | none |
+| 7 | `Graphics` | sub-page entry (24 §10) | | | none |
 
 One sub-page per settings section of `mothervr.json` (20 §5) [proposal:
 the player finds a setting where the file keeps it, and no page grows
@@ -1108,11 +1101,10 @@ Rules for every v2 page (this document's and those of 21, 23 and 24):
   `DATA\TEXT\ENGLISH\UI.TXT`], so each fits as the game's own longest one
   does. An item whose change applies at the next launch starts with
   `Requires restart!` as v1's runtime buttons do.
-- **Greying.** The `Enhanced Mode` entry is greyed while VR is not running,
-  like `Rendering` and `Input` (06 §5.3). On its page, entries 2 to 8 are
-  greyed while the `Enhanced Mode` toggle is off; the values behind them
-  are kept (3.1). An item that has effect only with another setting is
-  greyed while that setting is off, as each table says; its value is kept.
+- **Greying.** The seven v2 sub-page entries are greyed while VR is not
+  running, like `Rendering` and `Input` (06 §5.3). An item that has
+  effect only with another setting is greyed while that setting is off,
+  as each table says; its value is kept.
 - **Hidden items.** An item for a feature that is reserved, or not yet
   confirmed by the user where its document says so (24 §10), is not
   shown; an item whose game input or site is not yet confirmed (9.2, 9.3,
@@ -1186,8 +1178,7 @@ the menu change set of 14 (14 §3.1); where they go in the page map follows
 06 §7.3 (new pages and items created after every stock one); the order in
 which the player sees them is the order of the tables above.
 
-Every key of 3.1 is reachable in the headset through these pages
-(`EnhancedMode` through its toggle).
+Every key of 3.1 is reachable in the headset through these pages.
 
 ## 13. VR-off hotkey
 
@@ -1293,7 +1284,7 @@ events. Each is logged once when it happens or changes (11 §3):
 
 | Level | Area | When | Must convey |
 |---|---|---|---|
-| INF | Config | session start (11 §1.7) | the v2 keys in effect, with `EnhancedMode`, in the settings event |
+| INF | Config | session start (11 §1.7) | the v2 keys and their values in the settings event |
 | INF | Input | the turning in use changes (snap, game look, smooth) | which; the speed or repeat interval |
 | DBG | Input | turning blocked or unblocked by 4.4 (with `DebugOptions`) | why (interaction kind, breathing game, cutscene) |
 | INF | Stereo | play mode or calibration applied | the mode; the height taken, or why none was taken (invalid pose, out of range, no floor reference) |
@@ -1331,9 +1322,9 @@ events. Each is logged once when it happens or changes (11 §3):
 On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
 "Log" is `mothervr.log`.
 
-1. All keys of 3.1 at their defaults (or `EnhancedMode` off with other
-   values stored): every acceptance check of 04 and 05 passes unchanged,
-   and the file keeps the stored v2 values after a menu change.
+1. All keys of 3.1 at their defaults, or absent: every acceptance check
+   of 04 and 05 passes unchanged, and after a menu change the file keeps
+   the v2 values stored in it.
 2. `SmoothTurnSpeed` 90 with snap off: holding the right stick fully turns
    a full circle in 4 s (±10 %), at 90 Hz and with the frame rate capped
    at 45 Hz alike; the stick at rest never drifts; Camera Speed at its
@@ -1383,13 +1374,13 @@ On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
     says `"OpenXR"` and OpenXR starts; a v1 file with `"OpenVR"` still
     starts OpenVR.
 14. Every key of 3.1 can be changed on the options page in the headset,
-    in the front end and the pause menu, and the change is saved. The
-    `Enhanced Mode` entry, its page and the `Comfort` and `Controls` pages
-    show the labels, values, order and description lines of 12.1 and 12.2;
-    with the `Enhanced Mode` toggle off the sub-page entries are greyed;
-    `Calibrate Standing Height` counts down `Measuring in 3` to `1` and then
-    shows the height taken; with `-vrscale 1.2`, `World Scale` is greyed at
-    `1.2`.
+    in the front end and the pause menu, and the change is saved. The v2
+    sub-page entries on the `MotherVR` page and the `Comfort` and
+    `Controls` pages show the labels, values, order and description lines
+    of 12.1 and 12.2; with VR not running the sub-page entries are greyed;
+    there is no `Enhanced Mode` entry; `Calibrate Standing Height` counts
+    down `Measuring in 3` to `1` and then shows the height taken; with
+    `-vrscale 1.2`, `World Scale` is greyed at `1.2`.
 15. VR-off hotkey: holding the keys 1 s in gameplay leaves the game running
     flat on the monitor at window resolution after one short freeze; the
     headset shows the runtime's own environment; no message box; the log
@@ -1480,9 +1471,9 @@ Not made here; to be applied in a later revision:
 - `02-game-stereo-path.md` §7.4: a detach requested by the player, without
   a failure message (13).
 - `06-options-and-config.md` §1, §3.2, §3.3, §4.2, §4.3, §5: the
-  `EnhancedMode`, `Comfort` and `Controls` keys, their commands and pushes,
-  the `Enhanced Mode` entry on the `MotherVR` page, after `Input` (12.1),
-  and its pages (12); §1 and §1.1: `VRRuntime`'s default and
+  `Comfort` and `Controls` keys, their commands and pushes, the v2
+  sub-page entries on the `MotherVR` page, after `Input` (12.1), and their
+  pages (12); §1 and §1.1: `VRRuntime`'s default and
   fallback order once OpenXR is the default (11); §5.3: Camera Speed does
   not scale smooth turn (4.5).
 - `11-diagnostics.md` §5.3: the breathing-game state (9.1) and its strings;
@@ -1498,4 +1489,5 @@ Not made here; to be applied in a later revision:
   and for the emulated d-pad, drawn to the designs of 10.2 (10, 7); the v2
   pages and items with their labels and description lines (12).
 - `ANSWERS.md`: record the user decisions this document leaves open
-  (OpenXR default, `EnhancedMode`, the proposals marked here).
+  (OpenXR default, the proposals marked here) and the user decision of
+  2026-10-16 that there is no master switch (20 §1.3).

@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. Revision: r4 -->
+<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). Revision: r5 -->
 
 # 21. Hands and body
 
@@ -50,8 +50,8 @@ their `mothervr.json` key inside `Settings` (06 §1): `Hands.Enabled` is
 | Health on the wrist | 13 | `Hands.WristHealth` | health only on the game's HUD |
 | Haptics | 14 | `Hands.Haptics.Enabled` | no haptics (04 §5.1) |
 
-All keys are in §15. With every key at its default, or with the master
-switch `EnhancedMode` off (20 §1.3), nothing in this document is installed
+All keys are in §15. With every key at its default (20 §1.1, §1.3),
+nothing in this document is installed
 or runs (20 §1.1): no game site of §2 is hooked, no action is added to the
 runtime, no per-frame work is spent beyond reading the settings.
 
@@ -1090,8 +1090,8 @@ When the game rumble is on, the damage and firing pulses are still played
 New sections `Hands` and `Body` inside `Settings` of `mothervr.json` (06
 §1 style). Unknown keys are kept on save (06 §3). Every default gives v1.
 Keys are this project's own. "Applies" says when a change takes effect.
-While the master switch `EnhancedMode` is off, every key here reads as its
-default (20 §1.3). The seated and standing mode and the calibrated standing
+Each key applies on its own; there is no master switch (20 §1.3). The
+seated and standing mode and the calibrated standing
 eye height are 22's keys (22 §3.1); this document only reads them.
 
 ### 15.1 `Hands`
@@ -1131,8 +1131,8 @@ master key on gives the whole feature; the master keys default off (20
 
 ### 15.3 Options page and console
 
-Every key appears on the options page, on the `Hands` and `Body` pages of
-the `Enhanced Mode` page (22 §12.1, which also gives the rules every v2
+Every key appears on the options page, on the `Hands` and `Body` pages,
+reached from the `MotherVR` page (22 §12.1, which also gives the rules every v2
 page follows: look, value display, description lines, greying and hidden
 items). The calibration is 22's (22 §3.3, §12.2). The labels, values and
 description lines below are exact; they are this project's texts, in the
