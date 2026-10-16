@@ -59,6 +59,89 @@ TEST_CASE("v2 comfort: defaults are v1's, each key applies on its own") {
     CHECK_FALSE(out["Settings"].contains("EnhancedMode"));
 }
 
+TEST_CASE("v2 keys: defaults give v1 (spec 22 §3.1, 21 §15)") {
+    const Settings s;
+    CHECK_FALSE(s.comfort.snap_turn_fade);
+    CHECK(s.comfort.vignette == 0.0f);
+    CHECK(s.comfort.play_mode == PlayMode::Seated);
+    CHECK(s.comfort.standing_eye_height == 0.0f);
+    CHECK(s.comfort.world_scale == 1.0f);
+    CHECK_FALSE(s.controls.interaction_aware_turning);
+    CHECK_FALSE(s.controls.vr_off_hotkey);
+    CHECK_FALSE(s.controls.crash_safe_log);
+    CHECK_FALSE(s.hands.enabled);
+    CHECK(s.hands.aim_from_hand);
+    CHECK(s.hands.flashlight_aim == FlashlightAim::Head);
+    CHECK(s.hands.throw_strength == 1.0f);
+    CHECK_FALSE(s.hands.haptics.enabled);
+    CHECK(s.hands.haptics.strength == 1.0f);
+    CHECK(s.hands.haptics.game_rumble);
+    CHECK(s.body.visible == BodyVisible::Full);
+    CHECK_FALSE(s.body.real_crouch);
+}
+
+TEST_CASE("v2 keys: nested Hands.Haptics and string enums round trip") {
+    const Settings s = read_config(json::parse(R"({"Settings": {
+        "Comfort": {"PlayMode": "Standing", "Vignette": 0.5},
+        "Controls": {"VrOffHotkey": true},
+        "Hands": {"Enabled": true, "FlashlightAim": "LeftHand", "Haptics": {"Enabled": true, "Firing": false}},
+        "Body": {"Visible": "HandsOnly", "EyeForward": 0.1}}})"));
+    CHECK(s.comfort.play_mode == PlayMode::Standing);
+    CHECK(s.comfort.vignette == 0.5f);
+    CHECK(s.controls.vr_off_hotkey);
+    CHECK(s.hands.enabled);
+    CHECK(s.hands.flashlight_aim == FlashlightAim::LeftHand);
+    CHECK(s.hands.haptics.enabled);
+    CHECK_FALSE(s.hands.haptics.firing);
+    CHECK(s.hands.haptics.damage); // missing: default
+    CHECK(s.body.visible == BodyVisible::HandsOnly);
+    CHECK(s.body.eye_forward == doctest::Approx(0.1f));
+
+    json out = json::parse(R"({"Settings": {"Hands": {"Haptics": {"Mine": 1}}}})");
+    write_config(out, s);
+    CHECK(out["Settings"]["Hands"]["Haptics"]["Firing"] == false);
+    CHECK(out["Settings"]["Hands"]["Haptics"]["Mine"] == 1); // unknown key kept
+    CHECK(out["Settings"]["Hands"]["FlashlightAim"] == "LeftHand");
+    CHECK(out["Settings"]["Comfort"]["PlayMode"] == "Standing");
+    CHECK(out["Settings"]["Body"]["Visible"] == "HandsOnly");
+    CHECK(read_config(out).hands.haptics.enabled);
+
+    // Case-sensitive: anything else is the default.
+    CHECK(read_config(json::parse(R"({"Settings": {"Comfort": {"PlayMode": "standing"}}})"))
+              .comfort.play_mode == PlayMode::Seated);
+    // Hands.Haptics that is not an object reads as defaults.
+    CHECK(read_config(json::parse(R"({"Settings": {"Hands": {"Haptics": 3}}})")).hands.haptics.game_rumble);
+}
+
+TEST_CASE("sanitize: v2 ranges (spec 22 §3.1, 21 §15)") {
+    Settings s;
+    s.comfort.vignette            = 1.5f;
+    s.comfort.standing_eye_height = 0.8f;
+    s.comfort.world_scale         = 2.0f;
+    s.hands.throw_strength        = 3.0f;
+    s.hands.smoothing             = -0.1f;
+    s.hands.haptics.strength      = std::numeric_limits<float>::quiet_NaN();
+    s.body.eye_forward            = 0.5f;
+    s.body.seated_eye_raise       = -0.9f;
+    sanitize(s);
+    CHECK(s.comfort.vignette == 0.0f);
+    CHECK(s.comfort.standing_eye_height == 0.0f);
+    CHECK(s.comfort.world_scale == 1.0f);
+    CHECK(s.hands.throw_strength == 1.0f);
+    CHECK(s.hands.smoothing == 0.0f);
+    CHECK(s.hands.haptics.strength == 1.0f);
+    CHECK(s.body.eye_forward == doctest::Approx(0.2f)); // clamped
+    CHECK(s.body.seated_eye_raise == doctest::Approx(-0.5f));
+
+    s.comfort.standing_eye_height = 1.75f;
+    s.comfort.vignette            = 0.4f;
+    s.body.eye_forward            = std::numeric_limits<float>::quiet_NaN();
+    sanitize(s);
+    CHECK(s.comfort.standing_eye_height == 1.75f);
+    CHECK(s.comfort.vignette == 0.4f);
+    CHECK(s.body.eye_forward == 0.0f);
+}
+
 TEST_CASE("sanitize: comfort ranges (spec 22 §3.1)") {
     const auto speed = [](float v) {
         Settings s;
@@ -223,7 +306,7 @@ TEST_CASE("describe names each setting by its key path") {
 }
 
 TEST_CASE("the settings table: commands and their rules") {
-    CHECK(settings_table().size() == 17); // 15 of v1 and Discord, 2 of v2 comfort
+    CHECK(settings_table().size() == 53); // 15 of v1 and Discord, 38 of v2
     const SettingRow* row = find_command("mvr_pixelscale");
     REQUIRE(row != nullptr);
     CHECK(row->rule == CommandRule::PixelScale);

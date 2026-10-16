@@ -13,16 +13,17 @@
 // a setting is named in one place.
 namespace omvr::core::config {
 
-// The JSON object a key is in: "Settings" itself, or its "Rendering",
-// "Input" or "Comfort" object.
-enum class Section { Settings, Rendering, Input, Comfort };
+// The JSON object a key is in: "Settings" itself, or one of its objects.
+// HandsHaptics is "Haptics" inside "Hands".
+enum class Section { Settings, Rendering, Input, Comfort, Controls, Hands, HandsHaptics, Body };
 
 // A setting's place in Settings.
 template <class T>
 using Accessor = T& (*)(Settings&) noexcept;
 
 using Field = std::variant<Accessor<bool>, Accessor<int>, Accessor<float>, Accessor<VRRuntime>,
-                           Accessor<MirrorViewType>, Accessor<StereoAA>>;
+                           Accessor<MirrorViewType>, Accessor<StereoAA>, Accessor<PlayMode>,
+                           Accessor<FlashlightAim>, Accessor<BodyVisible>>;
 
 // How the setting's console command reads its value (spec 06 §4.2): a value
 // outside the rule changes nothing.
@@ -77,9 +78,15 @@ int snap_segments(int segments) noexcept;
 std::string_view to_string(VRRuntime r) noexcept;
 std::string_view to_string(MirrorViewType m) noexcept;
 std::string_view to_string(StereoAA a) noexcept;
+std::string_view to_string(PlayMode m) noexcept;
+std::string_view to_string(FlashlightAim a) noexcept;
+std::string_view to_string(BodyVisible v) noexcept;
 std::optional<VRRuntime> parse_vr_runtime(std::string_view s) noexcept;
 std::optional<MirrorViewType> parse_mirror_view_type(std::string_view s) noexcept;
 std::optional<StereoAA> parse_stereo_aa(std::string_view s) noexcept;
+std::optional<PlayMode> parse_play_mode(std::string_view s) noexcept;
+std::optional<FlashlightAim> parse_flashlight_aim(std::string_view s) noexcept;
+std::optional<BodyVisible> parse_body_visible(std::string_view s) noexcept;
 
 // The string parser and the last value of each enum the file stores.
 template <class E>
@@ -100,6 +107,22 @@ template <>
 struct EnumTraits<StereoAA> {
     static constexpr StereoAA kLast = StereoAA::Off;
     static std::optional<StereoAA> parse(std::string_view s) noexcept { return parse_stereo_aa(s); }
+};
+
+template <>
+struct EnumTraits<PlayMode> {
+    static constexpr PlayMode kLast = PlayMode::Standing;
+    static std::optional<PlayMode> parse(std::string_view s) noexcept { return parse_play_mode(s); }
+};
+template <>
+struct EnumTraits<FlashlightAim> {
+    static constexpr FlashlightAim kLast = FlashlightAim::RightHand;
+    static std::optional<FlashlightAim> parse(std::string_view s) noexcept { return parse_flashlight_aim(s); }
+};
+template <>
+struct EnumTraits<BodyVisible> {
+    static constexpr BodyVisible kLast = BodyVisible::None;
+    static std::optional<BodyVisible> parse(std::string_view s) noexcept { return parse_body_visible(s); }
 };
 
 } // namespace omvr::core::config

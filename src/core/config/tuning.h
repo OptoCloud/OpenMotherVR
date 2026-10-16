@@ -49,6 +49,25 @@ inline constexpr int kSnapTurnRepeatMsMin     = 150;
 inline constexpr int kSnapTurnRepeatMsMax     = 1000;
 inline constexpr int kSnapTurnRepeatMsDefault = 300;
 
+// Comfort.Vignette (spec 22 §3.1): 0 off to 1 strongest.
+inline constexpr float kVignetteMax = 1.0f;
+
+// Comfort.StandingEyeHeight, metres (spec 22 §3.1): 0 is not calibrated;
+// a calibrated height lies in [min, max], anything else becomes 0.
+inline constexpr float kStandingEyeHeightMin = 1.0f;
+inline constexpr float kStandingEyeHeightMax = 2.2f;
+
+// Hands (spec 21 §15.1).
+inline constexpr float kThrowStrengthMin     = 0.5f;
+inline constexpr float kThrowStrengthMax     = 2.0f;
+inline constexpr float kThrowStrengthDefault = 1.0f;
+inline constexpr float kHandSmoothingMax     = 1.0f;
+inline constexpr float kHapticStrengthMax    = 1.0f;
+
+// Body (spec 21 §15.2), metres; a value outside is clamped.
+inline constexpr float kEyeForwardMax     = 0.20f;
+inline constexpr float kSeatedEyeRaiseMax = 0.50f;
+
 // -vrscale <s>: the world scale accepted, and the scale without a usable
 // value (spec 03 §1, 06 §2).
 inline constexpr float kWorldScaleMin     = 0.495f;

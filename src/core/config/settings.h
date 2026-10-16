@@ -26,10 +26,10 @@ namespace omvr::core::config {
 //         "ToggleGrips":           bool,
 //         "ToggleCrouch":          bool
 //       },
-//       "Comfort": {                                          (ours, v2)
-//         "SmoothTurnSpeed":  number,
-//         "SnapTurnRepeatMs": number
-//       },
+//       "Comfort":  { ... },   (ours, v2: spec 22 §3.1)
+//       "Controls": { ... },   (ours, v2: spec 22 §3.1)
+//       "Hands":    { ..., "Haptics": { ... } },   (ours, v2: spec 21 §15.1)
+//       "Body":     { ... },   (ours, v2: spec 21 §15.2)
 //       "DebugOptions":     bool,   (the "Dev. Debug Options" flag)
 //       "SkipStartupIntro": bool
 //     }
@@ -58,6 +58,11 @@ enum class MirrorViewType { BothEyes = 0, RightEye = 1, LeftEye = 2 };
 // Auto runs it only up to kStereoAaMaxAutoScale: above that the eyes are
 // supersampled enough that it costs about 0.6 ms GPU for little gain.
 enum class StereoAA { Auto = 0, On = 1, Off = 2 };
+
+// v2 (ours). Each default is v1's behaviour (spec 20 §1.1).
+enum class PlayMode { Seated = 0, Standing = 1 };
+enum class FlashlightAim { Head = 0, LeftHand = 1, RightHand = 2 };
+enum class BodyVisible { Full = 0, ArmsAndHands = 1, HandsOnly = 2, None = 3 };
 
 // Defaults are the original's, except the runtime (see Config).
 struct RenderingSettings {
@@ -89,6 +94,63 @@ struct ComfortSettings {
     float smooth_turn_speed = 0.0f;
     // A held stick repeats a snap step this often; 0 never.
     int snap_turn_repeat_ms = kSnapTurnRepeatMsDefault;
+    // A short fade from black after each snap step.
+    bool snap_turn_fade = false;
+    // Comfort vignette strength while moving or turning, 0 off to 1.
+    float vignette     = 0.0f;
+    PlayMode play_mode = PlayMode::Seated;
+    // Metres; 0 is not calibrated.
+    float standing_eye_height = 0.0f;
+    float world_scale         = kWorldScaleDefault;
+};
+
+// v2 controls (spec 22 §3.1); every one off is v1.
+struct ControlsSettings {
+    bool interaction_aware_turning = false;
+    bool dpad_emulation            = false;
+    bool recenter_gesture          = false;
+    bool hud_toggle_gesture        = false;
+    bool holster_gestures          = false;
+    bool hiding_lean               = false;
+    bool hold_breath_gesture       = false;
+    bool controller_glyphs         = false;
+    bool vr_off_hotkey             = false;
+    // Read at attach: applies from the next launch.
+    bool crash_safe_log = false;
+};
+
+// Spec 21 §15.1. The sub-keys default on so that turning the master key
+// on gives the whole feature; the master keys default off.
+struct HapticsSettings {
+    bool enabled     = false; // read at runtime start
+    float strength   = kHapticStrengthMax;
+    bool game_rumble = true;
+    bool damage      = true;
+    bool tracker     = true;
+    bool firing      = true;
+    bool hacking     = true;
+};
+
+struct HandsSettings {
+    bool enabled                 = false;
+    bool aim_from_hand           = true;
+    bool tracker_in_hand         = true;
+    FlashlightAim flashlight_aim = FlashlightAim::Head;
+    bool melee_by_motion         = true;
+    bool throw_by_motion         = true;
+    float throw_strength         = kThrowStrengthDefault;
+    float smoothing              = 0.0f;
+    bool wrist_health            = false;
+    HapticsSettings haptics{};
+};
+
+// Spec 21 §15.2.
+struct BodySettings {
+    BodyVisible visible    = BodyVisible::Full;
+    float eye_forward      = 0.0f; // metres
+    bool room_scale        = false;
+    float seated_eye_raise = 0.0f; // metres
+    bool real_crouch       = false;
 };
 
 struct DebugSettings {
@@ -107,6 +169,9 @@ struct Settings {
     DebugSettings debug{};
     // Ours, v2: each default is v1's behaviour.
     ComfortSettings comfort{};
+    ControlsSettings controls{};
+    HandsSettings hands{};
+    BodySettings body{};
     // Ours: show the game and the VR runtime on the player's Discord
     // profile. Stored as Settings.DiscordRichPresence.
     bool discord_rich_presence = true;

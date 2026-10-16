@@ -11,6 +11,7 @@
 
 #include "core/config/settings_table.h"
 
+#include <optional>
 #include <type_traits>
 
 namespace omvr::core::config {
@@ -24,6 +25,10 @@ constexpr const char* kSettingsKey  = "Settings";
 constexpr const char* kRenderingKey = "Rendering";
 constexpr const char* kInputKey     = "Input";
 constexpr const char* kComfortKey   = "Comfort";
+constexpr const char* kControlsKey  = "Controls";
+constexpr const char* kHandsKey     = "Hands";
+constexpr const char* kHapticsKey   = "Haptics";
+constexpr const char* kBodyKey      = "Body";
 
 // The layout earlier builds of this project wrote: a top-level object
 // "DebugOptions" holding "SkipStartupIntro" and "DevDebugOptions".
@@ -36,9 +41,19 @@ const char* section_key(Section s) noexcept {
         case Section::Rendering: return kRenderingKey;
         case Section::Input: return kInputKey;
         case Section::Comfort: return kComfortKey;
+        case Section::Controls: return kControlsKey;
+        case Section::Hands: return kHandsKey;
+        case Section::HandsHaptics: return kHapticsKey;
+        case Section::Body: return kBodyKey;
         case Section::Settings: break;
     }
     return nullptr;
+}
+
+// The section a section lies in, or nullopt for one directly in Settings.
+std::optional<Section> parent_of(Section s) noexcept {
+    if (s == Section::HandsHaptics) return Section::Hands;
+    return std::nullopt;
 }
 
 // Tolerant lookup: returns `fallback` if `key` is missing or has the wrong
@@ -79,8 +94,19 @@ json& object_at(json& j, const char* key) {
 const json* section_in(const json& settings, Section section) {
     const char* key = section_key(section);
     if (!key) return &settings;
-    const auto it = settings.find(key);
-    return it != settings.end() && it->is_object() ? &*it : nullptr;
+    const auto parent  = parent_of(section);
+    const json* within = parent ? section_in(settings, *parent) : &settings;
+    if (!within) return nullptr;
+    const auto it = within->find(key);
+    return it != within->end() && it->is_object() ? &*it : nullptr;
+}
+
+// The section object of `settings` a row writes to, made where missing.
+json& section_at(json& settings, Section section) {
+    const char* key = section_key(section);
+    if (!key) return settings;
+    const auto parent = parent_of(section);
+    return object_at(parent ? section_at(settings, *parent) : settings, key);
 }
 
 template <class T>
@@ -154,9 +180,7 @@ void write_config(json& root, const Settings& c) {
     written.vr_runtime = written_runtime(c.vr_runtime);
     json& s            = object_at(root, kSettingsKey);
     for (const SettingRow& row : settings_table()) {
-        const char* key               = section_key(row.section);
-        json& section                 = key ? object_at(s, key) : s;
-        section[std::string(row.key)] = value_of(row, written);
+        section_at(s, row.section)[std::string(row.key)] = value_of(row, written);
     }
 }
 
