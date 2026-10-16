@@ -9,6 +9,7 @@
 #include "core/stereo/scene_tracker.h"
 #include "core/stereo/snap_turn.h"
 #include "core/stereo/stereo_aa.h"
+#include "core/stereo/stereo_update.h"
 #include "core/stereo/tuning.h"
 #include "core/stereo/ui_placement.h"
 #include "fakes/fakes.h"
@@ -143,6 +144,112 @@ TEST_CASE("snap turn steps and wraps") {
     CHECK(snapped_yaw(0.9f, 1.0f, 12) == doctest::Approx(0.9f + 1.0f / 6.0f - 2.0f));
     CHECK(snapped_yaw(-0.9f, -1.0f, 12) == doctest::Approx(-0.9f - 1.0f / 6.0f + 2.0f));
     CHECK(snapped_yaw(0.5f, 1.0f, 2) == doctest::Approx(-0.5f));
+}
+
+TEST_CASE("smooth turn: centre zone, linear ramp, degrees per second") {
+    // Spec 22 §4.2: d = (|v| - 0.33) / (1 - 0.33), clamped to [0, 1].
+    CHECK(smooth_turn_share(0.0f) == 0.0f);
+    CHECK(smooth_turn_share(0.33f) == 0.0f);
+    CHECK(smooth_turn_share(-0.2f) == 0.0f);
+    CHECK(smooth_turn_share(1.0f) == doctest::Approx(1.0f));
+    CHECK(smooth_turn_share(-1.0f) == doctest::Approx(1.0f));
+    CHECK(smooth_turn_share(0.665f) == doctest::Approx(0.5f));
+
+    // 90 degrees per second for one second at full deflection is half a
+    // half turn, to the right for a positive turn.
+    CHECK(smoothed_yaw(0.0f, 1.0f, 90.0f, 1.0f) == doctest::Approx(0.5f));
+    CHECK(smoothed_yaw(0.0f, -1.0f, 90.0f, 1.0f) == doctest::Approx(-0.5f));
+    CHECK(smoothed_yaw(0.2f, 0.1f, 90.0f, 1.0f) == 0.2f); // inside the zone
+    // Wrapped past 180 degrees.
+    CHECK(smoothed_yaw(0.95f, 1.0f, 180.0f, 0.1f) == doctest::Approx(0.95f + 0.1f - 2.0f));
+}
+
+namespace update_test {
+
+using omvr::core::config::Settings;
+using Time = std::chrono::steady_clock::time_point;
+
+UpdateInput pad_input(Time now, float turn, float yaw) {
+    UpdateInput in;
+    in.now           = now;
+    in.pad           = true;
+    in.turn          = turn;
+    in.follow_active = true;
+    in.follow_yaw    = yaw;
+    return in;
+}
+
+} // namespace update_test
+
+TEST_CASE("stereo update: v1 turning while EnhancedMode is off") {
+    using namespace update_test;
+    Settings s;
+    s.input.snap_rotation       = false;
+    s.comfort.smooth_turn_speed = 180.0f; // stored, but gated off
+    SceneTracker scene;
+    StereoUpdate update(s, scene);
+    const Time t0{1s};
+    const UpdateOutput out = update.run(pad_input(t0, 1.0f, 0.0f));
+    CHECK_FALSE(out.yaw.has_value());
+    CHECK(out.look_enabled == true); // the game's own look turns
+}
+
+TEST_CASE("stereo update: smooth turn is time-based, capped, and stops the game look") {
+    using namespace update_test;
+    Settings s;
+    s.enhanced_mode             = true;
+    s.input.snap_rotation       = false;
+    s.comfort.smooth_turn_speed = 180.0f;
+    SceneTracker scene;
+    StereoUpdate update(s, scene);
+    const Time t0{1s};
+
+    // The first update turns by nothing.
+    UpdateOutput out = update.run(pad_input(t0, 1.0f, 0.0f));
+    CHECK_FALSE(out.yaw.has_value());
+    CHECK(out.look_enabled == false);
+
+    // 20 ms at 180 degrees per second: 3.6 degrees, 0.02 half turns.
+    out = update.run(pad_input(t0 + 20ms, 1.0f, 0.0f));
+    REQUIRE(out.yaw.has_value());
+    CHECK(*out.yaw == doctest::Approx(0.02f));
+
+    // A 500 ms hitch turns for 50 ms only.
+    out = update.run(pad_input(t0 + 520ms, -1.0f, 0.0f));
+    REQUIRE(out.yaw.has_value());
+    CHECK(*out.yaw == doctest::Approx(-0.05f));
+
+    // A menu (screen mode) stops it; afterwards it resumes with no step.
+    UpdateInput menu = pad_input(t0 + 540ms, 1.0f, 0.0f);
+    menu.mode        = StereoMode::Screen;
+    CHECK_FALSE(update.run(menu).yaw.has_value());
+    CHECK_FALSE(update.run(pad_input(t0 + 2s, 1.0f, 0.0f)).yaw.has_value());
+    CHECK(update.run(pad_input(t0 + 2s + 10ms, 1.0f, 0.0f)).yaw.has_value());
+}
+
+TEST_CASE("stereo update: snap turn repeat interval") {
+    using namespace update_test;
+    Settings s;
+    s.enhanced_mode = true;
+    SceneTracker scene;
+    StereoUpdate update(s, scene);
+    const Time t0{1s};
+
+    SUBCASE("default 300 ms, as v1") {
+        CHECK(update.run(pad_input(t0, 1.0f, 0.0f)).yaw.has_value());
+        CHECK_FALSE(update.run(pad_input(t0 + 200ms, 1.0f, 0.0f)).yaw.has_value());
+        // Past the interval the latch clears; the next update steps.
+        CHECK_FALSE(update.run(pad_input(t0 + 301ms, 1.0f, 0.0f)).yaw.has_value());
+        CHECK(update.run(pad_input(t0 + 310ms, 1.0f, 0.0f)).yaw.has_value());
+    }
+    SUBCASE("0: one step per deflection") {
+        s.comfort.snap_turn_repeat_ms = 0;
+        CHECK(update.run(pad_input(t0, 1.0f, 0.0f)).yaw.has_value());
+        CHECK_FALSE(update.run(pad_input(t0 + 5s, 1.0f, 0.0f)).yaw.has_value());
+        CHECK_FALSE(update.run(pad_input(t0 + 6s, 1.0f, 0.0f)).yaw.has_value());
+        CHECK_FALSE(update.run(pad_input(t0 + 6s + 10ms, 0.0f, 0.0f)).yaw.has_value()); // released
+        CHECK(update.run(pad_input(t0 + 6s + 20ms, 1.0f, 0.0f)).yaw.has_value());
+    }
 }
 
 TEST_CASE("virtual screen and HUD quads follow the view") {

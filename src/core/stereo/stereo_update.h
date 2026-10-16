@@ -38,7 +38,7 @@ struct UpdateInput {
 // the look byte, takes the reference pose, re-places the menu screen, brings
 // the mode stack in line and writes the scene visibility.
 struct UpdateOutput {
-    std::optional<float> yaw;         // snap turn: the camera's new yaw
+    std::optional<float> yaw;         // snap or smooth turn: the camera's new yaw
     std::optional<bool> look_enabled; // the game's own look, while a camera is active
     bool recenter     = false;        // take the reference pose (device slot 21)
     bool place_screen = false;        // re-place the menu screen in front of the view
@@ -48,15 +48,16 @@ struct UpdateOutput {
     bool keyboard_mouse = false;
 };
 
-// Stereo::Update replaced (05 §3.2): snap turn on the turn axis, recenter on
-// LB+RB or Ctrl+Alt, game look only when snap is off or keyboard/mouse is
-// used, scene visibility for cutscenes and loading. The game's own update
+// Stereo::Update replaced (05 §3.2): snap or smooth turn on the turn axis
+// (spec 22 §4.1), recenter on LB+RB or Ctrl+Alt, game look only when
+// neither applies or keyboard/mouse is used, scene visibility for cutscenes
+// and loading. The game's own update
 // (DK2 recenter, fade) is not run. Pure over the values its thunk reads.
 // Game thread.
 // From: FUN_1001f8a0.
 class StereoUpdate final {
 public:
-    // `settings` is the live settings object: snap turn is read each update.
+    // `settings` is the live settings object: turning is read each update.
     StereoUpdate(const config::Settings& settings, SceneTracker& scene) noexcept
         : settings_(settings), scene_(scene) {}
 
@@ -75,7 +76,13 @@ public:
     void set_loading_blackout(bool on) noexcept { loading_blackout_ = on; }
 
 private:
-    void snap_turn(const UpdateInput& in, UpdateOutput& out) noexcept;
+    // Which turning applies (spec 22 §4.1); exactly one, chosen each update.
+    enum class Turning { Snap, GameLook, Smooth };
+    Turning turning(const config::ComfortSettings& comfort) const noexcept;
+
+    void snap_turn(const UpdateInput& in, UpdateOutput& out, const config::ComfortSettings& comfort) noexcept;
+    // True when smooth turn applied this update.
+    bool smooth_turn(const UpdateInput& in, UpdateOutput& out, float speed) noexcept;
     void recenter(const UpdateInput& in, UpdateOutput& out) noexcept;
 
     const config::Settings& settings_;
@@ -92,6 +99,9 @@ private:
                                                         // gameplay starting, headset put on
     int screen_replaced_ = 0;                           // +0x320
     std::chrono::steady_clock::time_point last_snap_{}; // kept past the stick's release
+    // The previous update smooth turn applied in; empty when the last one
+    // did not, so the first one turns by nothing (spec 22 §4.2).
+    std::optional<std::chrono::steady_clock::time_point> smooth_time_;
 };
 
 } // namespace omvr::core::stereo

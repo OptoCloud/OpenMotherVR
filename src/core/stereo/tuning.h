@@ -34,8 +34,12 @@ inline constexpr float kMinForwardLength = 1e-6f;
 
 // A turn-axis value beyond this is a snap step (05 §3.2c).
 inline constexpr float kTurnThreshold = 0.5f;
-// A held stick repeats a snap step this often.
-inline constexpr auto kSnapRepeat = std::chrono::milliseconds(300);
+// Smooth turn (spec 22 §4.2): the turn value's centre zone, the same one
+// the VR turn value already has (04 §5.8.5), so a real stick at rest never
+// drifts; and the longest time one update turns for, so a hitch does not
+// jump the view (below 20 frames per second the turn slows instead).
+inline constexpr float kSmoothTurnDeadZone = 0.33f;
+inline constexpr auto kSmoothTurnMaxStep   = std::chrono::milliseconds(50);
 // A full turn takes at least this many snap steps, whatever the setting.
 inline constexpr int kMinSnapSegments = 2;
 // Debug: how long after a snap step the camera is traced.
