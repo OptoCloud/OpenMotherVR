@@ -76,35 +76,35 @@ Fixes to original issues
 - [x] Stale Oculus input on focus loss: the Oculus backend is replaced by
       OpenXR, and both backends zero the controller state while the game
       lacks input focus (dashboard open)
-- [ ] Object pop-in: the game's per-object distance/LOD cull is wrong for
-      the wide per-eye field of view; bypassed in stereo, not yet confirmed
-      in game
-- [ ] Anti-aliasing modes are switched off in the stereo path: FXAA and
-      SMAA T1x re-enabled, SMAA T2x runs as T1x (no per-eye history);
-      implemented, not yet seen in game
-- [ ] Short delay before the head-in-wall blackout, so walking through
-      doors does not flash black; implemented (600 ms), not yet confirmed in
-      game
+- [x] Object pop-in: the game's per-object distance/LOD cull is wrong for
+      the wide per-eye field of view; bypassed in stereo (verified in game)
+- [x] Anti-aliasing modes are switched off in the stereo path: FXAA and
+      SMAA T1x re-enabled, SMAA T2x runs as T1x (no per-eye history)
+      (verified in game)
+- [x] Short delay before the head-in-wall blackout, so walking through
+      doors does not flash black (600 ms, verified in game)
 - [x] Snap turn at 3 segments turned 180 degrees (integer division)
 - [x] Controls only fit the Vive wand under OpenVR: SteamVR Input with
       default bindings for Index, Touch, WMR and Vive wands, rebindable in
       SteamVR (verified on Index)
 
-From the first tester reports (implemented, not yet confirmed in game)
-- [ ] OpenXR runtime discovery prefers the runtime made active in SteamVR
+From the first tester reports
+- [x] OpenXR runtime discovery prefers the runtime made active in SteamVR
       or the vendor's app over a leftover 32-bit registration; failure
       messages name the error and say how to get back to SteamVR, and the
       options page shows the runtime actually running
 - [ ] Warning when SteamVR's Desktop Game Theatre shows the game flat
-      instead of in VR
-- [ ] An oversized desktop mirror window goes borderless over its monitor
+      instead of in VR (implemented, not yet triggered in game)
+- [x] An oversized desktop mirror window goes borderless over its monitor
       instead of running past the screen
-- [ ] Losing the desktop focus (SteamVR, a streaming client) no longer
+- [x] Losing the desktop focus (SteamVR, a streaming client) no longer
       pauses the game or stalls loading screens
-- [ ] Desktop mirror modes crop each eye from its own half
-- [ ] Head pose held when tracking is lost; recenter waits for a valid pose
+- [x] Desktop mirror modes crop each eye from its own half
+- [x] Head pose held when tracking is lost; recenter waits for a valid pose
 - [ ] Runtime None leaves the game unmodded apart from the options page
+      (implemented, not yet run in game)
 - [ ] Crash record in `mothervr.log` (module, offset, registers, callers)
+      (implemented; the filter is in place, no crash recorded yet)
 - [ ] Not yet understood: a crash on B in the pause menu, the old menu
       lingering over the Continue video, the view sliding on snap turns
       while walking (diagnostics added behind Dev. Debug Options)
@@ -140,3 +140,23 @@ Quality of life
 - Test and support the 2020 build (current Steam, GOG, Epic)
 - A hotkey to disable VR (crash records are in v1)
 - Per-controller button glyphs (Index, Quest, WMR) in the UI
+- Discord Rich Presence: the area and what the player is doing (done;
+  `DiscordRichPresence` in `mothervr.json`)
+
+### Linux (Proton)
+
+Not started. The mod stays a Windows DLL; the work is making it run inside
+Proton/Wine with SteamVR for Linux or a Linux OpenXR runtime (Monado,
+WiVRn, ALVR).
+
+- [ ] Load under Proton next to DXVK: `WINEDLLOVERRIDES="d3d11=n,b"`,
+      forward to Proton's own `d3d11.dll` (DXVK) instead of `system32`
+- [ ] OpenVR through Proton's bridge to SteamVR for Linux (the embedded
+      `openvr_api.dll` against Proton's `vrclient`)
+- [ ] OpenXR through `wineopenxr`: runtime discovery without the Windows
+      registry entries, D3D11 swapchain images over DXVK's Vulkan interop
+- [ ] Headset audio redirect, crash record and desktop-focus fixes checked
+      under Wine (`IMMDevice`, SEH filter, window messages)
+- [ ] `scripts/run_game.ps1` counterpart for Linux and a Proton test pass
+      on the 2015 and 2020 builds
+- [ ] Player guide: Proton version, launch options, known issues
