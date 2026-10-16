@@ -34,13 +34,28 @@ enum class CommandRule {
     PixelScale,   // a number in [kPixelScaleMin, kPixelScaleMax]
     Segments,     // an integer of at least kSnapSegmentsMinCommand, rounded down to a step
     RuntimeEntry, // the options page's runtime entry (runtime_menu.h)
+    Number,       // a decimal number in the row's range
+    Integer,      // a decimal integer in the row's range
+};
+
+// The values a Number or Integer command accepts: [min, max], and 0 too
+// where 0 means off (spec 22 §3.1).
+struct CommandRange {
+    float min    = 0.0f;
+    float max    = 0.0f;
+    bool or_zero = false;
+
+    constexpr bool accepts(float v) const noexcept {
+        return (v >= min && v <= max) || (or_zero && v == 0.0f);
+    }
 };
 
 // What else an accepted command does.
 enum class CommandEffect {
     None,
-    QuitGame,      // the runtime takes effect on the next launch, so the game quits
-    ApplyBlinders, // the game reads the head-clip threshold at once
+    QuitGame,        // the runtime takes effect on the next launch, so the game quits
+    ApplyBlinders,   // the game reads the head-clip threshold at once
+    CalibrateHeight, // no setting: measure the standing eye height (spec 22 §3.3, §6.2)
 };
 
 struct SettingRow {
@@ -51,6 +66,11 @@ struct SettingRow {
     std::string_view command = {}; // "mvr_..." or empty
     CommandRule rule         = CommandRule::None;
     CommandEffect effect     = CommandEffect::None;
+    CommandRange range       = {}; // for CommandRule::Number and Integer
+    // The options page's function the value is pushed to (spec 06 §4.3), for
+    // the rows the push sends generically (the v2 pages); empty for the v1
+    // rows, which the push names one by one.
+    std::string_view push = {};
 };
 
 // Every setting, in the order the original's file lists them.

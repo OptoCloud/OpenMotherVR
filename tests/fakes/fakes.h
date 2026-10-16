@@ -10,6 +10,7 @@
 #include "core/diag/ports/log_sink.h"
 #include "core/ui/ports/archive_files.h"
 #include "core/ui/ports/game_signals.h"
+#include "core/ui/ports/play_space_control.h"
 #include "core/ui/ports/runtime_state.h"
 #include "core/ui/ports/script_variables.h"
 
@@ -124,6 +125,19 @@ public:
     bool has_failed                               = false;
     core::vr::DetectResult::Chosen chosen_runtime = core::vr::DetectResult::Chosen::OpenVR;
     bool active                                   = true;
+};
+
+// The calibration and the -vrscale switch as the test sets them; counts
+// calibration requests.
+class FakePlaySpaceControl final : public core::ui::ports::PlaySpaceControl {
+public:
+    void request_height_calibration() noexcept override { ++requests; }
+    core::ui::ports::CalibrationView height_calibration() noexcept override { return calibration; }
+    std::optional<float> world_scale_switch() const noexcept override { return scale_switch; }
+
+    int requests = 0;
+    core::ui::ports::CalibrationView calibration{};
+    std::optional<float> scale_switch;
 };
 
 // Every script-variable call, as "name=value" in call order.

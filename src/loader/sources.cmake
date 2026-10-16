@@ -17,6 +17,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/install.h
     ${CMAKE_CURRENT_LIST_DIR}/launch_options.cpp
     ${CMAKE_CURRENT_LIST_DIR}/launch_options.h
+    ${CMAKE_CURRENT_LIST_DIR}/play_space_control.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/play_space_control.h
     ${CMAKE_CURRENT_LIST_DIR}/resource_ids.h
     ${CMAKE_CURRENT_LIST_DIR}/resources.rc
     ${CMAKE_CURRENT_LIST_DIR}/runtime_state.cpp

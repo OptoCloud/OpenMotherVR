@@ -18,6 +18,7 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -26,12 +27,17 @@
 namespace {
 
 using namespace omvr::core::ui;
+using omvr::core::config::BodyVisible;
+using omvr::core::config::CommandEffect;
+using omvr::core::config::FlashlightAim;
 using omvr::core::config::MirrorViewType;
+using omvr::core::config::PlayMode;
 using omvr::core::config::Settings;
 using omvr::core::config::VRRuntime;
 using omvr::tests::bytes_of;
 using omvr::tests::FakeArchiveFiles;
 using omvr::tests::FakeGameSignals;
+using omvr::tests::FakePlaySpaceControl;
 using omvr::tests::FakeRuntimeState;
 using omvr::tests::MemoryFileStore;
 using omvr::tests::RecordingLog;
@@ -114,6 +120,209 @@ TEST_CASE("mvr_snaprotationsegments rounds down to a step") {
     CHECK(apply_command(s, "mvr_snaprotationsegments", "5").change->text == "4");
     CHECK(apply_command(s, "mvr_snaprotationsegments", "2").change->text == "2");
     CHECK(apply_command(s, "mvr_snaprotationsegments", "1").kind == Kind::Refused);
+}
+
+// Spec 22 §3.3, 21 §15.3: each v2 key's command takes the key's own range
+// (22 §3.1, 21 §15.1, §15.2); a value outside it changes nothing.
+TEST_CASE("v2 number commands take the key's range, and 0 where it means off") {
+    Settings s;
+    CommandOutcome o = apply_command(s, "mvr_smoothturnspeed", "45");
+    CHECK(o.kind == Kind::Applied);
+    CHECK(o.change->path == "Comfort.SmoothTurnSpeed");
+    CHECK(o.change->text == "45.00");
+    CHECK(s.comfort.smooth_turn_speed == 45.0f);
+    CHECK(apply_command(s, "mvr_smoothturnspeed", "0").kind == Kind::Applied);
+    CHECK(s.comfort.smooth_turn_speed == 0.0f);
+    CHECK(apply_command(s, "mvr_smoothturnspeed", "30").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_smoothturnspeed", "360").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_smoothturnspeed", "29.9").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_smoothturnspeed", "361").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_smoothturnspeed", "-30").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_smoothturnspeed", "fast").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_smoothturnspeed", nullptr).kind == Kind::Refused);
+    CHECK(s.comfort.smooth_turn_speed == 360.0f);
+
+    o = apply_command(s, "mvr_vignette", "0.3");
+    CHECK(o.change->text == "0.30");
+    CHECK(s.comfort.vignette == 0.3f);
+    CHECK(apply_command(s, "mvr_vignette", "1").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_vignette", "1.1").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_vignette", "-0.1").kind == Kind::Refused);
+
+    CHECK(apply_command(s, "mvr_standingeyeheight", "1.75").kind == Kind::Applied);
+    CHECK(s.comfort.standing_eye_height == 1.75f);
+    CHECK(apply_command(s, "mvr_standingeyeheight", "0").kind == Kind::Applied); // not calibrated
+    CHECK(apply_command(s, "mvr_standingeyeheight", "0.9").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_standingeyeheight", "2.3").kind == Kind::Refused);
+
+    CHECK(apply_command(s, "mvr_worldscale", "1.25").kind == Kind::Applied);
+    CHECK(s.comfort.world_scale == 1.25f);
+    CHECK(apply_command(s, "mvr_worldscale", "0.5").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_worldscale", "1.5").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_worldscale", "0.4").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_worldscale", "1.6").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_worldscale", "0").kind == Kind::Refused); // 0 is no scale
+
+    CHECK(apply_command(s, "mvr_throwstrength", "2").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_throwstrength", "0.5").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_throwstrength", "2.1").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_throwstrength", "0.4").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_handsmoothing", "0.7").kind == Kind::Applied);
+    CHECK(s.hands.smoothing == 0.7f);
+    CHECK(apply_command(s, "mvr_handsmoothing", "1.5").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_hapticsstrength", "0").kind == Kind::Applied);
+    CHECK(s.hands.haptics.strength == 0.0f);
+    CHECK(apply_command(s, "mvr_hapticsstrength", "1.01").kind == Kind::Refused);
+
+    CHECK(apply_command(s, "mvr_eyeforward", "-0.2").kind == Kind::Applied);
+    CHECK(s.body.eye_forward == -0.2f);
+    CHECK(apply_command(s, "mvr_eyeforward", "-0.21").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_eyeforward", "0.21").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_seatedeyeraise", "0.5").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_seatedeyeraise", "-0.5").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_seatedeyeraise", "0.55").kind == Kind::Refused);
+}
+
+TEST_CASE("v2 integer commands take whole numbers in range, and 0 where it means off") {
+    Settings s;
+    const CommandOutcome o = apply_command(s, "mvr_snapturnrepeat", "500");
+    CHECK(o.kind == Kind::Applied);
+    CHECK(o.change->path == "Comfort.SnapTurnRepeatMs");
+    CHECK(o.change->text == "500");
+    CHECK(s.comfort.snap_turn_repeat_ms == 500);
+    CHECK(apply_command(s, "mvr_snapturnrepeat", "0").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_snapturnrepeat", "150").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_snapturnrepeat", "1000").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_snapturnrepeat", "149").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_snapturnrepeat", "1001").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_snapturnrepeat", "200.5").kind == Kind::Refused);
+    CHECK(s.comfort.snap_turn_repeat_ms == 1000);
+}
+
+TEST_CASE("v2 list and switch commands") {
+    Settings s;
+    CommandOutcome o = apply_command(s, "mvr_playmode", "1");
+    CHECK(o.change->text == "Standing");
+    CHECK(s.comfort.play_mode == PlayMode::Standing);
+    CHECK(apply_command(s, "mvr_playmode", "2").kind == Kind::Refused);
+    o = apply_command(s, "mvr_flashlightaim", "2");
+    CHECK(o.change->text == "RightHand");
+    CHECK(s.hands.flashlight_aim == FlashlightAim::RightHand);
+    CHECK(apply_command(s, "mvr_flashlightaim", "3").kind == Kind::Refused);
+    o = apply_command(s, "mvr_bodyvisible", "3");
+    CHECK(o.change->path == "Body.Visible");
+    CHECK(o.change->text == "None");
+    CHECK(s.body.visible == BodyVisible::None);
+    CHECK(apply_command(s, "mvr_bodyvisible", "4").kind == Kind::Refused);
+
+    for (const char* name :
+         {"mvr_snapturnfade", "mvr_interactionawareturning", "mvr_dpademulation", "mvr_recentergesture",
+          "mvr_hudtogglegesture", "mvr_holstergestures", "mvr_hidinglean", "mvr_holdbreathgesture",
+          "mvr_controllerglyphs", "mvr_vroffhotkey", "mvr_crashsafelog", "mvr_hands", "mvr_wristhealth",
+          "mvr_haptics", "mvr_roomscale", "mvr_realcrouch"}) {
+        CHECK(apply_command(s, name, "1").kind == Kind::Applied);
+        CHECK(apply_command(s, name, "2").kind == Kind::Refused);
+    }
+    CHECK(s.comfort.snap_turn_fade);
+    CHECK(s.controls.crash_safe_log);
+    CHECK(s.hands.enabled);
+    CHECK(s.hands.haptics.enabled);
+    CHECK(s.body.real_crouch);
+    // These default on (21 §15.1).
+    for (const char* name : {"mvr_aimfromhand", "mvr_trackerinhand", "mvr_meleebymotion", "mvr_throwbymotion",
+                             "mvr_hapticsgamerumble", "mvr_hapticsdamage", "mvr_hapticstracker",
+                             "mvr_hapticsfiring", "mvr_hapticshacking"}) {
+        CHECK(apply_command(s, name, "0").change->text == "false");
+    }
+    CHECK_FALSE(s.hands.haptics.hacking);
+}
+
+TEST_CASE("mvr_calibrateheight asks for a calibration and saves nothing") {
+    Settings s;
+    const CommandOutcome o = apply_command(s, kCalibrateHeightCommand, nullptr);
+    CHECK(o.kind == Kind::Applied);
+    CHECK(o.effect == CommandEffect::CalibrateHeight);
+    CHECK_FALSE(o.change.has_value());
+    CHECK(apply_command(s, kCalibrateHeightCommand, "1").kind == Kind::Applied); // a value is ignored
+
+    MemoryFileStore files;
+    RecordingLog log;
+    omvr::core::config::SettingsStore store(files, log);
+    store.initialize(L"C:\\game");
+    FakeGameSignals signals;
+    FakeRuntimeState state;
+    DisplayReset reset(signals, state, log);
+    FakePlaySpaceControl play_space;
+    Commands commands(store, reset, signals, play_space, log);
+    char cmd[] = "mvr_calibrateheight";
+    commands.run(cmd);
+    CHECK(play_space.requests == 1);
+    CHECK(files.writes == 0);
+    CHECK(signals.exits == 0);
+    CHECK(log.lines.back() == "[script_bridge] standing height calibration requested by command");
+
+    char vignette[] = "mvr_vignette 0.5";
+    commands.run(vignette);
+    CHECK(store.current().comfort.vignette == 0.5f);
+    CHECK(files.writes == 1);
+    CHECK(log.contains("[script_bridge] Comfort.Vignette changed to 0.50 by command"));
+}
+
+TEST_CASE("the push sends each v2 value with its type, the -vrscale switch and the calibration") {
+    RecordingScriptVariables vars;
+    FakeGameSignals signals;
+    FakeRuntimeState state;
+    RecordingLog log;
+    DisplayReset reset(signals, state, log);
+    omvr::core::input::Glyphs glyphs;
+    omvr::core::input::ControlSchemes schemes(glyphs);
+    FakePlaySpaceControl play_space;
+    play_space.scale_switch = 1.2f;
+    play_space.calibration  = {ports::CalibrationPageState::Counting, 2};
+    Settings s;
+    s.comfort.smooth_turn_speed   = 45.0f;
+    s.comfort.play_mode           = PlayMode::Standing;
+    s.comfort.standing_eye_height = 1.72f;
+    s.controls.dpad_emulation     = true;
+    s.hands.flashlight_aim        = FlashlightAim::LeftHand;
+    s.hands.haptics.strength      = 0.5f;
+    s.body.visible                = BodyVisible::HandsOnly;
+    SettingsPush push({vars, reset, schemes, s, state, play_space, log});
+    push.push(ports::UiHandle{1});
+
+    const auto has = [&](const std::string& call) {
+        return std::ranges::find(vars.calls, call) != vars.calls.end();
+    };
+    CHECK(has("setMotherSmoothTurnSpeed=45.000000"));
+    CHECK(has("setMotherSnapTurnRepeatMs=300"));
+    CHECK(has("setMotherSnapTurnFade=false"));
+    CHECK(has("setMotherVignette=0.000000"));
+    CHECK(has("setMotherPlayMode=1"));
+    CHECK(has("setMotherStandingEyeHeight=1.720000"));
+    CHECK(has("setMotherWorldScale=1.000000"));
+    CHECK(has("setMotherDpadEmulation=true"));
+    CHECK(has("setMotherCrashSafeLog=false"));
+    CHECK(has("setMotherHandsEnabled=false"));
+    CHECK(has("setMotherAimFromHand=true"));
+    CHECK(has("setMotherFlashlightAim=1"));
+    CHECK(has("setMotherThrowStrength=1.000000"));
+    CHECK(has("setMotherHandSmoothing=0.000000"));
+    CHECK(has("setMotherHapticsEnabled=false"));
+    CHECK(has("setMotherHapticsStrength=0.500000"));
+    CHECK(has("setMotherHapticsHacking=true"));
+    CHECK(has("setMotherBodyVisible=2"));
+    CHECK(has("setMotherEyeForward=0.000000"));
+    CHECK(has("setMotherRealCrouch=false"));
+    CHECK(has("setMotherWorldScaleSwitch=1.200000"));
+    CHECK(has("setMotherCalibrationState=1"));
+    CHECK(has("setMotherCalibrationSeconds=2"));
+
+    // Without the switch the page is told 0.
+    RecordingScriptVariables plain;
+    FakePlaySpaceControl no_switch;
+    SettingsPush without({plain, reset, schemes, s, state, no_switch, log});
+    without.push(ports::UiHandle{1});
+    CHECK(std::ranges::find(plain.calls, "setMotherWorldScaleSwitch=0.000000") != plain.calls.end());
 }
 
 TEST_CASE("mvr_vrruntime maps the options page's entries and quits") {
@@ -200,7 +409,8 @@ TEST_CASE("the command runner saves, then quits, after mvr_vrruntime") {
     signals.events = &events;
     FakeRuntimeState state;
     DisplayReset reset(signals, state, log);
-    Commands commands(store, reset, signals, log);
+    FakePlaySpaceControl play_space;
+    Commands commands(store, reset, signals, play_space, log);
 
     char cmd[] = "mvr_vrruntime 1 trailing";
     commands.run(cmd);
@@ -232,7 +442,8 @@ TEST_CASE("the settings push sets every variable, then the controls help") {
     omvr::core::input::ControlSchemes schemes(glyphs);
     Settings s;
     s.rendering.pixel_scale = 1.5f;
-    SettingsPush push({vars, reset, schemes, s, state, log});
+    FakePlaySpaceControl play_space;
+    SettingsPush push({vars, reset, schemes, s, state, play_space, log});
 
     push.push(ports::UiHandle{});
     CHECK(vars.calls.empty());
@@ -257,13 +468,17 @@ TEST_CASE("the settings push sets every variable, then the controls help") {
                       "setMotherToggleGrips=false",
                       "setMotherToggleCrouch=false",
                   });
-    CHECK(vars.calls[14] == "addMotherViewControl=Move|L Touchpad");
-    CHECK(vars.calls.size() == 14 + schemes.control_help().size());
+    // Then the v2 pages: 38 settings and 3 page states (pushed before the
+    // help rows, which the page shows on its own sub-page).
+    constexpr std::size_t kPagePushes = 38 + 3;
+    CHECK(vars.calls[14] == "setMotherSmoothTurnSpeed=0.000000");
+    CHECK(vars.calls[14 + kPagePushes] == "addMotherViewControl=Move|L Touchpad");
+    CHECK(vars.calls.size() == 14 + kPagePushes + schemes.control_help().size());
 
     // A row the game refuses stops the list.
     RecordingScriptVariables short_vars;
     short_vars.row_limit = 2;
-    SettingsPush stops({short_vars, reset, schemes, s, state, log});
+    SettingsPush stops({short_vars, reset, schemes, s, state, play_space, log});
     stops.push(ports::UiHandle{1});
     CHECK(short_vars.rows == 2);
 }

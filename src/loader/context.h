@@ -44,6 +44,7 @@
 #include "loader/headset_audio.h"
 #include "loader/hook_targets.h"
 #include "loader/launch_options.h"
+#include "loader/play_space_control.h"
 #include "loader/runtime_state.h"
 #include "platform/d3d11/render/mirror_renderer.h"
 #include "platform/d3d11/render/vignette_renderer.h"
@@ -102,6 +103,8 @@ struct Context {
     game::ui::ScriptVars script_vars;
     game::ui::Console console;
     RuntimeStateView runtime_state; // over `runtimes` and `stereo`, declared below
+    // The standing height calibration and -vrscale, for the options pages.
+    PlaySpaceControlView play_space_control;
     core::ui::DisplayReset display_reset;
     // input
     game::input::InputManager input_manager;

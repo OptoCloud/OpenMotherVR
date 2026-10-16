@@ -63,6 +63,28 @@ bool& room_scale(Settings& s) noexcept { return s.body.room_scale; }
 float& seated_eye_raise(Settings& s) noexcept { return s.body.seated_eye_raise; }
 bool& real_crouch(Settings& s) noexcept { return s.body.real_crouch; }
 
+// What the v2 commands accept (spec 22 §3.1, 21 §15): the keys' ranges,
+// and 0 where it means off or not calibrated.
+constexpr CommandRange kSmoothTurnSpeed{kSmoothTurnSpeedMin, kSmoothTurnSpeedMax, true};
+constexpr CommandRange kSnapTurnRepeat{static_cast<float>(kSnapTurnRepeatMsMin),
+                                       static_cast<float>(kSnapTurnRepeatMsMax), true};
+constexpr CommandRange kVignette{0.0f, kVignetteMax};
+constexpr CommandRange kStandingEyeHeight{kStandingEyeHeightMin, kStandingEyeHeightMax, true};
+constexpr CommandRange kWorldScale{kWorldScaleMin, kWorldScaleMax};
+constexpr CommandRange kThrowStrength{kThrowStrengthMin, kThrowStrengthMax};
+constexpr CommandRange kHandSmoothing{0.0f, kHandSmoothingMax};
+constexpr CommandRange kHapticStrength{0.0f, kHapticStrengthMax};
+constexpr CommandRange kEyeForward{-kEyeForwardMax, kEyeForwardMax};
+constexpr CommandRange kSeatedEyeRaise{-kSeatedEyeRaiseMax, kSeatedEyeRaiseMax};
+
+// A row of the v2 pages: its command (named by this project, spec 22 §3.3)
+// and the page's function its value is pushed to.
+constexpr SettingRow page_row(Section section, std::string_view key, std::string_view path, Field field,
+                              std::string_view command, std::string_view push,
+                              CommandRule rule = CommandRule::Switch, CommandRange range = {}) {
+    return SettingRow{section, key, path, field, command, rule, CommandEffect::None, range, push};
+}
+
 // Key names are the original's (spec 06 §3); "StereoAntiAliasing" and the
 // OpenXR runtime value are this project's.
 constexpr std::array kRows{
@@ -96,46 +118,84 @@ constexpr std::array kRows{
                "mvr_skipintro", CommandRule::Switch},
     // Ours, file only (no options-page entry).
     SettingRow{Section::Settings, "DiscordRichPresence", "DiscordRichPresence", &discord_rich_presence},
-    // v2 (spec 22 §3.1, 21 §15), file only until the v2 options pages exist.
-    SettingRow{Section::Comfort, "SmoothTurnSpeed", "Comfort.SmoothTurnSpeed", &smooth_turn_speed},
-    SettingRow{Section::Comfort, "SnapTurnRepeatMs", "Comfort.SnapTurnRepeatMs", &snap_turn_repeat_ms},
-    SettingRow{Section::Comfort, "SnapTurnFade", "Comfort.SnapTurnFade", &snap_turn_fade},
-    SettingRow{Section::Comfort, "Vignette", "Comfort.Vignette", &vignette},
-    SettingRow{Section::Comfort, "PlayMode", "Comfort.PlayMode", &play_mode},
-    SettingRow{Section::Comfort, "StandingEyeHeight", "Comfort.StandingEyeHeight", &standing_eye_height},
-    SettingRow{Section::Comfort, "WorldScale", "Comfort.WorldScale", &world_scale},
-    SettingRow{Section::Controls, "InteractionAwareTurning", "Controls.InteractionAwareTurning",
-               &interaction_aware_turning},
-    SettingRow{Section::Controls, "DpadEmulation", "Controls.DpadEmulation", &dpad_emulation},
-    SettingRow{Section::Controls, "RecenterGesture", "Controls.RecenterGesture", &recenter_gesture},
-    SettingRow{Section::Controls, "HudToggleGesture", "Controls.HudToggleGesture", &hud_toggle_gesture},
-    SettingRow{Section::Controls, "HolsterGestures", "Controls.HolsterGestures", &holster_gestures},
-    SettingRow{Section::Controls, "HidingLean", "Controls.HidingLean", &hiding_lean},
-    SettingRow{Section::Controls, "HoldBreathGesture", "Controls.HoldBreathGesture", &hold_breath_gesture},
-    SettingRow{Section::Controls, "ControllerGlyphs", "Controls.ControllerGlyphs", &controller_glyphs},
-    SettingRow{Section::Controls, "VrOffHotkey", "Controls.VrOffHotkey", &vr_off_hotkey},
-    SettingRow{Section::Controls, "CrashSafeLog", "Controls.CrashSafeLog", &crash_safe_log},
-    SettingRow{Section::Hands, "Enabled", "Hands.Enabled", &hands_enabled},
-    SettingRow{Section::Hands, "AimFromHand", "Hands.AimFromHand", &aim_from_hand},
-    SettingRow{Section::Hands, "TrackerInHand", "Hands.TrackerInHand", &tracker_in_hand},
-    SettingRow{Section::Hands, "FlashlightAim", "Hands.FlashlightAim", &flashlight_aim},
-    SettingRow{Section::Hands, "MeleeByMotion", "Hands.MeleeByMotion", &melee_by_motion},
-    SettingRow{Section::Hands, "ThrowByMotion", "Hands.ThrowByMotion", &throw_by_motion},
-    SettingRow{Section::Hands, "ThrowStrength", "Hands.ThrowStrength", &throw_strength},
-    SettingRow{Section::Hands, "Smoothing", "Hands.Smoothing", &hand_smoothing},
-    SettingRow{Section::Hands, "WristHealth", "Hands.WristHealth", &wrist_health},
-    SettingRow{Section::HandsHaptics, "Enabled", "Hands.Haptics.Enabled", &haptics_enabled},
-    SettingRow{Section::HandsHaptics, "Strength", "Hands.Haptics.Strength", &haptics_strength},
-    SettingRow{Section::HandsHaptics, "GameRumble", "Hands.Haptics.GameRumble", &haptics_game_rumble},
-    SettingRow{Section::HandsHaptics, "Damage", "Hands.Haptics.Damage", &haptics_damage},
-    SettingRow{Section::HandsHaptics, "Tracker", "Hands.Haptics.Tracker", &haptics_tracker},
-    SettingRow{Section::HandsHaptics, "Firing", "Hands.Haptics.Firing", &haptics_firing},
-    SettingRow{Section::HandsHaptics, "Hacking", "Hands.Haptics.Hacking", &haptics_hacking},
-    SettingRow{Section::Body, "Visible", "Body.Visible", &body_visible},
-    SettingRow{Section::Body, "EyeForward", "Body.EyeForward", &eye_forward},
-    SettingRow{Section::Body, "RoomScale", "Body.RoomScale", &room_scale},
-    SettingRow{Section::Body, "SeatedEyeRaise", "Body.SeatedEyeRaise", &seated_eye_raise},
-    SettingRow{Section::Body, "RealCrouch", "Body.RealCrouch", &real_crouch},
+    // v2 (spec 22 §3.1, 21 §15): the pages Comfort, Controls, Hands and Body
+    // (22 §12, 21 §15.3) send these commands and receive these pushes.
+    page_row(Section::Comfort, "SmoothTurnSpeed", "Comfort.SmoothTurnSpeed", &smooth_turn_speed,
+             "mvr_smoothturnspeed", "setMotherSmoothTurnSpeed", CommandRule::Number, kSmoothTurnSpeed),
+    page_row(Section::Comfort, "SnapTurnRepeatMs", "Comfort.SnapTurnRepeatMs", &snap_turn_repeat_ms,
+             "mvr_snapturnrepeat", "setMotherSnapTurnRepeatMs", CommandRule::Integer, kSnapTurnRepeat),
+    page_row(Section::Comfort, "SnapTurnFade", "Comfort.SnapTurnFade", &snap_turn_fade, "mvr_snapturnfade",
+             "setMotherSnapTurnFade"),
+    page_row(Section::Comfort, "Vignette", "Comfort.Vignette", &vignette, "mvr_vignette", "setMotherVignette",
+             CommandRule::Number, kVignette),
+    page_row(Section::Comfort, "PlayMode", "Comfort.PlayMode", &play_mode, "mvr_playmode",
+             "setMotherPlayMode", CommandRule::Choice),
+    page_row(Section::Comfort, "StandingEyeHeight", "Comfort.StandingEyeHeight", &standing_eye_height,
+             "mvr_standingeyeheight", "setMotherStandingEyeHeight", CommandRule::Number, kStandingEyeHeight),
+    page_row(Section::Comfort, "WorldScale", "Comfort.WorldScale", &world_scale, "mvr_worldscale",
+             "setMotherWorldScale", CommandRule::Number, kWorldScale),
+    page_row(Section::Controls, "InteractionAwareTurning", "Controls.InteractionAwareTurning",
+             &interaction_aware_turning, "mvr_interactionawareturning", "setMotherInteractionAwareTurning"),
+    page_row(Section::Controls, "DpadEmulation", "Controls.DpadEmulation", &dpad_emulation,
+             "mvr_dpademulation", "setMotherDpadEmulation"),
+    page_row(Section::Controls, "RecenterGesture", "Controls.RecenterGesture", &recenter_gesture,
+             "mvr_recentergesture", "setMotherRecenterGesture"),
+    page_row(Section::Controls, "HudToggleGesture", "Controls.HudToggleGesture", &hud_toggle_gesture,
+             "mvr_hudtogglegesture", "setMotherHudToggleGesture"),
+    page_row(Section::Controls, "HolsterGestures", "Controls.HolsterGestures", &holster_gestures,
+             "mvr_holstergestures", "setMotherHolsterGestures"),
+    page_row(Section::Controls, "HidingLean", "Controls.HidingLean", &hiding_lean, "mvr_hidinglean",
+             "setMotherHidingLean"),
+    page_row(Section::Controls, "HoldBreathGesture", "Controls.HoldBreathGesture", &hold_breath_gesture,
+             "mvr_holdbreathgesture", "setMotherHoldBreathGesture"),
+    page_row(Section::Controls, "ControllerGlyphs", "Controls.ControllerGlyphs", &controller_glyphs,
+             "mvr_controllerglyphs", "setMotherControllerGlyphs"),
+    page_row(Section::Controls, "VrOffHotkey", "Controls.VrOffHotkey", &vr_off_hotkey, "mvr_vroffhotkey",
+             "setMotherVrOffHotkey"),
+    page_row(Section::Controls, "CrashSafeLog", "Controls.CrashSafeLog", &crash_safe_log, "mvr_crashsafelog",
+             "setMotherCrashSafeLog"),
+    page_row(Section::Hands, "Enabled", "Hands.Enabled", &hands_enabled, "mvr_hands",
+             "setMotherHandsEnabled"),
+    page_row(Section::Hands, "AimFromHand", "Hands.AimFromHand", &aim_from_hand, "mvr_aimfromhand",
+             "setMotherAimFromHand"),
+    page_row(Section::Hands, "TrackerInHand", "Hands.TrackerInHand", &tracker_in_hand, "mvr_trackerinhand",
+             "setMotherTrackerInHand"),
+    page_row(Section::Hands, "FlashlightAim", "Hands.FlashlightAim", &flashlight_aim, "mvr_flashlightaim",
+             "setMotherFlashlightAim", CommandRule::Choice),
+    page_row(Section::Hands, "MeleeByMotion", "Hands.MeleeByMotion", &melee_by_motion, "mvr_meleebymotion",
+             "setMotherMeleeByMotion"),
+    page_row(Section::Hands, "ThrowByMotion", "Hands.ThrowByMotion", &throw_by_motion, "mvr_throwbymotion",
+             "setMotherThrowByMotion"),
+    page_row(Section::Hands, "ThrowStrength", "Hands.ThrowStrength", &throw_strength, "mvr_throwstrength",
+             "setMotherThrowStrength", CommandRule::Number, kThrowStrength),
+    page_row(Section::Hands, "Smoothing", "Hands.Smoothing", &hand_smoothing, "mvr_handsmoothing",
+             "setMotherHandSmoothing", CommandRule::Number, kHandSmoothing),
+    page_row(Section::Hands, "WristHealth", "Hands.WristHealth", &wrist_health, "mvr_wristhealth",
+             "setMotherWristHealth"),
+    page_row(Section::HandsHaptics, "Enabled", "Hands.Haptics.Enabled", &haptics_enabled, "mvr_haptics",
+             "setMotherHapticsEnabled"),
+    page_row(Section::HandsHaptics, "Strength", "Hands.Haptics.Strength", &haptics_strength,
+             "mvr_hapticsstrength", "setMotherHapticsStrength", CommandRule::Number, kHapticStrength),
+    page_row(Section::HandsHaptics, "GameRumble", "Hands.Haptics.GameRumble", &haptics_game_rumble,
+             "mvr_hapticsgamerumble", "setMotherHapticsGameRumble"),
+    page_row(Section::HandsHaptics, "Damage", "Hands.Haptics.Damage", &haptics_damage, "mvr_hapticsdamage",
+             "setMotherHapticsDamage"),
+    page_row(Section::HandsHaptics, "Tracker", "Hands.Haptics.Tracker", &haptics_tracker,
+             "mvr_hapticstracker", "setMotherHapticsTracker"),
+    page_row(Section::HandsHaptics, "Firing", "Hands.Haptics.Firing", &haptics_firing, "mvr_hapticsfiring",
+             "setMotherHapticsFiring"),
+    page_row(Section::HandsHaptics, "Hacking", "Hands.Haptics.Hacking", &haptics_hacking,
+             "mvr_hapticshacking", "setMotherHapticsHacking"),
+    page_row(Section::Body, "Visible", "Body.Visible", &body_visible, "mvr_bodyvisible",
+             "setMotherBodyVisible", CommandRule::Choice),
+    page_row(Section::Body, "EyeForward", "Body.EyeForward", &eye_forward, "mvr_eyeforward",
+             "setMotherEyeForward", CommandRule::Number, kEyeForward),
+    page_row(Section::Body, "RoomScale", "Body.RoomScale", &room_scale, "mvr_roomscale",
+             "setMotherRoomScale"),
+    page_row(Section::Body, "SeatedEyeRaise", "Body.SeatedEyeRaise", &seated_eye_raise, "mvr_seatedeyeraise",
+             "setMotherSeatedEyeRaise", CommandRule::Number, kSeatedEyeRaise),
+    page_row(Section::Body, "RealCrouch", "Body.RealCrouch", &real_crouch, "mvr_realcrouch",
+             "setMotherRealCrouch"),
 };
 
 } // namespace

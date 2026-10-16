@@ -14,7 +14,9 @@
 
 #include <cmath>
 #include <limits>
+#include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -315,6 +317,41 @@ TEST_CASE("the settings table: commands and their rules") {
     CHECK(find_command("mvr_clipblinding")->effect == CommandEffect::ApplyBlinders);
     CHECK(find_command("mvr_nothing") == nullptr);
     CHECK(find_command("") == nullptr); // the AA row has no command
+}
+
+// Spec 22 §3.3, 21 §15.3: every v2 key has a command beginning with mvr_ and
+// a push to the options page; no command is a v1 name or another's.
+TEST_CASE("the settings table: every v2 key has its own command and push") {
+    const std::set<std::string_view> v1{
+        "mvr_vrruntime",     "mvr_mirrorview",   "mvr_mirrorviewsym",        "mvr_pixelscale",
+        "mvr_clipblinding",  "mvr_snaprotation", "mvr_snaprotationsegments", "mvr_inputrelativewalking",
+        "mvr_inputstrafing", "mvr_togglegrips",  "mvr_togglecrouch",         "mvr_debug",
+        "mvr_skipintro"};
+    std::set<std::string_view> commands;
+    std::set<std::string_view> pushes;
+    int v2_rows = 0;
+    for (const SettingRow& row : settings_table()) {
+        const bool v2 = row.section == Section::Comfort || row.section == Section::Controls ||
+                        row.section == Section::Hands || row.section == Section::HandsHaptics ||
+                        row.section == Section::Body;
+        if (!row.command.empty()) CHECK(commands.insert(row.command).second);
+        if (!v2) {
+            CHECK(row.push.empty());
+            continue;
+        }
+        ++v2_rows;
+        CHECK(row.command.starts_with("mvr_"));
+        CHECK_FALSE(v1.contains(row.command));
+        CHECK(row.rule != CommandRule::None);
+        CHECK(row.push.starts_with("setMother"));
+        CHECK(pushes.insert(row.push).second);
+    }
+    CHECK(v2_rows == 38);
+    CHECK(find_command("mvr_smoothturnspeed")->rule == CommandRule::Number);
+    CHECK(find_command("mvr_snapturnrepeat")->rule == CommandRule::Integer);
+    CHECK(find_command("mvr_playmode")->rule == CommandRule::Choice);
+    CHECK(find_command("mvr_hands")->path == "Hands.Enabled");
+    CHECK(find_command("mvr_haptics")->path == "Hands.Haptics.Enabled");
 }
 
 TEST_CASE("enum names round trip") {

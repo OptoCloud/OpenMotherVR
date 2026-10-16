@@ -15,6 +15,7 @@ namespace omvr::core::ui {
 
 namespace {
 
+using config::CommandEffect;
 using config::CommandRule;
 using config::SettingRow;
 using Kind = CommandOutcome::Kind;
@@ -83,6 +84,20 @@ CommandOutcome apply_segments(config::Settings& cfg, const SettingRow& row, cons
     return applied(cfg, row, segments, std::to_string(segments));
 }
 
+// A decimal number in the row's range (spec 22 §3.3); the log shows it
+// with two decimals, as the pixel scale.
+CommandOutcome apply_number(config::Settings& cfg, const SettingRow& row, const char* value) {
+    const auto v = util::parse_float(value);
+    if (!v || !row.range.accepts(*v)) return refused();
+    return applied(cfg, row, *v, std::format("{:.2f}", *v));
+}
+
+CommandOutcome apply_integer(config::Settings& cfg, const SettingRow& row, const char* value) {
+    const auto n = util::parse_int(value);
+    if (!n || !row.range.accepts(static_cast<float>(*n))) return refused();
+    return applied(cfg, row, *n, std::to_string(*n));
+}
+
 CommandOutcome apply_runtime_entry(config::Settings& cfg, const SettingRow& row, const char* value) {
     const auto n       = util::parse_int(value);
     const auto runtime = n ? runtime_from_ui(*n) : std::nullopt;
@@ -98,6 +113,8 @@ bool is_mod_command(std::string_view cmd) noexcept {
 }
 
 CommandOutcome apply_command(config::Settings& cfg, std::string_view name, const char* value) {
+    // Carries no setting value: any value after it is ignored.
+    if (name == kCalibrateHeightCommand) return {Kind::Applied, std::nullopt, CommandEffect::CalibrateHeight};
     const SettingRow* row = config::find_command(name);
     if (!row) return {Kind::Unknown};
     switch (row->rule) {
@@ -106,6 +123,8 @@ CommandOutcome apply_command(config::Settings& cfg, std::string_view name, const
         case CommandRule::PixelScale: return apply_pixel_scale(cfg, *row, value);
         case CommandRule::Segments: return apply_segments(cfg, *row, value);
         case CommandRule::RuntimeEntry: return apply_runtime_entry(cfg, *row, value);
+        case CommandRule::Number: return apply_number(cfg, *row, value);
+        case CommandRule::Integer: return apply_integer(cfg, *row, value);
         case CommandRule::None: break;
     }
     return {Kind::Unknown};
@@ -143,10 +162,17 @@ void Commands::run(char* cmd) noexcept {
 }
 
 void Commands::carry_out(const CommandOutcome& outcome) {
+    // Not a setting: nothing to save; the calibration stores the height
+    // it takes itself (spec 22 §6.2).
+    if (outcome.effect == CommandEffect::CalibrateHeight) {
+        log_.line("[script_bridge] standing height calibration requested by command");
+        play_space_.request_height_calibration();
+        return;
+    }
     config::Settings& cfg = store_.current();
     // Takes effect at once: the game reads the threshold through a pointer
     // patched into its head-in-wall check.
-    if (outcome.effect == config::CommandEffect::ApplyBlinders)
+    if (outcome.effect == CommandEffect::ApplyBlinders)
         stereo::set_clipping_blinders(cfg.rendering.clipping_blinders);
 
     config::sanitize(cfg);
@@ -163,7 +189,7 @@ void Commands::carry_out(const CommandOutcome& outcome) {
     // After the save: the new runtime is in the file before the game's
     // main loop reads the quit request. The new runtime takes effect on the
     // next launch, so the game quits, as in the original.
-    if (outcome.effect == config::CommandEffect::QuitGame) signals_.request_exit();
+    if (outcome.effect == CommandEffect::QuitGame) signals_.request_exit();
 }
 
 } // namespace omvr::core::ui

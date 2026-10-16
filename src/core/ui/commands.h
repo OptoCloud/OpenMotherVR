@@ -6,6 +6,7 @@
 #include "core/diag/ports/log.h"
 #include "core/ui/display_reset.h"
 #include "core/ui/ports/game_signals.h"
+#include "core/ui/ports/play_space_control.h"
 
 #include <optional>
 #include <string>
@@ -37,7 +38,9 @@ bool is_mod_command(std::string_view cmd) noexcept;
 CommandOutcome apply_command(config::Settings& cfg, std::string_view name, const char* value);
 
 // The options page's console commands ("mvr_*"): each sets one setting,
-// saves mothervr.json and, for the runtime, quits the game. Game thread.
+// saves mothervr.json and, for the runtime, quits the game; the calibrate
+// command (kCalibrateHeightCommand) starts the standing height measurement
+// instead. Game thread.
 //
 // One rule for bad values (spec 06 §4.2): a missing value, one that is not a
 // number of its kind, one outside the accepted set, or an unknown mvr_ name
@@ -49,8 +52,12 @@ CommandOutcome apply_command(config::Settings& cfg, std::string_view name, const
 class Commands {
 public:
     Commands(config::SettingsStore& store, DisplayReset& display_reset, ports::GameSignals& signals,
-             diag::ports::Log& log) noexcept
-        : store_(store), display_reset_(display_reset), signals_(signals), log_(log) {}
+             ports::PlaySpaceControl& play_space, diag::ports::Log& log) noexcept
+        : store_(store),
+          display_reset_(display_reset),
+          signals_(signals),
+          play_space_(play_space),
+          log_(log) {}
 
     // Runs the mvr_ command `cmd` (the raw console input, its first
     // whitespace-terminated token the command name), tokenising it in place.
@@ -63,6 +70,7 @@ private:
     config::SettingsStore& store_;
     DisplayReset& display_reset_;
     ports::GameSignals& signals_;
+    ports::PlaySpaceControl& play_space_;
     diag::ports::Log& log_;
 };
 

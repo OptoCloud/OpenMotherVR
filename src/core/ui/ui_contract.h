@@ -21,6 +21,10 @@ inline constexpr const wchar_t* kSidecarSuffix    = L".src";
 // is the game's own (spec 06 §4.1).
 inline constexpr std::string_view kCommandPrefix = "mvr_";
 
+// The command of the Comfort page's Calibrate Standing Height button; it
+// carries no setting value (spec 22 §3.3). This project's name.
+inline constexpr std::string_view kCalibrateHeightCommand = "mvr_calibrateheight";
+
 // The options page's runtime entries, the integers the menu sends with
 // mvr_vrruntime and is given in setMotherSetVRRuntime ("Disable VR", then
 // the original's "Use Oculus", now OpenXR, then "Use SteamVR").
@@ -44,6 +48,14 @@ inline constexpr const char* kToggleGrips          = "setMotherToggleGrips";
 inline constexpr const char* kToggleCrouch         = "setMotherToggleCrouch";
 // One row of the controls help: an action and its control.
 inline constexpr const char* kAddControlRow = "addMotherViewControl";
+// The v2 pages (spec 22 §12): each setting's own function is in the settings
+// table (SettingRow::push); these carry what is not a setting. The -vrscale
+// scale of this session, 0 without the switch (22 §12.2):
+inline constexpr const char* kWorldScaleSwitch = "setMotherWorldScaleSwitch";
+// The standing height calibration (22 §6.2, §12.2): its CalibrationPageState
+// and the seconds left of its countdown.
+inline constexpr const char* kCalibrationState   = "setMotherCalibrationState";
+inline constexpr const char* kCalibrationSeconds = "setMotherCalibrationSeconds";
 } // namespace script
 
 } // namespace omvr::core::ui
