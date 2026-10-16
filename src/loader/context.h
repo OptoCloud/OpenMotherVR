@@ -105,7 +105,8 @@ struct Context {
     game::ui::ScriptVars script_vars;
     game::ui::Console console;
     RuntimeStateView runtime_state; // over `runtimes` and `stereo`, declared below
-    // The standing height calibration and -vrscale, for the options pages.
+    // The standing height calibration and -vrscale, for the options pages;
+    // over `calibration`, declared below.
     PlaySpaceControlView play_space_control;
     core::ui::DisplayReset display_reset;
     // input

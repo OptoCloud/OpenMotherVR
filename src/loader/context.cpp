@@ -50,7 +50,7 @@ Context::Context(void* self) noexcept
       archive_files(self, OMVR_IDR_OPENVR_API, OMVR_IDR_UI_PATCH, log),
       ui_archive(archive_files, dialogs, log),
       runtime_state(runtimes, stereo, launch),
-      play_space_control(log),
+      play_space_control(calibration, clock, launch),
       display_reset(console, runtime_state, log),
       schemes(glyphs),
       pad(glyphs, log),
