@@ -16,6 +16,7 @@ add_executable(omvr_tests
     core/input_test.cpp
     core/render_test.cpp
     core/stereo_test.cpp
+    core/play_space_test.cpp
     core/presence_test.cpp
     core/ui_test.cpp
     core/vr_off_test.cpp

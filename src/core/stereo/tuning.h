@@ -117,4 +117,10 @@ inline constexpr int kReflectionLogLines         = 60;
 // brushed key does nothing.
 inline constexpr auto kVrOffHold = std::chrono::milliseconds(1000);
 
+// ---- Seated and standing play (22 §6) --------------------------------------
+
+// 22 §6.2: the calibrate command waits this long before it measures, time to
+// put a controller down and stand up straight.
+inline constexpr auto kCalibrationDelay = std::chrono::seconds(3);
+
 } // namespace omvr::core::stereo

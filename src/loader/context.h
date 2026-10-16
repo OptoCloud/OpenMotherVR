@@ -19,6 +19,8 @@
 #include "core/stereo/desktop_window.h"
 #include "core/stereo/head_clip_delay.h"
 #include "core/stereo/head_clip_pivot.h"
+#include "core/stereo/height_calibration.h"
+#include "core/stereo/play_space.h"
 #include "core/stereo/visibility_trace.h"
 #include "core/stereo/mode_policy.h"
 #include "core/stereo/reflection_pass.h"
@@ -145,6 +147,10 @@ struct Context {
     platform::d3d11::VignetteRenderer vignette;
     core::stereo::HeadClipDelay head_clip;
     core::stereo::HeadClipPivot head_clip_pivot;
+    // Seated and standing play, the eye's place and the world scale (22 §6,
+    // 21 §11), and the standing height calibration (22 §6.2). Game thread.
+    core::stereo::PlaySpace play_space;
+    core::stereo::HeightCalibration calibration;
     // Dev. Debug Options: what darkens the view (the game's head-in-wall
     // fade, the scene visibility the stereo update finds, and what it
     // leaves). Game thread.

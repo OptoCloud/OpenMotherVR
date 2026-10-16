@@ -71,6 +71,8 @@ Context::Context(void* self) noexcept
       update(settings.current(), scene),
       stereo(manager, update, dialogs, settings.current(), launch, runtimes, failure, log),
       head_clip(clock),
+      play_space(log),
+      calibration(log),
       stereo_aa(settings.current(), log),
       reflections(keyboard, settings.current(), log),
       screen_policy(virtual_screen, keyboard, stereo, runtimes, log),

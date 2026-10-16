@@ -69,6 +69,48 @@ headset; move it to the roadmap in `README.md` as verified.
       log shows `Start_Breathing_Game` / `End_Breathing_Game` with
       `breathing true` / `false`, and turning is blocked while it runs.
 
+## Seated and standing
+
+Room-scale (`Body.RoomScale`) and real crouch (`Body.RealCrouch`) are not
+built yet: those keys do nothing.
+
+- [ ] **Defaults are v1.** No `Comfort` or `Body` keys: no `[stereo] play
+      mode` or `[stereo] world scale` lines, and the view height resets at
+      each recenter as before.
+- [ ] **Standing, calibrated.** `"Comfort": {"PlayMode": "Standing",
+      "StandingEyeHeight": 1.70}` (your own eye height): standing straight
+      gives the game's normal eye height; ducking 30 cm lowers the view
+      30 cm. Kneel and load a level: after the loading screen the view is
+      still low. Log: `[stereo] play mode Standing (standing eye height
+      1.70 m)` at the first recenter.
+- [ ] **Automatic first calibration.** `"PlayMode": "Standing"` with no
+      `StandingEyeHeight`: stand straight when the game starts. Log:
+      `standing eye height calibrated: N m (automatic, ...)`, and the
+      value is saved in `mothervr.json`.
+- [ ] **Mode change waits for a recenter.** Switch Seated and Standing in
+      play: nothing jumps until the recenter right after, then the new
+      mode's line is logged.
+- [ ] **OpenXR floor.** On OpenXR the log has `openxr: floor reference
+      STAGE` (or `LOCAL_FLOOR`). On a runtime with neither: `openxr: no
+      STAGE or LOCAL_FLOOR space` and, in standing mode, `WARNING standing
+      play unavailable on OpenXR` (play is seated).
+- [ ] **Seated eye raise.** `"Body": {"SeatedEyeRaise": 0.2}`: the view is
+      20 cm higher, seated only; the head-in-wall fade does not start in
+      the open.
+- [ ] **Eye forward.** `"Body": {"EyeForward": 0.15}`: the view moves
+      forward of the body, less of the chest shows; the hands stay in the
+      controllers; the head-in-wall fade does not start standing in the
+      open.
+- [ ] **World scale.** `"Comfort": {"WorldScale": 0.8}` in play (once the
+      options page sets it): head motion is scaled from the next frame
+      with no jump; depth looks right in both eyes. Log: `[stereo] world
+      scale 0.80`. With `-vrscale 1.2` on the command line: `world scale
+      1.20 (set by -vrscale ...)` and the setting does nothing.
+- [ ] **Calibrate command** (once the options page has it): select it, put
+      the controller down, stand straight: after 3 s the log says
+      `standing eye height calibrated: N m`; with the headset off, it
+      waits (`height calibration waiting`) until it is put on.
+
 ## Hands
 
 Set `"Hands": {"Enabled": true}` before starting the game (the aim poses

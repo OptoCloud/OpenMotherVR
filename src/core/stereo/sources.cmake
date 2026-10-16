@@ -12,10 +12,14 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/head_clip_delay.h
     ${CMAKE_CURRENT_LIST_DIR}/head_clip_pivot.cpp
     ${CMAKE_CURRENT_LIST_DIR}/head_clip_pivot.h
+    ${CMAKE_CURRENT_LIST_DIR}/height_calibration.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/height_calibration.h
     ${CMAKE_CURRENT_LIST_DIR}/mirror_layout.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mirror_layout.h
     ${CMAKE_CURRENT_LIST_DIR}/mode_policy.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mode_policy.h
+    ${CMAKE_CURRENT_LIST_DIR}/play_space.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/play_space.h
     ${CMAKE_CURRENT_LIST_DIR}/reflection_pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/reflection_pass.h
     ${CMAKE_CURRENT_LIST_DIR}/render_target.cpp

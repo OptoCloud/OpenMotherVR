@@ -94,6 +94,21 @@ Playing
   - "Vignette": 0 to 1 darkens the edge of the view while you move with
     the stick or turn smoothly, and clears it when you stop; higher
     narrows the clear area more. 0 (the default) is off.
+  - "PlayMode": "Seated" (the default) puts your eyes at the character's
+    eye height at every recenter. "Standing" uses your real height: stand
+    straight for the normal view, duck or kneel to go lower, even when a
+    recenter happens while you crouch. Applies at the next recenter.
+  - "StandingEyeHeight": your standing eye height in metres (1.0 to 2.2)
+    for "Standing". 0 (the default) measures it at the first recenter
+    while you wear the headset in standing mode, and saves it.
+  - "WorldScale": 0.5 to 1.5 scales your head movement in the game
+    (default 1.0). -vrscale on the command line overrides it for that run.
+- Body (preview; Options > MotherVR > Body), in a "Body" object under
+  "Settings":
+  - "SeatedEyeRaise": -0.5 to 0.5 metres moves your eyes up (or down) in
+    seated play, for a low chair or a high stool. Default 0.
+  - "EyeForward": -0.2 to 0.2 metres moves your eyes forward of (or back
+    from) the character's body. Default 0.
 - Hands (preview; Options > MotherVR > Hands), in a "Hands" object
   under "Settings":
   - "Enabled": true uses your tracked controllers in the game (default

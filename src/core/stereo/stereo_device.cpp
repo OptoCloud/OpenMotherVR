@@ -9,12 +9,14 @@
 #include "core/stereo/stereo_device.h"
 
 #include "core/stereo/mirror_layout.h"
+#include "core/stereo/play_space.h"
 #include "core/stereo/render_target.h"
 #include "core/ui/compat_messages.h"
 #include "game/constants.h"
 #include "game/stereo/stereo_objects.h" // layer exception: see stereo_device.h
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <string_view>
 #include <utility>
@@ -118,10 +120,12 @@ MirrorView mirror_view_of(const StereoInterface& si, const config::RenderingSett
             .symmetric    = rendering.symmetric_mirror_view};
 }
 
-// The runtime's eye offsets, scaled by -vrscale (03 §5). The left eye's
-// offset goes to the game's eye 1, as in the original.
+// The runtime's eye offsets, scaled by the world scale (03 §5). The left
+// eye's offset goes to the game's eye 1, as in the original. 22 §6.3, §15:
+// the scale is the one the frame's head pose was converted with (slot 11
+// stores it before this frame's slot 5), so a frame never mixes two.
 void apply_eye_offsets(StereoInterface& si, const EyeOffsets& eye) noexcept {
-    const float s = si.world_scale;
+    const float s = std::atomic_ref(si.world_scale).load(std::memory_order_acquire);
     for (std::size_t i = 0; i < kAxes; ++i) {
         si.eye_desc[1].view_adjust[i] = s * eye[i];
         si.eye_desc[0].view_adjust[i] = s * eye[kAxes + i];
@@ -301,7 +305,10 @@ void StereoDevice::create_device(StereoManager& self) {
     // already: start the runtime once, then re-attach what it gave (03 §6.5).
     const bool first = !std::exchange(created_, true);
     if (first) {
-        si.world_scale = switches_.world_scale();
+        // 22 §6.3: Comfort.WorldScale, unless -vrscale sets it for the run.
+        std::atomic_ref(si.world_scale)
+            .store(effective_world_scale(settings_.comfort.world_scale, switches_.world_scale_switch()),
+                   std::memory_order_relaxed);
         init_device(si);
     }
     StereoInterface* device = load_state(si) != DeviceState::None ? &si : nullptr;

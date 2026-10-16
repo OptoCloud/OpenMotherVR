@@ -3,6 +3,8 @@
 #include "game/layout.h"
 #include "game/stereo/stereo_objects.h"
 
+#include <optional>
+
 namespace omvr::loader::hooks {
 
 // The stereo device's and manager's vtables (see game/stereo/stereo_objects.h);
@@ -23,5 +25,10 @@ int* __fastcall get_render_target_size(game::StereoManager* self, void* edx, int
 // Manager::GetHmdResolution(int* w, int* h): leave the window size alone.
 // From: FUN_1001f640 (ret 8).
 int* __fastcall get_hmd_resolution(game::StereoManager* self, void* edx, int* w, int* h) noexcept;
+
+// 22 §6.2: a standing eye height the calibration took goes into
+// Comfort.StandingEyeHeight and the file is saved; none changes nothing.
+// Game thread.
+void store_standing_height(std::optional<float> height_m) noexcept;
 
 } // namespace omvr::loader::hooks

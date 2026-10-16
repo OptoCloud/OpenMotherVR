@@ -11,6 +11,7 @@
 #include "loader/context.h"
 #include "loader/hooks/guard.h"
 #include "loader/hooks/pad_hooks.h"
+#include "loader/hooks/stereo_device_hooks.h"
 
 #include <algorithm>
 #include <type_traits>
@@ -156,6 +157,23 @@ void apply(Context& ctx, StereoManager& m, StereoInterface& device, const Update
     if (out.block_changed) core::stereo::log_turn_block(ctx.log, *out.block_changed);
 }
 
+// 22 §6: this frame's play-space settings, latched before any pose of the
+// frame (a play mode change asks for a recenter, at which it applies, 6.1),
+// and a pending height calibration (6.2), which reads the head only while
+// it waits.
+void update_play_space(Context& ctx, StereoInterface& device) {
+    if (ctx.play_space.begin_frame(core::stereo::play_space_settings(ctx.settings.current())))
+        ctx.update.request_recenter();
+    if (!ctx.calibration.pending()) return;
+    core::stereo::CalibrationReading reading;
+    if (auto* runtime = game::load_backend(device)) {
+        reading.has_floor = runtime->has_floor();
+        reading.in_use    = runtime->headset_in_use();
+        if (reading.in_use) reading.head_height_m = runtime->head_height_above_floor();
+    }
+    store_standing_height(ctx.calibration.update(ctx.clock.now(), reading));
+}
+
 float* place_quad(float* out, const Matrix44& quad) noexcept {
     std::ranges::copy(quad, out);
     return out;
@@ -179,6 +197,7 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
     }
     check_vr_off(ctx);
     guarded("Stereo::Update", [&] {
+        update_play_space(ctx, *device);
         const UpdateOutput out = ctx.update.run(gather(ctx, *self, *device));
         apply(ctx, *self, *device, out);
     });

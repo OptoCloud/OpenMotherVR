@@ -26,4 +26,10 @@ std::optional<VRRuntime> forced_runtime_in(std::wstring_view command_line);
 // From: FUN_1001f700 (the -vrforce* switches are handled above).
 float world_scale_in(std::span<const std::wstring> args) noexcept;
 
+// The value of the last -vrscale in `args` when it is accepted (a number in
+// [kWorldScaleMin, kWorldScaleMax]); none when there is no -vrscale or the
+// last one is not accepted. Spec 22 §6.3: an accepted switch overrides
+// Comfort.WorldScale for the run; otherwise the setting applies.
+std::optional<float> world_scale_switch_in(std::span<const std::wstring> args) noexcept;
+
 } // namespace omvr::core::config

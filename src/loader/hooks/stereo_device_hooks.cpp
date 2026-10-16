@@ -8,6 +8,8 @@
 
 #include "loader/hooks/stereo_device_hooks.h"
 
+#include "core/config/settings_table.h"
+#include "core/stereo/play_space.h"
 #include "core/stereo/sensor_start.h"
 #include "game/stereo/graphics_settings.h"
 #include "game/stereo/renderer.h"
@@ -23,6 +25,7 @@
 #include <dxgi.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -59,6 +62,15 @@ constexpr UINT kPresentFlags        = 0;
 
 // Slot 15's eye 1 is the right half.
 constexpr int kRightEye = 1;
+
+// The runtimes convert poses at scale 1: the play space applies the world
+// scale (22 §6.3).
+constexpr float kUnscaled = 1.0f;
+
+// The runtime's name for the log.
+std::string_view runtime_name(const StereoInterface& si) noexcept {
+    return core::config::to_string(static_cast<core::config::VRRuntime>(si.runtime_id));
+}
 
 StereoInterface& device_of(void* self) noexcept { return *static_cast<StereoInterface*>(self); }
 
@@ -185,15 +197,25 @@ void __fastcall dev_increment_frame(void* self, void*) noexcept { ++device_of(se
 bool __fastcall dev_presents(void*, void*) noexcept { return true; }
 
 // [11] GetHeadPose(float out[12]). Game thread.
+//
+// 22 §6, 21 §11: the runtime's pose at scale 1, made into the game's by the
+// play space (standing height, eye offsets, world scale). The frame's scale
+// goes to the render thread's slot 5 with the pose (22 §15). The hands are
+// placed relative to the real head, so they follow the moved eye (21 §11.2).
 float* __fastcall dev_head_pose(void* self, void*, float* out) noexcept {
     auto& si = device_of(self);
     guarded("GetHeadPose", [&] {
         if (auto* backend = load_backend(si)) {
-            backend->head_pose(pose_out(out), si.world_scale);
-            hands_on_head_pose(si, *backend, pose_out(out)); // 21 §3.4: the hands of this pose
+            auto& ctx = context();
+            util::Matrix34 head{};
+            backend->head_pose(head, kUnscaled);
+            const auto poses = ctx.play_space.on_head_pose(head, backend->floor_height());
+            std::atomic_ref(si.world_scale).store(ctx.play_space.world_scale(), std::memory_order_release);
+            pose_out(out) = poses.game;
+            hands_on_head_pose(si, *backend, poses.tracked); // 21 §3.4: the hands of this pose
             // 21 §14: the health and the firing of this frame.
             haptics_on_head_pose();
-            context().head_clip_pivot.on_head_pose(pose_out(out));
+            ctx.head_clip_pivot.on_head_pose(poses.player);
         }
     });
     store_pose_fetched(si, true);
@@ -246,13 +268,25 @@ void __fastcall dev_unused(void*, void*) noexcept {}
 // (03 section 2.1, 09 section 5.5); the retake is queued here, so the chord,
 // CreateDevice and the game's own recenter sites are all taken again once
 // the headset is worn and tracked.
+//
+// 22 §6.1: the play mode setting applies here; 22 §6.2: in standing mode
+// without a calibration, a reference taken with the headset in use also
+// calibrates.
 float* __fastcall dev_recenter_pose(void* self, void*, float* out) noexcept {
     auto& si = device_of(self);
     guarded("RecenterAndGetHeadPose", [&] {
         if (auto* backend = load_backend(si)) {
-            backend->head_yaw_pose(pose_out(out), si.world_scale);
-            context().head_clip_pivot.on_reference(pose_out(out));
-            if (!backend->recenter_taken()) context().update.request_recenter();
+            auto& ctx = context();
+            util::Matrix34 reference{};
+            backend->head_yaw_pose(reference, kUnscaled);
+            pose_out(out) = ctx.play_space.on_reference(reference, backend->floor_height(), runtime_name(si));
+            ctx.head_clip_pivot.on_reference(pose_out(out));
+            if (!backend->recenter_taken()) {
+                ctx.update.request_recenter();
+            } else if (ctx.play_space.wants_automatic_calibration() && ctx.play_space.reference_height() &&
+                       backend->headset_in_use()) {
+                store_standing_height(ctx.calibration.take_automatic(*ctx.play_space.reference_height()));
+            }
         }
     });
     return out;
@@ -348,7 +382,23 @@ game::stereo::ManagerSlots manager_slots() noexcept {
 void __fastcall create_device(StereoManager* self, void*, int enable) noexcept {
     // CreateDevice(1) asks for the headset (02 §6.1); anything else does nothing.
     if (enable != 1) return;
-    guarded("CreateDevice", [&] { context().stereo.create_device(*self); });
+    guarded("CreateDevice", [&] {
+        auto& ctx = context();
+        // 22 §6.3: the first reference is taken here, before any stereo
+        // update latched the play space's settings.
+        ctx.play_space.set_world_scale_switch(ctx.launch.world_scale_switch());
+        ctx.play_space.begin_frame(core::stereo::play_space_settings(ctx.settings.current()));
+        ctx.stereo.create_device(*self);
+    });
+}
+
+void store_standing_height(std::optional<float> height_m) noexcept {
+    if (!height_m) return;
+    guarded("store standing height", [&] {
+        auto& ctx                                          = context();
+        ctx.settings.current().comfort.standing_eye_height = *height_m;
+        ctx.settings.save_current();
+    });
 }
 
 int* __fastcall get_render_target_size(StereoManager* self, void*, int* w, int* h) noexcept {
