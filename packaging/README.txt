@@ -74,16 +74,14 @@ Playing
   you are in and what you are doing (loading, paused, hiding, hacking...);
   hover the picture for the VR runtime. false turns it off. With VR
   disabled it shows only "VR off".
-- Enhanced mode (preview, mothervr.json only for now): set
-  "EnhancedMode": true under "Settings", then in a "Comfort" object:
+- Comfort (preview, mothervr.json only for now), in a "Comfort" object
+  under "Settings":
   - "SmoothTurnSpeed": 30 to 360 degrees per second turns smoothly with
     the right stick when Snap Rotation is off (the further you push, the
     faster). 0 (the default) keeps the game's own stick turning, scaled
     by Controller Sensitivity.
   - "SnapTurnRepeatMs": how often a held stick repeats a snap turn, 150
     to 1000 ms (default 300). 0 turns once per push.
-  With "EnhancedMode": false the game behaves as before, and your values
-  are kept for when you turn it back on.
 
 If something goes wrong
 - The headset shows the game as a flat screen (Theatre), or the game

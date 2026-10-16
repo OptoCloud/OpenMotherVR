@@ -181,11 +181,10 @@ UpdateInput pad_input(Time now, float turn, float yaw) {
 
 } // namespace update_test
 
-TEST_CASE("stereo update: v1 turning while EnhancedMode is off") {
+TEST_CASE("stereo update: v1 turning at the default smooth-turn speed") {
     using namespace update_test;
     Settings s;
-    s.input.snap_rotation       = false;
-    s.comfort.smooth_turn_speed = 180.0f; // stored, but gated off
+    s.input.snap_rotation = false;
     SceneTracker scene;
     StereoUpdate update(s, scene);
     const Time t0{1s};
@@ -197,7 +196,6 @@ TEST_CASE("stereo update: v1 turning while EnhancedMode is off") {
 TEST_CASE("stereo update: smooth turn is time-based, capped, and stops the game look") {
     using namespace update_test;
     Settings s;
-    s.enhanced_mode             = true;
     s.input.snap_rotation       = false;
     s.comfort.smooth_turn_speed = 180.0f;
     SceneTracker scene;
@@ -230,7 +228,6 @@ TEST_CASE("stereo update: smooth turn is time-based, capped, and stops the game 
 TEST_CASE("stereo update: snap turn repeat interval") {
     using namespace update_test;
     Settings s;
-    s.enhanced_mode = true;
     SceneTracker scene;
     StereoUpdate update(s, scene);
     const Time t0{1s};

@@ -31,8 +31,7 @@ namespace omvr::core::config {
 //         "SnapTurnRepeatMs": number
 //       },
 //       "DebugOptions":     bool,   (the "Dev. Debug Options" flag)
-//       "SkipStartupIntro": bool,
-//       "EnhancedMode":     bool    (ours, v2)
+//       "SkipStartupIntro": bool
 //     }
 //   }
 //
@@ -106,19 +105,11 @@ struct Settings {
     RenderingSettings rendering{};
     InputSettings input{};
     DebugSettings debug{};
+    // Ours, v2: each default is v1's behaviour.
     ComfortSettings comfort{};
-    // Ours: the single v2 switch (spec 22 §3.1). While false every v2 key
-    // acts as its v1 value; the stored values are kept and written back.
-    bool enhanced_mode = false;
     // Ours: show the game and the VR runtime on the player's Discord
     // profile. Stored as Settings.DiscordRichPresence.
     bool discord_rich_presence = true;
 };
-
-// The comfort settings in effect: as stored with EnhancedMode on, v1's
-// otherwise.
-inline ComfortSettings effective_comfort(const Settings& s) noexcept {
-    return s.enhanced_mode ? s.comfort : ComfortSettings{};
-}
 
 } // namespace omvr::core::config

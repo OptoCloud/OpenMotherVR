@@ -23,7 +23,6 @@ bool& toggle_crouch(Settings& s) noexcept { return s.input.toggle_crouch; }
 bool& debug_options(Settings& s) noexcept { return s.debug.debug; }
 bool& skip_startup_intro(Settings& s) noexcept { return s.debug.skip_startup_intro; }
 bool& discord_rich_presence(Settings& s) noexcept { return s.discord_rich_presence; }
-bool& enhanced_mode(Settings& s) noexcept { return s.enhanced_mode; }
 float& smooth_turn_speed(Settings& s) noexcept { return s.comfort.smooth_turn_speed; }
 int& snap_turn_repeat_ms(Settings& s) noexcept { return s.comfort.snap_turn_repeat_ms; }
 
@@ -61,7 +60,6 @@ constexpr std::array kRows{
     // Ours, file only (no options-page entry).
     SettingRow{Section::Settings, "DiscordRichPresence", "DiscordRichPresence", &discord_rich_presence},
     // v2 (spec 22 §3.1), file only until the v2 options pages exist.
-    SettingRow{Section::Settings, "EnhancedMode", "EnhancedMode", &enhanced_mode},
     SettingRow{Section::Comfort, "SmoothTurnSpeed", "Comfort.SmoothTurnSpeed", &smooth_turn_speed},
     SettingRow{Section::Comfort, "SnapTurnRepeatMs", "Comfort.SnapTurnRepeatMs", &snap_turn_repeat_ms},
 };

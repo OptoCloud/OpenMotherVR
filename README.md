@@ -124,8 +124,8 @@ Hands
 
 Comfort
 - Smooth turning with adjustable speed, alongside snap rotation, and the
-  snap repeat interval (implemented behind `EnhancedMode`, set in
-  `mothervr.json` only; not yet tested in game)
+  snap repeat interval (implemented, set in `mothervr.json` only;
+  not yet tested in game)
 - Comfort vignette during stick locomotion
 - Seated and standing modes with height calibration; real crouch drives the
   in-game crouch

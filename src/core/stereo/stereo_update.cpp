@@ -12,7 +12,7 @@ namespace omvr::core::stereo {
 
 UpdateOutput StereoUpdate::run(const UpdateInput& in) noexcept {
     UpdateOutput out;
-    const config::ComfortSettings comfort = config::effective_comfort(settings_);
+    const config::ComfortSettings comfort = settings_.comfort;
     const Turning turn                    = turning(comfort);
     bool smoothed                         = false;
     if (in.pad) {

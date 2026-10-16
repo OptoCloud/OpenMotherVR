@@ -42,30 +42,21 @@ TEST_CASE("defaults") {
     CHECK_FALSE(s.debug.skip_startup_intro);
 }
 
-TEST_CASE("v2 comfort: defaults are v1's and EnhancedMode gates them") {
+TEST_CASE("v2 comfort: defaults are v1's, each key applies on its own") {
     Settings s;
-    CHECK_FALSE(s.enhanced_mode);
     CHECK(s.comfort.smooth_turn_speed == 0.0f);
     CHECK(s.comfort.snap_turn_repeat_ms == 300);
 
-    s = read_config(json::parse(R"({"Settings": {"EnhancedMode": false,
-        "Comfort": {"SmoothTurnSpeed": 120, "SnapTurnRepeatMs": 0}}})"));
-    CHECK(s.comfort.smooth_turn_speed == 120.0f); // stored as read
+    s = read_config(
+        json::parse(R"({"Settings": {"Comfort": {"SmoothTurnSpeed": 120, "SnapTurnRepeatMs": 0}}})"));
+    CHECK(s.comfort.smooth_turn_speed == 120.0f);
     CHECK(s.comfort.snap_turn_repeat_ms == 0);
-    CHECK(effective_comfort(s).smooth_turn_speed == 0.0f); // acts as v1
-    CHECK(effective_comfort(s).snap_turn_repeat_ms == 300);
 
-    s.enhanced_mode = true;
-    CHECK(effective_comfort(s).smooth_turn_speed == 120.0f);
-    CHECK(effective_comfort(s).snap_turn_repeat_ms == 0);
-
-    // Written back under Settings.Comfort, whatever EnhancedMode says.
-    s.enhanced_mode = false;
-    json out        = json::object();
+    json out = json::object();
     write_config(out, s);
-    CHECK(out["Settings"]["EnhancedMode"] == false);
     CHECK(out["Settings"]["Comfort"]["SmoothTurnSpeed"] == 120.0f);
     CHECK(out["Settings"]["Comfort"]["SnapTurnRepeatMs"] == 0);
+    CHECK_FALSE(out["Settings"].contains("EnhancedMode"));
 }
 
 TEST_CASE("sanitize: comfort ranges (spec 22 §3.1)") {
@@ -232,7 +223,7 @@ TEST_CASE("describe names each setting by its key path") {
 }
 
 TEST_CASE("the settings table: commands and their rules") {
-    CHECK(settings_table().size() == 18); // 15 of v1 and Discord, 3 of v2 comfort
+    CHECK(settings_table().size() == 17); // 15 of v1 and Discord, 2 of v2 comfort
     const SettingRow* row = find_command("mvr_pixelscale");
     REQUIRE(row != nullptr);
     CHECK(row->rule == CommandRule::PixelScale);
