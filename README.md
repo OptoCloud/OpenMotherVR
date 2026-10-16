@@ -42,6 +42,9 @@ wrong file (run `pwsh scripts/fetch_openvr_api.ps1`).
 
 ## Roadmap
 
+What is built but not yet seen working in the game, with how to check
+each item, is in [IN_GAME_CHECKS.md](IN_GAME_CHECKS.md).
+
 ### v1: MotherVR 0.8.1, revived
 
 Everything the original does, working on Windows 11 and current runtimes,

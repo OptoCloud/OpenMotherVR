@@ -83,6 +83,8 @@ links both.
   what could not be checked (a headset that was not worn, a level that was
   not loaded, the 2020 game build).
 - Do not claim a fix works in VR from a build alone.
+- A change that cannot be checked in game now adds its check to
+  `IN_GAME_CHECKS.md` (what to do, what should happen, the log line).
 
 ## Testing with a person in the loop
 
