@@ -183,7 +183,10 @@ bool __fastcall dev_presents(void*, void*) noexcept { return true; }
 float* __fastcall dev_head_pose(void* self, void*, float* out) noexcept {
     auto& si = device_of(self);
     guarded("GetHeadPose", [&] {
-        if (auto* backend = load_backend(si)) backend->head_pose(pose_out(out), si.world_scale);
+        if (auto* backend = load_backend(si)) {
+            backend->head_pose(pose_out(out), si.world_scale);
+            context().head_clip_pivot.on_head_pose(pose_out(out));
+        }
     });
     store_pose_fetched(si, true);
     return out;
@@ -240,6 +243,7 @@ float* __fastcall dev_recenter_pose(void* self, void*, float* out) noexcept {
     guarded("RecenterAndGetHeadPose", [&] {
         if (auto* backend = load_backend(si)) {
             backend->head_yaw_pose(pose_out(out), si.world_scale);
+            context().head_clip_pivot.on_reference(pose_out(out));
             if (!backend->recenter_taken()) context().update.request_recenter();
         }
     });

@@ -15,6 +15,8 @@
 
 #include <d3d11.h>
 
+#include <array>
+#include <cmath>
 #include <type_traits>
 
 namespace omvr::loader::hooks {
@@ -53,6 +55,9 @@ void capture_reflection(int eye) noexcept {
             eye, ctx.log);
     });
 }
+
+constexpr const char* kHeadClipPivotLog =
+    "[stereo] head-in-wall fade: {} (the game's eye is {:.2f} m from the body)";
 
 } // namespace
 
@@ -122,10 +127,32 @@ bool __cdecl cull_occlusion(const void* bounds, const void* ctx, const void* buf
            game::stereo::call_cull_occlusion(c.targets.render_fixes.cull, bounds, ctx, buffer);
 }
 
+// The game's eye and pivot are vec3s. In stereo the pivot is first moved so
+// that only the real head's displacement counts (HeadClipPivot: views an
+// animation drives no longer black out). With Dev. Debug Options, each
+// start and end of that is logged with the game's distance.
 float __stdcall head_clip_fade(const float* eye, const float* pivot) noexcept {
-    auto& ctx        = context();
-    const float fade = game::stereo::call_head_clip_fade(ctx.targets.render_fixes.head_clip, eye, pivot);
-    return ctx.head_clip.apply(fade, ctx.stereo.running());
+    auto& ctx          = context();
+    const bool running = ctx.stereo.running();
+    const float* used  = pivot;
+    std::array<float, 3> moved{};
+    if (running) {
+        const bool was    = ctx.head_clip_pivot.adjusted();
+        const util::Vec3 p = ctx.head_clip_pivot.pivot({eye[0], eye[1], eye[2]}, {pivot[0], pivot[1], pivot[2]});
+        if (ctx.head_clip_pivot.adjusted()) {
+            moved = {p.x, p.y, p.z};
+            used  = moved.data();
+        }
+        if (was != ctx.head_clip_pivot.adjusted() && ctx.log.debug_enabled()) {
+            const float d = std::hypot(eye[0] - pivot[0], eye[1] - pivot[1], eye[2] - pivot[2]);
+            core::diag::ports::logf(ctx.log, kHeadClipPivotLog,
+                                    ctx.head_clip_pivot.adjusted() ? "an animation drives the view, only the real head counts"
+                                                                   : "measured from the body again",
+                                    d);
+        }
+    }
+    const float fade = game::stereo::call_head_clip_fade(ctx.targets.render_fixes.head_clip, eye, used);
+    return ctx.head_clip.apply(fade, running);
 }
 
 } // namespace omvr::loader::hooks

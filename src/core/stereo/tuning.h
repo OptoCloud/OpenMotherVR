@@ -73,6 +73,12 @@ inline constexpr auto kSnapFadeTime = std::chrono::milliseconds(100);
 // held off this long in stereo.
 inline constexpr float kFadeClear = 0.99999f;
 inline constexpr auto kFadeGrace  = std::chrono::milliseconds(600);
+// HeadClipPivot: how much further the game's eye may be from the body's
+// pivot than the real head has moved since the recenter before the rest is
+// taken as an animation driving the view (metres). Above the few
+// centimetres a neck model or the game's own camera sway add, well below
+// the 0.5 m where the fade starts.
+inline constexpr float kHeadClipAnimationMargin = 0.2f;
 
 // ---- Render target (03 §4) -------------------------------------------------
 

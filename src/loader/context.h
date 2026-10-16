@@ -12,6 +12,7 @@
 #include "core/stereo/comfort_view.h"
 #include "core/stereo/desktop_window.h"
 #include "core/stereo/head_clip_delay.h"
+#include "core/stereo/head_clip_pivot.h"
 #include "core/stereo/mode_policy.h"
 #include "core/stereo/reflection_pass.h"
 #include "core/stereo/scene_tracker.h"
@@ -118,6 +119,7 @@ struct Context {
     core::stereo::ComfortView comfort;
     platform::d3d11::VignetteRenderer vignette;
     core::stereo::HeadClipDelay head_clip;
+    core::stereo::HeadClipPivot head_clip_pivot;
     core::stereo::StereoAa stereo_aa;
     core::stereo::ReflectionPass reflections;
     core::stereo::VirtualScreenPolicy screen_policy;

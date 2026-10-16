@@ -3,6 +3,7 @@
 // head-clip delay and the stereo AA decisions.
 
 #include "core/stereo/head_clip_delay.h"
+#include "core/stereo/head_clip_pivot.h"
 #include "core/stereo/mirror_layout.h"
 #include "core/stereo/mode_policy.h"
 #include "core/stereo/render_target.h"
@@ -357,6 +358,47 @@ TEST_CASE("head-clip fade waits out the grace period in stereo") {
     CHECK(delay.apply(0.2f, true) == kSceneVisible);
     clock.advance(1ms);
     CHECK(delay.apply(0.2f, true) == 0.2f); // 600 ms since the last clear
+}
+
+TEST_CASE("head-clip pivot: only the real head's movement counts") {
+    using omvr::util::Matrix34;
+    using omvr::util::Vec3;
+    const auto at = [](float x, float y, float z) {
+        Matrix34 m{};
+        m.m[0][3] = x;
+        m.m[1][3] = y;
+        m.m[2][3] = z;
+        return m;
+    };
+    HeadClipPivot p;
+    const Vec3 eye{1.0f, 0.0f, 0.0f};
+    const Vec3 body{0.0f, 0.0f, 0.0f};
+
+    // No reference yet: the game's pivot.
+    Vec3 out = p.pivot(eye, body);
+    CHECK(out.x == 0.0f);
+    CHECK_FALSE(p.adjusted());
+
+    p.on_reference(at(0.0f, 1.7f, 0.0f));
+    p.on_head_pose(at(0.1f, 1.7f, 0.0f)); // the head moved 0.1 m
+
+    // The game's eye is 1 m from the body: an animation. The pivot moves to
+    // 0.1 m from the eye on the same line.
+    out = p.pivot(eye, body);
+    CHECK(p.adjusted());
+    CHECK(out.x == doctest::Approx(0.9f));
+    CHECK(out.y == doctest::Approx(0.0f));
+
+    // Within the margin of the real movement: the game's pivot.
+    out = p.pivot({0.25f, 0.0f, 0.0f}, body);
+    CHECK_FALSE(p.adjusted());
+    CHECK(out.x == 0.0f);
+
+    // The player walks 0.7 m away from the body: the game's pivot, so the
+    // view still goes black.
+    p.on_head_pose(at(0.7f, 1.7f, 0.0f));
+    out = p.pivot({0.7f, 0.0f, 0.0f}, body);
+    CHECK_FALSE(p.adjusted());
 }
 
 TEST_CASE("stereo AA runs the game's pass by setting and pixel scale") {
