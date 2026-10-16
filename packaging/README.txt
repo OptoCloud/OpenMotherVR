@@ -45,8 +45,9 @@ Playing
   itself when you put the headset on and when a level finishes loading.
 - Clip Blinding (Options > MotherVR): the view fades to black when you
   move your real head into a wall, or more than about half a metre from
-  your body, after half a second. Scenes where the game moves your view
-  (animations, cutscenes) do not black out.
+  your body, after half a second. Only in normal play: cutscenes,
+  interactions (hacking, levers, ladders...) and hiding never black out,
+  however you move your head.
 - VR controllers (Index, Quest/Touch, WMR, Vive wands) have default
   layouts. Index/Touch: left stick move (click: sprint), right stick
   turn (up/down: weapons, click: radial menu), A interact (hand near

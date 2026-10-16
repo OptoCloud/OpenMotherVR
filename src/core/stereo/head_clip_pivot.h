@@ -53,4 +53,22 @@ private:
     mutable bool adjusted_ = false;
 };
 
+// What the head-in-wall fade needs to know about the game.
+struct ViewOwner {
+    bool cutscene_or_fade = false; // the scene tracker (05 §6.2)
+    bool player_camera    = true;  // the first-person camera is tracked and active
+    bool interaction      = false; // an interaction runs (11 §5.3): its animation moves the view
+    bool hiding           = false; // in a locker or under a table
+};
+
+// The game, not the player, decides where the view is: a cutscene or level
+// fade, a camera taken from the player, an interaction or a hiding place.
+// The head-in-wall fade is then not used at all, however the player moves:
+// it exists to stop the player's own head from passing through walls in
+// play, and in these scenes the game puts the view where it wants, often
+// with the character's face right against a wall.
+inline bool game_drives_view(const ViewOwner& v) noexcept {
+    return v.cutscene_or_fade || !v.player_camera || v.interaction || v.hiding;
+}
+
 } // namespace omvr::core::stereo

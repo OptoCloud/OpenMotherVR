@@ -361,6 +361,14 @@ TEST_CASE("head-clip fade waits out the grace period in stereo") {
     CHECK(delay.apply(0.2f, true) == 0.2f); // 600 ms since the last clear
 }
 
+TEST_CASE("head-in-wall fade: off whenever the game drives the view") {
+    CHECK_FALSE(game_drives_view({}));
+    CHECK(game_drives_view({.cutscene_or_fade = true}));
+    CHECK(game_drives_view({.player_camera = false}));
+    CHECK(game_drives_view({.interaction = true}));
+    CHECK(game_drives_view({.hiding = true}));
+}
+
 TEST_CASE("visibility trace: one change when darkening and one when clear again") {
     using Change = VisibilityTrace::Change;
     VisibilityTrace t;

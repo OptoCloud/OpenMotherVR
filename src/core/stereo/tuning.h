@@ -79,7 +79,8 @@ inline constexpr auto kFadeGrace  = std::chrono::milliseconds(600);
 // centimetres a neck model or the game's own camera sway add, well below
 // the 0.5 m where the fade starts.
 inline constexpr float kHeadClipAnimationMargin = 0.2f;
-// HeadClipPivot: while the real head is within this distance of where it
+// HeadClipPivot (in play, see game_drives_view for scenes): while the real
+// head is within this distance of where it
 // was at the last recenter, it cannot be inside a wall (the game's own
 // collision keeps the body, and the eye with it, out of geometry), so the
 // game's fade is not used. Scenes where an animation puts the character's

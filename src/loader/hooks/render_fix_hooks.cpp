@@ -56,21 +56,31 @@ void capture_reflection(int eye) noexcept {
     });
 }
 
+// Who decides where the view is, for the head-in-wall fade. Game thread.
+core::stereo::ViewOwner view_owner(Context& ctx) noexcept {
+    return {.cutscene_or_fade = ctx.scene.cutscene_or_fade(),
+            .player_camera    = ctx.follow.active(),
+            .interaction      = ctx.interactions.in_interaction(),
+            .hiding           = ctx.interactions.hiding()};
+}
+
 constexpr const char* kHeadClipDarkLog =
     "[diag] head-in-wall fade {:.2f} (handed on {:.2f}): eye {:.2f} m from the body, head moved {:.2f} m{}{}";
 constexpr const char* kHeadClipClearLog = "[diag] head-in-wall fade clear again (lowest {:.2f})";
 
 // Dev. Debug Options: each time the game's own head-in-wall fade leaves
 // clear and comes back. Game thread, once per change.
-void trace_head_clip(Context& ctx, const float* eye, const float* pivot, float fade, float result) noexcept {
+void trace_head_clip(Context& ctx, const float* eye, const float* pivot, float fade, float result,
+                     bool ignored) noexcept {
     using Change = core::stereo::VisibilityTrace::Change;
     switch (ctx.head_clip_trace.update(fade)) {
         case Change::Darkened:
-            core::diag::ports::logf(ctx.log, kHeadClipDarkLog, fade, result,
-                                    std::hypot(eye[0] - pivot[0], eye[1] - pivot[1], eye[2] - pivot[2]),
-                                    ctx.head_clip_pivot.real_displacement(),
-                                    ctx.head_clip_pivot.adjusted() ? ", pivot moved" : "",
-                                    ctx.head_clip_pivot.real_head_still() ? ", head still: ignored" : "");
+            core::diag::ports::logf(
+                ctx.log, kHeadClipDarkLog, fade, result,
+                std::hypot(eye[0] - pivot[0], eye[1] - pivot[1], eye[2] - pivot[2]),
+                ctx.head_clip_pivot.real_displacement(),
+                ctx.head_clip_pivot.adjusted() ? ", pivot moved" : "",
+                ignored ? ", ignored (the game drives the view or the head is still)" : "");
             break;
         case Change::Cleared:
             core::diag::ports::logf(ctx.log, kHeadClipClearLog, ctx.head_clip_trace.lowest());
@@ -177,11 +187,13 @@ float __stdcall head_clip_fade(const float* eye, const float* pivot) noexcept {
         }
     }
     const float fade = game::stereo::call_head_clip_fade(ctx.targets.render_fixes.head_clip, eye, used);
-    // A real head that has barely moved is not in a wall, whatever an
-    // animation did to the eye.
-    const bool still   = running && ctx.head_clip_pivot.real_head_still();
-    const float result = ctx.head_clip.apply(still ? core::stereo::kSceneVisible : fade, running);
-    if (running && ctx.log.debug_enabled()) trace_head_clip(ctx, eye, pivot, fade, result);
+    // Not used while the game drives the view, nor while the real head has
+    // barely moved (then it is not in a wall, whatever an animation did to
+    // the eye).
+    const bool ignore =
+        running && (core::stereo::game_drives_view(view_owner(ctx)) || ctx.head_clip_pivot.real_head_still());
+    const float result = ctx.head_clip.apply(ignore ? core::stereo::kSceneVisible : fade, running);
+    if (running && ctx.log.debug_enabled()) trace_head_clip(ctx, eye, pivot, fade, result, ignore);
     return result;
 }
 
