@@ -31,6 +31,10 @@ float HeadClipPivot::real_displacement() const noexcept {
     return has_head_ && has_reference_ ? distance(head_, reference_) : 0.0f;
 }
 
+bool HeadClipPivot::real_head_still() const noexcept {
+    return has_head_ && has_reference_ && real_displacement() < kHeadClipStillRadius;
+}
+
 util::Vec3 HeadClipPivot::pivot(const util::Vec3& eye, const util::Vec3& pivot) const noexcept {
     adjusted_ = false;
     if (!has_head_ || !has_reference_) return pivot;

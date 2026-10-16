@@ -392,6 +392,7 @@ TEST_CASE("head-clip pivot: only the real head's movement counts") {
     Vec3 out = p.pivot(eye, body);
     CHECK(out.x == 0.0f);
     CHECK_FALSE(p.adjusted());
+    CHECK_FALSE(p.real_head_still()); // nothing known: the game's fade
 
     p.on_reference(at(0.0f, 1.7f, 0.0f));
     p.on_head_pose(at(0.1f, 1.7f, 0.0f)); // the head moved 0.1 m
@@ -408,11 +409,14 @@ TEST_CASE("head-clip pivot: only the real head's movement counts") {
     CHECK_FALSE(p.adjusted());
     CHECK(out.x == 0.0f);
 
+    // 0.1 m is within the still radius: the game's fade is not used.
+    CHECK(p.real_head_still());
     // The player walks 0.7 m away from the body: the game's pivot, so the
     // view still goes black.
     p.on_head_pose(at(0.7f, 1.7f, 0.0f));
     out = p.pivot({0.7f, 0.0f, 0.0f}, body);
     CHECK_FALSE(p.adjusted());
+    CHECK_FALSE(p.real_head_still());
 }
 
 TEST_CASE("stereo AA runs the game's pass by setting and pixel scale") {

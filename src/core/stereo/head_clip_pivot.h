@@ -17,7 +17,10 @@ namespace omvr::core::stereo {
 // real head's displacement by more than kHeadClipAnimationMargin, the
 // pivot is moved along the same line to the real displacement's distance
 // from the eye, so the distance term and the wall probe see the real
-// head's movement only. Game thread (head pose, recenter and camera update
+// head's movement only. And while the real head has barely moved, the
+// fade is not used at all (real_head_still): an animation can also put the
+// character's face against a wall with the eye close to the pivot. Game
+// thread (head pose, recenter and camera update
 // all run there).
 class HeadClipPivot final {
 public:
@@ -33,6 +36,11 @@ public:
     // How far the real head is from where it was at the last recenter, in
     // the game's metres; 0 before both poses are known.
     float real_displacement() const noexcept;
+
+    // The real head has stayed within kHeadClipStillRadius of the last
+    // recenter: whatever the game's fade says, the player's head is not in
+    // a wall. False before both poses are known.
+    bool real_head_still() const noexcept;
 
     // Whether the last pivot() moved the game's pivot.
     bool adjusted() const noexcept { return adjusted_; }

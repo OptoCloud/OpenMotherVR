@@ -57,7 +57,7 @@ void capture_reflection(int eye) noexcept {
 }
 
 constexpr const char* kHeadClipDarkLog =
-    "[diag] head-in-wall fade {:.2f} (handed on {:.2f}): eye {:.2f} m from the body, head moved {:.2f} m{}";
+    "[diag] head-in-wall fade {:.2f} (handed on {:.2f}): eye {:.2f} m from the body, head moved {:.2f} m{}{}";
 constexpr const char* kHeadClipClearLog = "[diag] head-in-wall fade clear again (lowest {:.2f})";
 
 // Dev. Debug Options: each time the game's own head-in-wall fade leaves
@@ -69,7 +69,8 @@ void trace_head_clip(Context& ctx, const float* eye, const float* pivot, float f
             core::diag::ports::logf(ctx.log, kHeadClipDarkLog, fade, result,
                                     std::hypot(eye[0] - pivot[0], eye[1] - pivot[1], eye[2] - pivot[2]),
                                     ctx.head_clip_pivot.real_displacement(),
-                                    ctx.head_clip_pivot.adjusted() ? ", pivot moved" : "");
+                                    ctx.head_clip_pivot.adjusted() ? ", pivot moved" : "",
+                                    ctx.head_clip_pivot.real_head_still() ? ", head still: ignored" : "");
             break;
         case Change::Cleared:
             core::diag::ports::logf(ctx.log, kHeadClipClearLog, ctx.head_clip_trace.lowest());
@@ -175,8 +176,11 @@ float __stdcall head_clip_fade(const float* eye, const float* pivot) noexcept {
                                     d);
         }
     }
-    const float fade   = game::stereo::call_head_clip_fade(ctx.targets.render_fixes.head_clip, eye, used);
-    const float result = ctx.head_clip.apply(fade, running);
+    const float fade = game::stereo::call_head_clip_fade(ctx.targets.render_fixes.head_clip, eye, used);
+    // A real head that has barely moved is not in a wall, whatever an
+    // animation did to the eye.
+    const bool still   = running && ctx.head_clip_pivot.real_head_still();
+    const float result = ctx.head_clip.apply(still ? core::stereo::kSceneVisible : fade, running);
     if (running && ctx.log.debug_enabled()) trace_head_clip(ctx, eye, pivot, fade, result);
     return result;
 }
