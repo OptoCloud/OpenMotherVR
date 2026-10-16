@@ -20,6 +20,7 @@
 #include <wrl/client.h>
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -62,6 +63,7 @@ struct Session::Impl {
     void warn_adapter_mismatch(ID3D11Device* device, const XrGraphicsRequirementsD3D11KHR& reqs);
     bool create_session(ID3D11Device* device);
     bool create_spaces();
+    void create_floor_space();
     XrSpace make_reference_space(XrReferenceSpaceType type, const XrPosef& pose);
     bool do_recenter(XrTime t);
     void check_visible() noexcept;
@@ -82,6 +84,7 @@ struct Session::Impl {
     void read_hands(XrTime t);
     void locate_views(XrTime t);
     void locate_head(XrTime t);
+    void locate_floor(XrTime t);
     void log_ipd_once();
 
     core::diag::ports::Log& log;
@@ -98,6 +101,7 @@ struct Session::Impl {
         SpaceOwner local;  // runtime's LOCAL origin
         SpaceOwner seated; // LOCAL re-anchored by recenter()
         SpaceOwner view;
+        SpaceOwner floor; // STAGE, else LOCAL_FLOOR, when the runtime has one (22 §6.1)
         XrSessionState session_state = XR_SESSION_STATE_UNKNOWN;
         bool running                 = false;
         bool lost                    = false;
@@ -152,6 +156,8 @@ struct Session::Impl {
     // state.views as published to other threads. Outside State: atomics do
     // not reset by assignment.
     util::SeqLock<FrameViews> published_views;
+    // state.floor exists; read on the game thread (22 §6.1).
+    std::atomic<bool> floor_available{false};
 
     // The manifest probe() chose; init_system hands it to the loader.
     std::filesystem::path manifest;

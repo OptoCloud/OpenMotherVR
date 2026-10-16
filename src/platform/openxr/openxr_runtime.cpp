@@ -28,6 +28,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace omvr::platform::openxr {
@@ -162,7 +163,8 @@ public:
         const FrameViews v = xr_.views();
         render_views_.store(v); // what the game renders this frame with
         head_read_.store(true, std::memory_order_relaxed);
-        out = game_pose(v.head, world_scale);
+        floor_ = floor_of(v);
+        out    = game_pose(v.head, world_scale);
     }
 
     // Game thread. The grip poses located with the views head_pose handed
@@ -194,6 +196,7 @@ public:
 
     void head_yaw_pose(Matrix34& out, float world_scale) override {
         const FrameViews v = xr_.views();
+        floor_             = floor_of(v);
         // Never from an invalid head (09 §5.5): the previous reference stays
         // (identity before any). A queued retake waits for headset_in_use,
         // which needs a valid head, so it happens once tracking is back.
@@ -281,6 +284,19 @@ public:
         xr_.end_on_request();
     }
 
+    // 22 §6.1: the floor space located with the views head_pose or
+    // head_yaw_pose used.
+    bool has_floor() const override { return xr_.has_floor(); }
+    std::optional<float> floor_height() override { return floor_; }
+
+    std::optional<float> head_height_above_floor() override {
+        const FrameViews v = xr_.views();
+        if (!v.head_valid) return std::nullopt;
+        const std::optional<float> floor = floor_of(v);
+        if (!floor) return std::nullopt;
+        return v.head.position.y - *floor;
+    }
+
     bool headset_in_use() override {
         if (!xr_.running()) return false;
         const FrameViews v = xr_.views();
@@ -299,6 +315,11 @@ private:
         D3D11_TEXTURE2D_DESC d{};
         d3d11::to_d3d(texture)->GetDesc(&d);
         return {d.Height, d.Width / 2};
+    }
+
+    std::optional<float> floor_of(const FrameViews& v) const noexcept {
+        if (!xr_.has_floor() || !v.floor_valid) return std::nullopt;
+        return v.floor_y;
     }
 
     static Matrix34 game_pose(const Pose& p, float world_scale) noexcept {
@@ -439,6 +460,7 @@ private:
     Vec3 eye_offset_[kEyeCount] = {{-kDefaultEyeX, 0, 0}, {kDefaultEyeX, 0, 0}};
     float yaw_                  = 0.0f; // game thread: the latest reference's heading
     bool recenter_taken_        = true; // game thread: the last head_yaw_pose took a new one
+    std::optional<float> floor_;        // game thread: the floor of those views (22 §6.1)
     // Written on the game thread (head_pose, head_yaw_pose), read on the
     // render thread (submit_frame).
     util::SeqLock<FrameViews> render_views_;

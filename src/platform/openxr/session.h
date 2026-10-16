@@ -91,6 +91,10 @@ struct FrameViews {
     bool valid                = false; // eye orientations valid: a projection layer may use them
     bool eye_positions_valid  = false; // eye positions are this frame's, not held
     bool head_valid           = false; // head orientation and position both this frame's
+    // The floor's height in the seated space at display_time (22 §6.1): the
+    // last valid one, located with the head; floor_valid once it has been.
+    float floor_y    = 0.0f;
+    bool floor_valid = false;
 };
 
 // A region of a texture in pixels (the depth slice is always the first).
@@ -156,6 +160,10 @@ public:
 
     // True between xrBeginSession and xrEndSession.
     bool running() const noexcept;
+
+    // The session has a floor reference space (STAGE, else LOCAL_FLOOR) for
+    // standing play (22 §6.1). Any thread.
+    bool has_floor() const noexcept;
 
     // The runtime asked the application to quit (session state EXITING).
     bool exit_requested() const noexcept;

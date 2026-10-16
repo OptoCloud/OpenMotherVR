@@ -48,6 +48,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -197,6 +198,9 @@ public:
     void poll_input() override;
     bool headset_in_use() override;
     bool recenter_taken() const override { return recenter_taken_; }
+    bool has_floor() const override { return tracking_origin_ == vr::TrackingUniverseStanding; }
+    std::optional<float> floor_height() override;
+    std::optional<float> head_height_above_floor() override;
     bool hand_pose(int hand, Matrix34& out, float world_scale) override;
     bool hand_velocity(int hand, float (&out)[3], float world_scale) override;
     bool aim_pose(int hand, Matrix34& out, float world_scale) override;
@@ -639,6 +643,21 @@ bool OpenVrRuntime::headset_in_use() {
     if (!active) return false;
     const auto& m = read_head().m;
     return head_valid_ && core::vr::is_upright(m[1][1]);
+}
+
+// 22 §6.1: the standing universe's Y is the height above the calibrated
+// floor (03 §1), so the floor is at 0.
+std::optional<float> OpenVrRuntime::floor_height() {
+    if (!has_floor()) return std::nullopt;
+    return 0.0f;
+}
+
+// 22 §6.2: read fresh, as headset_in_use (menus call no head_pose).
+std::optional<float> OpenVrRuntime::head_height_above_floor() {
+    if (!has_floor()) return std::nullopt;
+    const auto& m = read_head().m;
+    if (!head_valid_) return std::nullopt;
+    return m[1][3];
 }
 
 // ---- slots 9-10 --------------------------------------------------------------

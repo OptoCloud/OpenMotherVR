@@ -3,6 +3,8 @@
 #include "core/vr/types.h"
 #include "util/math/matrix.h"
 
+#include <optional>
+
 // The VR runtime behind the stereo device: one implementation per runtime.
 //
 // The original has two implementations, MotherVR::OpenVR (vtable 0x1005ddac)
@@ -60,6 +62,22 @@ public:
     // When the FOV only became known after init (OpenXR runtimes that do not
     // report it up front), updates `desc` and returns true once.
     virtual bool refresh_headset_desc(HeadsetDesc& /*desc*/) { return false; }
+
+    // ---- The floor, for standing play (spec 22 §6.1, §6.2) ----
+    //
+    // Game thread. Heights are runtime metres, before the world scale, +Y up.
+    //
+    // The runtime has a floor reference (OpenVR's standing universe;
+    // OpenXR's STAGE or LOCAL_FLOOR space). Fixed once the runtime runs.
+    virtual bool has_floor() const { return false; }
+    // The floor's height in the space of the head pose head_pose or
+    // head_yaw_pose last returned, located for the same instant. None
+    // without a floor reference, or before the floor was first located.
+    virtual std::optional<float> floor_height() { return std::nullopt; }
+    // The head's height above the floor from the newest valid head pose,
+    // read fresh as headset_in_use reads it (menus call no head_pose). None
+    // without a floor reference or a valid pose.
+    virtual std::optional<float> head_height_above_floor() { return std::nullopt; }
 
     // The player turned VR off (22 §13): the device has already detached
     // and no new call will come. Stop showing the game in the headset and

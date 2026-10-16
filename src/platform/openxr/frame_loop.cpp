@@ -188,6 +188,19 @@ void Session::Impl::locate_head(XrTime t) {
     state.views.head_valid = (hf & kOrientationAndPosition) == kOrientationAndPosition;
 }
 
+// 22 §6.1: the floor's height in the seated space, located with the head
+// so a re-anchor moves both together; the last valid one while the runtime
+// cannot locate it.
+void Session::Impl::locate_floor(XrTime t) {
+    if (!state.floor) return;
+    Pose floor{};
+    if ((locate_flags(state.floor.get(), state.seated.get(), t, floor) &
+         XR_SPACE_LOCATION_POSITION_VALID_BIT) == 0)
+        return;
+    state.views.floor_y     = floor.position.y;
+    state.views.floor_valid = true;
+}
+
 void Session::Impl::log_ipd_once() {
     if (!state.views.eye_positions_valid || state.ipd_logged) return;
     const Vec3 a = state.views.eyes[0].pose.position, b = state.views.eyes[1].pose.position;
@@ -217,6 +230,7 @@ bool Session::Impl::begin_frame() {
     read_hands(t);
     locate_views(t);
     locate_head(t);
+    locate_floor(t);
     state.views.display_time = t;
     published_views.store(state.views);
     log_ipd_once();

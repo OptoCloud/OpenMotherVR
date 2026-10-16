@@ -11,11 +11,13 @@
 #include "platform/win32/text.h"
 #include "util/math/angle.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <thread>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace omvr::platform::openxr {
 
@@ -42,7 +44,9 @@ constexpr std::string_view kLogCreated     = "openxr: session created, per-eye {
 constexpr std::string_view kLogExitRequest = "openxr: ending the session at the player's request";
 constexpr std::string_view kLogExitTimeout =
     "openxr: the runtime did not stop the session within {} ms; destroying it running";
-constexpr std::string_view kLogEnded = "openxr: session and instance destroyed; VR off until restart";
+constexpr std::string_view kLogEnded   = "openxr: session and instance destroyed; VR off until restart";
+constexpr std::string_view kLogFloor   = "openxr: floor reference {}";
+constexpr std::string_view kLogNoFloor = "openxr: no STAGE or LOCAL_FLOOR space: standing play unavailable";
 
 // The log label of the headset-not-showing-the-game warning (09 §3.1).
 constexpr std::string_view kNotShowingLabel = "headset not showing the game";
@@ -189,6 +193,8 @@ void Session::Impl::teardown() {
     state.seated.reset();
     state.local.reset();
     state.view.reset();
+    state.floor.reset();
+    floor_available.store(false, std::memory_order_relaxed);
     state.session.reset();
     state.instance.reset();
     state.context.Reset();
@@ -232,7 +238,34 @@ bool Session::Impl::create_spaces() {
     state.local.reset(make_reference_space(XR_REFERENCE_SPACE_TYPE_LOCAL, kIdentityPose));
     state.seated.reset(make_reference_space(XR_REFERENCE_SPACE_TYPE_LOCAL, kIdentityPose));
     state.view.reset(make_reference_space(XR_REFERENCE_SPACE_TYPE_VIEW, kIdentityPose));
-    return state.local && state.seated && state.view;
+    if (!(state.local && state.seated && state.view)) return false;
+    create_floor_space();
+    return true;
+}
+
+// 22 §6.1: the floor for standing play, STAGE when the runtime has it, else
+// LOCAL_FLOOR (XR_EXT_local_floor). Optional: without either, play is
+// seated.
+void Session::Impl::create_floor_space() {
+    std::uint32_t n = 0;
+    xrEnumerateReferenceSpaces(state.session.get(), 0, &n, nullptr);
+    std::vector<XrReferenceSpaceType> types(n);
+    if (n == 0 || XR_FAILED(xrEnumerateReferenceSpaces(state.session.get(), n, &n, types.data())))
+        types.clear();
+    const auto has = [&types](XrReferenceSpaceType t) { return std::ranges::find(types, t) != types.end(); };
+    XrReferenceSpaceType type = XR_REFERENCE_SPACE_TYPE_STAGE;
+    const char* name          = "STAGE";
+    if (!has(type)) {
+        type = XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT;
+        name = "LOCAL_FLOOR";
+    }
+    if (has(type)) state.floor.reset(make_reference_space(type, kIdentityPose));
+    floor_available.store(static_cast<bool>(state.floor), std::memory_order_relaxed);
+    if (state.floor) {
+        logf(log, kLogFloor, name);
+    } else {
+        log.line(kLogNoFloor);
+    }
 }
 
 SessionInfo Session::Impl::init(ID3D11Device* device) noexcept {
@@ -331,6 +364,8 @@ void Session::set_aim_poses(bool on) noexcept { impl_->input.set_aim_poses(on); 
 void Session::set_haptics(bool on) noexcept { impl_->input.set_haptics(on); }
 
 bool Session::running() const noexcept { return impl_->state.running && !impl_->state.lost; }
+
+bool Session::has_floor() const noexcept { return impl_->floor_available.load(std::memory_order_relaxed); }
 
 bool Session::exit_requested() const noexcept { return impl_->state.exit_requested; }
 

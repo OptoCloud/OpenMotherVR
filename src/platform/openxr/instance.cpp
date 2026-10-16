@@ -115,9 +115,12 @@ bool Session::Impl::init_system() noexcept {
     const auto props     = offered_extensions();
     const bool fov_ext   = offered(props, XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
     const bool audio_ext = offered(props, XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
+    // 22 §6.1: LOCAL_FLOOR is the floor reference when there is no STAGE.
+    const bool floor_ext = offered(props, XR_EXT_LOCAL_FLOOR_EXTENSION_NAME);
     std::vector<const char*> extensions{XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
     if (fov_ext) extensions.push_back(XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
     if (audio_ext) extensions.push_back(XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
+    if (floor_ext) extensions.push_back(XR_EXT_LOCAL_FLOOR_EXTENSION_NAME);
     if (!create_instance(extensions)) {
         teardown();
         return false;
