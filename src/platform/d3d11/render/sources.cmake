@@ -6,4 +6,6 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/mirror_renderer.h
     ${CMAKE_CURRENT_LIST_DIR}/texture_dump.cpp
     ${CMAKE_CURRENT_LIST_DIR}/texture_dump.h
+    ${CMAKE_CURRENT_LIST_DIR}/vignette_renderer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/vignette_renderer.h
 )

@@ -43,6 +43,11 @@ void read_pad(Context& ctx, void* pad, UpdateInput& in) noexcept {
     // The turn is the player map's analog action; its virtual code follows
     // the map's digital count (0x12C on the shipped map), so it is derived.
     in.turn = merged_pad_axis(pad, ctx.pad.analog_virtual_code(game::kPlayerMap, game::player_action::kTurn));
+    // Spec 22 §5: the movement the comfort vignette follows.
+    in.move_x =
+        merged_pad_axis(pad, ctx.pad.analog_virtual_code(game::kPlayerMap, game::player_action::kMoveX));
+    in.move_y =
+        merged_pad_axis(pad, ctx.pad.analog_virtual_code(game::kPlayerMap, game::player_action::kMoveY));
 }
 
 // 05 §3.2b, e: the keyboard chord and keyboard or mouse use.
@@ -67,6 +72,10 @@ UpdateInput gather(Context& ctx, StereoManager& m, StereoInterface& device) {
     in.follow_active = ctx.follow.active();
     if (in.follow_active) in.follow_yaw = ctx.follow.yaw();
     in.mode = mode_of(m);
+    // Spec 22 §4.4: the script events' interaction state.
+    in.in_interaction   = ctx.interactions.in_interaction();
+    in.interaction_kind = ctx.interactions.interaction();
+    in.breathing_game   = ctx.interactions.breathing_game();
     // Asked only while a recenter waits for the headset, as the runtime
     // reads a fresh pose for it.
     auto* runtime     = game::load_backend(device);
@@ -98,6 +107,11 @@ void apply(Context& ctx, StereoManager& m, StereoInterface& device, const Update
     if (out.place_screen) place_menu_screen(ctx, m);
     sync_mode_stack(ctx, m);
     if (out.scene_visibility) m.game_64 = *out.scene_visibility;
+    // Spec 22 §4.3, §5, §15: to the render thread's slot 6.
+    ctx.comfort.publish_target(out.vignette_target);
+    if (out.snap_fade) ctx.comfort.note_snap_step();
+    if (out.turning_changed) core::stereo::log_turning(ctx.log, *out.turning_changed);
+    if (out.block_changed) core::stereo::log_turn_block(ctx.log, *out.block_changed);
 }
 
 float* place_quad(float* out, const Matrix44& quad) noexcept {
@@ -118,6 +132,7 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
         // 05 §3.2a: without a running headset only the game's own look is
         // kept on.
         if (ctx.follow.active()) ctx.follow.set_look_enabled(true);
+        ctx.comfort.publish_target(0.0f); // spec 22 §5: no vignette without a running device
         return 0;
     }
     guarded("Stereo::Update", [&] {

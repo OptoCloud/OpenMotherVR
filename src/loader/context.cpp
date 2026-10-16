@@ -63,6 +63,7 @@ Context::Context(void* self) noexcept
                                             manager.si.mirror_cb_screen, manager.si.mirror_cb,
                                             manager.si.mirror_sampler},
              &manager.si.eye_texture[0].srv, log),
+      vignette(log),
       window(stereo, log),
       shader_fixes(log) {}
 

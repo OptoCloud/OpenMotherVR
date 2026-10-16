@@ -9,6 +9,7 @@
 #include "core/input/interaction_state.h"
 #include "core/input/virtual_pad.h"
 #include "core/render/shader_fix_stats.h"
+#include "core/stereo/comfort_view.h"
 #include "core/stereo/desktop_window.h"
 #include "core/stereo/head_clip_delay.h"
 #include "core/stereo/mode_policy.h"
@@ -36,6 +37,7 @@
 #include "loader/launch_options.h"
 #include "loader/runtime_state.h"
 #include "platform/d3d11/render/mirror_renderer.h"
+#include "platform/d3d11/render/vignette_renderer.h"
 #include "platform/d3d11/system_d3d11.h"
 #include "platform/discord/presence.h"
 #include "platform/openvr/runtime_probe.h"
@@ -111,6 +113,10 @@ struct Context {
     core::stereo::StereoUpdate update;
     core::stereo::StereoDevice stereo;      // owns the VrRuntime through a factory
     platform::d3d11::MirrorRenderer mirror; // the desktop mirror on the stereo device's objects
+    // The comfort vignette and snap fade, game to render thread (22 §15), and
+    // their pass in slot 6 (22 §5).
+    core::stereo::ComfortView comfort;
+    platform::d3d11::VignetteRenderer vignette;
     core::stereo::HeadClipDelay head_clip;
     core::stereo::StereoAa stereo_aa;
     core::stereo::ReflectionPass reflections;

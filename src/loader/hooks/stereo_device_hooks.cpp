@@ -20,6 +20,7 @@
 #include <d3d11.h>
 #include <dxgi.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -80,6 +81,20 @@ void take_stereo_target(const game::AddressMap& addresses, StereoInterface& si, 
     t0.srv           = renderer_rt<ID3D11ShaderResourceView>(addresses, AiAddr::RendererRtSrv, index);
 }
 
+// Spec 22 §4.3, §5: the comfort vignette and the snap-turn fade, drawn into
+// the eyes before the runtime takes them (OpenVR's submit, OpenXR's copy)
+// and before the mirror samples them. Head-tracked frames only. Nothing to
+// draw costs one comparison. Render thread.
+void draw_comfort(Context& ctx, StereoInterface& si) noexcept {
+    const auto& fov      = si.eye_fov[0]; // symmetric (03 §3.2): one eye gives both
+    const auto constants = ctx.comfort.frame(ctx.clock.now(), load_pose_fetched(si),
+                                             std::max(fov.left, fov.right), std::max(fov.up, fov.down));
+    if (!constants) return;
+    auto* dc = renderer_get<ID3D11DeviceContext>(ctx.addresses, AiAddr::RendererContext);
+    ctx.vignette.draw(platform::d3d11::gpu_context(dc),
+                      platform::d3d11::gpu_texture(si.eye_texture[0].texture), *constants);
+}
+
 // ---- Device vtable (all __thiscall, 02 §5) ----------------------------------------
 
 // [0] scalar deleting destructor. The object is static: never freed.
@@ -113,6 +128,9 @@ bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noex
         const auto size = texture_size(si.eye_texture[0].texture);
         auto* device    = renderer_get<ID3D11Device>(ctx.addresses, AiAddr::RendererDevice);
         auto* dc        = renderer_get<ID3D11DeviceContext>(ctx.addresses, AiAddr::RendererContext);
+        // Spec 22 §15: the comfort pass's resources follow the target.
+        ctx.vignette.configure(platform::d3d11::gpu_device(device),
+                               platform::d3d11::gpu_texture(si.eye_texture[0].texture));
         return ctx.stereo.configure_rendering(si, size, platform::d3d11::gpu_device(device),
                                               platform::d3d11::gpu_context(dc), ctx.mirror);
     });
@@ -139,6 +157,7 @@ void __fastcall dev_end_frame(void* self, void*) noexcept {
     auto& si  = device_of(self);
     guarded("EndFrame", [&] {
         if (auto* backend = load_backend(si)) {
+            draw_comfort(ctx, si);
             backend->submit_frame(platform::d3d11::gpu_texture(si.eye_texture[0].texture));
         }
     });
