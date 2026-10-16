@@ -113,6 +113,21 @@ long CrashRecorder::chain(EXCEPTION_POINTERS* info) noexcept {
     return previous_ ? previous_(info) : EXCEPTION_CONTINUE_SEARCH;
 }
 
+// 22 §14: the state event, then the flush, each on its own so a fault in
+// one still leaves the other.
+void CrashRecorder::write_state_and_flush() noexcept {
+    const StateRenderer render         = render_state_.load();
+    core::diag::ports::LogFlush* flush = flush_.load();
+    if (!render || !flush) return;
+    __try {
+        const std::size_t n = render(std::span<char>{message_, sizeof(message_) - 1});
+        if (n > 0) log_.line_in(std::string_view{message_, n}, line_);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    __try {
+        flush->flush_now();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
 long CrashRecorder::on_crash(EXCEPTION_POINTERS* info) noexcept {
     // Only the first: a crash while logging must not recurse.
     if (info && info->ExceptionRecord && info->ContextRecord && !logged_.exchange(true)) {
@@ -121,8 +136,14 @@ long CrashRecorder::on_crash(EXCEPTION_POINTERS* info) noexcept {
         __try {
             write_record(*info);
         } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        write_state_and_flush();
     }
     return chain(info);
+}
+
+void CrashRecorder::enable_crash_safe(StateRenderer render, core::diag::ports::LogFlush& flush) noexcept {
+    flush_.store(&flush);
+    render_state_.store(render);
 }
 
 void CrashRecorder::install(Filter ours) noexcept { previous_ = ::SetUnhandledExceptionFilter(ours); }

@@ -61,7 +61,11 @@ extern "C" __declspec(dllexport) HRESULT WINAPI D3D11CreateDeviceAndSwapChain(
     // has no Present hook). Once is enough here.
     static std::once_flag crash_filter_reasserted;
     try {
-        std::call_once(crash_filter_reasserted, [] { omvr::loader::hooks::reassert_crash_hook(); });
+        std::call_once(crash_filter_reasserted, [] {
+            omvr::loader::hooks::reassert_crash_hook();
+            // The first point after attach outside the loader lock (22 §14).
+            omvr::loader::hooks::start_log_flusher();
+        });
     } catch (...) {
         // call_once only throws if the callable does, and it is noexcept.
     }

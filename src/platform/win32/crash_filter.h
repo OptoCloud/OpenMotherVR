@@ -2,12 +2,14 @@
 #pragma once
 
 #include "core/diag/ports/log.h"
+#include "core/diag/ports/log_flush.h"
 #include "core/diag/tuning.h"
 #include "platform/win32/constants.h"
 
 #include <atomic>
 #include <cstddef>
 #include <format>
+#include <span>
 #include <utility>
 
 struct _EXCEPTION_POINTERS;
@@ -25,6 +27,10 @@ public:
 
     explicit CrashRecorder(core::diag::ports::Log& log) noexcept : log_(log) {}
 
+    // Renders Controls.CrashSafeLog's crash event (22 §14) into `out` and
+    // returns its length; on the faulting thread, without allocating.
+    using StateRenderer = std::size_t (*)(std::span<char> out) noexcept;
+
     // Installs `ours` as the unhandled-exception filter. Call once, at attach.
     void install(Filter ours) noexcept;
 
@@ -40,11 +46,17 @@ public:
     // the faulting thread, in whatever state the process is.
     long on_crash(_EXCEPTION_POINTERS* info) noexcept;
 
+    // Controls.CrashSafeLog (22 §14): after the record, one more event with
+    // the mod's state, then the log flushed to disk before the exception is
+    // passed on, since the process may end as soon as it is. At attach.
+    void enable_crash_safe(StateRenderer render, core::diag::ports::LogFlush& flush) noexcept;
+
 private:
     template <class... Args>
     void record(std::format_string<Args...> fmt, Args&&... args) noexcept;
     void write_record(const _EXCEPTION_POINTERS& info) noexcept;
     void write_stack(const _EXCEPTION_POINTERS& info) noexcept;
+    void write_state_and_flush() noexcept;
     long chain(_EXCEPTION_POINTERS* info) noexcept;
 
     core::diag::ports::Log& log_;
@@ -58,6 +70,9 @@ private:
     // one it replaced (ours), the nested call goes on to previous_ instead of
     // looping back into it.
     std::atomic<unsigned long> chaining_thread_{0};
+    // Set once at attach with Controls.CrashSafeLog on; null keeps v1's record.
+    std::atomic<StateRenderer> render_state_{nullptr};
+    std::atomic<core::diag::ports::LogFlush*> flush_{nullptr};
 
     // The record is rendered in storage allocated once at attach, not on the
     // faulting thread's stack: after a stack overflow only the guard region

@@ -9,6 +9,7 @@ add_executable(omvr_tests
     util/util_test.cpp
     core/comfort_test.cpp
     core/config_test.cpp
+    core/crash_log_test.cpp
     core/diag_test.cpp
     core/input_test.cpp
     core/render_test.cpp

@@ -32,7 +32,10 @@ std::unique_ptr<core::vr::ports::VrRuntime> make_runtime(Context& c, core::vr::D
 
 Context::Context(void* self) noexcept
     : module(self),
-      log(clock, log_sink, platform::win32::current_process_id()),
+      flush_schedule(thread_roles),
+      log_flusher(log_sink, clock, flush_schedule, log),
+      log_out(log_sink, log_flusher, current_thread, thread_roles),
+      log(clock, log_out, platform::win32::current_process_id()),
       crash(log),
       settings(files, log),
       dialogs(core::ui::kCaption, log),

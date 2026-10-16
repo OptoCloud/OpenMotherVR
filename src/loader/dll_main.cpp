@@ -19,6 +19,7 @@
 #include "loader/context.h"
 #include "loader/hooks/crash_hook.h"
 #include "platform/win32/module.h"
+#include "platform/win32/process_info.h"
 
 #include <windows.h>
 
@@ -36,6 +37,8 @@ constexpr std::string_view kDetachUnloadLine = "== MotherVR detach == (unload)";
 
 void on_attach(HINSTANCE self) noexcept {
     auto& ctx = omvr::loader::create_context(self);
+    // The thread that runs attach is the game thread (11 §1.4).
+    ctx.thread_roles.set(diag::ThreadRole::Main, omvr::platform::win32::current_thread_id());
     if (const auto dir = omvr::platform::win32::module_directory(); !dir.empty()) {
         ctx.log_sink.open(dir / diag::kLogFileName);
     }
@@ -49,6 +52,8 @@ void on_attach(HINSTANCE self) noexcept {
     } catch (...) {
         ctx.log.line("attach failed: unknown exception");
     }
+    // Controls.CrashSafeLog applies from here, once the settings are read.
+    omvr::loader::hooks::enable_crash_safe_log();
     ctx.dialogs.start();
 }
 

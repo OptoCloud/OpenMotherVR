@@ -14,6 +14,7 @@
 #include "platform/d3d11/constants.h"
 #include "platform/d3d11/swapchain.h"
 #include "platform/win32/patching/memory.h"
+#include "platform/win32/process_info.h"
 
 #include <windows.h>
 #include <dxgi.h>
@@ -98,6 +99,8 @@ HRESULT __stdcall hook_present(void* self, UINT sync_interval, UINT flags) noexc
     // a point to put the crash filter back on top, if the game installed
     // its own after attach (11, the crash record).
     if (n == 1) {
+        // The game presents on its render thread (11 §1.4).
+        ctx.thread_roles.set(core::diag::ThreadRole::Render, platform::win32::current_thread_id());
         ctx.log.line(kFirstPresentLog);
         reassert_crash_hook();
     }

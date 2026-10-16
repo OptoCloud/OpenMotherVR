@@ -11,6 +11,7 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/constants.h
     ${CMAKE_CURRENT_LIST_DIR}/crash_filter.cpp
     ${CMAKE_CURRENT_LIST_DIR}/crash_filter.h
+    ${CMAKE_CURRENT_LIST_DIR}/current_thread.h
     ${CMAKE_CURRENT_LIST_DIR}/dialog_thread.cpp
     ${CMAKE_CURRENT_LIST_DIR}/dialog_thread.h
     ${CMAKE_CURRENT_LIST_DIR}/dll_directory_scope.cpp
@@ -21,6 +22,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/file_io.h
     ${CMAKE_CURRENT_LIST_DIR}/file_log_sink.cpp
     ${CMAKE_CURRENT_LIST_DIR}/file_log_sink.h
+    ${CMAKE_CURRENT_LIST_DIR}/log_flusher.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/log_flusher.h
     ${CMAKE_CURRENT_LIST_DIR}/message_box.cpp
     ${CMAKE_CURRENT_LIST_DIR}/message_box.h
     ${CMAKE_CURRENT_LIST_DIR}/module.cpp

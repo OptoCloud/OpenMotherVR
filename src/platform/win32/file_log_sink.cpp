@@ -24,4 +24,10 @@ void FileLogSink::write(std::span<const char> line) noexcept {
                 nullptr);
 }
 
+// FILE_APPEND_DATA access is enough for FlushFileBuffers (the handle needs
+// write or append access).
+void FileLogSink::flush() noexcept {
+    if (void* h = file_.load(std::memory_order_acquire)) ::FlushFileBuffers(h);
+}
+
 } // namespace omvr::platform::win32

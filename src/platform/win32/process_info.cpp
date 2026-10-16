@@ -40,6 +40,8 @@ std::string process_name(std::uint32_t pid) {
 
 std::uint32_t current_process_id() noexcept { return ::GetCurrentProcessId(); }
 
+std::uint32_t current_thread_id() noexcept { return ::GetCurrentThreadId(); }
+
 bool process_elevated() noexcept {
     HANDLE raw = nullptr;
     if (!::OpenProcessToken(::GetCurrentProcess(), TOKEN_QUERY, &raw)) return false;

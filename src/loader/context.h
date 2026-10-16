@@ -2,7 +2,10 @@
 #pragma once
 
 #include "core/config/settings_store.h"
+#include "core/diag/crash_safe_sink.h"
+#include "core/diag/flush_schedule.h"
 #include "core/diag/logger.h"
+#include "core/diag/thread_roles.h"
 #include "core/input/control_mapper.h"
 #include "core/input/control_scheme.h"
 #include "core/input/glyphs.h"
@@ -48,10 +51,12 @@
 #include "platform/openxr/virtual_screen.h"
 #include "platform/win32/clock.h"
 #include "platform/win32/crash_filter.h"
+#include "platform/win32/current_thread.h"
 #include "platform/win32/dialog_thread.h"
 #include "platform/win32/file_io.h"
 #include "platform/win32/file_log_sink.h"
 #include "platform/win32/input/keyboard.h"
+#include "platform/win32/log_flusher.h"
 #include "platform/win32/payload_files.h"
 
 #include <atomic>
@@ -73,6 +78,11 @@ struct Context {
     // diag
     platform::win32::SystemClock clock;
     platform::win32::FileLogSink log_sink;
+    platform::win32::CurrentThread current_thread;
+    core::diag::ThreadRoles thread_roles;      // which thread is main, render, mod (11 §1.4)
+    core::diag::FlushScheduler flush_schedule; // the mod thread's pace (22 §14)
+    platform::win32::LogFlusher log_flusher;   // Controls.CrashSafeLog's mod thread (22 §14)
+    core::diag::CrashSafeSink log_out;         // the logger's sink: the file, flushed by policy
     core::diag::Logger log;
     platform::win32::CrashRecorder crash;
     // config, ui

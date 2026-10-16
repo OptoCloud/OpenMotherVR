@@ -1,6 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 
@@ -20,5 +21,9 @@ inline constexpr std::uint32_t kDebugLogPeriodFrames = 900;
 
 // A replacement that throws is logged at most this many times.
 inline constexpr int kGuardLogLimit = 16;
+
+// With Controls.CrashSafeLog, the mod's thread flushes the log to disk at
+// most once per this interval, and within it after a write (22 §14).
+inline constexpr std::chrono::milliseconds kLogFlushInterval{1000};
 
 } // namespace omvr::core::diag

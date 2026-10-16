@@ -20,6 +20,11 @@ public:
     bool ready() const noexcept override;
     void write(std::span<const char> line) noexcept override;
 
+    // Has Windows write the file's cached data to disk (FlushFileBuffers),
+    // so the lines survive a crash of the whole system (22 §14). Slow (a
+    // disk write): never on the render or job threads.
+    void flush() noexcept;
+
 private:
     // HANDLE, published once open; never closed: the log lasts the process.
     std::atomic<void*> file_{nullptr};
