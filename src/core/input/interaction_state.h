@@ -41,6 +41,8 @@ public:
     [[nodiscard]] bool in_interaction() const noexcept;     // between start_interaction and its end
     [[nodiscard]] Interaction interaction() const noexcept; // the specific kind, when announced
     [[nodiscard]] bool hiding() const noexcept;             // in a locker or under a table
+    // The hiding place's breathing game is in progress (spec 22 §9.1).
+    [[nodiscard]] bool breathing_game() const noexcept;
 
     // One string the scripts passed. Returns true when it changed the state.
     // Game thread.
@@ -50,6 +52,10 @@ public:
     // change, so new event names can be found by playing. Game thread.
     void log_event(std::string_view text, bool changed) noexcept;
 
+    // A loading screen opened: the breathing game ends with the level
+    // (spec 22 §9.1). Game thread.
+    void on_loading_screen() noexcept;
+
 private:
     void end_interaction() noexcept;
     bool on_prefixed_event(std::string_view text) noexcept;
@@ -58,6 +64,7 @@ private:
     std::atomic<bool> in_interaction_{false};
     std::atomic<Interaction> interaction_{Interaction::None};
     std::atomic<bool> hiding_{false};
+    std::atomic<bool> breathing_game_{false};
     std::mutex mutex_;                        // guards seen_; never held across a game call
     std::set<std::string, std::less<>> seen_; // find() without a copy
 };

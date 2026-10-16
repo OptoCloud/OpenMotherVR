@@ -184,6 +184,9 @@ inline constexpr std::string_view kEventLadderFinish     = "ladder_interaction_f
 inline constexpr std::string_view kEventSuitChangeFinish = "suit_change_interaction_finish";
 inline constexpr std::string_view kEventCutsceneStart    = "cutscene_visibility_start";
 inline constexpr std::string_view kEventCutsceneFinish   = "cutscene_visibility_finish";
+// The hiding place's breathing game (spec 22 §2.3, §9.1).
+inline constexpr std::string_view kEventBreathingGameStart = "Start_Breathing_Game";
+inline constexpr std::string_view kEventBreathingGameEnd   = "End_Breathing_Game";
 // "<prefix>_start" / "<prefix>_finish".
 inline constexpr std::string_view kEventStartSuffix  = "_start";
 inline constexpr std::string_view kEventFinishSuffix = "_finish";

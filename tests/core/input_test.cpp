@@ -458,8 +458,9 @@ TEST_CASE("interaction state logs a string the first time and on a change") {
     s.log_event("start_interaction", false);
     s.log_event("start_interaction", true);
     REQUIRE(log.lines.size() == 2);
-    CHECK(log.lines[0] == "[events] \"start_interaction\" (new): interaction false kind 0 hiding false");
-    CHECK(log.lines[1] == "[events] \"start_interaction\": interaction false kind 0 hiding false");
+    CHECK(log.lines[0] ==
+          "[events] \"start_interaction\" (new): interaction false kind 0 hiding false breathing false");
+    CHECK(log.lines[1] == "[events] \"start_interaction\": interaction false kind 0 hiding false breathing false");
 }
 
 } // namespace

@@ -117,6 +117,7 @@ void __fastcall loading_open(void* self, void*) noexcept {
     context().play.set_screen(core::ui::Screen::Loading);
     enter_screen_mode();
     context().update.set_loading_blackout(true);
+    context().interactions.on_loading_screen(); // spec 22 §9.1: the breathing game ends with the level
     push_settings(self);
 }
 

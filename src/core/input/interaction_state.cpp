@@ -30,7 +30,7 @@ constexpr std::array kEnds = {
     game::kEventSuitChangeFinish,
 };
 
-constexpr std::string_view kEventLog = "[events] \"{}\"{}: interaction {} kind {} hiding {}";
+constexpr std::string_view kEventLog = "[events] \"{}\"{}: interaction {} kind {} hiding {} breathing {}";
 constexpr std::string_view kNewTag   = " (new)";
 
 // 11 §5.2: most traffic is per-frame engine chatter that no tracked string
@@ -86,9 +86,16 @@ bool InteractionState::on_event(std::string_view text) noexcept {
         hiding_.store(true, std::memory_order_relaxed);
         return true;
     }
+    // Spec 22 §9.1: set and cleared by the hiding place's pair, also
+    // cleared when the player leaves the hiding place.
+    if (text == game::kEventBreathingGameStart || text == game::kEventBreathingGameEnd) {
+        breathing_game_.store(text == game::kEventBreathingGameStart, std::memory_order_relaxed);
+        return true;
+    }
     bool changed = false;
     if (text == game::kEventHidingFinish) {
         hiding_.store(false, std::memory_order_relaxed);
+        breathing_game_.store(false, std::memory_order_relaxed);
         changed = true;
     }
     if (is_end(text)) {
@@ -106,7 +113,7 @@ void InteractionState::log_event(std::string_view text, bool changed) noexcept {
         if (first) seen_.emplace(text);
         if (!first && !changed) return;
         diag::ports::logf(log_, kEventLog, text, first ? kNewTag : std::string_view{}, in_interaction(),
-                          static_cast<int>(interaction()), hiding());
+                          static_cast<int>(interaction()), hiding(), breathing_game());
     } catch (...) {}
 }
 
@@ -117,5 +124,12 @@ Interaction InteractionState::interaction() const noexcept {
     return interaction_.load(std::memory_order_relaxed);
 }
 bool InteractionState::hiding() const noexcept { return hiding_.load(std::memory_order_relaxed); }
+bool InteractionState::breathing_game() const noexcept {
+    return breathing_game_.load(std::memory_order_relaxed);
+}
+
+void InteractionState::on_loading_screen() noexcept {
+    breathing_game_.store(false, std::memory_order_relaxed);
+}
 
 } // namespace omvr::core::input
