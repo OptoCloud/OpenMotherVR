@@ -107,6 +107,18 @@ Playing
     your left controller points. Default true.
   - "Smoothing": 0 to 1 steadies the hands; higher steadies more but lags
     behind. 0 (the default) is off.
+  - "Haptics": an object of its own inside "Hands" for controller
+    vibration; works with or without "Enabled":
+    - "Enabled": true makes the controllers vibrate for the game
+      (default false). Set it before starting the game; a custom SteamVR
+      binding for the game made before needs a reset to the default.
+    - "Strength": 0 to 1 scales every vibration (default 1).
+    - "GameRumble": the game's own pad rumble, low motor in the left
+      hand and high motor in the right. "Damage": being hurt and dying.
+      "Tracker": a tick in the left hand per scan while the motion
+      tracker is up. "Firing": a buzz in the right hand per shot.
+      "Hacking": the start and end of hacking and cutting. Each
+      default true.
 - Controls (preview, mothervr.json only for now), in a "Controls" object
   under "Settings":
   - "InteractionAwareTurning": true stops the right stick turning you

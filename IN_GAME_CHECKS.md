@@ -101,6 +101,56 @@ are registered when the runtime starts). Try on OpenVR and OpenXR.
 - [ ] **Threads.** No crash or stutter when the weapon update runs (it is
       assumed to run on the game thread).
 
+## Haptics
+
+Set `"Hands": {"Haptics": {"Enabled": true}}` before starting the game (the
+vibration outputs are registered when the runtime starts). Hands need not
+be on. Try on OpenVR and OpenXR, with Dev. Debug Options on.
+
+- [ ] **Defaults.** With haptics off: no `haptics` lines, no `[hook]
+      haptics` lines, no `haptic output` lines from the runtime.
+- [ ] **Installed.** With haptics on: `haptics: on (...)`, `[hook]
+      haptics, game rumble: in place`, `... damage and death: in place`,
+      `... firing: in place`, `[hook] hands, motion tracker in hand: in
+      place` (the tracker scan's call, shared). OpenVR: `haptic output
+      actions haptic_left and haptic_right declared`, then once a
+      controller is bound `haptic outputs bound: left true, right true`.
+      OpenXR: `haptic output action created` and, per controller profile,
+      `haptic output bound to N source(s)`.
+- [ ] **Damage and death.** Take a hit: both controllers buzz briefly,
+      harder for bigger hits (`[diag] haptics: damage pulse, amplitude
+      ...`). Die: one long strong buzz (`death pulse`). Healing with a
+      medikit and reloading a save give none.
+- [ ] **Tracker.** Hold the tracker up: a faint tick in the left
+      controller each scan (about twice a second); none with it lowered.
+      With `"Input": {"ToggleGrips": true}`, ticks while toggled up.
+- [ ] **Firing.** Revolver, shotgun, bolt gun: one buzz in the right
+      controller per pull (`firing pulse, amplitude 0.60`); the
+      flamethrower buzzes softly for as long as it fires. No buzz for melee,
+      the stun baton or throwables, or while the game will not let the
+      weapon fire.
+- [ ] **Hacking and cutting.** Both controllers buzz when the hacking device
+      or the cutting torch starts and again when it ends.
+- [ ] **The game's rumble.** Wherever a pad would rumble (explosions, the
+      Alien's attacks, heavy doors): the left controller follows the pad's
+      low motor, the right the high motor. Log: `haptics: the game set its
+      rumble for the first time (thread ...)` names the thread, and with
+      Debug Options `[diag] haptics: game rumble set N times ...` every
+      900 frames says how often the game sets it (21 §22 item 9: whether it
+      rumbles at all without a pad connected). A level the game stops
+      renewing ends after 0.5 s: no buzz stays on in the pause menu.
+- [ ] **Real pad.** With an Xbox pad connected the pad still rumbles.
+- [ ] **No focus, lost hand.** With the SteamVR dashboard or the Quest menu
+      open nothing vibrates; a covered controller gets nothing.
+- [ ] **Strength and keys.** `"Strength": 0.3` makes every buzz weaker,
+      `0` silences them; each of `"GameRumble"`, `"Damage"`, `"Tracker"`,
+      `"Firing"`, `"Hacking"` set to false stops its own buzz at once.
+- [ ] **Frequency.** On OpenVR the vibrations ask for frequency 0 (the
+      runtime's default): if a controller does not vibrate at all on
+      OpenVR but does on OpenXR, report it with the controller type.
+- [ ] **Legacy input.** If the log says `IVRInput unavailable, using legacy
+      input`, the same events still give short pulses.
+
 ## VR off and logging
 
 - [ ] **VR-off hotkey.** `"Controls": {"VrOffHotkey": true}`; hold right
