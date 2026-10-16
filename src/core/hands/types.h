@@ -2,12 +2,14 @@
 #pragma once
 
 #include "core/vr/types.h"
+#include "game/constants.h"
 #include "util/math/matrix.h"
 #include "util/math/vec.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 // Values the hand features work on (spec 21 §3). Poses from the runtime are
 // in the convention of the head pose the stereo device returns
@@ -73,6 +75,20 @@ struct AimRay {
     util::Vec3 start{};
     util::Vec3 direction{};
     util::Vec3 end{};
+};
+
+// The player character's health (21 §2.2, §14.2).
+struct Health {
+    std::uintptr_t player = 0; // which character: another one (a reload, a new level) starts afresh
+    std::uint16_t current = 0;
+    std::uint16_t maximum = 0;
+};
+
+// What the firing pulse reads in one game frame (21 §14.2).
+struct FireSample {
+    bool pressed = false;                   // the VR fire control
+    std::optional<game::WeaponType> weapon; // the current item's weapon type; nullopt: no weapon
+    bool gate_open = false;                 // the fire alignment byte allows firing (21 §2.5)
 };
 
 } // namespace omvr::core::hands

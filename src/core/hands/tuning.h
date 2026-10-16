@@ -56,4 +56,51 @@ inline constexpr float kNozzleOffsetMetres = 0.0f;
 // threshold; a negative threshold passes every length the test computes.
 inline constexpr float kFireGateAlwaysPass = -1.0f;
 
+// ---- Haptics (21 §14) ----------------------------------------------------------
+
+// 21 §14.2 [proposal]: each event's default amplitude (before
+// Hands.Haptics.Strength) and duration, chosen so the events are told
+// apart without masking each other.
+// Damage: kDamageBase + kDamagePerLostMaximum * (health lost / maximum),
+// capped at kHapticMaxAmplitude.
+inline constexpr float kHapticMaxAmplitude   = 1.0f;
+inline constexpr float kDamageBase           = 0.3f;
+inline constexpr float kDamagePerLostMaximum = 2.0f;
+inline constexpr Seconds kDamageDuration{0.15f};
+inline constexpr float kDeathAmplitude = 1.0f;
+inline constexpr Seconds kDeathDuration{0.6f};
+// A tick per tracker scan, felt but faint.
+inline constexpr float kTrackerPingAmplitude = 0.15f;
+inline constexpr Seconds kTrackerPingDuration{0.02f};
+// A shot; the flamethrower's softer pulse repeats while the fire control is
+// held (a new one as each ends).
+inline constexpr float kFiringAmplitude = 0.6f;
+inline constexpr Seconds kFiringDuration{0.06f};
+inline constexpr float kFlameAmplitude = 0.3f;
+inline constexpr Seconds kFlameDuration{0.06f};
+inline constexpr float kHackingAmplitude = 0.4f;
+inline constexpr Seconds kHackingDuration{0.08f};
+
+// 21 §14.3: the game's rumble is played while its level is above this, as a
+// series of short vibrations renewed each frame. Each lasts
+// kRumbleRenewal: longer than a frame at any rate the headset runs (so
+// the series has no gaps) and short enough that the vibration ends soon
+// after the level drops (implementation choice).
+inline constexpr float kRumbleFloor = 0.02f;
+inline constexpr Seconds kRumbleRenewal{0.05f};
+// A rumble level the game has not set again for this long counts as 0
+// (implementation choice: the game's own pad stop at 0xFE7698 writes the
+// pad directly, not through RumbleSetMotors, 21 §2.9, so a level could
+// otherwise be left on; whether the game renews a held level is open,
+// 21 §22 item 9).
+inline constexpr Seconds kRumbleStale{0.5f};
+
+// 21 §14.2, §14.3: the vibration frequency asked of the runtimes with
+// vibration actions: 0, the runtime's default (OpenXR spells it
+// XR_FREQUENCY_UNSPECIFIED).
+inline constexpr float kVibrationFrequencyDefault = 0.0f;
+// 21 §14.3 [proposal]: OpenVR legacy input pulses each frame for
+// amplitude * this many microseconds (the API's pulse is about 0 to 4 ms).
+inline constexpr float kLegacyPulseMicrosecondsPerAmplitude = 3000.0f;
+
 } // namespace omvr::core::hands

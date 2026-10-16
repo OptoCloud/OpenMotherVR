@@ -9,6 +9,8 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/hand_mapping.h
     ${CMAKE_CURRENT_LIST_DIR}/hand_track.cpp
     ${CMAKE_CURRENT_LIST_DIR}/hand_track.h
+    ${CMAKE_CURRENT_LIST_DIR}/haptics.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/haptics.h
     ${CMAKE_CURRENT_LIST_DIR}/hands.cpp
     ${CMAKE_CURRENT_LIST_DIR}/hands.h
     ${CMAKE_CURRENT_LIST_DIR}/pose_filter.cpp
