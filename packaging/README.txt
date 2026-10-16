@@ -87,6 +87,21 @@ Playing
   - "Vignette": 0 to 1 darkens the edge of the view while you move with
     the stick or turn smoothly, and clears it when you stop; higher
     narrows the clear area more. 0 (the default) is off.
+- Hands (preview, mothervr.json only for now), in a "Hands" object under
+  "Settings":
+  - "Enabled": true uses your tracked controllers in the game (default
+    false). Set it before starting the game: aiming needs a pointing pose
+    that is asked of SteamVR or OpenXR at start (a custom SteamVR binding
+    for the game made before needs a reset to the default to get it). The
+    in-game arms still play the game's own animation for now.
+  - "AimFromHand": with Enabled, the revolver, shotgun, bolt gun and
+    flamethrower aim where your right controller points, not where you
+    look; the drawn weapon does not follow your hand yet. Melee weapons
+    keep the game's aim. Default true.
+  - "TrackerInHand": with Enabled, the motion tracker's cone points where
+    your left controller points. Default true.
+  - "Smoothing": 0 to 1 steadies the hands; higher steadies more but lags
+    behind. 0 (the default) is off.
 - Controls (preview, mothervr.json only for now), in a "Controls" object
   under "Settings":
   - "InteractionAwareTurning": true stops the right stick turning you
