@@ -26,8 +26,13 @@ namespace omvr::core::config {
 //         "ToggleGrips":           bool,
 //         "ToggleCrouch":          bool
 //       },
+//       "Comfort": {                                          (ours, v2)
+//         "SmoothTurnSpeed":  number,
+//         "SnapTurnRepeatMs": number
+//       },
 //       "DebugOptions":     bool,   (the "Dev. Debug Options" flag)
-//       "SkipStartupIntro": bool
+//       "SkipStartupIntro": bool,
+//       "EnhancedMode":     bool    (ours, v2)
 //     }
 //   }
 //
@@ -79,6 +84,14 @@ struct InputSettings {
     bool toggle_crouch             = false;
 };
 
+// v2 comfort (spec 22 §3.1). Each default is v1's behaviour.
+struct ComfortSettings {
+    // Degrees per second; 0 turns through the game's own stick look.
+    float smooth_turn_speed = 0.0f;
+    // A held stick repeats a snap step this often; 0 never.
+    int snap_turn_repeat_ms = kSnapTurnRepeatMsDefault;
+};
+
 struct DebugSettings {
     bool skip_startup_intro = false;
     // "Dev. Debug Options" in the MotherVR menu: unhides Select Level and the
@@ -93,9 +106,19 @@ struct Settings {
     RenderingSettings rendering{};
     InputSettings input{};
     DebugSettings debug{};
+    ComfortSettings comfort{};
+    // Ours: the single v2 switch (spec 22 §3.1). While false every v2 key
+    // acts as its v1 value; the stored values are kept and written back.
+    bool enhanced_mode = false;
     // Ours: show the game and the VR runtime on the player's Discord
     // profile. Stored as Settings.DiscordRichPresence.
     bool discord_rich_presence = true;
 };
+
+// The comfort settings in effect: as stored with EnhancedMode on, v1's
+// otherwise.
+inline ComfortSettings effective_comfort(const Settings& s) noexcept {
+    return s.enhanced_mode ? s.comfort : ComfortSettings{};
+}
 
 } // namespace omvr::core::config

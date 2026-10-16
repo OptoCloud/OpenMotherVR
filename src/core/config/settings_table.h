@@ -13,9 +13,9 @@
 // a setting is named in one place.
 namespace omvr::core::config {
 
-// The JSON object a key is in: "Settings" itself, or its "Rendering" or
-// "Input" object.
-enum class Section { Settings, Rendering, Input };
+// The JSON object a key is in: "Settings" itself, or its "Rendering",
+// "Input" or "Comfort" object.
+enum class Section { Settings, Rendering, Input, Comfort };
 
 // A setting's place in Settings.
 template <class T>
@@ -61,7 +61,8 @@ const SettingRow* find_command(std::string_view name) noexcept;
 // Brings hand-edited or console-set values into range, in place: a pixel
 // scale outside [kPixelScaleMin, kPixelScaleMax] (or not a number) becomes
 // kPixelScaleDefault, and the snap rotation segments are rounded down to
-// one of kSnapSegmentSteps (below the smallest: kSnapSegmentsDefault). The
+// one of kSnapSegmentSteps (below the smallest: kSnapSegmentsDefault), and
+// the comfort values are held to their ranges (spec 22 §3.1). The
 // runtime value Oculus becomes OpenXR (there is no LibOVR backend; Oculus
 // means OpenXR). Run after every load and every mvr_* command.
 // From: the guards in FUN_100202e0 (mvr_pixelscale) and FUN_10020870

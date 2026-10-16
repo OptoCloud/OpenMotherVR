@@ -36,6 +36,19 @@ inline constexpr int kSnapSegmentsDefault = 12;
 // mvr_snaprotationsegments refuses fewer than this (spec 06 §4.2).
 inline constexpr int kSnapSegmentsMinCommand = 2;
 
+// Comfort.SmoothTurnSpeed, degrees per second (spec 22 §3.1): 0 keeps the
+// game's own stick look; any other value is held to [min, max]. Below 30 a
+// full circle takes over 12 s; above 360 it is no smoother than a snap.
+inline constexpr float kSmoothTurnSpeedMin = 30.0f;
+inline constexpr float kSmoothTurnSpeedMax = 360.0f;
+
+// Comfort.SnapTurnRepeatMs (spec 22 §3.1): 0 steps once per deflection;
+// any other value is held to [min, max]; a negative one is the default,
+// v1's fixed 300 ms.
+inline constexpr int kSnapTurnRepeatMsMin     = 150;
+inline constexpr int kSnapTurnRepeatMsMax     = 1000;
+inline constexpr int kSnapTurnRepeatMsDefault = 300;
+
 // -vrscale <s>: the world scale accepted, and the scale without a usable
 // value (spec 03 §1, 06 §2).
 inline constexpr float kWorldScaleMin     = 0.495f;

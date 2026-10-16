@@ -42,6 +42,59 @@ TEST_CASE("defaults") {
     CHECK_FALSE(s.debug.skip_startup_intro);
 }
 
+TEST_CASE("v2 comfort: defaults are v1's and EnhancedMode gates them") {
+    Settings s;
+    CHECK_FALSE(s.enhanced_mode);
+    CHECK(s.comfort.smooth_turn_speed == 0.0f);
+    CHECK(s.comfort.snap_turn_repeat_ms == 300);
+
+    s = read_config(json::parse(R"({"Settings": {"EnhancedMode": false,
+        "Comfort": {"SmoothTurnSpeed": 120, "SnapTurnRepeatMs": 0}}})"));
+    CHECK(s.comfort.smooth_turn_speed == 120.0f); // stored as read
+    CHECK(s.comfort.snap_turn_repeat_ms == 0);
+    CHECK(effective_comfort(s).smooth_turn_speed == 0.0f); // acts as v1
+    CHECK(effective_comfort(s).snap_turn_repeat_ms == 300);
+
+    s.enhanced_mode = true;
+    CHECK(effective_comfort(s).smooth_turn_speed == 120.0f);
+    CHECK(effective_comfort(s).snap_turn_repeat_ms == 0);
+
+    // Written back under Settings.Comfort, whatever EnhancedMode says.
+    s.enhanced_mode = false;
+    json out        = json::object();
+    write_config(out, s);
+    CHECK(out["Settings"]["EnhancedMode"] == false);
+    CHECK(out["Settings"]["Comfort"]["SmoothTurnSpeed"] == 120.0f);
+    CHECK(out["Settings"]["Comfort"]["SnapTurnRepeatMs"] == 0);
+}
+
+TEST_CASE("sanitize: comfort ranges (spec 22 §3.1)") {
+    const auto speed = [](float v) {
+        Settings s;
+        s.comfort.smooth_turn_speed = v;
+        sanitize(s);
+        return s.comfort.smooth_turn_speed;
+    };
+    CHECK(speed(0.0f) == 0.0f);
+    CHECK(speed(10.0f) == 30.0f);
+    CHECK(speed(90.0f) == 90.0f);
+    CHECK(speed(500.0f) == 360.0f);
+    CHECK(speed(-45.0f) == 0.0f);
+    CHECK(speed(std::numeric_limits<float>::quiet_NaN()) == 0.0f);
+
+    const auto repeat = [](int v) {
+        Settings s;
+        s.comfort.snap_turn_repeat_ms = v;
+        sanitize(s);
+        return s.comfort.snap_turn_repeat_ms;
+    };
+    CHECK(repeat(0) == 0);
+    CHECK(repeat(100) == 150);
+    CHECK(repeat(450) == 450);
+    CHECK(repeat(5000) == 1000);
+    CHECK(repeat(-1) == 300);
+}
+
 TEST_CASE("read_config reads every key of the original layout") {
     const json root  = json::parse(R"({"Settings": {
         "VRRuntime": "OpenXR", "DebugOptions": true, "SkipStartupIntro": true,
@@ -179,7 +232,7 @@ TEST_CASE("describe names each setting by its key path") {
 }
 
 TEST_CASE("the settings table: commands and their rules") {
-    CHECK(settings_table().size() == 15);
+    CHECK(settings_table().size() == 18); // 15 of v1 and Discord, 3 of v2 comfort
     const SettingRow* row = find_command("mvr_pixelscale");
     REQUIRE(row != nullptr);
     CHECK(row->rule == CommandRule::PixelScale);

@@ -23,6 +23,9 @@ bool& toggle_crouch(Settings& s) noexcept { return s.input.toggle_crouch; }
 bool& debug_options(Settings& s) noexcept { return s.debug.debug; }
 bool& skip_startup_intro(Settings& s) noexcept { return s.debug.skip_startup_intro; }
 bool& discord_rich_presence(Settings& s) noexcept { return s.discord_rich_presence; }
+bool& enhanced_mode(Settings& s) noexcept { return s.enhanced_mode; }
+float& smooth_turn_speed(Settings& s) noexcept { return s.comfort.smooth_turn_speed; }
+int& snap_turn_repeat_ms(Settings& s) noexcept { return s.comfort.snap_turn_repeat_ms; }
 
 // Key names are the original's (spec 06 §3); "StereoAntiAliasing" and the
 // OpenXR runtime value are this project's.
@@ -57,6 +60,10 @@ constexpr std::array kRows{
                "mvr_skipintro", CommandRule::Switch},
     // Ours, file only (no options-page entry).
     SettingRow{Section::Settings, "DiscordRichPresence", "DiscordRichPresence", &discord_rich_presence},
+    // v2 (spec 22 §3.1), file only until the v2 options pages exist.
+    SettingRow{Section::Settings, "EnhancedMode", "EnhancedMode", &enhanced_mode},
+    SettingRow{Section::Comfort, "SmoothTurnSpeed", "Comfort.SmoothTurnSpeed", &smooth_turn_speed},
+    SettingRow{Section::Comfort, "SnapTurnRepeatMs", "Comfort.SnapTurnRepeatMs", &snap_turn_repeat_ms},
 };
 
 } // namespace
@@ -137,6 +144,22 @@ void sanitize(Settings& cfg) noexcept {
     if (!(scale >= kPixelScaleMin && scale <= kPixelScaleMax)) scale = kPixelScaleDefault;
 
     cfg.input.snap_rotation_segments = snap_segments(cfg.input.snap_rotation_segments);
+
+    // 0 or [min, max]; NaN and negative speeds are 0 (spec 22 §3.1).
+    float& speed = cfg.comfort.smooth_turn_speed;
+    if (!(speed > 0.0f)) {
+        speed = 0.0f;
+    } else {
+        speed = std::clamp(speed, kSmoothTurnSpeedMin, kSmoothTurnSpeedMax);
+    }
+
+    // 0 or [min, max]; a negative interval is the default.
+    int& repeat = cfg.comfort.snap_turn_repeat_ms;
+    if (repeat < 0) {
+        repeat = kSnapTurnRepeatMsDefault;
+    } else if (repeat > 0) {
+        repeat = std::clamp(repeat, kSnapTurnRepeatMsMin, kSnapTurnRepeatMsMax);
+    }
 }
 
 } // namespace omvr::core::config

@@ -23,6 +23,7 @@ using nlohmann::json;
 constexpr const char* kSettingsKey  = "Settings";
 constexpr const char* kRenderingKey = "Rendering";
 constexpr const char* kInputKey     = "Input";
+constexpr const char* kComfortKey   = "Comfort";
 
 // The layout earlier builds of this project wrote: a top-level object
 // "DebugOptions" holding "SkipStartupIntro" and "DevDebugOptions".
@@ -34,6 +35,7 @@ const char* section_key(Section s) noexcept {
     switch (s) {
         case Section::Rendering: return kRenderingKey;
         case Section::Input: return kInputKey;
+        case Section::Comfort: return kComfortKey;
         case Section::Settings: break;
     }
     return nullptr;
