@@ -39,4 +39,6 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/ui_placement.h
     ${CMAKE_CURRENT_LIST_DIR}/virtual_screen_policy.cpp
     ${CMAKE_CURRENT_LIST_DIR}/virtual_screen_policy.h
+    ${CMAKE_CURRENT_LIST_DIR}/vr_off_hotkey.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/vr_off_hotkey.h
 )

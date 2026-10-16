@@ -60,6 +60,20 @@ void read_keyboard_and_mouse(const game::AddressMap& addresses, void* keyboard, 
         game::input::any_key(addresses, keyboard) || game::input::mouse_active(addresses, mouse);
 }
 
+// 22 §13: right Ctrl + right Shift + F10, held, turns VR off for the
+// session; read with the game's key test while the keyboard and mouse
+// devices exist.
+void check_vr_off(Context& ctx) noexcept {
+    bool held      = false;
+    void* keyboard = ctx.input_manager.keyboard_device();
+    if (ctx.settings.current().controls.vr_off_hotkey && keyboard && ctx.input_manager.mouse_device()) {
+        held = game::input::key_down(ctx.addresses, keyboard, game::kScanRCtrl) &&
+               game::input::key_down(ctx.addresses, keyboard, game::kScanRShift) &&
+               game::input::key_down(ctx.addresses, keyboard, game::kScanF10);
+    }
+    if (ctx.vr_off.update(held, ctx.clock.now())) ctx.stereo.request_vr_off();
+}
+
 // Runs under guarded: the runtime's headset_in_use may throw.
 UpdateInput gather(Context& ctx, StereoManager& m, StereoInterface& device) {
     UpdateInput in;
@@ -135,6 +149,7 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
         ctx.comfort.publish_target(0.0f); // spec 22 §5: no vignette without a running device
         return 0;
     }
+    check_vr_off(ctx);
     guarded("Stereo::Update", [&] {
         const UpdateOutput out = ctx.update.run(gather(ctx, *self, *device));
         apply(ctx, *self, *device, out);

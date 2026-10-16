@@ -13,6 +13,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <thread>
 #include <string>
 #include <string_view>
 
@@ -36,8 +37,12 @@ constexpr std::string_view kLogInstanceLoss = "openxr: instance loss pending";
 constexpr std::string_view kLogAdapterMismatch =
     "openxr: WARNING game renders on {} (LUID {:08X}:{:08X}), the runtime wants adapter LUID {:08X}:{:08X}; "
     "continuing";
-constexpr std::string_view kLogNoInput = "openxr: controller input unavailable";
-constexpr std::string_view kLogCreated = "openxr: session created, per-eye {}x{}";
+constexpr std::string_view kLogNoInput     = "openxr: controller input unavailable";
+constexpr std::string_view kLogCreated     = "openxr: session created, per-eye {}x{}";
+constexpr std::string_view kLogExitRequest = "openxr: ending the session at the player's request";
+constexpr std::string_view kLogExitTimeout =
+    "openxr: the runtime did not stop the session within {} ms; destroying it running";
+constexpr std::string_view kLogEnded = "openxr: session and instance destroyed; VR off until restart";
 
 // The log label of the headset-not-showing-the-game warning (09 §3.1).
 constexpr std::string_view kNotShowingLabel = "headset not showing the game";
@@ -271,6 +276,36 @@ void Session::Impl::shutdown() noexcept {
     teardown();
 }
 
+// Polls events until handle_state has seen STOPPING (and called
+// xrEndSession) or the session is lost; false when the wait ran out.
+bool Session::Impl::wait_for_stopping() {
+    const auto deadline = clock.now() + core::vr::kExitSessionWait;
+    for (;;) {
+        poll_events();
+        if (!state.running || state.lost) return true;
+        if (clock.now() >= deadline) return false;
+        std::this_thread::sleep_for(core::vr::kExitSessionPoll);
+    }
+}
+
+// 22 §13: xrRequestExitSession, xrEndSession on STOPPING, then the handles
+// in the order teardown keeps (the session before the instance).
+void Session::Impl::end_on_request() noexcept {
+    try {
+        if (state.session && state.running) {
+            log.line(kLogExitRequest);
+            if (check(xrRequestExitSession(state.session.get()), "xrRequestExitSession") &&
+                !wait_for_stopping())
+                logf(log, kLogExitTimeout, core::vr::kExitSessionWait.count());
+        }
+        teardown();
+        log.line(kLogEnded);
+    } catch (...) {
+        // Logging or event handling threw; the handles go regardless.
+        teardown();
+    }
+}
+
 // ---- Session ---------------------------------------------------------------------
 
 Session::Session(core::diag::ports::Log& log, const core::diag::ports::Clock& clock,
@@ -288,6 +323,10 @@ bool Session::init_system() noexcept { return impl_->init_system(); }
 const SystemInfo& Session::system_info() const noexcept { return impl_->state.info; }
 
 void Session::shutdown() noexcept { impl_->shutdown(); }
+
+void Session::end_on_request() noexcept { impl_->end_on_request(); }
+
+void Session::set_aim_poses(bool on) noexcept { impl_->input.set_aim_poses(on); }
 
 bool Session::running() const noexcept { return impl_->state.running && !impl_->state.lost; }
 

@@ -61,6 +61,13 @@ public:
     // report it up front), updates `desc` and returns true once.
     virtual bool refresh_headset_desc(HeadsetDesc& /*desc*/) { return false; }
 
+    // The player turned VR off (22 §13): the device has already detached
+    // and no new call will come. Stop showing the game in the headset and
+    // hand the game released VR controls; an OpenXR session is ended in API
+    // order (xrRequestExitSession, xrEndSession at STOPPING) before its
+    // instance is destroyed. Render thread, once.
+    virtual void stop() {}
+
     // ---- Controller poses (not in the original; groundwork for the hands) ----
     //
     // `hand` 0 = left, 1 = right. Game thread, like head_pose.

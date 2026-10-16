@@ -91,6 +91,11 @@ inline constexpr std::uint32_t kPadHasActivitySlot = 11;
 // Keyboard scan codes the mod reads (04 §2.2).
 inline constexpr int kScanLCtrl = 0x1D;
 inline constexpr int kScanLAlt  = 0x38;
+// The VR-off hotkey's right-hand keys (spec 22 section 13): DirectInput's
+// right Ctrl, right Shift and F10.
+inline constexpr int kScanRCtrl  = 0x9D;
+inline constexpr int kScanRShift = 0x36;
+inline constexpr int kScanF10    = 0x44;
 
 // Pad control codes (04 §2.3). "No control" is -1, read as 16 bits 0xFFFF.
 inline constexpr int kNoPadControl         = -1;

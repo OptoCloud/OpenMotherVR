@@ -16,6 +16,7 @@
 //   shutdown()     when the stereo device drops its runtime (a failed
 //                  session). Not at process exit: the runtime cleans up
 //                  after a process that ends with a session open.
+//   end_on_request() when the player turns VR off (22 §13)
 //
 // This header exposes project types only; the OpenXR and D3D11 state lives
 // in Session::Impl (session_impl.h).
@@ -136,6 +137,12 @@ public:
     const SystemInfo& system_info() const noexcept;
 
     void shutdown() noexcept;
+
+    // The player turned VR off (22 §13): the session is ended in the order
+    // the API requires (xrRequestExitSession, then xrEndSession once the
+    // state is STOPPING, waiting at most kExitSessionWait), then the
+    // session and the instance are destroyed. Render thread.
+    void end_on_request() noexcept;
 
     // True between xrBeginSession and xrEndSession.
     bool running() const noexcept;

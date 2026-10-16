@@ -20,6 +20,7 @@
 #include "core/stereo/stereo_device.h"
 #include "core/stereo/stereo_update.h"
 #include "core/stereo/virtual_screen_policy.h"
+#include "core/stereo/vr_off_hotkey.h"
 #include "core/ui/commands.h"
 #include "core/ui/display_reset.h"
 #include "core/ui/play_state.h"
@@ -112,6 +113,8 @@ struct Context {
     core::stereo::SceneTracker scene;
     core::stereo::ModePolicy modes;
     core::stereo::StereoUpdate update;
+    // Controls.VrOffHotkey's hold (22 §13). Game thread.
+    core::stereo::VrOffHotkey vr_off;
     core::stereo::StereoDevice stereo;      // owns the VrRuntime through a factory
     platform::d3d11::MirrorRenderer mirror; // the desktop mirror on the stereo device's objects
     // The comfort vignette and snap fade, game to render thread (22 §15), and

@@ -113,6 +113,20 @@ public:
     // start; the swapchain is kept windowed so the mode change cannot fail.
     PixelSize render_target_size(game::StereoInterface& si, vr::ports::VrRuntime& runtime);
 
+    // The VR-off hotkey fired (22 §13): VR goes off at the end of the
+    // current frame. Game thread.
+    void request_vr_off() noexcept { vr_off_requested_.store(true, std::memory_order_release); }
+
+    // The player turned VR off this session. Any thread.
+    bool turned_off() const noexcept { return turned_off_.load(std::memory_order_acquire); }
+
+    // After the device presented a frame: if VR-off was requested, detaches
+    // the device as after a late runtime failure (02 §7.4) but without the
+    // failure message, and stops the runtime (an OpenXR session is ended in
+    // the order the API requires). True when it turned VR off, so the
+    // game's targets can be rebuilt at the window's size. Render thread.
+    bool turn_off_if_requested(game::StereoInterface& si) noexcept;
+
 private:
     void fail_runtime(game::StereoInterface& si, vr::DetectResult::Chosen chosen, bool late) noexcept;
     void init_device(game::StereoInterface& si) noexcept;
@@ -139,6 +153,10 @@ private:
     // by the Present hook and the options page.
     std::atomic<bool> runtime_failed_{false};
     std::atomic<bool> vr_session_active_{false};
+    // 22 §13: set on the game thread by the hotkey, taken on the render
+    // thread between frames.
+    std::atomic<bool> vr_off_requested_{false};
+    std::atomic<bool> turned_off_{false};
     // Game thread: CreateDevice has run once.
     bool created_ = false;
     // Game thread: the render target size last logged.

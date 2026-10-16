@@ -44,6 +44,9 @@ constexpr std::string_view kEyeOffsetsLog =
 constexpr std::string_view kTargetSizeLog =
     "[stereo] render target size {}x{} ({:.1f} MP, pixel scale {:.2f}; state {}, texture {}x{})";
 constexpr std::string_view kCreateDeviceLog = "[stereo] CreateDevice{}: {}";
+constexpr std::string_view kVrOffLog =
+    "[stereo] VR turned off at the player's request (VR-off hotkey); the game continues flat, VR returns "
+    "at the next launch";
 
 // The runtime's eyes, as VrRuntime numbers them.
 constexpr int kLeftEye  = 0;
@@ -166,6 +169,31 @@ void StereoDevice::fail_runtime(StereoInterface& si, Chosen chosen, bool late) n
     if (!late) runtime_.reset();
     runtime_failed_ = true;
     ui::report_init_failure(dialogs_, chosen, failure_.last());
+}
+
+// 22 §13: the order of 02 §7.4. State and pointer are cleared before the
+// runtime is stopped, so no new call starts using it; the runtime object is
+// kept until exit, as after a late failure, so a call the game thread began
+// before (a head pose) still finds it alive. No message: the player asked.
+bool StereoDevice::turn_off_if_requested(StereoInterface& si) noexcept {
+    if (!vr_off_requested_.exchange(false, std::memory_order_acq_rel)) return false;
+    if (load_state(si) == DeviceState::None) return false;
+    vr::ports::VrRuntime* runtime = load_backend(si);
+    store_state(si, DeviceState::None);
+    if (load_device(manager_) == &si) store_device(manager_, nullptr);
+    vr_session_active_ = false;
+    store_backend(si, nullptr);
+    runtime_failed_ = true; // the options page shows VR not running (06 §5.2)
+    turned_off_.store(true, std::memory_order_release);
+    log_.line(kVrOffLog);
+    if (runtime) {
+        try {
+            runtime->stop();
+        } catch (...) {
+            // The device is detached either way; the runtime ends with the process.
+        }
+    }
+    return true;
 }
 
 // From: FUN_1001eac0.

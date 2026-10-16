@@ -55,4 +55,11 @@ inline constexpr std::uint32_t kScreenBottomQuarters = 3;
 // long after the session started (09 §3.1).
 inline constexpr auto kVisibleTimeout = std::chrono::seconds(10);
 
+// After xrRequestExitSession (22 §13) the runtime is given this long to
+// reach STOPPING, polled this often; a runtime that does not is ended by
+// destroying the session. A one-off wait on the render thread, at the
+// moment the player turned VR off.
+inline constexpr std::chrono::milliseconds kExitSessionWait{1000};
+inline constexpr std::chrono::milliseconds kExitSessionPoll{5};
+
 } // namespace omvr::core::vr

@@ -90,6 +90,8 @@ constexpr std::string_view kLogShowsGame   = "openvr: the headset shows the game
 constexpr std::string_view kLogShowsOther  = "openvr: the headset shows process {} ({}), not the game";
 constexpr std::string_view kLogController  = "openvr: {} hand controller: {} (device {})";
 constexpr std::string_view kLogHandsPrefix = "openvr: hands (head-local m, +x right +y up -z fwd):";
+constexpr std::string_view kLogStopped =
+    "openvr: stopped at the player's request; the headset shows SteamVR, the runtime stays loaded";
 
 // The player's start-up failure text for a missing interface (13 §5.3).
 constexpr std::string_view kFailMissingInterface = "SteamVR does not provide {}";
@@ -195,6 +197,7 @@ public:
     bool recenter_taken() const override { return recenter_taken_; }
     bool hand_pose(int hand, Matrix34& out, float world_scale) override;
     bool hand_velocity(int hand, float (&out)[3], float world_scale) override;
+    void stop() override;
 
 private:
     using Hands = std::array<HandPose, kHandCount>;
@@ -387,6 +390,18 @@ void OpenVrRuntime::release_render_resources() {
     if (overlay_handle_ == vr::k_ulOverlayHandleInvalid) return;
     overlay_->DestroyOverlay(overlay_handle_);
     overlay_handle_ = vr::k_ulOverlayHandleInvalid;
+}
+
+// 22 §13. The headset stops showing the game: the virtual screen goes and
+// the compositor drops the last frame (it shows its own scene until a new
+// submit, which never comes). VR_Shutdown is not called: the game thread
+// may still be inside a pose read that began before the detach, so the
+// runtime stays loaded until exit, unused (02 §7.4).
+void OpenVrRuntime::stop() {
+    controls_.write(Controls{}, false);
+    release_render_resources();
+    compositor_->ClearLastSubmittedFrame();
+    log_.line(kLogStopped);
 }
 
 // ---- slots 5-6 ---------------------------------------------------------------

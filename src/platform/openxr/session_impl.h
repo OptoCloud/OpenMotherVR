@@ -69,6 +69,8 @@ struct Session::Impl {
     void poll_events();
     void teardown();
     void shutdown() noexcept;
+    void end_on_request() noexcept;
+    bool wait_for_stopping();
 
     // ---- frame_loop.cpp: the frame boundary (09 §5)
     struct FrameLayers;

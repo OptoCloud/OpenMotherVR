@@ -167,6 +167,9 @@ void __fastcall dev_end_frame(void* self, void*) noexcept {
     ctx.mirror.draw(platform::d3d11::gpu_context(dc), load_pose_fetched(si));
     swap->Present(kPresentSyncInterval, kPresentFlags);
     store_pose_fetched(si, false);
+    // 22 §13: a VR-off request takes effect between frames; the game's
+    // targets then return to the window's size.
+    if (ctx.stereo.turn_off_if_requested(si)) ctx.display_reset.reset_after_vr_off();
 }
 
 // [7] BeginEyeRender / [8] EndEyeRender: nothing to do.

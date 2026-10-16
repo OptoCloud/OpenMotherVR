@@ -34,4 +34,10 @@ void DisplayReset::reset_if_changed(const config::Settings& cfg) noexcept {
         changed(now.symmetric_mirror_view != was.symmetric_mirror_view, " Rendering.SymmetricMirrorView"));
 }
 
+void DisplayReset::reset_after_vr_off() noexcept {
+    if (!signals_.can_reset_display()) return;
+    signals_.request_display_reset();
+    log_.line("[script_bridge] display reset raised; VR turned off, targets return to the window size");
+}
+
 } // namespace omvr::core::ui

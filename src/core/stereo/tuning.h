@@ -104,4 +104,10 @@ inline constexpr std::array<float, 4> kScreenMirrorSource = {0.0f, 0.25f, 0.5f, 
 inline constexpr std::size_t kReflectionPovSlots = 8;
 inline constexpr int kReflectionLogLines         = 60;
 
+// ---- VR-off hotkey (22 §13) ------------------------------------------------
+
+// How long the chord must be held before VR turns off: long enough that a
+// brushed key does nothing.
+inline constexpr auto kVrOffHold = std::chrono::milliseconds(1000);
+
 } // namespace omvr::core::stereo

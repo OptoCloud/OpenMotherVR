@@ -250,6 +250,14 @@ public:
 
     bool recenter_taken() const override { return recenter_taken_; }
 
+    // 22 §13: the game sees every VR control released, then the session
+    // ends in API order and the instance goes.
+    void stop() override {
+        controls_.write(input::Controls{}, false);
+        session_ = false;
+        xr_.end_on_request();
+    }
+
     bool headset_in_use() override {
         if (!xr_.running()) return false;
         const FrameViews v = xr_.views();

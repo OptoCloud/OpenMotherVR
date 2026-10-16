@@ -33,6 +33,11 @@ public:
     // The first call records what the targets were made with.
     void reset_if_changed(const config::Settings& cfg) noexcept;
 
+    // VR was turned off by the hotkey (22 §13): the game rebuilds its
+    // targets at the window's size, once, instead of keeping the stereo
+    // size until the next resize. Game or render thread.
+    void reset_after_vr_off() noexcept;
+
 private:
     ports::GameSignals& signals_;
     ports::RuntimeState& runtime_;
