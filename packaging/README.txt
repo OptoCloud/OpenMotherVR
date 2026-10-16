@@ -58,7 +58,9 @@ Playing
   controller bindings > Alien: Isolation.
 - An Xbox controller works too.
 - Settings: in game, Options > MotherVR. Or edit mothervr.json while the
-  game is closed.
+  game is closed. The Comfort, Controls, Hands and Body pages there hold
+  the settings of the same names below; a setting marked "Requires
+  restart!" applies from the next launch.
 - VR off (runtime None, or -vrforcenone): the game plays as unmodded,
   with only the MotherVR options page added, so VR can be turned back
   on from there. The mod then changes no shaders, window, SSAO, camera
@@ -79,8 +81,8 @@ Playing
   you are in and what you are doing (loading, paused, hiding, hacking...);
   hover the picture for the VR runtime. false turns it off. With VR
   disabled it shows only "VR off".
-- Comfort (preview, mothervr.json only for now), in a "Comfort" object
-  under "Settings":
+- Comfort (preview; Options > MotherVR > Comfort), in a "Comfort"
+  object under "Settings":
   - "SmoothTurnSpeed": 30 to 360 degrees per second turns smoothly with
     the right stick when Snap Rotation is off (the further you push, the
     faster). 0 (the default) keeps the game's own stick turning, scaled
@@ -92,8 +94,8 @@ Playing
   - "Vignette": 0 to 1 darkens the edge of the view while you move with
     the stick or turn smoothly, and clears it when you stop; higher
     narrows the clear area more. 0 (the default) is off.
-- Hands (preview, mothervr.json only for now), in a "Hands" object under
-  "Settings":
+- Hands (preview; Options > MotherVR > Hands), in a "Hands" object
+  under "Settings":
   - "Enabled": true uses your tracked controllers in the game (default
     false). Set it before starting the game: aiming needs a pointing pose
     that is asked of SteamVR or OpenXR at start (a custom SteamVR binding
@@ -119,8 +121,8 @@ Playing
       tracker is up. "Firing": a buzz in the right hand per shot.
       "Hacking": the start and end of hacking and cutting. Each
       default true.
-- Controls (preview, mothervr.json only for now), in a "Controls" object
-  under "Settings":
+- Controls (preview; Options > MotherVR > Controls), in a "Controls"
+  object under "Settings":
   - "InteractionAwareTurning": true stops the right stick turning you
     while you use a keypad, terminal, lever or other interaction, during
     the breathing game while hiding, and in cutscenes; mouse look still

@@ -163,6 +163,57 @@ be on. Try on OpenVR and OpenXR, with Dev. Debug Options on.
       launch): `log: crash-safe logging on` at start, no stutter from
       logging; after a crash the `crash: mod state:` line is in the file.
 
+## Options pages
+
+Options > MotherVR has four new entries, Comfort, Controls, Hands and
+Body, for every key of those sections. The menus' `GameMenu` class is
+recompiled to add them, so also watch for any menu that stops working.
+
+- [ ] **Archive rebuilt.** First start of the new DLL: `ui patch: built
+      ... (522 entries)`; the next start: `payload: ... is current`.
+- [ ] **Entries.** Front end and pause menu: Options > MotherVR lists VR
+      Runtime, Rendering, Input, Comfort, Controls, Hands, Body, Dev. Debug
+      Options, Skip Startup Intro; each new page's title is its entry's
+      label. The game-over menu still has no MotherVR entry.
+- [ ] **Greyed without VR.** With `-vrforcenone` the four new entries are
+      greyed like Rendering and Input.
+- [ ] **Values shown.** With `"Comfort": {"SmoothTurnSpeed": 37,
+      "Vignette": 0.34}` and `"Body": {"EyeForward": 0.123}` written by
+      hand, the pages show `30°/s`, `30%` and `0.12`, and `mothervr.json`
+      is not rewritten until a control is changed.
+- [ ] **Changing a value.** Each control logs `[script_bridge] <key path>
+      changed to <value> by command` (for example `Comfort.Vignette changed
+      to 0.30`) and saves `mothervr.json`; reopening the menu shows the new
+      value. Opening a menu logs no `by command` line (a pushed value never
+      sends one back).
+- [ ] **Sliders.** World Scale, Throw Strength, Hand Smoothing, Haptics
+      Strength, Eye Forward and Seated Eye Raise show a plain decimal
+      beside the bar (`0.55`, `-0.2`, `1`), one step per left or right.
+- [ ] **Greying.** Hands: with Tracked Hands off, Aim from Hand, Motion
+      Tracker in Hand, Melee by Swing, Throw by Motion, Throw Strength and
+      Hand Smoothing are greyed; Throw Strength also with Throw by Motion
+      off; the five Vibrate items and Haptics Strength with Haptics off.
+      Flashlight Aim, Lean While Hiding and Hold Breath Gesture are always
+      greyed with `Not available yet`. Body: Seated Eye Raise greyed in
+      Standing; Real Crouch greyed unless Standing with a calibrated
+      height. Turning a master toggle greys or frees its items at once.
+- [ ] **Calibrate Standing Height.** Without a height its description is
+      `Stand up straight, select, and keep still`. Select it: `Measuring in
+      3`, `2`, `1`, then `Waiting for head tracking`; the log has `standing
+      height calibration requested by command` and the calibration's own
+      lines. Reopen the menu: `Standing height: 1.72 m. Select to measure
+      again` (your height). With the headset off it stays `Waiting for head
+      tracking`; on a runtime without a floor: `Not measured: no floor
+      height on this runtime`.
+- [ ] **-vrscale.** With `-vrscale 1.2`: World Scale greyed at `1.2`, its
+      description `Set by -vrscale on the command line for this session`.
+- [ ] **Texts fit.** The longest description lines (D-Pad Emulation,
+      No Turning During Interactions) fit the description area.
+- [ ] **Stock menus intact.** Options > Game, Video (greyed in VR as
+      before), Audio, Load Game, the controls help (Input > View Controls)
+      and, with Dev. Debug Options, Select Level and Trigger Debug
+      Checkpoint behave as before; `Use OpenXR` still reads so.
+
 ## Builds and runtimes
 
 - [ ] Every item above on both OpenVR and OpenXR where it applies.
