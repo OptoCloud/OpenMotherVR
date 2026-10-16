@@ -21,8 +21,17 @@ namespace omvr::game::hands {
 inline constexpr std::ptrdiff_t kRegistryCharacterList = 0x08;
 inline constexpr std::ptrdiff_t kListData              = 0x80;
 inline constexpr std::ptrdiff_t kListCount             = 0x84;
-// The character's current health, unsigned 16-bit.
-inline constexpr std::ptrdiff_t kCharacterHealth = 0x33C;
+// The character's current health, unsigned 16-bit; its maximum is the
+// base (u16) times the factor (float), truncated (the getter 0x37A240).
+inline constexpr std::ptrdiff_t kCharacterHealth          = 0x33C;
+inline constexpr std::ptrdiff_t kCharacterHealthBase      = 0x33E;
+inline constexpr std::ptrdiff_t kCharacterHealthMaxFactor = 0x340;
+// The character's weapon component (pointer; 21 §2.2, §2.5): the object
+// AimRayUpdate and CurrentItem run on, whose owner is at +0x1528 and whose
+// fire alignment byte is at +0x153C.
+inline constexpr std::ptrdiff_t kCharacterWeaponComponent = 0x1100;
+inline constexpr std::ptrdiff_t kComponentOwner           = 0x1528;
+inline constexpr std::ptrdiff_t kComponentFireAligned     = 0x153C;
 // The camera manager at [registry] + 0x58; its active camera, the one the
 // aim ray is built from, at +0x1DC.
 inline constexpr std::ptrdiff_t kRegistryCameraManager = 0x58;
@@ -55,6 +64,17 @@ void* player_character(const HandTargets& t) noexcept;
 
 // The player's current health is above 0 (21 §2.2).
 bool alive(const void* character) noexcept;
+
+// The character's current and maximum health (21 §2.2).
+core::hands::Health health(const void* character) noexcept;
+
+// The character's weapon component, or null when it has none or the
+// component names another owner.
+void* weapon_component(void* character) noexcept;
+
+// The component's fire alignment byte is set: the game allows firing in
+// its aiming states (21 §2.5).
+bool fire_aligned(const void* component) noexcept;
 
 // The active camera's pose (21 §2.4), nullopt when there is none.
 std::optional<core::hands::CameraPose> active_camera(const HandTargets& t) noexcept;

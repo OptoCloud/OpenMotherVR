@@ -31,4 +31,17 @@ struct HandSitesOutcome {
 HandSitesOutcome install_hand_sites(const GameImage& g, Patcher& p, const HandHooks& hooks,
                                     HandTargets& out) noexcept;
 
+// The pieces the haptics (21 §14) share with the hands. Each checks before
+// it sets anything; false leaves `out` as it was.
+//
+// The player (21 §2.2): PlayerGetter reads the character registry; sets
+// `out.registry`. A mismatch is logged.
+bool find_player(const GameImage& g, core::diag::ports::Log& log, HandTargets& out) noexcept;
+// CurrentItem's first bytes (21 §2.5); sets `out.current_item`.
+bool find_current_item(const GameImage& g, HandTargets& out) noexcept;
+// The tracker scan's one call (21 §2.6), pointed at `hook` (TrackerScan's
+// ABI) once for both features that need it; true when it is, now or
+// already. Sets `out.tracker_scan` before the redirect.
+bool install_tracker_call(const GameImage& g, Patcher& p, const void* hook, HandTargets& out) noexcept;
+
 } // namespace omvr::game::hands

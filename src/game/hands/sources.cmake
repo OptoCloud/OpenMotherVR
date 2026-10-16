@@ -5,4 +5,6 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/hand_objects.h
     ${CMAKE_CURRENT_LIST_DIR}/hand_sites.cpp
     ${CMAKE_CURRENT_LIST_DIR}/hand_sites.h
+    ${CMAKE_CURRENT_LIST_DIR}/haptic_sites.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/haptic_sites.h
 )

@@ -262,6 +262,27 @@ inline const HandRvas& hand_rvas(GameBuild version) noexcept {
     return version == GameBuild::Patched2020 ? kHandRvas2020 : kHandRvas2015;
 }
 
+// The haptics' own game sites (spec 21 §14, §20); they also use the
+// player, CurrentItem and the tracker scan call of HandRvas.
+struct HapticRvas {
+    // 21 §2.9: RumbleSetMotors (thiscall on the XInput rumble object, two
+    // floats: the low- and high-frequency motor levels, ret 8), and the
+    // vtable whose slot 0 holds it, checked to confirm the function.
+    std::uint32_t rumble_set_motors;
+    std::uint32_t rumble_vtable;
+};
+
+inline constexpr HapticRvas kHapticRvas2015 = {
+    .rumble_set_motors = 0x00C09280,
+    .rumble_vtable     = 0x011C1840,
+};
+
+inline constexpr HapticRvas kHapticRvas2020 = {};
+
+inline const HapticRvas& haptic_rvas(GameBuild version) noexcept {
+    return version == GameBuild::Patched2020 ? kHapticRvas2020 : kHapticRvas2015;
+}
+
 // Sites and bytes the original writes but codes inline in FUN_1001d6f0
 // instead of keeping them in its address table.
 struct InlineSites {

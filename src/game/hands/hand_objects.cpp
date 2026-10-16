@@ -18,6 +18,9 @@ using AimRayUpdateFn = void(__fastcall*)(void* self, void* edx);
 using CurrentItemFn  = void*(__fastcall*)(void* self, void* edx);
 using TrackerScanFn  = bool(__fastcall*)(void* self, void* edx);
 
+// Above this the game's truncation to a 32-bit integer overflows.
+constexpr float kHealthProductLimit = 2147483648.0f;
+
 const std::uint8_t* at(const void* object, std::ptrdiff_t offset) noexcept {
     return static_cast<const std::uint8_t*>(object) + offset;
 }
@@ -68,6 +71,29 @@ void* player_character(const HandTargets& t) noexcept {
 }
 
 bool alive(const void* character) noexcept { return read<std::uint16_t>(character, kCharacterHealth) > 0; }
+
+core::hands::Health health(const void* character) noexcept {
+    const auto base   = read<std::uint16_t>(character, kCharacterHealthBase);
+    const auto factor = read<float>(character, kCharacterHealthMaxFactor);
+    // As the game's getter: float product, truncated, low 16 bits. A factor
+    // that is not a number or out of range gives no maximum (0) rather than
+    // an undefined conversion.
+    const float product = static_cast<float>(base) * factor;
+    const auto maximum  = product >= 0.0f && product < kHealthProductLimit
+                              ? static_cast<std::uint16_t>(static_cast<std::int32_t>(product))
+                              : std::uint16_t{0};
+    return {address_of(character), read<std::uint16_t>(character, kCharacterHealth), maximum};
+}
+
+void* weapon_component(void* character) noexcept {
+    void* component = pointer_at(character, kCharacterWeaponComponent);
+    if (!component || pointer_at(component, kComponentOwner) != character) return nullptr;
+    return component;
+}
+
+bool fire_aligned(const void* component) noexcept {
+    return read<std::uint8_t>(component, kComponentFireAligned) != 0;
+}
 
 std::optional<core::hands::CameraPose> active_camera(const HandTargets& t) noexcept {
     const void* reg = registry(t);
