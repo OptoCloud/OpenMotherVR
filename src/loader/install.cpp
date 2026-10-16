@@ -31,6 +31,7 @@
 #include "loader/context.h"
 #include "loader/hooks/event_tap_hook.h"
 #include "loader/hooks/file_hooks.h"
+#include "loader/hooks/hand_hooks.h"
 #include "loader/hooks/menu_hooks.h"
 #include "loader/hooks/pad_hooks.h"
 #include "loader/hooks/render_fix_hooks.h"
@@ -245,6 +246,8 @@ bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept {
     const bool installed = install_stereo_path(ctx, g, patcher) &&
                            install_game_side(ctx, g, patcher, mod_archive) &&
                            install_patches_and_controls(ctx, g, patcher);
+    // v2 hands (21): their sites only once Hands.Enabled is on.
+    if (installed) hooks::prepare_hands(g);
     // The level for the Discord activity; runtime None leaves the game's
     // imports alone like everything else outside the UI set.
     if (installed && ctx.settings.current().discord_rich_presence) hooks::watch_game_file_opens(ai_base);

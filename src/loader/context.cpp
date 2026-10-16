@@ -51,6 +51,7 @@ Context::Context(void* self) noexcept
       pad(glyphs, log),
       controls(pad, schemes, settings.current().input),
       interactions(log),
+      hands(settings.current().hands, log),
       settings_push({script_vars, display_reset, schemes, settings.current(), runtime_state, log}),
       commands(settings, display_reset, console, log),
       xr(log, clock, dialogs, failure),

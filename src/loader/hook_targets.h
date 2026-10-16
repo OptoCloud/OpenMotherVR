@@ -2,6 +2,7 @@
 #pragma once
 
 #include "game/event_tap.h"
+#include "game/hands/hand_objects.h"
 #include "game/input/input_manager.h"
 #include "game/sites/game_behaviour.h"
 #include "game/sites/render_fixes.h"
@@ -30,6 +31,10 @@ struct HookTargets {
 
     // The game pad's five methods behind the replaced vtable slots (04 §3.3).
     game::input::StockPad stock_pad{};
+
+    // The hand features' game functions (spec 21 §20), set when their
+    // sites go in.
+    game::hands::HandTargets hands{};
 
     // The script event tap's trampoline.
     game::TapFn event_tap = nullptr;
