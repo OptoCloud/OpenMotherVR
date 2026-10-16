@@ -1,7 +1,8 @@
 // OpenMotherVR-Provenance: clean
 // The render fixes (07, 08): planar reflections, anti-aliasing, culling, the
-// head-in-wall fade and the event tap. Each checks its own code right
-// before it is written and stays off on its own (01 §2.5.2).
+// head-in-wall fade, the event tap and the particle lighting lookup
+// (dumps/13). Each checks its own code right before it is written and stays
+// off on its own (01 §2.5.2).
 
 #include "game/sites/render_fixes.h"
 
@@ -31,6 +32,7 @@ constexpr std::string_view kStereoAa    = kStereoAaArea;
 constexpr std::string_view kCulling     = kCullingArea;
 constexpr std::string_view kHeadClip    = kHeadClipArea;
 constexpr std::string_view kEventTap    = kEventTapArea;
+constexpr std::string_view kAlphaLight  = kAlphaLightArea;
 constexpr std::string_view kNoAddress   = "this build has no address for it";
 
 constexpr int kReflectionSites = 2; // the render call and the clear gate
@@ -38,6 +40,7 @@ constexpr int kStereoAaSites   = 2; // the SMAA call and the stereo output draw
 constexpr int kCullingSites    = 2; // the distance and the occlusion test calls
 constexpr int kHeadClipSites   = 1;
 constexpr int kEventTapSites   = 1;
+constexpr int kAlphaLightSites = 1;
 
 constexpr std::string_view kAreaOnLog  = "[hook] {}: in place on {} sites";
 constexpr std::string_view kAreaOffLog = "[hook] {}: off; {}";
@@ -58,6 +61,8 @@ constexpr std::string_view kHeadClipCallLog =
     "[hook] {}: off; HeadClipFadeCall (RVA {:08X}) is not the expected call";
 constexpr std::string_view kEventTapLog =
     "[hook] {}: off; ScriptEventTap (RVA {:08X}) does not hold the expected no-op or could not be detoured";
+constexpr std::string_view kAlphaLightCallLog =
+    "[hook] {}: off; AlphaLightNdcCall (RVA {:08X}) is not the expected call";
 constexpr std::string_view kNoAppendLog =
     "[hook] mode stack: this build has no address for the game's append; the count is raised only into "
     "existing "
@@ -194,6 +199,21 @@ void tap_game_events(const GameImage& g, Patcher& p, const ReconRvas& r,
     }
 }
 
+// Particle lighting (dumps/13 §6): in stereo the atlas lookup gets the
+// eye's NDC scale and offset relative to the centre camera the atlas was
+// laid out with.
+void fix_alpha_light(const GameImage& g, Patcher& p, const ReconRvas& r,
+                     const RenderFixHooks& hooks) noexcept {
+    if (!calls(g.at_rva(r.alpha_light_ndc_call), g.at_rva(r.eye_ndc))) {
+        ports::logf(p.log(), kAlphaLightCallLog, kAlphaLight, r.alpha_light_ndc_call);
+        return;
+    }
+    hooks.targets->alpha_light = {.eye_ndc = g.at_rva(r.eye_ndc)};
+    if (p.redirect_call(g.at_rva(r.alpha_light_ndc_call), hooks.alpha_light_eye_ndc, "EyeNdc")) {
+        area_on(p.log(), kAlphaLight, kAlphaLightSites);
+    }
+}
+
 using Fix = void (*)(const GameImage&, Patcher&, const ReconRvas&, const RenderFixHooks&) noexcept;
 
 // Runs `fix` when this build has its address (`rva`), else reports it off.
@@ -239,6 +259,7 @@ void install_render_fixes(const GameImage& g, Patcher& p, const RenderFixHooks& 
     fix_if_known(r.cull_distance_call, kCulling, &fix_culling, g, p, r, hooks);
     fix_if_known(r.head_clip_fade_call, kHeadClip, &fix_head_clip_fade, g, p, r, hooks);
     fix_if_known(r.event_tap, kEventTap, &tap_game_events, g, p, r, hooks);
+    fix_if_known(r.alpha_light_ndc_call, kAlphaLight, &fix_alpha_light, g, p, r, hooks);
 }
 
 } // namespace omvr::game::sites

@@ -5,6 +5,7 @@
 #include "game/event_tap.h"
 #include "game/game_image.h"
 #include "game/patcher.h"
+#include "game/stereo/alpha_light.h"
 #include "game/stereo/cull.h"
 #include "game/stereo/head_clip.h"
 #include "game/stereo/mode_stack.h"
@@ -21,6 +22,7 @@ inline constexpr std::string_view kStereoAaArea    = "stereo anti-aliasing";
 inline constexpr std::string_view kCullingArea     = "culling";
 inline constexpr std::string_view kHeadClipArea    = "head-in-wall delay";
 inline constexpr std::string_view kEventTapArea    = "event tap";
+inline constexpr std::string_view kAlphaLightArea  = "particle lighting";
 
 // One outcome line per feature area at attach, so a log shows which parts of
 // the mod are in place and, for those that are not, why (11).
@@ -42,9 +44,10 @@ struct RenderFixTargets {
     stereo::StereoAaTargets aa{};
     stereo::CullTargets cull{};
     stereo::HeadClipTargets head_clip{};
+    stereo::AlphaLightTargets alpha_light{};
 };
 
-// The replacements of the render fixes (07, 08).
+// The replacements of the render fixes (07, 08, dumps/13).
 struct RenderFixHooks {
     const void* render_reflection;
     const void* stereo_final_draw;
@@ -54,6 +57,7 @@ struct RenderFixHooks {
     const void* head_clip_fade;
     TapFn event_tap;
     TapFn* event_tap_trampoline;
+    const void* alpha_light_eye_ndc;
     // Where the targets the replacements call are kept.
     RenderFixTargets* targets;
     // Gates the game's clear for the reflection targets; false if the

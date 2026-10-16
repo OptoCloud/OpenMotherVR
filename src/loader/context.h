@@ -12,6 +12,7 @@
 #include "core/input/glyphs.h"
 #include "core/input/interaction_state.h"
 #include "core/input/virtual_pad.h"
+#include "core/render/alpha_light.h"
 #include "core/render/shader_fix_stats.h"
 #include "core/stereo/comfort_view.h"
 #include "core/stereo/desktop_window.h"
@@ -148,6 +149,9 @@ struct Context {
     core::stereo::VirtualScreenPolicy screen_policy;
     core::stereo::DesktopWindow window;
     core::render::ShaderFixStats shader_fixes;
+    // Dev. Debug Options: the particle lighting lookup's correction, logged
+    // once per change (dumps/13). Render thread.
+    core::render::AlphaLightTrace alpha_light_trace;
     // proxy, hooks
     platform::d3d11::SystemD3d11 system_d3d11;
     std::atomic<bool> ui_set_only{false};

@@ -153,6 +153,13 @@ struct ReconRvas {
     // no-op, `mov eax, ecx; ret 4`, that scripts pass debug strings to.
     std::uint32_t event_tap;
 
+    // Particle lighting (dumps/13_particle_lighting.md): the one call of
+    // Stereo::EyeNdc (thiscall(float out[4], int eye), ret 8; device slot
+    // 14 while it runs), in the lighting atlas lookup 0x57EB30. Checked in
+    // the 2015 AI.exe (timestamp 0x54E3199D): `e8 c6 9a 03 00` at 0x57EC15.
+    std::uint32_t alpha_light_ndc_call;
+    std::uint32_t eye_ndc;
+
     // Mode stack (cleanroom 05 section 3.2f, 01 StereoModeStackAppend): the
     // game's int-array append and its call in StereoPushMode, after
     // `lea ecx, [ebx+0x68]`. thiscall(const int*), ret 4; returns the new
@@ -182,6 +189,8 @@ inline constexpr ReconRvas kReconRvas2015 = {
     .head_clip_fade_call     = 0x0034E2C1,
     .head_clip_fade          = 0x00346DE0,
     .event_tap               = 0x00A1BCC0,
+    .alpha_light_ndc_call    = 0x0057EC15,
+    .eye_ndc                 = 0x005B86E0,
     .mode_stack_append_call  = 0x005D9C53,
     .mode_stack_append       = 0x00294540,
 };

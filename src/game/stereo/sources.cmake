@@ -1,6 +1,8 @@
 # OpenMotherVR-Provenance: clean
 # Sources of src/game/stereo/; each directory lists its own files.
 target_sources(mothervr PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/alpha_light.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/alpha_light.h
     ${CMAKE_CURRENT_LIST_DIR}/cull.cpp
     ${CMAKE_CURRENT_LIST_DIR}/cull.h
     ${CMAKE_CURRENT_LIST_DIR}/field.h

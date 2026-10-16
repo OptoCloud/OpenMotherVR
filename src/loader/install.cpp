@@ -29,6 +29,7 @@
 #include "game/sites/stereo_path.h"
 #include "game/sites/ui_set.h"
 #include "loader/context.h"
+#include "loader/hooks/alpha_light_hooks.h"
 #include "loader/hooks/event_tap_hook.h"
 #include "loader/hooks/file_hooks.h"
 #include "loader/hooks/hand_hooks.h"
@@ -179,6 +180,7 @@ sites::RenderFixHooks render_fix_hooks(Context& ctx) noexcept {
             code_pointer(&hooks::head_clip_fade),
             hooks::event_tap_replacement(),
             &ctx.targets.event_tap,
+            code_pointer(&hooks::alpha_light_eye_ndc),
             &ctx.targets.render_fixes,
             &hooks::install_reflections};
 }

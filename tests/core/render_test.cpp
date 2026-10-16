@@ -1,7 +1,9 @@
 // OpenMotherVR-Provenance: clean
 // core/render: the DXBC checksum against fxc's own on the project's mirror
-// shaders, and the position-dither fix on a synthetic pixel shader.
+// shaders, the position-dither fix on a synthetic pixel shader, and the
+// particle lighting lookup in stereo.
 
+#include "core/render/alpha_light.h"
 #include "core/render/dither_fix.h"
 #include "core/render/dxbc.h"
 
@@ -123,6 +125,71 @@ TEST_CASE("the dither fix refuses what it does not understand") {
     const std::vector<std::uint8_t> other = container(no_cb2);
     CHECK(patch_position_dither(other.data(), other.size(), sites).empty());
     CHECK(sites == 0);
+}
+
+// dumps/13 §5, §6: the game addresses the lighting atlas with
+// `ndc / scale - offset` of the drawn eye; it must land on the centre's NDC
+// `s_c * t + o_c` of the same view tangent t.
+float lookup(float ndc, float scale, float offset) { return ndc / scale - offset; }
+
+TEST_CASE("flat play keeps the game's own lookup") {
+    const NdcScaleOffset flat{};
+    const NdcScaleOffset r = eye_ndc_in_centre(flat, flat);
+    CHECK(r.offset_x == 0.0f);
+    CHECK(r.offset_y == 0.0f);
+    CHECK(r.scale_x == 1.0f);
+    CHECK(r.scale_y == 1.0f);
+}
+
+TEST_CASE("an eye with the centre's symmetric FOV reads the atlas at its own NDC") {
+    // The mod's render FOV (03 §3.2): both eyes and the centre share one
+    // symmetric FovPort, tangents 1.4 wide and 1.25 high.
+    const NdcScaleOffset shared{
+        .offset_x = 0.0f, .offset_y = 0.0f, .scale_x = 1.0f / 1.4f, .scale_y = 1.0f / 1.25f};
+    const NdcScaleOffset r = eye_ndc_in_centre(shared, shared);
+    CHECK(r.offset_x == doctest::Approx(0.0f));
+    CHECK(r.offset_y == doctest::Approx(0.0f));
+    CHECK(r.scale_x == doctest::Approx(1.0f));
+    CHECK(r.scale_y == doctest::Approx(1.0f));
+}
+
+TEST_CASE("an eye with its own FOV reads the atlas where the centre put that direction") {
+    // LibOVR's FovPort to NDC (slot 14): scale 2 / (l + r), offset
+    // (l - r) * scale / 2; the centre (eye -1) has no offset.
+    const float l = 1.1f, rt = 1.4f, u = 1.3f, d = 1.2f;
+    const NdcScaleOffset eye{.offset_x = (l - rt) / (l + rt),
+                             .offset_y = (u - d) / (u + d),
+                             .scale_x  = 2.0f / (l + rt),
+                             .scale_y  = 2.0f / (u + d)};
+    const NdcScaleOffset centre{.offset_x = 0.0f, .offset_y = 0.0f, .scale_x = 0.8f, .scale_y = 0.75f};
+    const NdcScaleOffset r = eye_ndc_in_centre(eye, centre);
+    for (const float t : {-1.0f, -0.3f, 0.0f, 0.5f, 1.2f}) {
+        const float eye_x = eye.scale_x * t + eye.offset_x;
+        const float eye_y = eye.scale_y * t + eye.offset_y;
+        CHECK(lookup(eye_x, r.scale_x, r.offset_x) == doctest::Approx(centre.scale_x * t));
+        CHECK(lookup(eye_y, r.scale_y, r.offset_y) == doctest::Approx(centre.scale_y * t));
+    }
+}
+
+TEST_CASE("a lookup without a usable scale stays the game's") {
+    const NdcScaleOffset eye{.offset_x = 0.1f, .offset_y = 0.0f, .scale_x = 0.7f, .scale_y = 0.8f};
+    const NdcScaleOffset zero{.offset_x = 0.0f, .offset_y = 0.0f, .scale_x = 0.0f, .scale_y = 0.8f};
+    const NdcScaleOffset r = eye_ndc_in_centre(eye, zero);
+    CHECK(r.offset_x == eye.offset_x);
+    CHECK(r.scale_x == eye.scale_x);
+    CHECK(r.scale_y == eye.scale_y);
+}
+
+TEST_CASE("the particle lighting trace reports each eye's answer once per change") {
+    AlphaLightTrace trace;
+    const NdcScaleOffset a{.offset_x = 0.0f, .offset_y = 0.0f, .scale_x = 0.7f, .scale_y = 0.8f};
+    const NdcScaleOffset b{.offset_x = 0.0f, .offset_y = 0.0f, .scale_x = 0.6f, .scale_y = 0.8f};
+    CHECK(trace.changed(0, a));
+    CHECK_FALSE(trace.changed(0, a));
+    CHECK(trace.changed(1, a));
+    CHECK_FALSE(trace.changed(1, a));
+    CHECK(trace.changed(0, b));
+    CHECK_FALSE(trace.changed(1, a));
 }
 
 } // namespace
