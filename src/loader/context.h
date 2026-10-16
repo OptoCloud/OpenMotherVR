@@ -17,6 +17,7 @@
 #include "core/stereo/desktop_window.h"
 #include "core/stereo/head_clip_delay.h"
 #include "core/stereo/head_clip_pivot.h"
+#include "core/stereo/visibility_trace.h"
 #include "core/stereo/mode_policy.h"
 #include "core/stereo/reflection_pass.h"
 #include "core/stereo/scene_tracker.h"
@@ -136,6 +137,12 @@ struct Context {
     platform::d3d11::VignetteRenderer vignette;
     core::stereo::HeadClipDelay head_clip;
     core::stereo::HeadClipPivot head_clip_pivot;
+    // Dev. Debug Options: what darkens the view (the game's head-in-wall
+    // fade, the scene visibility the stereo update finds, and what it
+    // leaves). Game thread.
+    core::stereo::VisibilityTrace head_clip_trace;
+    core::stereo::VisibilityTrace found_visibility_trace;
+    core::stereo::VisibilityTrace final_visibility_trace;
     core::stereo::StereoAa stereo_aa;
     core::stereo::ReflectionPass reflections;
     core::stereo::VirtualScreenPolicy screen_policy;

@@ -111,7 +111,34 @@ void sync_mode_stack(Context& ctx, StereoManager& m) noexcept {
     ctx.modes.report(game::stereo::apply_stack_sync(ctx.targets.mode_stack, m, sync));
 }
 
+// Dev. Debug Options: the scene visibility as the stereo update finds it
+// (`found`: what the game or the head-in-wall fade wrote) and as it leaves
+// it, each logged when it leaves clear and when it comes back, with what the
+// update knows. Game thread, once per change.
+void trace_visibility(Context& ctx, bool found, float visibility) noexcept {
+    using Change        = core::stereo::VisibilityTrace::Change;
+    auto& trace         = found ? ctx.found_visibility_trace : ctx.final_visibility_trace;
+    const char* where   = found ? "found at the stereo update" : "left for the frame";
+    const bool cutscene = ctx.scene.cutscene_or_fade();
+    const bool loading  = ctx.update.loading_blackout();
+    const char* camera  = ctx.follow.active() ? "player" : "taken";
+    switch (trace.update(visibility)) {
+        case Change::Darkened:
+            core::diag::ports::logf(ctx.log,
+                                    "[diag] scene visibility {:.2f} {}; cutscene {}, loading {}, camera {}",
+                                    visibility, where, cutscene, loading, camera);
+            break;
+        case Change::Cleared:
+            core::diag::ports::logf(ctx.log, "[diag] scene visibility {} clear again (lowest {:.2f})", where,
+                                    trace.lowest());
+            break;
+        case Change::None: break;
+    }
+}
+
 void apply(Context& ctx, StereoManager& m, StereoInterface& device, const UpdateOutput& out) {
+    const bool trace = ctx.log.debug_enabled();
+    if (trace) trace_visibility(ctx, true, m.game_64);
     if (out.yaw) ctx.follow.set_yaw(*out.yaw);
     if (out.look_enabled) {
         ctx.follow.set_look_enabled(*out.look_enabled);
@@ -121,6 +148,7 @@ void apply(Context& ctx, StereoManager& m, StereoInterface& device, const Update
     if (out.place_screen) place_menu_screen(ctx, m);
     sync_mode_stack(ctx, m);
     if (out.scene_visibility) m.game_64 = *out.scene_visibility;
+    if (trace) trace_visibility(ctx, false, m.game_64);
     // Spec 22 §4.3, §5, §15: to the render thread's slot 6.
     ctx.comfort.publish_target(out.vignette_target);
     if (out.snap_fade) ctx.comfort.note_snap_step();

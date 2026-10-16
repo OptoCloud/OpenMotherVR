@@ -30,6 +30,10 @@ public:
     // The pivot to hand HeadClipFade for the game's `eye` and `pivot`.
     util::Vec3 pivot(const util::Vec3& eye, const util::Vec3& pivot) const noexcept;
 
+    // How far the real head is from where it was at the last recenter, in
+    // the game's metres; 0 before both poses are known.
+    float real_displacement() const noexcept;
+
     // Whether the last pivot() moved the game's pivot.
     bool adjusted() const noexcept { return adjusted_; }
 

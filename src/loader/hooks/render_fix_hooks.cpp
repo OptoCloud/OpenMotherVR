@@ -56,6 +56,28 @@ void capture_reflection(int eye) noexcept {
     });
 }
 
+constexpr const char* kHeadClipDarkLog =
+    "[diag] head-in-wall fade {:.2f} (handed on {:.2f}): eye {:.2f} m from the body, head moved {:.2f} m{}";
+constexpr const char* kHeadClipClearLog = "[diag] head-in-wall fade clear again (lowest {:.2f})";
+
+// Dev. Debug Options: each time the game's own head-in-wall fade leaves
+// clear and comes back. Game thread, once per change.
+void trace_head_clip(Context& ctx, const float* eye, const float* pivot, float fade, float result) noexcept {
+    using Change = core::stereo::VisibilityTrace::Change;
+    switch (ctx.head_clip_trace.update(fade)) {
+        case Change::Darkened:
+            core::diag::ports::logf(ctx.log, kHeadClipDarkLog, fade, result,
+                                    std::hypot(eye[0] - pivot[0], eye[1] - pivot[1], eye[2] - pivot[2]),
+                                    ctx.head_clip_pivot.real_displacement(),
+                                    ctx.head_clip_pivot.adjusted() ? ", pivot moved" : "");
+            break;
+        case Change::Cleared:
+            core::diag::ports::logf(ctx.log, kHeadClipClearLog, ctx.head_clip_trace.lowest());
+            break;
+        case Change::None: break;
+    }
+}
+
 constexpr const char* kHeadClipPivotLog =
     "[stereo] head-in-wall fade: {} (the game's eye is {:.2f} m from the body)";
 
@@ -137,8 +159,9 @@ float __stdcall head_clip_fade(const float* eye, const float* pivot) noexcept {
     const float* used  = pivot;
     std::array<float, 3> moved{};
     if (running) {
-        const bool was    = ctx.head_clip_pivot.adjusted();
-        const util::Vec3 p = ctx.head_clip_pivot.pivot({eye[0], eye[1], eye[2]}, {pivot[0], pivot[1], pivot[2]});
+        const bool was = ctx.head_clip_pivot.adjusted();
+        const util::Vec3 p =
+            ctx.head_clip_pivot.pivot({eye[0], eye[1], eye[2]}, {pivot[0], pivot[1], pivot[2]});
         if (ctx.head_clip_pivot.adjusted()) {
             moved = {p.x, p.y, p.z};
             used  = moved.data();
@@ -146,13 +169,16 @@ float __stdcall head_clip_fade(const float* eye, const float* pivot) noexcept {
         if (was != ctx.head_clip_pivot.adjusted() && ctx.log.debug_enabled()) {
             const float d = std::hypot(eye[0] - pivot[0], eye[1] - pivot[1], eye[2] - pivot[2]);
             core::diag::ports::logf(ctx.log, kHeadClipPivotLog,
-                                    ctx.head_clip_pivot.adjusted() ? "an animation drives the view, only the real head counts"
-                                                                   : "measured from the body again",
+                                    ctx.head_clip_pivot.adjusted()
+                                        ? "an animation drives the view, only the real head counts"
+                                        : "measured from the body again",
                                     d);
         }
     }
-    const float fade = game::stereo::call_head_clip_fade(ctx.targets.render_fixes.head_clip, eye, used);
-    return ctx.head_clip.apply(fade, running);
+    const float fade   = game::stereo::call_head_clip_fade(ctx.targets.render_fixes.head_clip, eye, used);
+    const float result = ctx.head_clip.apply(fade, running);
+    if (running && ctx.log.debug_enabled()) trace_head_clip(ctx, eye, pivot, fade, result);
+    return result;
 }
 
 } // namespace omvr::loader::hooks

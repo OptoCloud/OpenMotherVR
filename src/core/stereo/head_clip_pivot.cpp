@@ -27,11 +27,15 @@ void HeadClipPivot::on_reference(const util::Matrix34& reference) noexcept {
     has_reference_ = true;
 }
 
+float HeadClipPivot::real_displacement() const noexcept {
+    return has_head_ && has_reference_ ? distance(head_, reference_) : 0.0f;
+}
+
 util::Vec3 HeadClipPivot::pivot(const util::Vec3& eye, const util::Vec3& pivot) const noexcept {
     adjusted_ = false;
     if (!has_head_ || !has_reference_) return pivot;
     const float game = distance(eye, pivot);
-    const float real = distance(head_, reference_);
+    const float real = real_displacement();
     if (!(game > real + kHeadClipAnimationMargin)) return pivot;
     adjusted_     = true;
     const float s = real / game;

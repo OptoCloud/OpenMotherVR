@@ -93,6 +93,7 @@ public:
 
     // The 3D scene goes black behind a loading screen.
     void set_loading_blackout(bool on) noexcept { loading_blackout_ = on; }
+    bool loading_blackout() const noexcept { return loading_blackout_; }
 
 private:
     // Which turning applies (spec 22 §4.1); exactly one, chosen each update.

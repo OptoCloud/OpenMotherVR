@@ -4,6 +4,7 @@
 
 #include "core/stereo/head_clip_delay.h"
 #include "core/stereo/head_clip_pivot.h"
+#include "core/stereo/visibility_trace.h"
 #include "core/stereo/mirror_layout.h"
 #include "core/stereo/mode_policy.h"
 #include "core/stereo/render_target.h"
@@ -358,6 +359,19 @@ TEST_CASE("head-clip fade waits out the grace period in stereo") {
     CHECK(delay.apply(0.2f, true) == kSceneVisible);
     clock.advance(1ms);
     CHECK(delay.apply(0.2f, true) == 0.2f); // 600 ms since the last clear
+}
+
+TEST_CASE("visibility trace: one change when darkening and one when clear again") {
+    using Change = VisibilityTrace::Change;
+    VisibilityTrace t;
+    CHECK(t.update(1.0f) == Change::None);
+    CHECK(t.update(0.6f) == Change::Darkened);
+    CHECK(t.update(0.0f) == Change::None);
+    CHECK(t.update(0.3f) == Change::None);
+    CHECK(t.lowest() == 0.0f);
+    CHECK(t.update(1.0f) == Change::Cleared);
+    CHECK(t.update(0.8f) == Change::Darkened);
+    CHECK(t.lowest() == 0.8f);
 }
 
 TEST_CASE("head-clip pivot: only the real head's movement counts") {
