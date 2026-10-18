@@ -11,6 +11,7 @@
 #include "core/input/control_scheme.h"
 #include "core/input/gestures.h"
 #include "core/input/glyphs.h"
+#include "core/input/interaction_state.h"
 #include "core/input/virtual_pad.h"
 #include "fakes/fakes.h"
 #include "game/constants.h"
@@ -25,10 +26,12 @@ struct MapperRig {
     core::config::InputSettings input;
     core::config::ControlsSettings controls;
     SettableStick stick;
+    core::input::InteractionState interactions{log};
     FakeClock clock;
     FakeGestureContext context;
     core::input::Gestures gestures{{controls, context, log}};
-    core::input::ControlMapper mapper{{pad, schemes, input, controls, stick, clock, log, &gestures}};
+    core::input::ControlMapper mapper{
+        {pad, schemes, input, controls, stick, interactions, clock, log, &gestures}};
 
     const core::input::ActionTier& player() { return pad.tiers()[game::kPlayerMap]; }
 };

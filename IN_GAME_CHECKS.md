@@ -54,6 +54,14 @@ side of the head and Map hides or shows the HUD (`[diag] hud: ...`).
 - [ ] **Unexplained reports:** B in the pause menu crashing; the old menu
       lingering over the Continue video; the view sliding on snap turns
       while walking.
+- [ ] **Two-handed lever (04 §5.8.5, item 30).** Thumbstick controllers,
+      Dev. Debug Options on. At a two-handed lever (the game prompts "Hold
+      aim and fire", then the move and look sticks down): hold the right
+      grip and right trigger, push both sticks down: the lever is pulled,
+      and the weapon does not change. Away from the lever the right stick
+      up or down still cycles weapons. Log: `[events] "start_interaction"`
+      with `interaction true` at the lever, then `stop_interaction` with
+      `interaction false`.
 
 ## Blackouts and rendering
 

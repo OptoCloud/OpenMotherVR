@@ -6,6 +6,7 @@
 #include "core/input/control_scheme.h"
 #include "core/input/dpad_emulation.h"
 #include "core/input/gestures.h"
+#include "core/input/interaction_state.h"
 #include "core/input/ports/controls_sink.h"
 #include "core/input/ports/stick_context.h"
 
@@ -21,6 +22,7 @@ struct ControlMapperDeps {
     const config::InputSettings& input;
     const config::ControlsSettings& controls; // Controls.DpadEmulation (22 §7)
     const ports::StickContext& stick;         // where the left stick is free for the d-pad
+    const InteractionState& interactions;     // look Y and weapon cycling (04 §5.8.5)
     const diag::ports::Clock& clock;          // the d-pad modifier's hold
     diag::ports::Log& log;                    // the d-pad's changes, with DebugOptions
     Gestures* gestures = nullptr;             // the body gestures of 22 §8, §9; none: v1

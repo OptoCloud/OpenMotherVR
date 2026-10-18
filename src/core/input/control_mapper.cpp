@@ -20,11 +20,16 @@ namespace omvr::core::input {
 
 namespace {
 
+// Map 0's analog action 2, `cam_vertical_rot`: the look stick's Y (04
+// §5.8.5, 22 §2.1). A game fact, kept here beside the one row that writes it.
+constexpr int kLookY = 2;
+
 // What one frame of controls means for the game's actions, before it is
 // written to the tiers (04 §5.8.5). Pure values.
 struct GameActions {
     float move_x = 0, move_y = 0;
     float turn       = 0;
+    float look_y     = 0;
     bool next_weapon = false, prev_weapon = false;
     bool flashlight = false;
     bool confirm    = false;
@@ -52,16 +57,20 @@ Vec2 move_value(const Controls& c) noexcept {
     return move;
 }
 
-GameActions game_actions(const Controls& c, bool near_head, bool snap_rotation, bool aim,
-                         bool tracker) noexcept {
+GameActions game_actions(const Controls& c, bool near_head, bool snap_rotation, bool aim, bool tracker,
+                         bool interacting) noexcept {
     const TouchpadRegions stick = decode_touchpad(c.turn, false);
     GameActions a;
     const Vec2 move = move_value(c);
     a.move_x        = move.x;
     a.move_y        = move.y;
     a.turn          = turn_value(c, stick, snap_rotation);
+    // 04 §5.8.5 r10: a two-handed lever wants the look stick down, so during
+    // an interaction the stick's Y is the game's look Y and cycles no weapon
+    // (one owner per input). Outside interactions pitch comes from the head.
+    a.look_y = interacting ? c.turn.y : 0.0f;
     // Sticks also select weapons up and down (04 §5.3).
-    const bool weapon_stick = !c.touchpad_scheme && !stick.horizontal;
+    const bool weapon_stick = !c.touchpad_scheme && !stick.horizontal && !interacting;
     a.next_weapon           = weapon_stick && c.turn.y > kWeaponStickDeflection;
     a.prev_weapon           = weapon_stick && c.turn.y < -kWeaponStickDeflection;
     a.flashlight            = c.flashlight || (c.interact && near_head);
@@ -136,6 +145,7 @@ void write_player_map(TierWriter& w, const Controls& c, const GameActions& a) no
     w.analog(kMoveX, a.move_x);
     w.analog(kMoveY, a.move_y);
     w.analog(kTurn, a.turn);
+    w.analog(kLookY, a.look_y);
 }
 
 // Menu map (04 §2.4).
@@ -211,7 +221,8 @@ void ControlMapper::write(const Controls& in, bool near_head) noexcept {
     grips_.update(c.grip_r, c.grip_l, toggle);
     const bool aim      = toggle ? grips_.aim() : c.grip_r;
     const bool tracker  = toggle ? grips_.tracker() : c.grip_l && !c.radial;
-    GameActions actions = game_actions(c, near_head, deps_.input.snap_rotation, aim, tracker);
+    GameActions actions = game_actions(c, near_head, deps_.input.snap_rotation, aim, tracker,
+                                       deps_.interactions.in_interaction());
     apply_gestures(actions, gestures);
 
     auto& tiers = deps_.pad.tiers();

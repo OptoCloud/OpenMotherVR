@@ -345,6 +345,53 @@ TEST_CASE("the control mapper: turn, weapons, move and clamps") {
     CHECK(rig.pad.tiers()[game::kMenuMap].analog[game::menu_action::kTriggerL] == 1.0f);
 }
 
+// 04 §5.8.5 r10, acceptance item 30: during an interaction the look stick's Y
+// is map 0's analog 2 (`cam_vertical_rot`), so a two-handed lever can be
+// pulled, and it cycles no weapon; outside one analog 2 is 0.
+TEST_CASE("the control mapper: look Y only during an interaction") {
+    omvr::tests::MapperRig rig;
+    const ActionTier& player = rig.pad.tiers()[game::kPlayerMap];
+    namespace pa             = game::player_action;
+    constexpr int kLookY     = 2;
+
+    Controls down;
+    down.turn = {0.0f, -0.9f};
+    rig.mapper.write(down, false);
+    CHECK(player.analog[kLookY] == 0.0f);
+    CHECK(player.digital[pa::kPrevWeapon] == 1);
+
+    REQUIRE(rig.interactions.on_event("start_interaction"));
+    rig.mapper.write(down, false);
+    CHECK(player.analog[kLookY] == doctest::Approx(-0.9f));
+    CHECK(player.digital[pa::kPrevWeapon] == 0);
+    CHECK(player.digital[pa::kNextWeapon] == 0);
+
+    // Not gated (a light push and a horizontal one pass), not scaled, and
+    // limited to [-1, 1] as every analog value (04 §5.1).
+    Controls light;
+    light.turn = {0.0f, 0.2f};
+    rig.mapper.write(light, false);
+    CHECK(player.analog[kLookY] == doctest::Approx(0.2f));
+    Controls sideways;
+    sideways.turn = {0.9f, 0.3f};
+    rig.mapper.write(sideways, false);
+    CHECK(player.analog[kLookY] == doctest::Approx(0.3f));
+    Controls up;
+    up.turn = {0.0f, 1.2f};
+    rig.mapper.write(up, false);
+    CHECK(player.analog[kLookY] == 1.0f);
+    CHECK(player.digital[pa::kNextWeapon] == 0);
+    Controls pad        = down;
+    pad.touchpad_scheme = true;
+    rig.mapper.write(pad, false);
+    CHECK(player.analog[kLookY] == doctest::Approx(-0.9f));
+
+    REQUIRE(rig.interactions.on_event("stop_interaction"));
+    rig.mapper.write(up, false);
+    CHECK(player.analog[kLookY] == 0.0f);
+    CHECK(player.digital[pa::kNextWeapon] == 1);
+}
+
 TEST_CASE("the control mapper: grips hold, or toggle") {
     omvr::tests::MapperRig rig;
     const ActionTier& player = rig.pad.tiers()[game::kPlayerMap];
