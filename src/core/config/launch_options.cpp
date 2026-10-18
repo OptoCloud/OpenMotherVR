@@ -59,8 +59,4 @@ std::optional<float> world_scale_switch_in(std::span<const std::wstring> args) n
     return scale;
 }
 
-float world_scale_in(std::span<const std::wstring> args) noexcept {
-    return world_scale_switch_in(args).value_or(kWorldScaleDefault);
-}
-
 } // namespace omvr::core::config

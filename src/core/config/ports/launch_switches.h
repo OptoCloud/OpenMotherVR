@@ -16,12 +16,9 @@ public:
     // Safe under the loader lock: the hook installer decides the patch set
     // with it at attach.
     virtual std::optional<VRRuntime> forced_runtime() const noexcept = 0;
-    // The -vrscale world scale (world_scale_in). Splits the command line as
-    // the shell does, so not under the loader lock.
-    virtual float world_scale() const noexcept = 0;
     // The accepted -vrscale value, none without one (world_scale_switch_in):
-    // it overrides Comfort.WorldScale for the run (spec 22 §6.3). As
-    // world_scale, not under the loader lock.
+    // it overrides Comfort.WorldScale for the run (spec 22 §6.3). Splits the
+    // command line as the shell does, so not under the loader lock.
     virtual std::optional<float> world_scale_switch() const noexcept = 0;
 
 protected:

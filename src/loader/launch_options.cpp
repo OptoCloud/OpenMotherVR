@@ -12,11 +12,6 @@ namespace omvr::loader {
 ProcessLaunchSwitches::ProcessLaunchSwitches() noexcept
     : forced_(core::config::forced_runtime_in(platform::win32::process_command_line())) {}
 
-float ProcessLaunchSwitches::world_scale() const noexcept {
-    const std::vector<std::wstring> args = platform::win32::process_arguments();
-    return core::config::world_scale_in(args);
-}
-
 std::optional<float> ProcessLaunchSwitches::world_scale_switch() const noexcept {
     const std::vector<std::wstring> args = platform::win32::process_arguments();
     return core::config::world_scale_switch_in(args);

@@ -18,7 +18,6 @@ public:
     ProcessLaunchSwitches() noexcept;
 
     std::optional<core::config::VRRuntime> forced_runtime() const noexcept override { return forced_; }
-    float world_scale() const noexcept override;
     std::optional<float> world_scale_switch() const noexcept override;
 
 private:

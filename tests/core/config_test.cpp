@@ -444,7 +444,10 @@ TEST_CASE("-vrforce* switches: exact tokens, any case, the last wins") {
 }
 
 TEST_CASE("-vrscale: the next argument, within range, the last wins") {
-    using Args = std::vector<std::wstring>;
+    using Args                = std::vector<std::wstring>;
+    const auto world_scale_in = [](const Args& args) {
+        return world_scale_switch_in(args).value_or(kWorldScaleDefault);
+    };
     CHECK(world_scale_in(Args{L"AI.exe"}) == kWorldScaleDefault);
     CHECK(world_scale_in(Args{L"AI.exe", L"-vrscale", L"1.2"}) == 1.2f);
     CHECK(world_scale_in(Args{L"AI.exe", L"-VRScale", L"0.5"}) == 0.5f);
