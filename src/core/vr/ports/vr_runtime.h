@@ -59,6 +59,14 @@ public:
     // caller queues a retake (03 §2.1, 09 §5.5). Game thread.
     virtual bool recenter_taken() const { return true; }
 
+    // The runtime moved its tracking space under the mod since the last
+    // call (OpenVR: a new chaperone universe or a zero-pose reset, 03 §6.8):
+    // the reference is stale, and the caller queues a retake (03 §2.2).
+    // True once per change; any pose read after it is in the new space.
+    // OpenXR re-anchors its own spaces (09 §6) and never reports one. Game
+    // thread.
+    virtual bool tracking_space_changed() { return false; }
+
     // When the FOV only became known after init (OpenXR runtimes that do not
     // report it up front), updates `desc` and returns true once.
     virtual bool refresh_headset_desc(HeadsetDesc& /*desc*/) { return false; }

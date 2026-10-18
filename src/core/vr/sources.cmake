@@ -17,6 +17,8 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/runtime_detector.h
     ${CMAKE_CURRENT_LIST_DIR}/runtime_failure.cpp
     ${CMAKE_CURRENT_LIST_DIR}/runtime_failure.h
+    ${CMAKE_CURRENT_LIST_DIR}/space_change.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/space_change.h
     ${CMAKE_CURRENT_LIST_DIR}/tuning.h
     ${CMAKE_CURRENT_LIST_DIR}/types.h
 )

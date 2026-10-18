@@ -1,5 +1,6 @@
 // core/vr: heading and the vertical rule, the game pose conversion, FOV
-// tangents and crop bounds, pose hold rules, pose age and runtime choice.
+// tangents and crop bounds, pose hold rules, pose age, runtime choice,
+// tracking space changes and the frame kind log.
 
 #include "core/diag/tuning.h"
 #include "core/vr/fov.h"
@@ -8,6 +9,7 @@
 #include "core/vr/pose_convert.h"
 #include "core/vr/pose_hold.h"
 #include "core/vr/runtime_choice.h"
+#include "core/vr/space_change.h"
 #include "core/vr/tuning.h"
 
 #include <doctest/doctest.h>
@@ -214,3 +216,42 @@ TEST_CASE("runtime choice precedence") {
 }
 
 } // namespace
+
+// 03 §6.8: a change is handed over only after the next pose wait, and
+// several before a take count as one retake.
+TEST_CASE("tracking space change is published after the pose wait, once") {
+    SpaceChange change;
+    CHECK_FALSE(change.take());
+    change.publish(); // nothing noted
+    CHECK_FALSE(change.take());
+
+    change.note();
+    CHECK_FALSE(change.take()); // not before the wait that follows it
+    change.publish();
+    CHECK(change.take());
+    CHECK_FALSE(change.take());
+
+    change.note();
+    change.publish();
+    change.note();
+    change.publish();
+    CHECK(change.take());
+    CHECK_FALSE(change.take());
+}
+
+// 11 §4.5: the first frame and each change until the first tracked frame are
+// always logged; later changes only with DebugOptions.
+TEST_CASE("frame kind lines: always at start-up, then with DebugOptions") {
+    FrameKindLog log;
+    CHECK(log.next(false, false) == FrameKindLine::Always); // first frame: screen
+    CHECK(log.next(false, false) == FrameKindLine::None);   // unchanged
+    CHECK(log.next(true, false) == FrameKindLine::Always);  // first tracked frame
+    CHECK(log.next(true, true) == FrameKindLine::None);
+    CHECK(log.next(false, false) == FrameKindLine::None); // later change, debug off
+    CHECK(log.next(true, true) == FrameKindLine::Debug);  // later change, debug on
+    CHECK(log.next(false, true) == FrameKindLine::Debug);
+
+    FrameKindLog tracked_first;
+    CHECK(tracked_first.next(true, false) == FrameKindLine::Always);
+    CHECK(tracked_first.next(false, false) == FrameKindLine::None);
+}

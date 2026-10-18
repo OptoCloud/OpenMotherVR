@@ -55,6 +55,11 @@ inline constexpr std::size_t kPropertyBufferSize = 64;
 // (03 §7, "around the screen").
 inline constexpr vr::VRTextureBounds_t kNoImageBounds{0.0f, 0.0f, 1e-5f, 1e-5f};
 
+// At most this many runtime events are read per submitted frame (03 §6.8):
+// far more than SteamVR sends, so the queue never falls behind, while a
+// flooding runtime cannot hold the render thread.
+inline constexpr std::size_t kMaxEventsPerFrame = 64;
+
 // IVRSystem::TriggerHapticPulse's axis: 0, the controller's one haptic
 // actuator on every controller the legacy path serves (21 §14.3).
 inline constexpr std::uint32_t kLegacyHapticAxis = 0;

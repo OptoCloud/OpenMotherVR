@@ -24,6 +24,7 @@
 #include "core/vr/pose_convert.h"
 #include "core/vr/pose_hold.h"
 #include "core/vr/runtime_failure.h"
+#include "core/vr/space_change.h"
 #include "core/vr/tuning.h"
 #include "platform/d3d11/handles.h"
 #include "platform/openvr/api_loader.h"
@@ -85,7 +86,12 @@ constexpr std::string_view kLogRecenterSkipped =
 constexpr std::string_view kLogRecenter =
     "openvr: recenter: head x=({:.2f} {:.2f} {:.2f}) y=({:.2f} {:.2f} {:.2f}) z=({:.2f} {:.2f} {:.2f}) "
     "pos=({:.2f} {:.2f} {:.2f}) yaw={:.1f} deg{}, activity={}";
-constexpr std::string_view kLogFrameKind = "[diag] frames now {}";
+constexpr std::string_view kLogFrameKind       = "[diag] frames now {}";
+constexpr std::string_view kLogFrameKindAlways = "openvr: frames now {}";
+constexpr std::string_view kLogSpaceChanged =
+    "openvr: {}: the tracking space moved; the virtual screen is hidden and the reference retaken once the "
+    "headset is in use";
+constexpr std::string_view kLogHeadsetActivity = "openvr: headset {} (event {})";
 constexpr std::string_view kLogNoApplications =
     "openvr: no {}: cannot check which application the headset shows; VR is otherwise unaffected";
 constexpr std::string_view kLogShowsGame   = "openvr: the headset shows the game";
@@ -164,6 +170,21 @@ input::HandInput legacy_hand(const vr::VRControllerState_t& s) noexcept {
 // The translation column of a 3x4 tracking matrix.
 util::Vec3 translation(const float (&m)[3][4]) noexcept { return {m[0][3], m[1][3], m[2][3]}; }
 
+const char* frame_kind_text(bool head_tracked) noexcept { return head_tracked ? "tracked" : "on the screen"; }
+
+// The events after which the poses are in a moved tracking space (03 §6.8),
+// by name for the log; null for any other event. A re-anchor of one
+// universe may move the other on some runtimes, so each counts whatever
+// universe the poses are in: a needless retake only faces forward again.
+const char* space_change_name(std::uint32_t event) noexcept {
+    switch (event) {
+        case vr::VREvent_ChaperoneUniverseHasChanged: return "chaperone universe changed";
+        case vr::VREvent_SeatedZeroPoseReset: return "seated zero pose reset";
+        case vr::VREvent_StandingZeroPoseReset: return "standing zero pose reset";
+        default: return nullptr;
+    }
+}
+
 class OpenVrRuntime final : public core::vr::ports::VrRuntime {
 public:
     explicit OpenVrRuntime(const OpenVrRuntimeDeps& deps) noexcept
@@ -198,6 +219,7 @@ public:
     void poll_input() override;
     bool headset_in_use() override;
     bool recenter_taken() const override { return recenter_taken_; }
+    bool tracking_space_changed() override { return space_change_.take(); }
     bool has_floor() const override { return tracking_origin_ == vr::TrackingUniverseStanding; }
     std::optional<float> floor_height() override;
     std::optional<float> head_height_above_floor() override;
@@ -217,6 +239,9 @@ private:
     void log_hands(const Hands& h);
     void submit_eyes(const vr::VRTextureWithPose_t& tex);
     void show_screen(void* side_by_side, const vr::VRTextureWithPose_t& tex);
+    void place_screen(void* side_by_side);
+    void hide_screen();
+    void poll_events();
     void write_controls();
     void play_haptics(const vr::TrackedDevicePose_t (&poses)[vr::k_unMaxTrackedDeviceCount],
                       const vr::TrackedDeviceIndex_t (&index)[kHandCount]);
@@ -254,6 +279,14 @@ private:
     // unconverted yaw-only reference Y, which places the virtual screen.
     SeqLock<vr::HmdMatrix34_t> render_pose_;
     SeqLock<vr::HmdMatrix34_t> yaw_matrix_;
+    // yaw_matrix_ holds a reference taken in the current tracking space: set
+    // by a valid recenter (game thread), cleared by a tracking space change
+    // (render thread). Until then no screen is shown (03 §7).
+    std::atomic<bool> screen_reference_{false};
+    // Render thread: tracking space changes, handed to the game thread
+    // (tracking_space_changed) after the next pose wait.
+    core::vr::SpaceChange space_change_;
+    core::vr::FrameKindLog frame_kind_log_; // render thread
     bool cinema_mode_                     = false;
     vr::VROverlayHandle_t overlay_handle_ = vr::k_ulOverlayHandleInvalid;
 
@@ -461,6 +494,7 @@ void OpenVrRuntime::head_yaw_pose(Matrix34& out, float world_scale) {
     yaw_                            = heading.yaw_rad;
     const vr::HmdMatrix34_t y       = yaw_only(heading.yaw_rad, m);
     yaw_matrix_.store(y);
+    screen_reference_.store(true, std::memory_order_release);
     out = to_game_pose(y.m, world_scale);
     log_recenter(m, heading);
 }
@@ -547,10 +581,16 @@ void OpenVrRuntime::begin_frame(float eye_offsets[6], bool head_tracked) {
         const vr::HmdMatrix34_t e = system_->GetEyeToHeadTransform(static_cast<vr::EVREye>(eye));
         for (int i = 0; i < kAxes; ++i) eye_offsets[eye * kAxes + i] = e.m[i][kPositionColumn];
     }
-    // Debug: screen frames (menus, videos, loading) against tracked ones,
-    // once per change.
-    if (cinema_mode_ != !head_tracked && log_.debug_enabled())
-        logf(log_, kLogFrameKind, head_tracked ? "tracked" : "on the screen");
+    // Screen frames (menus, videos, loading) against tracked ones, once per
+    // change: always until the first tracked frame, then with Dev. Debug
+    // Options (11 §4.5).
+    switch (frame_kind_log_.next(head_tracked, log_.debug_enabled())) {
+        case core::vr::FrameKindLine::Always:
+            logf(log_, kLogFrameKindAlways, frame_kind_text(head_tracked));
+            break;
+        case core::vr::FrameKindLine::Debug: logf(log_, kLogFrameKind, frame_kind_text(head_tracked)); break;
+        case core::vr::FrameKindLine::None: break;
+    }
     cinema_mode_ = !head_tracked;
 }
 
@@ -569,8 +609,13 @@ void OpenVrRuntime::submit_frame(core::vr::GpuTexture texture) {
     else
         show_screen(side_by_side, tex);
 
+    // Events before the pose wait, a change handed over after it: a pose the
+    // game thread reads for the retake is then from a wait that followed
+    // the change (03 §6.8).
+    poll_events();
     // Running start: block until the next frame's poses are due (03 §6.3).
     compositor_->WaitGetPoses(nullptr, 0, nullptr, 0);
+    space_change_.publish();
     read_hands();
     // The controllers as of this WaitGetPoses go to the game now, before its
     // next simulation step, not at the next BeginFrame (P10, as OpenXR).
@@ -580,31 +625,72 @@ void OpenVrRuntime::submit_frame(core::vr::GpuTexture texture) {
 
 // A head-tracked frame: both eyes, cropped to their real FOV.
 void OpenVrRuntime::submit_eyes(const vr::VRTextureWithPose_t& tex) {
-    if (overlay_handle_ != vr::k_ulOverlayHandleInvalid && overlay_->IsOverlayVisible(overlay_handle_)) {
-        overlay_->HideOverlay(overlay_handle_);
-    }
+    hide_screen();
     compositor_->Submit(vr::Eye_Left, &tex, &bounds_[0], vr::Submit_TextureWithPose);
     compositor_->Submit(vr::Eye_Right, &tex, &bounds_[1], vr::Submit_TextureWithPose);
 }
 
 // Menus, videos, loading: the left eye's image on a screen in front of where
 // the head was facing at the last recenter, the 3D view left black (03 §7).
+// Without a reference in the current tracking space (none taken yet, or the
+// space moved since) the screen would stand wherever that space's origin
+// is, often behind or below the player: only black is shown until the
+// retake.
 void OpenVrRuntime::show_screen(void* side_by_side, const vr::VRTextureWithPose_t& tex) {
-    if (overlay_handle_ != vr::k_ulOverlayHandleInvalid) {
-        vr::Texture_t plain{side_by_side, vr::TextureType_DirectX, vr::ColorSpace_Gamma};
-        overlay_->SetOverlayTexture(overlay_handle_, &plain);
-        vr::HmdMatrix34_t m = yaw_matrix_.load();
-        m.m[0][3] -= kCinemaDistance * m.m[0][2];
-        m.m[2][3] -= kCinemaDistance * m.m[2][2];
-        overlay_->SetOverlayTransformAbsolute(overlay_handle_, vr::TrackingUniverseStanding, &m);
-        overlay_->SetOverlayWidthInMeters(overlay_handle_, kCinemaWidth);
-        const vr::VRTextureBounds_t screen{0.0f, core::vr::kScreenTopV, core::vr::kScreenLeftHalfU,
-                                           core::vr::kScreenBottomV};
-        overlay_->SetOverlayTextureBounds(overlay_handle_, &screen);
-        overlay_->ShowOverlay(overlay_handle_);
-    }
+    if (screen_reference_.load(std::memory_order_acquire))
+        place_screen(side_by_side);
+    else
+        hide_screen();
     compositor_->Submit(vr::Eye_Left, &tex, &kNoImageBounds, vr::Submit_TextureWithPose);
     compositor_->Submit(vr::Eye_Right, &tex, &kNoImageBounds, vr::Submit_TextureWithPose);
+}
+
+// In the universe the poses, and so the reference, are in (03 §1), not a
+// fixed one: in another universe the screen would stand at the same
+// coordinates of a different origin.
+void OpenVrRuntime::place_screen(void* side_by_side) {
+    if (overlay_handle_ == vr::k_ulOverlayHandleInvalid) return;
+    vr::Texture_t plain{side_by_side, vr::TextureType_DirectX, vr::ColorSpace_Gamma};
+    overlay_->SetOverlayTexture(overlay_handle_, &plain);
+    vr::HmdMatrix34_t m = yaw_matrix_.load();
+    m.m[0][3] -= kCinemaDistance * m.m[0][2];
+    m.m[2][3] -= kCinemaDistance * m.m[2][2];
+    overlay_->SetOverlayTransformAbsolute(overlay_handle_,
+                                          static_cast<vr::ETrackingUniverseOrigin>(tracking_origin_), &m);
+    overlay_->SetOverlayWidthInMeters(overlay_handle_, kCinemaWidth);
+    const vr::VRTextureBounds_t screen{0.0f, core::vr::kScreenTopV, core::vr::kScreenLeftHalfU,
+                                       core::vr::kScreenBottomV};
+    overlay_->SetOverlayTextureBounds(overlay_handle_, &screen);
+    overlay_->ShowOverlay(overlay_handle_);
+}
+
+void OpenVrRuntime::hide_screen() {
+    if (overlay_handle_ != vr::k_ulOverlayHandleInvalid && overlay_->IsOverlayVisible(overlay_handle_)) {
+        overlay_->HideOverlay(overlay_handle_);
+    }
+}
+
+// Render thread, once per submitted frame: the process's only reader of
+// IVRSystem's event queue, which every reader in the process shares (the
+// overlay's own events are not asked for). Bounded, so a runtime that
+// floods the queue cannot hold the frame; the rest wait for the next one.
+// Logs once per event, and these events are rare.
+void OpenVrRuntime::poll_events() {
+    vr::VREvent_t e{};
+    for (std::size_t n = 0; n < kMaxEventsPerFrame && system_->PollNextEvent(&e, sizeof(e)); ++n) {
+        if (const char* name = space_change_name(e.eventType)) {
+            logf(log_, kLogSpaceChanged, name);
+            screen_reference_.store(false, std::memory_order_release);
+            space_change_.note();
+        } else if (e.trackedDeviceIndex == vr::k_unTrackedDeviceIndex_Hmd &&
+                   (e.eventType == vr::VREvent_TrackedDeviceUserInteractionStarted ||
+                    e.eventType == vr::VREvent_TrackedDeviceUserInteractionEnded)) {
+            // Not a retake by itself (03 §2.2); logged so a report shows
+            // whether a moved screen followed putting the headset on.
+            const bool started = e.eventType == vr::VREvent_TrackedDeviceUserInteractionStarted;
+            logf(log_, kLogHeadsetActivity, started ? "in use" : "idle", e.eventType);
+        }
+    }
 }
 
 // SteamVR shows one scene application. If it is not this process (SteamVR's

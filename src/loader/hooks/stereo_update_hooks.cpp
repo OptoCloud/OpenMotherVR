@@ -197,6 +197,10 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
     }
     check_vr_off(ctx);
     guarded("Stereo::Update", [&] {
+        // 03 §2.2, §6.8: the runtime moved its tracking space; the
+        // reference is retaken once the headset is in use.
+        if (auto* runtime = game::load_backend(*device); runtime && runtime->tracking_space_changed())
+            ctx.update.request_recenter();
         update_play_space(ctx, *device);
         const UpdateOutput out = ctx.update.run(gather(ctx, *self, *device));
         apply(ctx, *self, *device, out);
