@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). r6 (project decision: with the aim poses made only at runtime start, turning tracked hands on in the menu left aiming on the head until the next start): the aim pose actions are declared and bound whatever `Hands.Enabled` is, so the key applies at once as §15.1 says; a binding that lacks them is logged. r7 (static analysis of the 2015 `AI.exe` and the game's data by the spec side, without a lead): `FinalPoseStep`'s single return corrected (0x2A5553 belongs to the next function); the pose's hand-over to the model's render objects (`SkinSetPose` 0x28E9A0, its two calls in `FinalPoseStep`, which render objects receive which pose, and that it reads the pose without keeping it); the skeleton's name field and the model-space array's size; the crouch methods' condition byte `+0x3E2E` (corrects §2.2); the game's first-person camera offsets in `DATA\GLOBALCONSTANTS.TXT` (§22 item 14, the crouch drop); body visibility's method made exact (collapse at the nearest drawn joint, in a copy handed to the render objects; the held item's bone always drawn); real crouch's press through the v1 crouch control; room-scale kept off until the frame of the game's movement input and the body's yaw are established (new §22 items 25, 26); new open items 27 (parts posed from another skeleton) and 28 (the requested crouch byte in play). r8 (a tester's log: a value set in a menu was never applied): a skeleton that cannot be read is read again once a second until it can be (§10.2, project decision with its reason), and that is logged once per change with its reason (§18). Revision: r8 -->
+<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). r6 (project decision: with the aim poses made only at runtime start, turning tracked hands on in the menu left aiming on the head until the next start): the aim pose actions are declared and bound whatever `Hands.Enabled` is, so the key applies at once as §15.1 says; a binding that lacks them is logged. r7 (static analysis of the 2015 `AI.exe` and the game's data by the spec side, without a lead): `FinalPoseStep`'s single return corrected (0x2A5553 belongs to the next function); the pose's hand-over to the model's render objects (`SkinSetPose` 0x28E9A0, its two calls in `FinalPoseStep`, which render objects receive which pose, and that it reads the pose without keeping it); the skeleton's name field and the model-space array's size; the crouch methods' condition byte `+0x3E2E` (corrects §2.2); the game's first-person camera offsets in `DATA\GLOBALCONSTANTS.TXT` (§22 item 14, the crouch drop); body visibility's method made exact (collapse at the nearest drawn joint, in a copy handed to the render objects; the held item's bone always drawn); real crouch's press through the v1 crouch control; room-scale kept off until the frame of the game's movement input and the body's yaw are established (new §22 items 25, 26); new open items 27 (parts posed from another skeleton) and 28 (the requested crouch byte in play). r8 (a tester's log: a value set in a menu was never applied): a skeleton that cannot be read is read again once a second until it can be (§10.2, project decision with its reason), and that is logged once per change with its reason (§18). r9 (game analysis of the 2015 `AI.exe` by the spec side, facts located with the help of an analysis of another mod and verified in the code): the character's model-to-world transform on the animation component and the bone world query `BoneWorldTransform` 0x2A2FB0 with its pose selector (§2.3); the final pose is entry 7 of the component's pose array; the held item's attachment query at 0x3B4E06 and what makes the item follow the edited hand (§4.2 item 6, §22 item 3); the game's limb IK is not run for the player's first-person skeleton while tracked hands are active (§4.2 item 7, §22 item 4); the game's CCD and two-joint IK solvers (§22 item 23); the grip to hand-bone mapping derived from each skeleton's own finger bones at run time (new §3.5, §22 item 2). Revision: r9 -->
 
 # 21. Hands and body
 
@@ -188,7 +188,42 @@ of its first argument) is not above 0. It is called from 0x2A7986,
 0x2A79A1, 0x2A79BC and 0x2A7F30. §4.2 item 7 states what it must not undo.
 Whether the game also contains general IK solvers an implementation could
 use for §4.2 is open (§22 item 23); the required result does not depend on
-them.
+them. r9: it does (below).
+
+**Model to world [sure for the code, r9].** `BoneWorldTransform` 0x2A2FB0
+(`55 8b ec 83 e4 f0 83 ec 54`) is a `thiscall` on the animation component
+(character `+0x3F0`) with three stack arguments, in push order last to
+first: the bone index, a pose selector, a pointer to a 0x30-byte output
+transform; `ret 0xc`. It maps the selector through 0x2A1CF0 to an index
+`k` (selectors 8 and above lose 8 first), takes the pose at component
+`+0x230 + 4 k` (the skeleton of that pose at `+0x210 + 4 k`), makes the
+bone's model-space transform current through the getter 0x7B9E80 when its
+flag bit 1 is set, and returns it in world coordinates:
+
+    world translation = T + rotate(Q, model translation)   (scaled by S [likely])
+    world rotation    = Q * model rotation
+
+with `T` the vector at component `+0x270`, `Q` the quaternion (x, y, z, w)
+at component `+0x280` and `S` the vector at component `+0x290`; so the
+character's model-to-world transform is the bone-transform-shaped record at
+component `+0x270` (character `+0x660`, `+0x670`, `+0x680`), 16-byte
+aligned. World to model is its inverse: subtract `T`, rotate by the
+conjugate of `Q`, divide by `S`. The pose `FinalPoseStep` edits and hands
+to the renderer (component `+0x24C`, §2.3) is entry 7 of the array at
+`+0x230` (0x230 + 7 * 4) [sure for the arithmetic]; that selector 7 gives
+`k` = 7 is [likely] (acceptance item 3 logs it).
+
+**The game's IK solvers [likely, r9; the shapes match the public Havok
+animation SDK's CCD and two-joint solvers].** 0x7C1DA0
+(`f3 0f 10 44 24 08 8b c1`) constructs a CCD solver in place (`thiscall`,
+an iteration count and a float gain, `ret 8`; it writes the solver's
+vtable, RVA 0x1029BA4, at `+0`, the count at `+8` and the gain at `+0xC`);
+0x7C1DD0 (`55 8b ec 83 e4 f0 81 ec d4 00 00 00`) solves with it; 0x7C2630
+(`55 8b ec 83 e4 f0 a1 30 61 be 01`) is the two-joint solve, taking a setup
+record, the pose and a result. The game keeps per-layer two-joint setups
+for its characters (the layer table 0x288E90 maps a layer to its index)
+[likely]. An implementation may use these solvers or solve the two-bone
+chain itself; §4.2's required result is the same.
 
 **First-person skeletons [sure, game data].** The player's first-person
 character uses the skeleton definitions `FEMALEFP` and `SPACESUITFP`
@@ -420,8 +455,8 @@ palm, away from the palm for the left hand and into it for the right)
 actions of 04 §5.8.2, which are chosen to match it.
 
 The mapping from the grip pose to the game's hand bone (an offset and a
-rotation per side and per first-person skeleton) is a game fact still to
-be measured (§22 item 2). It is a constant per skeleton, not a feel value.
+rotation per side and per first-person skeleton) is a constant per
+skeleton, not a feel value; r9: §3.5 derives it from the skeleton itself.
 
 ### 3.2 Smoothing [proposal]
 
@@ -463,6 +498,45 @@ their velocities and validity, and the head pose of the same prediction)
 through the torn-free hand-over of 04 §5.11 and 12 §3; the job threads read
 a copy the game thread made for the frame (§17), never the render thread's
 live data, so every character job of one frame sees the same hands.
+
+### 3.5 Grip to hand bone [required method, r9; the numbers are proposals]
+
+The hand bone's origin is the wrist; the grip pose's origin is inside the
+closed hand on the handle's axis (§3.1). The offset and rotation between
+them come from the player's skeleton, measured once per skeleton when it
+is first seen (and again when it changes, §2.3), from the local-space
+translations of the hand's finger bones (pose `+0x04`, §2.3), which are in
+the hand bone's own frame and do not change with animation:
+
+- `I`, `M`, `R`, `P`: the local translations of `<Side>HandIndex1`,
+  `<Side>HandMiddle1`, `<Side>HandRing1`, `<Side>HandPinky1` (the
+  knuckles), and `T` of `<Side>HandThumb1`, when each of them has the hand
+  bone as its parent; otherwise the skeleton is unsupported for hands
+  (§4.6, logged once);
+- knuckle line `a = unit(I - P)`: the handle's axis runs across the closed
+  fist from the little finger out past the index finger, the grip pose's
+  -Z (§3.1);
+- forward `f = unit(M)`: from the wrist to the middle knuckle;
+- palm normal `n = unit(f x a)`, its sign chosen so that `n . T > 0` (the
+  thumb is on the palm side), then made orthogonal to `a`;
+- grip origin in the hand bone's frame: the mean of `I`, `M`, `R`, `P`
+  moved 0.025 m along `n` (towards the palm) [proposal: the handle sits
+  under the first finger joints, about half a finger's thickness inside the
+  knuckle line];
+- grip axes in the hand bone's frame: -Z along `a`; +X along `-n` for the
+  left hand (away from the palm) and `+n` for the right (into the palm), as
+  §3.1 states the grip's +X; +Y completes the frame with the handedness of
+  the game's space (the mirror `M` of §3.1).
+
+The hand bone is then placed so that this grip frame coincides with the
+hand's target of §3.1 converted to model space (§2.3, model to world): the
+bone's model rotation is the target rotation times the inverse of the grip
+frame's rotation in the bone, and its origin is the target position minus
+the grip origin rotated by the bone's model rotation. With the game's
+skeletons this puts the wrist about 7 to 12 cm from the grip origin,
+towards the elbow [likely; acceptance item 3 logs both lengths per side].
+No setting adjusts this: the derived frame is the rule, and an error found
+in game is corrected here in the spec.
 
 ## 4. Tracked hands
 
@@ -506,10 +580,17 @@ player character only (§2.2), every frame:
    moved hand **in the same frame**. The game updates equipment before the
    final-pose step (§2.1), so the attachment as the game computes it
    belongs to the pose before the edit; how the result is reached is the
-   implementation's choice (§22 item 3 says where to look).
+   implementation's choice (§22 item 3 says where to look). r9: the
+   attachment reads the hand through `BoneWorldTransform` at 0x3B4E06
+   with selector 6 (§22 item 3); reading the final pose (selector 7) and
+   running the equipment update 0x382710 again for the player after the
+   edit gives the result [likely].
 7. **The game's own limb IK** (0x29ED80) does not move the arm chain away
    from the result while tracked hands are active (§22 item 4 says where
-   to look).
+   to look). r9: for the player's first-person skeleton (`FEMALEFP`,
+   `SPACESUITFP`, matched by the skeleton's name, §2.3) it is not run at
+   all while tracked hands are active; for every other character and with
+   hands off it runs as in v1.
 8. **Other characters** are never edited.
 9. **Model-space consistency.** After the edit the pose's local and model
    transforms agree (the flags of §2.3 are left so the game recomputes what
@@ -1420,6 +1501,10 @@ every row. Names are spec labels.
 | `FinalPoseThunk` | 0x2A55E0 | ? | function | `8b 4c 24 04 81 c1 f0 03 00 00 e9 51 fa ff ff`; its address is pushed at 0x2A5655 (`68 e0 55 6a 00`) | 2.3 |
 | game limb IK | 0x29ED80 | ? | function | `55 8b ec 83 e4 f0`; `stdcall`, `ret 0x10` | 2.3 |
 | pose model-space getter | 0x7B9E80 | ? | function | shows the pose layout | 2.3 |
+| `BoneWorldTransform` | 0x2A2FB0 | ? | function | `55 8b ec 83 e4 f0 83 ec 54`; `thiscall` on component, (bone, selector, out*), `ret 0xc`; model-to-world at component +0x270 / +0x280 / +0x290 | 2.3 |
+| held item attachment query | 0x3B4E06 | ? | call site | `e8 a5 e1 ee ff` (to 0x2A2FB0); selector pushed at 0x3B4DFD `6a 06` | 4.2, 22 |
+| CCD solver construct / solve | 0x7C1DA0 / 0x7C1DD0 | ? | functions | `f3 0f 10 44 24 08 8b c1` / `55 8b ec 83 e4 f0 81 ec d4 00 00 00` | 2.3 |
+| two-joint solve | 0x7C2630 | ? | function | `55 8b ec 83 e4 f0 a1 30 61 be 01` | 2.3 |
 | `CameraPosition` / `CameraForward` | 0x0295B0 / 0x0295D0 | ? | functions | camera +0x3C / quaternion +0x2C | 2.4 |
 | `AimRayUpdate` | 0x382210 | ? | function | `55 8b ec 83 e4 f0 83 ec 54` | 2.5 |
 | aim ray call | 0x3CD410 | ? | call site | `e8 fb 4d fb ff` | 2.5 |
@@ -1445,7 +1530,11 @@ where a VRB line is needed.
    Repeat in a space-suit section (`SPACESUITFP`).
 3. Hands on, looking straight ahead with both hands held out: the VRB line
    shows each hand's world target within 5 mm of the hand bone's reached
-   position (§4.2 item 1). Turning the head leaves the in-game hands where the real
+   position (§4.2 item 1). r9: once per skeleton the log gives the grip
+   frame of §3.5 per side (the wrist to grip distance, expected 7 to 12 cm)
+   and the `Head` bone's world position from `BoneWorldTransform`'s
+   transform next to the active camera's position (expected within
+   0.25 m, which confirms the model-to-world record and selector 7). Turning the head leaves the in-game hands where the real
    hands are. Snap turn and recenter do not detach them.
 4. Reach above the head, behind the back and across the chest: the arms
    follow without the elbow flipping; out of reach, the arm is straight
@@ -1502,19 +1591,18 @@ where a VRB line is needed.
 
 1. **Stage order and threads** (§2.1): confirm the execution order and that
    the final-pose step runs on job threads (acceptance 1).
-2. **Grip to hand-bone mapping** per first-person skeleton: the axes of
-   `LeftHand` / `RightHand` in model space and the offset from the grip
-   point to the bone origin. To find: the skeletons' bind poses (the
-   skeleton files under `DATA\ANIM_SYS\SKELE` in `ANIMATION.PAK`, or the
-   pose read in game with no animation layer), then fit the palm centre to
-   the OpenXR grip definition (§3.1).
-3. **Held item after the edit** (§4.2 item 6): how the game places a held
-   item on the hand bone, and from which pose. Look at the equipment update
-   0x382710 and the bone transform query 0x2A2FB0 (`thiscall` on the
-   animation component, bone, space, out).
-4. **The game's limb IK** (0x29ED80): which limbs its four call sites
-   serve, and when in the frame they run relative to `FinalPoseStep`
-   (§4.2 item 7).
+2. **Grip to hand-bone mapping**: r9: derived per skeleton at run time
+   from the hand's finger bones (§3.5); acceptance item 3 confirms the
+   result and the wrist distance.
+3. **Held item after the edit** (§4.2 item 6): r9: the attachment query
+   is `BoneWorldTransform` at 0x3B4E06 with selector 6 (§2.3); that
+   selector 7 is the edited pose and that a second equipment update after
+   the edit carries the item along are [likely], confirmed by acceptance
+   item 5 (the weapon stays in the hand while the hand moves fast).
+4. **The game's limb IK** (0x29ED80): r9: not run for the player's
+   first-person skeleton while tracked hands are active (§4.2 item 7);
+   which limbs its four call sites serve stays open and no longer blocks
+   anything.
 5. **Weapon transform**: where the drawn weapon's muzzle and barrel axis
    can be read (a candidate is the function at 0x3A07D0 on the weapon; its
    meaning is not verified).
@@ -1566,9 +1654,8 @@ where a VRB line is needed.
     drive the character's right hand (crossing arms) or be unsupported.
 22. (Resolved in r2: seated and standing play and the calibration are
     22's, §11.4.)
-23. **Game IK solvers**: whether the game contains general IK solvers
-    (for example in the animation library around the model-space getter
-    0x7B9E80) usable for §4.2; to be identified.
+23. **Game IK solvers**: r9: CCD and two-joint solvers at 0x7C1DA0,
+    0x7C1DD0 and 0x7C2630 (§2.3) [likely]; using them is optional.
 24. **Screens framed for a fixed eye point** (§11.2): which interaction
     kinds of 11 §5.3 show a screen the game composes for the body's own
     eye point. To resolve: with `Body.EyeForward` at +0.2, use each kind
