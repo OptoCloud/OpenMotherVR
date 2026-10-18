@@ -2,6 +2,7 @@
 #include "core/ui/play_state.h"
 
 #include "game/constants.h"
+#include "util/text/ascii.h"
 
 #include <array>
 #include <cstddef>
@@ -56,33 +57,16 @@ constexpr std::array kLevels{
 constexpr std::string_view kProduction = "env\\production\\";
 constexpr std::string_view kDlc        = "dlc\\";
 
-char fold(char c) noexcept {
-    if (c == '/') return '\\';
-    return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
-}
-
-bool equal_folded(std::string_view a, std::string_view b) noexcept {
-    if (a.size() != b.size()) return false;
-    for (std::size_t i = 0; i < a.size(); ++i)
-        if (fold(a[i]) != fold(b[i])) return false;
-    return true;
-}
-
-// Position of `needle` (lower case, backslashes) in `hay`, or npos.
-std::size_t find_folded(std::string_view hay, std::string_view needle) noexcept {
-    if (needle.size() > hay.size()) return std::string_view::npos;
-    for (std::size_t i = 0; i + needle.size() <= hay.size(); ++i)
-        if (equal_folded(hay.substr(i, needle.size()), needle)) return i;
-    return std::string_view::npos;
-}
+// ASCII case and both path separators folded.
+char fold(char c) noexcept { return c == '/' ? '\\' : util::ascii_lower(c); }
 
 } // namespace
 
 std::string_view level_folder(std::string_view path) noexcept {
-    const std::size_t at = find_folded(path, kProduction);
+    const std::size_t at = util::find_folded(path, kProduction, fold);
     if (at == std::string_view::npos) return {};
     std::string_view rest = path.substr(at + kProduction.size());
-    if (rest.size() > kDlc.size() && equal_folded(rest.substr(0, kDlc.size()), kDlc))
+    if (rest.size() > kDlc.size() && util::equals_folded(rest.substr(0, kDlc.size()), kDlc, fold))
         rest.remove_prefix(kDlc.size());
     const std::size_t end = rest.find_first_of("\\/");
     if (end == 0 || end == std::string_view::npos) return {}; // a file, not a folder
@@ -93,7 +77,7 @@ std::span<const Level> levels() noexcept { return kLevels; }
 
 int find_level(std::string_view folder) noexcept {
     for (std::size_t i = 0; i < kLevels.size(); ++i)
-        if (equal_folded(kLevels[i].folder, folder)) return static_cast<int>(i);
+        if (util::equals_folded(kLevels[i].folder, folder, fold)) return static_cast<int>(i);
     return -1;
 }
 

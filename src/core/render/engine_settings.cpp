@@ -7,6 +7,7 @@
 
 #include "core/diag/log_format.h"
 #include "core/render/tuning.h"
+#include "util/text/ascii.h"
 
 #include <algorithm>
 #include <charconv>
@@ -414,14 +415,9 @@ EngineSettingsEdit add_engine_options(std::string_view xml, std::span<const Engi
 
 bool names_engine_settings(std::string_view opened, std::string_view game_path) noexcept {
     if (game_path.empty() || opened.size() < game_path.size()) return false;
-    const auto fold = [](char c) noexcept {
-        if (c == '/') return '\\';
-        return (c >= 'a' && c <= 'z') ? static_cast<char>(c - 'a' + 'A') : c;
-    };
+    const auto fold        = [](char c) noexcept { return c == '/' ? '\\' : util::ascii_lower(c); };
     const std::size_t tail = opened.size() - game_path.size();
-    for (std::size_t i = 0; i < game_path.size(); ++i) {
-        if (fold(opened[tail + i]) != fold(game_path[i])) return false;
-    }
+    if (!util::equals_folded(opened.substr(tail), game_path, fold)) return false;
     return tail == 0 || fold(opened[tail - 1]) == '\\';
 }
 

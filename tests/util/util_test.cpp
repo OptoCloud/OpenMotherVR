@@ -113,6 +113,17 @@ TEST_CASE("ASCII case-insensitive compare") {
     CHECK(util::ascii_lower(L'É') == L'É'); // only ASCII letters fold
 }
 
+TEST_CASE("ASCII case-insensitive and folded search") {
+    CHECK(util::find_ignoring_ascii_case("vr probe: OpenXR Failed", "failed") == 17);
+    CHECK(util::contains_ignoring_ascii_case("Cannot open", "cannot"));
+    CHECK_FALSE(util::contains_ignoring_ascii_case("fai", "fail"));
+    CHECK(util::find_ignoring_ascii_case("abc", "") == 0);
+    const auto slash = [](char c) { return c == '/' ? '\\' : util::ascii_lower(c); };
+    CHECK(util::find_folded("DATA/ENV/Production/x", "env\\production\\", slash) == 5);
+    CHECK(util::equals_folded("A/b", "a\\B", slash));
+    CHECK_FALSE(util::equals_folded("ab", "abc", slash));
+}
+
 TEST_CASE("Reader reads little-endian values and stops at the end") {
     const std::vector<std::byte> data = {std::byte{0x78}, std::byte{0x56}, std::byte{0x34}, std::byte{0x12},
                                          std::byte{0xAB}};

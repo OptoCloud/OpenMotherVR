@@ -2,6 +2,7 @@
 #include "core/diag/flush_policy.h"
 
 #include "core/diag/tuning.h"
+#include "util/text/ascii.h"
 
 #include <array>
 #include <cstddef>
@@ -20,27 +21,11 @@ constexpr std::array<std::string_view, 17> kProblemWords = {
     "ignored",   "not patched", "not detoured", "not redirected", "without vr",
 };
 
-char lower(char c) noexcept { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; }
-
-// `word` (lower case) appears in `text` at `at`, ignoring case.
-bool matches_at(std::string_view text, std::size_t at, std::string_view word) noexcept {
-    for (std::size_t i = 0; i < word.size(); ++i)
-        if (lower(text[at + i]) != word[i]) return false;
-    return true;
-}
-
-bool contains_word(std::string_view text, std::string_view word) noexcept {
-    if (word.size() > text.size()) return false;
-    for (std::size_t at = 0; at + word.size() <= text.size(); ++at)
-        if (matches_at(text, at, word)) return true;
-    return false;
-}
-
 } // namespace
 
 bool is_problem_line(std::string_view line) noexcept {
     for (const std::string_view word : kProblemWords)
-        if (contains_word(line, word)) return true;
+        if (util::contains_ignoring_ascii_case(line, word)) return true;
     return false;
 }
 
