@@ -11,6 +11,7 @@
 #include "core/input/gestures.h"
 #include "core/input/glyphs.h"
 #include "core/input/virtual_pad.h"
+#include "core/input_rig.h"
 #include "fakes/fakes.h"
 #include "game/constants.h"
 
@@ -27,22 +28,9 @@ using namespace omvr::core::input;
 namespace game = omvr::game;
 namespace pa   = omvr::game::player_action;
 using namespace std::chrono_literals;
-using omvr::tests::FakeClock;
-using omvr::tests::RecordingLog;
 
 constexpr float kQuarterTurn = std::numbers::pi_v<float> / 2.0f;
 const TimePoint kT0{std::chrono::seconds(100)};
-
-class FakeContext final : public ports::GestureContext {
-public:
-    ports::GameContext game_context() const noexcept override { return state; }
-    ports::GameContext state;
-};
-
-class FreeStick final : public ports::StickContext {
-public:
-    bool stick_free() const noexcept override { return false; }
-};
 
 // A standing player facing -Z with the head at 1.6 m, focused.
 BodyPoses standing() {
@@ -380,21 +368,7 @@ TEST_CASE("hold breath: a hand within 12 cm of the mouth, released beyond 18 cm"
 
 namespace {
 
-struct Rig {
-    Glyphs glyphs;
-    RecordingLog log;
-    VirtualPad pad{glyphs, log};
-    ControlSchemes schemes{glyphs};
-    omvr::core::config::InputSettings input;
-    omvr::core::config::ControlsSettings controls;
-    FreeStick stick;
-    FakeClock clock;
-    FakeContext context;
-    Gestures gestures{{controls, context, log}};
-    ControlMapper mapper{{pad, schemes, input, controls, stick, clock, log, &gestures}};
-
-    const ActionTier& player() { return pad.tiers()[game::kPlayerMap]; }
-
+struct Rig : omvr::tests::MapperRig {
     // Writes `c` after the focus gate has opened.
     void settle(const Controls& c) {
         mapper.write(c, false);

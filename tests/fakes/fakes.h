@@ -8,6 +8,8 @@
 #include "core/diag/ports/clock.h"
 #include "core/diag/ports/log.h"
 #include "core/diag/ports/log_sink.h"
+#include "core/input/ports/gesture_context.h"
+#include "core/input/ports/stick_context.h"
 #include "core/ui/ports/archive_files.h"
 #include "core/ui/ports/game_signals.h"
 #include "core/ui/ports/play_space_control.h"
@@ -39,6 +41,21 @@ public:
 private:
     std::chrono::steady_clock::time_point now_{std::chrono::seconds(10)};
     core::diag::ports::LocalTime local_{};
+};
+
+// Whether the left stick is free for the d-pad (a menu, an interaction), as
+// the test sets it; by default it walks the player.
+class SettableStick final : public core::input::ports::StickContext {
+public:
+    bool stick_free() const noexcept override { return free; }
+    bool free = false;
+};
+
+// What the game is doing for the gestures, as the test sets it.
+class FakeGestureContext final : public core::input::ports::GestureContext {
+public:
+    core::input::ports::GameContext game_context() const noexcept override { return state; }
+    core::input::ports::GameContext state;
 };
 
 // A log that keeps every line.

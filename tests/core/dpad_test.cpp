@@ -11,6 +11,7 @@
 #include "core/input/dpad_emulation.h"
 #include "core/input/glyphs.h"
 #include "core/input/virtual_pad.h"
+#include "core/input_rig.h"
 #include "fakes/fakes.h"
 #include "game/constants.h"
 
@@ -24,8 +25,6 @@ namespace {
 using namespace omvr::core::input;
 namespace game = omvr::game;
 using namespace std::chrono_literals;
-using omvr::tests::FakeClock;
-using omvr::tests::RecordingLog;
 
 constexpr Dpad kUp{.up = true};
 constexpr Dpad kDown{.down = true};
@@ -33,20 +32,10 @@ constexpr Dpad kLeft{.left = true};
 constexpr Dpad kRight{.right = true};
 constexpr Dpad kNone{};
 
-class SwitchStick final : public ports::StickContext {
-public:
-    bool stick_free() const noexcept override { return free; }
-    bool free = false;
-};
-
 // A pad whose maps put d-pad directions where the game's defaults do (22
 // §2.2): map 0 prev / next main weapon on left / right, map 1 up / down /
 // left / right on the d-pad; and one map 2 action on DPAD_UP.
-struct DpadPad {
-    Glyphs glyphs;
-    RecordingLog log;
-    VirtualPad pad{glyphs, log};
-
+struct DpadPad : omvr::tests::MapperRig {
     static constexpr int kPrevMainWeapon = 0x1A;
     static constexpr int kNextMainWeapon = 0x1B;
     static constexpr int kMenuUp         = 2;
@@ -195,62 +184,50 @@ TEST_CASE("the pad drives every map 0 and 1 action on a pressed d-pad direction 
 
 TEST_CASE("the control mapper hands the d-pad to the pad and frees the stick (22 §7)") {
     DpadPad p;
-    ControlSchemes schemes(p.glyphs);
-    omvr::core::config::InputSettings input;
-    omvr::core::config::ControlsSettings controls;
-    SwitchStick stick;
-    FakeClock clock;
-    ControlMapper mapper({p.pad, schemes, input, controls, stick, clock, p.log});
     const ActionTier& menu = p.pad.tiers()[game::kMenuMap];
     namespace ma           = game::menu_action;
 
     Controls c;
-    c.move     = {0.0f, 0.9f};
-    stick.free = true; // a menu on the virtual screen
+    c.move       = {0.0f, 0.9f};
+    p.stick.free = true; // a menu on the virtual screen
 
     // Key off: v1, the stick moves the menu's analog and presses no d-pad.
-    mapper.write(c, false);
+    p.mapper.write(c, false);
     CHECK(menu.analog[ma::kMoveY] == doctest::Approx(0.9f));
     CHECK_FALSE(p.down(1, DpadPad::kMenuUp));
 
     // Key on: the d-pad press, and the stick's movement value is 0.
-    controls.dpad_emulation = true;
-    mapper.write(c, false);
+    p.controls.dpad_emulation = true;
+    p.mapper.write(c, false);
     CHECK(p.down(1, DpadPad::kMenuUp));
     CHECK(menu.analog[ma::kMoveY] == 0.0f);
 
     // A controller's own d-pad presses whatever the key.
-    controls.dpad_emulation = false;
+    p.controls.dpad_emulation = false;
     Controls own;
     own.dpad = kDown;
     (void)p.pad.on_activity(false, PlayerDevices::NoManager); // clear earlier activity
-    mapper.write(own, false);
+    p.mapper.write(own, false);
     CHECK(p.down(1, DpadPad::kMenuDown));
     CHECK(p.pad.on_activity(false, PlayerDevices::NoManager).any); // VR activity (04 §5.1)
-    mapper.write(Controls{}, false);
+    p.mapper.write(Controls{}, false);
     CHECK_FALSE(p.down(1, DpadPad::kMenuDown));
 }
 
 TEST_CASE("the control mapper: the held modifier is not sprint, its stick does not walk (22 §7)") {
     DpadPad p;
-    ControlSchemes schemes(p.glyphs);
-    omvr::core::config::InputSettings input;
-    omvr::core::config::ControlsSettings controls;
-    controls.dpad_emulation = true;
-    SwitchStick stick;
-    FakeClock clock;
-    ControlMapper mapper({p.pad, schemes, input, controls, stick, clock, p.log});
-    const ActionTier& player = p.pad.tiers()[game::kPlayerMap];
-    namespace pa             = game::player_action;
+    p.controls.dpad_emulation = true;
+    const ActionTier& player  = p.pad.tiers()[game::kPlayerMap];
+    namespace pa              = game::player_action;
 
     Controls c;
     c.sprint = true;
     c.move   = {-0.9f, 0.0f};
-    mapper.write(c, false);
+    p.mapper.write(c, false);
     CHECK(player.digital[pa::kSprint] == 1); // not held long enough yet
     CHECK(player.analog[pa::kMoveX] == doctest::Approx(-0.9f));
-    clock.advance(300ms);
-    mapper.write(c, false);
+    p.clock.advance(300ms);
+    p.mapper.write(c, false);
     CHECK(player.digital[pa::kSprint] == 0);
     CHECK(player.analog[pa::kMoveX] == 0.0f);
     CHECK(p.down(0, DpadPad::kPrevMainWeapon));
@@ -268,18 +245,12 @@ TEST_CASE("the thumbstick scheme passes a controller's d-pad on") {
 TEST_CASE("the control mapper logs each change of the d-pad with Dev. Debug Options (22 §7)") {
     DpadPad p;
     p.log.debug = true;
-    ControlSchemes schemes(p.glyphs);
-    omvr::core::config::InputSettings input;
-    omvr::core::config::ControlsSettings controls;
-    SwitchStick stick;
-    FakeClock clock;
-    ControlMapper mapper({p.pad, schemes, input, controls, stick, clock, p.log});
 
     Controls c;
     c.dpad = kUp;
-    mapper.write(c, false);
-    mapper.write(c, false); // no change: no line
-    mapper.write(Controls{}, false);
+    p.mapper.write(c, false);
+    p.mapper.write(c, false); // no change: no line
+    p.mapper.write(Controls{}, false);
     CHECK(p.log.lines.size() == 2);
     CHECK(p.log.contains("[input] d-pad up true down false left false right false (emulated false)"));
 }

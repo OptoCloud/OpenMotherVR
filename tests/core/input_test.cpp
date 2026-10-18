@@ -12,6 +12,7 @@
 #include "core/input/interaction_state.h"
 #include "core/input/remap.h"
 #include "core/input/virtual_pad.h"
+#include "core/input_rig.h"
 #include "fakes/fakes.h"
 #include "game/constants.h"
 
@@ -28,12 +29,6 @@ namespace {
 using namespace omvr::core::input;
 namespace game = omvr::game;
 using omvr::tests::RecordingLog;
-
-// The left stick walks the player (no menu, no interaction).
-class FixedStick final : public ports::StickContext {
-public:
-    bool stick_free() const noexcept override { return false; }
-};
 
 TEST_CASE("touchpad regions: down interacts, up reloads, the centre opens the radial") {
     TouchpadRegions r = decode_touchpad({0.0f, -0.8f}, true);
@@ -280,15 +275,7 @@ TEST_CASE("pad activity switches the prompts between VR and stock glyphs") {
 }
 
 TEST_CASE("the control mapper writes the player and menu tiers") {
-    Glyphs glyphs;
-    RecordingLog log;
-    VirtualPad pad(glyphs, log);
-    ControlSchemes schemes(glyphs);
-    omvr::core::config::InputSettings settings;
-    omvr::core::config::ControlsSettings controls;
-    FixedStick stick_context;
-    omvr::tests::FakeClock clock;
-    ControlMapper mapper({pad, schemes, settings, controls, stick_context, clock, log});
+    omvr::tests::MapperRig rig;
 
     Controls c;
     c.trigger_r = 0.9f;
@@ -296,10 +283,10 @@ TEST_CASE("the control mapper writes the player and menu tiers") {
     c.interact  = true;
     c.move      = {0.3f, 0.4f};
     c.turn      = {0.9f, 0.0f};
-    mapper.write(c, false);
+    rig.mapper.write(c, false);
 
-    const ActionTier& player = pad.tiers()[game::kPlayerMap];
-    const ActionTier& menu   = pad.tiers()[game::kMenuMap];
+    const ActionTier& player = rig.pad.tiers()[game::kPlayerMap];
+    const ActionTier& menu   = rig.pad.tiers()[game::kMenuMap];
     namespace pa             = game::player_action;
     namespace ma             = game::menu_action;
     CHECK(player.digital[pa::kFire] == 1);
@@ -312,95 +299,79 @@ TEST_CASE("the control mapper writes the player and menu tiers") {
     CHECK(menu.digital[ma::kConfirm] == 1);
     CHECK(menu.analog[ma::kTriggerR] == doctest::Approx(0.9f));
     // A trigger past kActivityThreshold counts as VR activity.
-    CHECK(pad.on_activity(false, PlayerDevices::NoManager).any);
+    CHECK(rig.pad.on_activity(false, PlayerDevices::NoManager).any);
 
     // Interact near the head is the flashlight.
-    mapper.write(c, true);
+    rig.mapper.write(c, true);
     CHECK(player.digital[pa::kFlashlight] == 1);
 }
 
 TEST_CASE("the control mapper: turn, weapons, move and clamps") {
-    Glyphs glyphs;
-    RecordingLog log;
-    VirtualPad pad(glyphs, log);
-    ControlSchemes schemes(glyphs);
-    omvr::core::config::InputSettings settings;
-    omvr::core::config::ControlsSettings controls;
-    FixedStick stick_context;
-    omvr::tests::FakeClock clock;
-    ControlMapper mapper({pad, schemes, settings, controls, stick_context, clock, log});
-    const ActionTier& player = pad.tiers()[game::kPlayerMap];
+    omvr::tests::MapperRig rig;
+    const ActionTier& player = rig.pad.tiers()[game::kPlayerMap];
     namespace pa             = game::player_action;
 
     Controls pad_turn;
     pad_turn.touchpad_scheme = true;
     pad_turn.turn            = {0.9f, 0.0f};
     pad_turn.turn_engaged    = false;
-    mapper.write(pad_turn, false);
+    rig.mapper.write(pad_turn, false);
     CHECK(player.analog[pa::kTurn] == 0.0f); // snap rotation: a touchpad turn needs a click
     pad_turn.turn_engaged = true;
-    mapper.write(pad_turn, false);
+    rig.mapper.write(pad_turn, false);
     CHECK(player.analog[pa::kTurn] == doctest::Approx(0.9f * kTouchpadTurnScale));
 
     Controls stick;
     stick.turn = {0.0f, 0.8f};
-    mapper.write(stick, false);
+    rig.mapper.write(stick, false);
     CHECK(player.digital[pa::kNextWeapon] == 1);
     CHECK(player.digital[pa::kPrevWeapon] == 0);
     stick.turn = {0.0f, -0.8f};
-    mapper.write(stick, false);
+    rig.mapper.write(stick, false);
     CHECK(player.digital[pa::kPrevWeapon] == 1);
 
     Controls diagonal;
     diagonal.touchpad_scheme = true;
     diagonal.move            = {1.0f, 1.0f};
-    mapper.write(diagonal, false);
+    rig.mapper.write(diagonal, false);
     CHECK(player.analog[pa::kMoveX] == doctest::Approx(std::sqrt(0.5f)));
     CHECK(player.analog[pa::kMoveY] == doctest::Approx(std::sqrt(0.5f)));
 
     Controls wild;
     wild.move      = {std::numeric_limits<float>::quiet_NaN(), 0.0f};
     wild.trigger_l = 1.5f;
-    mapper.write(wild, false);
+    rig.mapper.write(wild, false);
     CHECK(player.analog[pa::kMoveX] == 0.0f);
-    CHECK(pad.tiers()[game::kMenuMap].analog[game::menu_action::kTriggerL] == 1.0f);
+    CHECK(rig.pad.tiers()[game::kMenuMap].analog[game::menu_action::kTriggerL] == 1.0f);
 }
 
 TEST_CASE("the control mapper: grips hold, or toggle") {
-    Glyphs glyphs;
-    RecordingLog log;
-    VirtualPad pad(glyphs, log);
-    ControlSchemes schemes(glyphs);
-    omvr::core::config::InputSettings settings;
-    omvr::core::config::ControlsSettings controls;
-    FixedStick stick_context;
-    omvr::tests::FakeClock clock;
-    ControlMapper mapper({pad, schemes, settings, controls, stick_context, clock, log});
-    const ActionTier& player = pad.tiers()[game::kPlayerMap];
+    omvr::tests::MapperRig rig;
+    const ActionTier& player = rig.pad.tiers()[game::kPlayerMap];
     namespace pa             = game::player_action;
 
     Controls c;
     c.grip_r = true;
     c.grip_l = true;
-    mapper.write(c, false);
+    rig.mapper.write(c, false);
     CHECK(player.digital[pa::kAim] == 1);
     CHECK(player.digital[pa::kTracker] == 1);
     c.radial = true; // the left grip with the radial menu open is not the tracker
-    mapper.write(c, false);
+    rig.mapper.write(c, false);
     CHECK(player.digital[pa::kTracker] == 0);
 
-    settings.toggle_grips = true;
+    rig.input.toggle_grips = true;
     Controls press;
     press.grip_r = true;
-    mapper.write(press, false); // held from before: no edge
+    rig.mapper.write(press, false); // held from before: no edge
     CHECK(player.digital[pa::kAim] == 0);
     Controls release;
-    mapper.write(release, false);
-    mapper.write(press, false); // press: on
+    rig.mapper.write(release, false);
+    rig.mapper.write(press, false); // press: on
     CHECK(player.digital[pa::kAim] == 1);
-    mapper.write(release, false);
+    rig.mapper.write(release, false);
     CHECK(player.digital[pa::kAim] == 1); // stays on
-    mapper.write(press, false);           // press again: off
+    rig.mapper.write(press, false);       // press again: off
     CHECK(player.digital[pa::kAim] == 0);
 }
 
