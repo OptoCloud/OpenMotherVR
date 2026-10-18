@@ -2,11 +2,10 @@
 #include "platform/openvr/runtime_probe.h"
 
 #include "platform/openvr/constants.h"
+#include "platform/win32/environment.h"
 #include "platform/win32/text.h"
 
 #include <nlohmann/json.hpp>
-
-#include <windows.h>
 
 #include <filesystem>
 #include <fstream>
@@ -32,21 +31,10 @@ constexpr const char* kWhyNotParsed = "openvrpaths.vrpath is not parseable";
 constexpr const char* kWhyNoRuntime = "openvrpaths.vrpath has no runtime entry";
 constexpr const char* kWhyNotRead   = "openvrpaths.vrpath could not be read";
 
-// %LOCALAPPDATA%, or empty when it is not set.
-std::wstring local_app_data() {
-    DWORD n = ::GetEnvironmentVariableW(kLocalAppDataVariable, nullptr, 0);
-    if (n == 0) return {};
-    std::wstring value(n, L'\0');
-    n = ::GetEnvironmentVariableW(kLocalAppDataVariable, value.data(), static_cast<DWORD>(value.size()));
-    if (n == 0) return {};
-    value.resize(n);
-    return value;
-}
-
 // %LOCALAPPDATA%\openvr\openvrpaths.vrpath; the canonical OpenVR runtime
 // registry.
 std::filesystem::path openvr_paths_file() {
-    const std::wstring base = local_app_data();
+    const std::wstring base = win32::environment_variable(kLocalAppDataVariable).value_or(std::wstring{});
     if (base.empty()) return {};
     return std::filesystem::path{base} / kPathsDirectory / kPathsFileName;
 }
