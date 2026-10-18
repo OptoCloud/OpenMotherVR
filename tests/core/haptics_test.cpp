@@ -17,6 +17,7 @@
 namespace {
 
 using namespace omvr::core::hands;
+using omvr::core::input::Interaction;
 using omvr::core::vr::ports::HapticFrame;
 using omvr::game::WeaponType;
 using namespace std::chrono_literals;
@@ -177,19 +178,32 @@ TEST_CASE("haptics: the flamethrower pulses 0.3 again as each pulse ends while h
 
 TEST_CASE("haptics: hacking pulses both hands at its start and at its end") {
     Rig r;
-    r.haptics.on_interaction(true);
+    r.haptics.on_interaction(Interaction::Hacking);
     auto f = r.frame();
     check_pulse(f[0], 0.4f, 0.08f);
     check_pulse(f[1], 0.4f, 0.08f);
     r.clock.advance(100ms);
-    r.haptics.on_interaction(true); // unchanged
+    r.haptics.on_interaction(Interaction::Hacking); // unchanged
     check_silent(r.frame()[0]);
-    r.haptics.on_interaction(false);
+    r.haptics.on_interaction(Interaction::None);
     check_pulse(r.frame()[0], 0.4f, 0.08f);
     r.clock.advance(100ms);
     r.settings.hacking = false;
-    r.haptics.on_interaction(true);
+    r.haptics.on_interaction(Interaction::Hacking);
     check_silent(r.frame()[0]);
+}
+
+TEST_CASE("haptics: cutting pulses as hacking does; other interactions do not") {
+    Rig r;
+    r.haptics.on_interaction(Interaction::Keypad);
+    check_silent(r.frame()[0]);
+    r.haptics.on_interaction(Interaction::Cutting);
+    check_pulse(r.frame()[1], 0.4f, 0.08f);
+    r.clock.advance(100ms);
+    r.haptics.on_interaction(Interaction::Hacking); // still hacking or cutting
+    check_silent(r.frame()[1]);
+    r.haptics.on_interaction(Interaction::Generic); // the cut ended back to generic
+    check_pulse(r.frame()[1], 0.4f, 0.08f);
 }
 
 TEST_CASE("haptics: the game's rumble is renewed each frame, low motor left, high motor right") {
@@ -227,7 +241,7 @@ TEST_CASE("haptics: a rumble level not set again for 0.5 s ends; GameRumble off 
 TEST_CASE("haptics: rumble and a pulse together play the larger; the pulse resumes when rumble ends") {
     Rig r;
     r.haptics.on_rumble(0.2f, 0.2f, r.now());
-    r.haptics.on_interaction(true);
+    r.haptics.on_interaction(Interaction::Hacking);
     check_pulse(r.frame()[0], 0.4f, kRumbleRenewal.count());
     r.clock.advance(20ms);
     r.haptics.on_rumble(0.0f, 0.0f, r.now());
@@ -240,7 +254,7 @@ TEST_CASE("haptics: nothing without input focus or for a lost hand, and nothing 
     Rig r;
     r.haptics.on_rumble(0.5f, 0.5f, r.now());
     CHECK(r.frame()[0].play);
-    r.haptics.on_interaction(true);
+    r.haptics.on_interaction(Interaction::Hacking);
     auto f = r.frame(false);
     check_silent(f[0]);
     check_silent(f[1]);
@@ -253,7 +267,7 @@ TEST_CASE("haptics: nothing without input focus or for a lost hand, and nothing 
     check_silent(f[0]); // the hacking pulse came without focus: not played late
     CHECK_FALSE(f[0].stop);
 
-    r.haptics.on_interaction(false);
+    r.haptics.on_interaction(Interaction::None);
     f = r.frame(true, {false, true});
     check_silent(f[0]);
     check_pulse(f[1], 0.4f, 0.08f);

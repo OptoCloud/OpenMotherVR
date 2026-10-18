@@ -135,11 +135,8 @@ void haptics_on_head_pose() noexcept {
 
 void haptics_on_interaction() noexcept {
     if (!installed) return;
-    auto& ctx       = context();
-    const auto kind = ctx.interactions.interaction();
-    ctx.haptics.on_interaction(
-        ctx.interactions.in_interaction() &&
-        (kind == core::input::Interaction::Hacking || kind == core::input::Interaction::Cutting));
+    auto& ctx = context();
+    ctx.haptics.on_interaction(ctx.interactions.interaction());
 }
 
 void haptics_on_tracker_scan() noexcept {

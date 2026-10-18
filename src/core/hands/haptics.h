@@ -6,6 +6,7 @@
 #include "core/diag/ports/log.h"
 #include "core/hands/tuning.h"
 #include "core/hands/types.h"
+#include "core/input/interaction_state.h"
 #include "core/vr/ports/haptic_source.h"
 #include "game/constants.h"
 
@@ -57,10 +58,10 @@ public:
     // held (Hands.Haptics.Firing).
     void on_fire(const FireSample& fire, TimePoint now) noexcept;
 
-    // Game thread (the script event tap): whether a hacking or cutting
-    // interaction is in progress; its start and its end pulse
+    // Game thread (the script event tap): the interaction in progress
+    // (None: none); the start and the end of hacking or cutting pulse
     // (Hands.Haptics.Hacking).
-    void on_interaction(bool hacking_or_cutting) noexcept;
+    void on_interaction(input::Interaction kind) noexcept;
 
     // The tracker scan's thread: a scan ran; `raised` is the tracker held up
     // (Hands.Haptics.Tracker).

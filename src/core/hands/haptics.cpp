@@ -97,7 +97,9 @@ void Haptics::on_fire(const FireSample& fire, TimePoint now) noexcept {
     if (pressed_now) emit(HapticEvent::Firing, {kFiringAmplitude, kFiringDuration});
 }
 
-void Haptics::on_interaction(bool hacking_or_cutting) noexcept {
+void Haptics::on_interaction(input::Interaction kind) noexcept {
+    const bool hacking_or_cutting =
+        kind == input::Interaction::Hacking || kind == input::Interaction::Cutting;
     if (std::exchange(hacking_, hacking_or_cutting) == hacking_or_cutting || !settings_.hacking) return;
     emit(HapticEvent::Hacking, {kHackingAmplitude, kHackingDuration});
 }
