@@ -2,6 +2,7 @@
 
 #include "game/game_image.h"
 #include "game/patcher.h"
+#include "game/stereo/mode_stack.h"
 #include "game/sites/ui_set.h"
 #include "game/x86.h"
 
@@ -139,6 +140,14 @@ inline constexpr std::array kGameSideCalls = {
 // originals are saved into `originals` before their slots are replaced.
 bool install_game_side_hooks(const GameImage& g, Patcher& patcher, const GameSideReplacements& r,
                              GameSideOriginals& originals) noexcept;
+
+// 8: the game's mode-stack append, so the stereo update can raise the stack
+// count through the game's allocator (05 §4.4). Nothing is written to the
+// game; on a build without the address, or other code at its call, the
+// update keeps to the storage the stack already has.
+// The append found goes to `out`.
+void find_mode_stack_append(const GameImage& g, core::diag::ports::Log& log,
+                            stereo::ModeStackTargets& out) noexcept;
 
 // 9: camera, UI and loader byte patches. `head_clip_threshold` is the
 // threshold the game's head-in-wall check is pointed at.

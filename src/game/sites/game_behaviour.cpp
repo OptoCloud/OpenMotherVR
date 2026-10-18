@@ -3,19 +3,30 @@
 
 #include "game/sites/game_behaviour.h"
 
+#include "game/addresses.h"
 #include "game/code_address.h"
+#include "game/layout.h"
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 
 namespace omvr::game::sites {
 
 namespace {
 
 constexpr std::string_view kBytePatchesLog = "[hook] camera, UI and loader patches applied";
+constexpr std::string_view kNoAppendLog =
+    "[hook] mode stack: this build has no address for the game's "
+    "append; the count is raised only into existing storage";
+constexpr std::string_view kAppendCodeLog =
+    "[hook] mode stack: StereoModeStackAppend's call (RVA {:08X}) is not the expected code; the count is "
+    "raised only into existing storage";
+constexpr std::string_view kAppendFoundLog =
+    "[hook] mode stack: count raised through the game's append (RVA {:08X})";
 
 // ---- 9: the bytes written (05 §7) --------------------------------------------
 
@@ -71,6 +82,14 @@ std::array<std::uint8_t, 1> ui_reference_disp(std::uint8_t back_buffer_disp_lo) 
     return {static_cast<std::uint8_t>(back_buffer_disp_lo + kUiReferenceSizeOffset)};
 }
 
+// 05 §4.4: `lea ecx, [ebx+0x68]`, the manager's mode stack, before the
+// append's call.
+constexpr std::uint8_t kModRmEcxEbxDisp8 =
+    x86::modrm(x86::kModDisp8, std::to_underlying(x86::Reg::Ecx), std::to_underlying(x86::Reg::Ebx));
+static_assert(kModRmEcxEbxDisp8 == 0x4B);
+constexpr std::array<std::uint8_t, 3> kLeaEcxModeStack = {
+    x86::kLea, kModRmEcxEbxDisp8, static_cast<std::uint8_t>(offsetof(StereoManager, stack_data))};
+
 // ---- 8: vtable slots and calls -------------------------------------------------
 
 GameSideOriginals save_originals(const GameImage& g) noexcept {
@@ -102,6 +121,23 @@ bool install_game_side_hooks(const GameImage& g, Patcher& patcher, const GameSid
     // Save the game's methods before their slots are replaced.
     originals = save_originals(g);
     return replace_slots(g, patcher, r) && redirect_calls(g, patcher, r);
+}
+
+void find_mode_stack_append(const GameImage& g, core::diag::ports::Log& log,
+                            stereo::ModeStackTargets& out) noexcept {
+    const ReconRvas& r = kReconRvas[g.version];
+    if (r.mode_stack_append == 0) {
+        log.line(kNoAppendLog);
+        return;
+    }
+    const std::uint8_t* site = g.at_rva(r.mode_stack_append_call);
+    if (!x86::matches(site - kLeaEcxModeStack.size(), kLeaEcxModeStack) ||
+        !calls(site, g.at_rva(r.mode_stack_append))) {
+        core::diag::ports::logf(log, kAppendCodeLog, r.mode_stack_append_call);
+        return;
+    }
+    out.append = g.at_rva(r.mode_stack_append);
+    core::diag::ports::logf(log, kAppendFoundLog, r.mode_stack_append);
 }
 
 bool apply_byte_patches(const GameImage& g, Patcher& p, const float* head_clip_threshold) noexcept {

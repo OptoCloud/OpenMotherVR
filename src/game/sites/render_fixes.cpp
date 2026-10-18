@@ -8,18 +8,15 @@
 
 #include "game/addresses.h"
 #include "game/code_address.h"
-#include "game/layout.h"
 #include "game/sites/area_log.h"
 #include "game/stereo/cull.h"
 #include "game/stereo/head_clip.h"
-#include "game/stereo/mode_stack.h"
 #include "game/stereo/postfx.h"
 #include "game/x86.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <utility>
 
 namespace omvr::game::sites {
 
@@ -55,16 +52,6 @@ constexpr std::string_view kEventTapLog =
     "[hook] {}: off; ScriptEventTap (RVA {:08X}) does not hold the expected no-op or could not be detoured";
 constexpr std::string_view kAlphaLightCallLog =
     "[hook] {}: off; AlphaLightNdcCall (RVA {:08X}) is not the expected call";
-constexpr std::string_view kNoAppendLog =
-    "[hook] mode stack: this build has no address for the game's append; the count is raised only into "
-    "existing "
-    "storage";
-constexpr std::string_view kAppendCodeLog =
-    "[hook] mode stack: StereoModeStackAppend's call (RVA {:08X}) is not the expected code; the count is "
-    "raised "
-    "only into existing storage";
-constexpr std::string_view kAppendFoundLog =
-    "[hook] mode stack: count raised through the game's append (RVA {:08X})";
 
 // ---- The code the fixes expect --------------------------------------------------
 
@@ -80,14 +67,6 @@ constexpr auto kAaPassPrologue = x86::kAlignedFramePrologue;
 // no phase check.
 constexpr std::array<std::uint8_t, 10> kOcclusionArgs = {0x8B, 0x46, 0x5C, 0x85, 0xC0,
                                                          0x74, 0x0F, 0x50, 0x56, 0x53};
-
-// 05 §4.4: `lea ecx, [ebx+0x68]`, the manager's mode stack, before the
-// append's call.
-constexpr std::uint8_t kModRmEcxEbxDisp8 =
-    x86::modrm(x86::kModDisp8, std::to_underlying(x86::Reg::Ecx), std::to_underlying(x86::Reg::Ebx));
-static_assert(kModRmEcxEbxDisp8 == 0x4B);
-constexpr std::array<std::uint8_t, 3> kLeaEcxModeStack = {
-    x86::kLea, kModRmEcxEbxDisp8, static_cast<std::uint8_t>(offsetof(StereoManager, stack_data))};
 
 bool postfx_getter_is_expected(const std::uint8_t* getter) noexcept {
     return getter[0] == x86::kMovEaxImm32 && getter[kGetterRetOffset] == x86::kRet;
@@ -218,22 +197,6 @@ void fix_if_known(std::uint32_t rva, std::string_view area, Fix fix, const GameI
 }
 
 } // namespace
-
-void find_mode_stack_append(const GameImage& g, ports::Log& log, stereo::ModeStackTargets& out) noexcept {
-    const ReconRvas& r = kReconRvas[g.version];
-    if (r.mode_stack_append == 0) {
-        log.line(kNoAppendLog);
-        return;
-    }
-    const std::uint8_t* site = g.at_rva(r.mode_stack_append_call);
-    if (!x86::matches(site - kLeaEcxModeStack.size(), kLeaEcxModeStack) ||
-        !calls(site, g.at_rva(r.mode_stack_append))) {
-        ports::logf(log, kAppendCodeLog, r.mode_stack_append_call);
-        return;
-    }
-    out.append = g.at_rva(r.mode_stack_append);
-    ports::logf(log, kAppendFoundLog, r.mode_stack_append);
-}
 
 void install_render_fixes(const GameImage& g, Patcher& p, const RenderFixHooks& hooks) noexcept {
     const ReconRvas& r = kReconRvas[g.version];

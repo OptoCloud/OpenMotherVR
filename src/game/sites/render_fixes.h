@@ -8,7 +8,6 @@
 #include "game/stereo/alpha_light.h"
 #include "game/stereo/cull.h"
 #include "game/stereo/head_clip.h"
-#include "game/stereo/mode_stack.h"
 #include "game/stereo/postfx.h"
 #include "game/stereo/pov.h"
 
@@ -23,14 +22,6 @@ inline constexpr std::string_view kCullingArea     = "culling";
 inline constexpr std::string_view kHeadClipArea    = "head-in-wall delay";
 inline constexpr std::string_view kEventTapArea    = "event tap";
 inline constexpr std::string_view kAlphaLightArea  = "particle lighting";
-
-// 8: the game's mode-stack append, so the stereo update can raise the stack
-// count through the game's allocator (05 §4.4). Nothing is written to the
-// game; on a build without the address, or other code at its call, the
-// update keeps to the storage the stack already has.
-// The append found goes to `out`.
-void find_mode_stack_append(const GameImage& g, core::diag::ports::Log& log,
-                            stereo::ModeStackTargets& out) noexcept;
 
 // The AI.exe functions the render fixes' replacements call, as the
 // installer finds them. Each is filled before its call is redirected.
