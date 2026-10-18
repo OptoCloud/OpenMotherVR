@@ -12,6 +12,7 @@
 #include "game/constants.h"
 #include "util/sync/change_latch.h"
 #include "util/sync/frame_period.h"
+#include "util/sync/once_latch.h"
 #include "util/sync/seqlock.h"
 
 #include <array>
@@ -97,8 +98,8 @@ private:
     // Game thread (aim).
     util::ChangeLatch<WeaponClass> class_logged_;
     util::FramePeriod aim_log_{diag::kDebugLogPeriodFrames};
-    bool fire_gate_noted_ = false;
-    bool no_aim_noted_    = false;
+    util::OnceLatch fire_gate_noted_;
+    util::OnceLatch no_aim_noted_;
 
     // The tracker scan's thread.
     TrackerFacing tracker_;

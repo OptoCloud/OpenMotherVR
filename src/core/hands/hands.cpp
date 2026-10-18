@@ -134,15 +134,13 @@ Hands::AimResult Hands::aim(const AimRay& game, const CameraPose& camera,
     const HandView& right = view->hands[kRightHand];
     if (!aims_from_hand(c) || !(right.weight > 0.0f)) return {};
     if (!right.has_aim) {
-        if (!no_aim_noted_) log_.line(kLogNoAim);
-        no_aim_noted_ = true;
+        if (no_aim_noted_.first()) log_.line(kLogNoAim);
         return {};
     }
     AimResult r;
     r.ray         = hand_aim_ray(game, to_world(camera, right.aim), right.weight, muzzle_offset(c));
     r.hand_aiming = true;
-    if (!fire_gate_noted_) log_.line(kLogGate);
-    fire_gate_noted_ = true;
+    if (fire_gate_noted_.first()) log_.line(kLogGate);
     if (aim_log_.tick() && log_.debug_enabled()) {
         const AimRay& a = *r.ray;
         logf(log_, kLogAim, a.start.x, a.start.y, a.start.z, a.direction.x, a.direction.y, a.direction.z,

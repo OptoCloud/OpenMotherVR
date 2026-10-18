@@ -5,6 +5,7 @@
 #include "core/diag/ports/log.h"
 #include "core/hands/body_visibility.h"
 #include "core/hands/types.h"
+#include "util/sync/once_latch.h"
 
 #include <array>
 #include <atomic>
@@ -105,8 +106,8 @@ private:
 
     std::atomic<bool> applied_{false};
     std::atomic<bool> other_pose_{false};
-    bool applied_logged_    = false;
-    bool other_pose_logged_ = false;
+    util::OnceLatch applied_logged_;
+    util::OnceLatch other_pose_logged_;
 };
 
 } // namespace omvr::core::hands

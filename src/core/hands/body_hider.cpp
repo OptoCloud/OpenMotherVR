@@ -144,14 +144,8 @@ void BodyHider::log_skeleton(const PlayerSkeleton& s, const SkeletonBones& bones
 }
 
 void BodyHider::log_job_reports() noexcept {
-    if (!applied_logged_ && applied_.load(std::memory_order_relaxed)) {
-        applied_logged_ = true;
-        log_.line(kLogApplied);
-    }
-    if (!other_pose_logged_ && other_pose_.load(std::memory_order_relaxed)) {
-        other_pose_logged_ = true;
-        log_.line(kLogOtherPose);
-    }
+    if (applied_.load(std::memory_order_relaxed) && applied_logged_.first()) log_.line(kLogApplied);
+    if (other_pose_.load(std::memory_order_relaxed) && other_pose_logged_.first()) log_.line(kLogOtherPose);
 }
 
 } // namespace omvr::core::hands
