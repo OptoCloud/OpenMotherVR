@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build, re-checked against the binary for r2: reflection render and its single call, POV::SetEye including its FOV formula, renderer clear prologue, screen-constants upload); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; analysis of the game's level pixel shaders (LEVEL_SHADERS_DX11_BIN.PAK of the Torrens level); geometric derivation of the per-eye mapping by the spec side; observation in game by the spec side (an earlier mod showed reflections sliding against head motion; the per-eye render required here has not yet been seen running, because in every scene tested the reflection view never had both its active and render flags set). r4: some game facts (the side effects of POV::SetEye, mip generation by quality and the mip count at target creation, the values the graphics settings offer for setting 0x10) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and the game's `ENGINE_SETTINGS.XML` by the spec side; the viewport rebuild of §8 item 1 re-read in the 2015 `AI.exe`; requirements of §4.3, §4.6, §6 and §7 restated as results (clean-room review round 2); capture gating aligned with 11 and 13. Section numbers are unchanged from r3. r5 (with 24 r6): the reflection quality's values include the option the v2 engine settings override adds (§1); the reflection events of §6 also convey the reflection quality, project decision with its reason in §6. r6: static analysis by the spec side of the level shader packs of six levels and of the global deferred shader pack (every reflection sampler forms its lookup from the pixel position and register 60; the deferred-light vertex shaders' use of buffer 1 register 21 and the upload's formulas, re-read in the 2015 `AI.exe` at 0x574F50); a tester's report (metal and glass looking different across the view) attributed to 08 §1.5. Section numbers are unchanged from r5. Revision: r6 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build, re-checked against the binary for r2: reflection render and its single call, POV::SetEye including its FOV formula, renderer clear prologue, screen-constants upload); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; analysis of the game's level pixel shaders (LEVEL_SHADERS_DX11_BIN.PAK of the Torrens level); geometric derivation of the per-eye mapping by the spec side; observation in game by the spec side (an earlier mod showed reflections sliding against head motion; the per-eye render required here has not yet been seen running, because in every scene tested the reflection view never had both its active and render flags set). r4: some game facts (the side effects of POV::SetEye, mip generation by quality and the mip count at target creation, the values the graphics settings offer for setting 0x10) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and the game's `ENGINE_SETTINGS.XML` by the spec side; the viewport rebuild of §8 item 1 re-read in the 2015 `AI.exe`; requirements of §4.3, §4.6, §6 and §7 restated as results (clean-room review round 2); capture gating aligned with 11 and 13. Section numbers are unchanged from r3. r5 (with 24 r6): the reflection quality's values include the option the v2 engine settings override adds (§1); the reflection events of §6 also convey the reflection quality, project decision with its reason in §6. r6: static analysis by the spec side of the level shader packs of six levels and of the global deferred shader pack (every reflection sampler forms its lookup from the pixel position and register 60; the deferred-light vertex shaders' use of buffer 1 register 21 and the upload's formulas, re-read in the 2015 `AI.exe` at 0x574F50); a tester's report (metal and glass looking different across the view) attributed to 08 §1.5. Section numbers are unchanged from r5. r7: a comparison with the rendering behaviour of another mod, made by the spec side to find what this project lacks; the game facts it led to were verified by the spec side in the 2015 `AI.exe` (the reflection's object list is built before its render, by the list builder 0x5F0810 in the render-list job, from the projection the update left, §2.8; the viewport setter 0x621350 and the vertex constant writer 0x621C20, §4.8); requirements stated as this project's own results: the object list covers both eyes' reflections (§4.7, new), and each pass draws only into its own half, now required whatever the answer to §8 item 1 (§4.8, new); checks, events and acceptance steps for both. Other section numbers are unchanged from r6. Revision: r7 -->
 
 # 07: Planar reflections in stereo
 
@@ -90,7 +90,9 @@ manager has `+0x56` and `+0x60` non-zero. Otherwise it:
 
 1. begins rendering the POV (0x5B11D0): uploads view, projection and camera
    constants, sets the render target and the viewport (§2.6);
-2. culls the scene for this POV (0x590020);
+2. calls 0x590020 for this POV (r7: the object list it draws was built
+   earlier in the frame, §2.8 [sure]; 0x590020 itself is not where
+   objects are culled [likely]);
 3. begins the pass on the reflection target (0x5B3A80 with 1, 0, 0), which
    **clears the whole target** (§2.3);
 4. renders the reflected scene (0x5B1570, then 0x5B53A0);
@@ -221,6 +223,21 @@ or between the eyes on such a surface comes from that factor's dither,
 differed, the reflection view never rendered (§6's event showed its
 flags 0 throughout).
 
+### 2.8 The reflection's object list (r7) [sure for the code]
+
+Which objects the reflection draws is decided before its render, in the
+render-list job of group 0 (`BUILD_PRE_MAIN_RENDER_LISTS`, 08 §2.1): the
+list builder 0x5F0810 copies the reflection POV's view `+0x00` and
+projection `+0x40` as they are at that moment, multiplies them and culls
+the scene against that frustum. The eye transform it applies to the main
+view in stereo (08 §2.1, the call at 0x5F0946) is applied only to a POV
+with flag bit 7, so never to the reflection. The list job runs after the
+update of §2.1 and before the render of §2.2 [likely: the update runs in
+the game update, the job in the render jobs]. So the reflection's objects
+are those inside the mirrored camera with the game's **flat** camera
+projection (§2.1), whatever view and projection the render later uses;
+changing the POV's matrices at the render (§4.2) does not add objects.
+
 ## 3. Why it breaks in stereo [likely]
 
 In stereo the bound target is the side-by-side target `W x H`, so
@@ -235,6 +252,13 @@ about the wrong centre with unequal horizontal and vertical scale, which
 shows as shear. The two eyes also see reflections that do not fuse. On a
 flat screen the projection and the full-target viewport match, so the game
 is correct there.
+
+A per-eye render alone does not cure everything (r7): its objects come
+from the list of §2.8, culled with the flat camera's projection, which in
+a headset is narrower than each eye's field of view [likely: the flat
+camera's field of view is the game's own setting, the headset's is wider
+on current headsets]. Objects mirrored near the outer parts of each eye's
+reflection are then missing from it.
 
 ## 4. Required behaviour
 
@@ -276,7 +300,7 @@ the call for half `k`, this must hold:
 | Item | Required value |
 |---|---|
 | POV view `+0x000` and projection `+0x040` | the centre view and projection the update left this frame (§2.1), transformed for eye `k` exactly as ApplyEyeTransform (§2.5) transforms them; always derived from the centre matrices, never from the other pass's result |
-| POV culling frustum | consistent with that view and projection (the frustum update of §2.5) |
+| POV culling frustum | consistent with that view and projection (the frustum update of §2.5); r7: it does not choose the objects drawn, §2.8 and §4.7 do |
 | aspect `+0x0E4`, vertical FOV `+0x0E0` | `P[1][1] / P[0][0]` and `2·atan(1 / P[1][1])` of that projection (the game's own formulas, §2.4) |
 | projection copy `+0x080` | equal to that projection |
 | POV eye `+0x378` | `k`, so the viewport is half `k` (§2.6, §4.4) |
@@ -332,10 +356,11 @@ touched: the main view's eye-1 pass relies on it.
 ### 4.6 Not required
 
 - The mip chain (with reflections on, the quality-3 blur of §2.2, since
-  the settings offer only 0 and 3) is built at the end of each pass over
-  the whole target, so at quality 3 the blur runs twice and crosses the
-  seam between the halves by a few texels. This is acceptable. Building it
-  only once, after the second pass, is allowed.
+  the settings offer only 0 and 3) is built at the end of each pass, so at
+  quality 3 the blur runs twice. With §4.8 each run stays inside its own
+  half; building the chain only once, after the second pass, over both
+  halves, is also allowed, and its blur may then cross the seam between
+  the halves by a few texels, which is acceptable.
 - Each eye must see a reflection rendered for its own eye position: the
   two eyes' reflections must differ by the parallax of the mirrored scene,
   so that the reflection appears below the floor at the mirrored depth. A
@@ -343,13 +368,87 @@ touched: the main view's eye-1 pass relies on it.
 - Switching planar reflections off in VR is not acceptable as the fix (the
   game's own Rift preset did; the mod must not, 02 §6.5).
 
+### 4.7 The object list covers both eyes (r7)
+
+While stereo runs, the reflection's object list (§2.8) must hold every
+object inside the reflection frustum of the mirrored **centre** camera
+(the view the update of §2.1 leaves) with the headset's projection for
+eye -1 (device slot 12 with eye -1, 02 §5.1: the shared field of view of
+03 §3.2, no eye offset), the frustum the game itself culls the main view
+with in stereo (08 §2.1). Each eye's reflection frustum of §4.1 is that
+frustum moved sideways by half the eye distance, so the list then lacks
+only objects lying wholly in a strip of that width at the outer side of
+one eye's reflection, as for the main view; this is accepted (08 §2.1).
+
+Means: the implementation's choice. Game facts it can rely on: the
+update is the call at 0x5B4640 (`e8 9b fb ff ff`, §2.1), on the game's
+main thread, before the list job; the list builder reads `+0x00` and
+`+0x40` and nothing the passes of §4.2 write. One way: after the game's
+update, while stereo runs and flag bit 0 is set, replace the reflection
+POV's projection `+0x40` and its copy `+0x080` with the eye -1 projection
+(ApplyEyeTransform with eye -1 on a copy, §2.5, which for eye -1 leaves
+the view unchanged), and set the frustum (0x5B2FB0), aspect and FOV from
+it as §4.2 does. This does not change the passes of §4.2: their
+projection is replaced by each eye's in any case (§2.5), and their view is
+the update's. Another way that meets the result is to keep every object
+of the reflection's list in stereo (no frustum test for that list); it
+costs more draws.
+
+The shared save area (§1) is not involved. Flat play, no device or a
+device not in state 2: the update's projection is kept.
+
+### 4.8 Each pass draws only into its half (r7)
+
+Required whatever the answer to §8 item 1: during pass `k`, everything the
+reflection render draws lands in half `k` of the target it draws into,
+and every full-screen pass inside it (the mip blur among them) reads its
+source only from half `k`, at the same scale, so that half `1-k` keeps
+what the other pass drew. In detail:
+
+- every viewport set during pass `k` on the reflection target, one of its
+  mip levels, or one of the blur's intermediate targets lies inside half
+  `k` of that target: for a target `w` pixels wide, half 0 is the columns
+  `0` to `floor(w/2) - 1` and half 1 the next `floor(w/2)` columns (an odd
+  last column is not used). A viewport the game sets inside half `k`
+  already (with `+0x378 = k`, §2.6) is kept as it is; one that covers the
+  target's full width is narrowed to half `k`; height and depth range are
+  kept;
+- the screen-mapping constant the game's full-screen and deferred-light
+  vertex shaders map with (vertex buffer 1 register 21, §2.7) describes
+  the viewport actually set, so that a full-screen pass reads the same
+  half it writes;
+- outside the two passes nothing is changed.
+
+Game facts for the means [sure]: the renderer's viewport setter is
+0x621350 (cdecl `(context, const int vp[6])` with `vp = {x, y, width,
+height}` followed by the minimum and maximum depth as floats; it builds
+one D3D11 viewport and calls `RSSetViewports` through the D3D11 context
+held at the context's `+0x08`; prologue `55 8b ec 83 ec 18 8b 45 0c`); the
+vertex constant writer is 0x621C20 (cdecl `(renderer, buffer, first
+register, const float4* data, register count)`, prologue `55 8b ec 56 8b
+75 08 57`; 24 §14.2). The viewport may also be confined at the game's
+immediate context in the proxy (01) during the passes. Whatever state says
+"pass `k` is running" is written and read on the render thread only, as
+for the clear of §4.3.
+
+If the game already keeps the origin (§8 item 1 answered "kept"), this
+section changes nothing at run time.
+
 ## 5. Installation, checks and fallback
 
 At load (with the rest of the patch set, 01 §2.3), on the 2015 build only,
 both sites are verified before anything is written:
 
 - the call site 0x5B5D91 holds `e8` whose target resolves to 0x5B5C40;
-- the renderer clear 0x621770 starts with `55 8b ec 83 ec 10`.
+- the renderer clear 0x621770 starts with `55 8b ec 83 ec 10`;
+- (r7) the sites the implementation uses for §4.8 (for example the
+  viewport setter and the vertex constant writer with the prologues of
+  §4.8): if one differs, the fix is not installed, as for the clear,
+  because a pass that draws outside its half would erase the other's;
+- (r7) the site used for §4.7 (for example the update call at 0x5B4640
+  with the bytes of §2.1): if it differs, the fix is still installed
+  without §4.7 and the log says so: a per-eye reflection with objects
+  missing at its outer edges is still far better than the mono one.
 
 | Call site | Clear prologue | Result |
 |---|---|---|
@@ -378,6 +477,11 @@ must convey what is listed):
   whether a scene has an active reflection (§7 step 3). Bounded so a run
   cannot flood the log; the bounds are the implementation's choice;
 - the first per-eye render, once per run;
+- (r7) whether §4.7 is in effect (once at install), and the first time in
+  a run that §4.8 had to narrow a viewport, with the pass, the target's
+  width and the viewport before and after. This event answers §8 item 1:
+  if it never appears while per-eye renders run, the game keeps the
+  origin;
 - with each reflection POV event above, the reflection quality (manager
   `+0x60`), and each change of that quality seen at a reflection render,
   within the same bound. Project decision of r5: a tester comparing
@@ -439,6 +543,11 @@ is [likely] and is exactly what step 3 shows.
    the right eye's reflection and half 1 the left eye's (§4.1), and
    neither has been erased. If half 1 is not drawn where expected, the
    viewport origin is lost (§8 item 1).
+5a. (r7) Look at the reflection of a door frame or a lamp near the
+   outer edge of each eye's view (turn the head until it is at the far
+   left of the left eye, then the far right of the right eye): it is in
+   the reflection up to the edge, where before §4.7 it was cut off. Read
+   the log for §6's viewport event: note whether the game lost the origin.
 6. Switch Planar Reflections off in the options: floors fall back to their
    environment reflection, and no further flags events with bit 4 appear.
 7. With the runtime None, the game's render runs once per frame as in the
@@ -454,8 +563,9 @@ is [likely] and is exactly what step 3 shows.
    `AI.exe`). Resolve with §7 step 5. If half 1 is not drawn where
    expected, the per-eye render must draw only into half k, and every
    full-screen pass inside the reflection render (the mip blur among them)
-   must read and write only half k. Where to enforce this is the
-   implementation's choice.
+   must read and write only half k. r7: §4.8 now requires this in every
+   case; what remains open is only whether the correction is ever needed,
+   which §6's viewport event shows.
 2. **Clears of intermediate targets in the second pass [guess].** Skipping
    every renderer clear during the second pass (§4.3) includes any clear
    of the mip blur's intermediate targets ("Reflection Mip Blur Target",

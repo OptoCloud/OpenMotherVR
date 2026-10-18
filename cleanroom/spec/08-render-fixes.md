@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build; every site and byte below re-read from the binary for r2; for r4 the spec side re-read the cull function 0x61FD20 and its distance test, the register 39 upload and the head-in-wall fade 0x346DE0) and of the game's pixel shaders (DXBC from the level and global shader packs; for r4 the spec side counted the pixel shaders holding the dither's immediates in three level packs); the public DXBC container layout and checksum; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and shader packs by the spec side (the dither sequence and how it fails, register 39, the cull function's tests); that analysis served only as a lead to which problems exist, and the required results of sections 1, 2 and 4 are stated as this project's own properties; in-game observation by the spec side in a headset (section 1 and section 5 confirmed working); measurements in game by the spec side (draw-submission cost with the distance, occlusion and view-volume tests all bypassed; AA cost; shader-creation cost over the first 3500 shaders of a session); user requirements (anti-aliasing choice with an automatic mode, no MD5 of every shader, shaders changed by other tools pass through); project decisions, each with its reason inline (the head-in-wall delay D, chosen afresh for r4; the bound on the dither's input). r4: clean-room review round 2 applied (section 1 as properties, section 2.1 restated from the spec side's own reading, the head-in-wall delay and its "clear" test re-derived from the game, measurement conditions stated). Section numbers are unchanged from r3. For r5: cross-document alignment after the second fix pass (the acceptance of 07 is 07 §7; the setting's full key `Rendering.StereoAntiAliasing`; the AA log event as 11 §2.4 defines it; the head-in-wall measurement no longer points at a log event 11 does not define). Section numbers are unchanged from r4. For r6, under the clean-room process r3 (what a player sees may be stated exactly): the options-page label of `ClippingBlinders` (`Clip Blinding`, the label players of the earlier mod knew) in §4.1 and §4.2, and that `Rendering.StereoAntiAliasing` has no options-page control (§3.2). No game fact was added. Section numbers are unchanged from r5. For r7: a tester's report on OpenXR with a Valve Index at pixel scale 2.0 (glass not transparent in the corner of the view; a ceiling grill and staircases with a metallic look only in the right part of the right eye); static analysis by the spec side of the level shader packs of six levels (Torrens, `TECH_HUB`, `SCI_HOSPITALUPPER`, `HAB_AIRPORT`, `SOLACE`, `TECH_RND`) with the public D3D shader disassembler: the dither occurs in eleven register layouts, of which r6 matched one; counts per layout, per pack and per render-target count, and which shaders declare constant buffer 2 (§1.1); the overflow region evaluated by the spec side from the formula (§1.5); project decision with its reason (§1.4: shaders without constant buffer 2 are patched with a wrapped position); new §1.5 and §1.6; other section numbers are unchanged from r6. A new §8 (r7): the particle lighting lookup in stereo, from static analysis of the 2015 `AI.exe` by the spec side (the lookup's tile offset and scale, the stereo manager's NDC wrapper and its single call, device slot 14 for eye -1, the per-frame alpha-light camera) and of the particle shaders in the level packs (how the vertex shaders form the lookup and the pixel shaders read it); a tester's report (smoke near the floor unlit when looked at directly) with the diagnostic that settles it. Revision: r7 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build; every site and byte below re-read from the binary for r2; for r4 the spec side re-read the cull function 0x61FD20 and its distance test, the register 39 upload and the head-in-wall fade 0x346DE0) and of the game's pixel shaders (DXBC from the level and global shader packs; for r4 the spec side counted the pixel shaders holding the dither's immediates in three level packs); the public DXBC container layout and checksum; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and shader packs by the spec side (the dither sequence and how it fails, register 39, the cull function's tests); that analysis served only as a lead to which problems exist, and the required results of sections 1, 2 and 4 are stated as this project's own properties; in-game observation by the spec side in a headset (section 1 and section 5 confirmed working); measurements in game by the spec side (draw-submission cost with the distance, occlusion and view-volume tests all bypassed; AA cost; shader-creation cost over the first 3500 shaders of a session); user requirements (anti-aliasing choice with an automatic mode, no MD5 of every shader, shaders changed by other tools pass through); project decisions, each with its reason inline (the head-in-wall delay D, chosen afresh for r4; the bound on the dither's input). r4: clean-room review round 2 applied (section 1 as properties, section 2.1 restated from the spec side's own reading, the head-in-wall delay and its "clear" test re-derived from the game, measurement conditions stated). Section numbers are unchanged from r3. For r5: cross-document alignment after the second fix pass (the acceptance of 07 is 07 §7; the setting's full key `Rendering.StereoAntiAliasing`; the AA log event as 11 §2.4 defines it; the head-in-wall measurement no longer points at a log event 11 does not define). Section numbers are unchanged from r4. For r6, under the clean-room process r3 (what a player sees may be stated exactly): the options-page label of `ClippingBlinders` (`Clip Blinding`, the label players of the earlier mod knew) in §4.1 and §4.2, and that `Rendering.StereoAntiAliasing` has no options-page control (§3.2). No game fact was added. Section numbers are unchanged from r5. For r7: a tester's report on OpenXR with a Valve Index at pixel scale 2.0 (glass not transparent in the corner of the view; a ceiling grill and staircases with a metallic look only in the right part of the right eye); static analysis by the spec side of the level shader packs of six levels (Torrens, `TECH_HUB`, `SCI_HOSPITALUPPER`, `HAB_AIRPORT`, `SOLACE`, `TECH_RND`) with the public D3D shader disassembler: the dither occurs in eleven register layouts, of which r6 matched one; counts per layout, per pack and per render-target count, and which shaders declare constant buffer 2 (§1.1); the overflow region evaluated by the spec side from the formula (§1.5); project decision with its reason (§1.4: shaders without constant buffer 2 are patched with a wrapped position); new §1.5 and §1.6; other section numbers are unchanged from r6. A new §8 (r7): the particle lighting lookup in stereo, from static analysis of the 2015 `AI.exe` by the spec side (the lookup's tile offset and scale, the stereo manager's NDC wrapper and its single call, device slot 14 for eye -1, the per-frame alpha-light camera) and of the particle shaders in the level packs (how the vertex shaders form the lookup and the pixel shaders read it); a tester's report (smoke near the floor unlit when looked at directly) with the diagnostic that settles it. For r8: a comparison of this document's fixes with the rendering behaviour of another mod, made by the spec side to find behaviour, fixes and conveniences this project lacks; every game fact it led to was verified by the spec side in the 2015 `AI.exe` or the level shader packs, and every requirement is this project's own: the dither sites' operand order and count per shader (§1.1) and how the renderer binds constant buffers (§1.4), counted and read by the spec side; how the game builds each view's object list, on which threads the per-object tests run, and the frustum the main view is culled with in stereo (§2.1, from the build jobs 0x375300 to 0x37539A, the per-group build 0x5B1A50 and the list builder 0x5F0810), which answers the first open question of §7; the alpha-light tile of an emitter (§8.5, from 0x589A20); project decisions with their reasons (§2.1: the strip outside the centre frustum is accepted; §8.5: the lookup fix is kept and a constant lighting is offered as a v2 option, 24 §15). Section numbers are unchanged from r7. Revision: r8 -->
 
 # 08: Rendering fixes
 
@@ -104,6 +104,18 @@ layout. 296 of the shaders holding the dither do not declare constant
 buffer 2 (281 of them in another layout). Every one of the 4121 sites
 holds two consecutive dwords 0x3A83126F in one of its two immediates.
 
+**Operand order and sites per shader (r8) [sure, counted by the spec
+side over the Torrens and `TECH_HUB` level packs, 1309 sites].** Whatever
+the register layout, instruction 1 reads `vP` as its first source and the
+immediate as its second; instruction 2 reads `vP`, then the immediate,
+then `-vT` with component x of the input replicated (`-vT.xxxx` in the
+table's layout). No shader holds more than one site, so the number of
+shaders of a level pack that hold the dither is the number of sites to
+patch in it (93 of the 1309 sites are in shaders that do not declare
+constant buffer 2). A match that relies on these two facts finds every
+site of these packs; §1.4's rule (any other form is left unchanged)
+still applies to whatever else a pack holds.
+
 ### 1.2 Why it fails on a side-by-side target [likely]
 
 The hash input is `d = (0.001·p - t)·(0.001·p)`, with `p` in pixels of
@@ -196,7 +208,14 @@ results:
   up banding, which a pattern repeating every 1024 pixels still does, and
   the value has the same range as `p · (1/W, 1/H)`, so the bound below
   holds as it does for the other shaders). Every other property of this
-  section holds for it.
+  section holds for it. r8 [likely, spec side's reading of the renderer]:
+  the game binds constant buffers per stage and slot as device-context
+  state, from the renderer's table of slots, for every slot marked as
+  changed (0x621850, called for each shader stage from 0x623030), not
+  according to the declarations of the shader being drawn; so a shader
+  given a declaration of buffer 2 would most likely read the game's
+  buffer too. The wrapped position stays the required means: it depends
+  on nothing outside the shader.
 - **Containers understood or untouched.** A DXBC container the
   implementation does not fully understand, by the public DXBC layout, is
   left unchanged; so is one whose stored checksum (bytes 4..19, the standard
@@ -330,6 +349,49 @@ buffer]:
 | 0 | `BUILD_PRE_MAIN_RENDER_LISTS` | the reflection view | no | no |
 
 So the occlusion test only ever runs for the main view.
+
+**How a view's object list is built (r8) [sure for the code].**
+
+- Three jobs build the render lists, each for one group: 0x375300 for
+  group 0, 0x375340 for group 2 and 0x375380 for group 1. Each resets the
+  group's lists (0x5B1AD0) and calls the per-group build 0x5B1A50
+  (thiscall on the POV manager, one argument, the group, `ret 4`; calls at
+  0x37531A, 0x37535A, 0x37539A). For every POV of that group with flag bit
+  4 set, it calls the list builder 0x5F0810 (cdecl, arguments POV
+  `+0xEC`, the main view's POV, the POV; its only call is at 0x5B1AB0,
+  `e8 5b ed 03 00`).
+- The builder copies the POV's view (`+0x00`) and projection (`+0x40`).
+  Only for the main view (flag bit 7), and only while the stereo device is
+  in state 2, it then replaces them through ApplyEyeTransform (07 §2.5)
+  with eye -1 (the call at 0x5F0946) and takes the field of view from the
+  stereo manager's wrapper 0x5B86C0 with eye -1 (0x5F095D). It multiplies
+  view by projection into the cull context, which lives on the builder's
+  own stack; the frustum test reads that product.
+- It does not run the per-object tests itself: it submits them as job
+  items (job function 0x5E9830, which makes the call to 0x61FD20 at
+  0x5E984B; submitted at 0x5F0C7B through 0x5B6000), up to 128 objects
+  each. So the tests of one list run on several job threads at once, and
+  the three build jobs may overlap [likely]. Whatever decides a test's
+  result (§2.3) must therefore be valid on any job thread, and must not be
+  state that one build sets for "the list being built now". The "stereo
+  running" read of §2.3 meets this.
+
+Consequences:
+
+- **Main view in stereo.** Its list is culled with the centre position
+  and the device's projection for eye -1 (02 §5.1: eye 0's EyeFov, no
+  eye offset), which with 03 §3.2 is the shared field of view of both
+  eyes. Each eye's frustum is that frustum moved sideways by half the eye
+  distance, so it reaches beyond it only in a strip of that width along
+  its outer side plane (spec side's geometry). An object is dropped
+  although one eye could see it only when its bounding sphere lies wholly
+  inside that strip: within about 32 mm (half a 64 mm eye distance)
+  outside the centre view's side plane, at the outermost edge of one eye.
+  Accepted, with no key (project decision: the loss is a sliver at the
+  edge of the view, while a wider cull frustum costs draws everywhere).
+- **The reflection view** (group 0) gets no eye transform: its list is
+  culled with the projection its update left, the game's flat camera
+  projection. 07 §4.7 says what the mod must do about it.
 
 Sites (2015; check every byte before writing):
 
@@ -565,13 +627,12 @@ itself: the game leaves whatever viewport it last used bound.
 
 ## 7. Open questions
 
-- **Main-view frustum in stereo (§2).** Whether the frustum the main view is
-  culled with while stereo runs contains both eyes' frusta (it is the centre
-  view's; with symmetric per-eye frusta offset by half the eye distance, the
-  outer edges of each eye may fall just outside it). Look for: objects at the
-  far left of the left eye or far right of the right eye vanishing; the
-  frustum the main POV's culling context is built from (POV frustum update
-  0x5B2FB0).
+- **Main-view frustum in stereo (§2).** Answered in r8 (§2.1): the
+  centre position with the device's eye -1 projection; only a strip of
+  half the eye distance at each eye's outer edge lies outside it, which is
+  accepted. Still worth noting in the walk of §2.3's acceptance: an object
+  at the very left of the left eye or the very right of the right eye,
+  close to the head, that vanishes.
 - **View groups (§2.1).** Confirm that only group 2 fills context `+0x5C`.
   Look for: the writers of POV `+0x310` and of context `+0x5C`.
 - **Distance scale (§2.2).** Confirm that context `+0x50` comes from the
@@ -736,6 +797,27 @@ Diagnostic for one session (Dev. Debug Options):
   smoke while looking at it directly: lit from further away and unlit
   when standing over it points to candidate 2.
 
-A lighting of smoke that does not follow the scene's lights (a constant
-brightness) would hide all three, but is not this project's choice
-(24 §4.2: particles still respond to lights).
+**More game facts for candidate 2 (r8) [likely; spec side's reading of
+the tile function 0x589A20, whose only call is at 0x617E33].** The
+emitter's box is clipped first; the tile's rectangle is centred on the
+projection through `LightObject` `+0x70` of the centroid of the clipped
+corners, and its half extents are the largest distance of a clipped
+corner from that centre on each axis. The depth of that centre is the
+depth at which the tile's light is evaluated (8.3). On one branch the
+function sets the emitter's tile pointer (`+0x04`) to null and gives it
+no tile [sure for the store]; the condition is a sign test on the
+projected centroid [guess: its depth, so an emitter whose centroid is
+not in front of the atlas camera reads no light at all]. Such an emitter
+shows as unlit smoke for as long as the condition holds, with the head
+still, which the diagnostic above tells apart from candidate 1.
+
+**Decision (r8).** The lookup fix of 8.3 stays a v1 fix whatever 8.5
+turns out to be: its arithmetic is sure, and without it every lit
+particle reads its light at the wrong place in a headset, the centre of
+the view being the only place where it is right. For the effect of 8.5,
+and for players who prefer smoke whose brightness never changes with the
+view, v2 offers a constant lighting of smoke and fog as an option
+(24 §15, `Graphics.ConstantSmokeLighting`, off by default): it hides all
+three candidates, at the cost that smoke no longer responds to the
+scene's lights. With the option off, particles still respond to lights
+(24 §4.2), and 8.5 stays open until the diagnostic has been run.

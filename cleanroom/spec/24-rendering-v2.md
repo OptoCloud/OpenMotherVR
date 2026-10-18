@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). r3 (spec r7 cross-check): 07 §8 item 1 no longer names the viewport setter or a viewport constant, so the viewport setter 0x621350 (it builds one viewport and calls `ID3D11DeviceContext::RSSetViewports`), the constant writers 0x621C20 and 0x621C90 and the pass set-up's type argument are given as this document's own facts, verified by the spec side in the 2015 `AI.exe`, and the velocity shader question no longer assumes a viewport constant; the settings setter labelled `SettingsSetOption` as in 01 §4, and whether it reaches the saved settings left open as 02 §11 item 5 does; the 2D-only effects keep the player's saved settings as 02 §6.5 now requires of v1. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Graphics` page of the options page given exactly (item order, labels, control kinds, value names, steps, description lines, greying and the rule for showing an item), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the game's English menu texts it names read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the anti-aliasing option names from `DATA\ENGINE_SETTINGS.XML`; the `Pixel Scale` item and the Video page's `Shadow Map Resolution` item named by their labels. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Graphics` page is reached from the `MotherVR` page (22 §12.1). r6 (user decision of 2026-10-18, a tester's request): the additions of §6.2 made exact: `ShadowMap4096` adds the option `4096` and `SharpReflections` the option `Alternative` with value 6 (replacing the proposed value 1), both ranked so that they never become the default, the heap additions' names, and an addition the player's file already offers is not made twice; how the Video page shows an option's name and that the C runtime's open of the engine settings file goes through `AI.exe`'s `CreateFileA` import (§1.9), the reflection quality compares in the reflection manager's code (§12 item 6) and the copy's file name (13 §2), read by the spec side in the 2015 `AI.exe`, `DATA\TEXT\ENGLISH\UI.TXT` and `DATA\ENGINE_SETTINGS.XML`. r7: static analysis of the 2015 `AI.exe` by the spec side (the chromatic aberration reader's flag read and the only readers of `+0x1B38`; the film grain reader 0x5F63D0, its only call, its read of the intensity and the only readers of `+0x608`; §1.6, §8); project decisions with their reasons (§8: a value written for a reader's call does not outlive it; a toggle's call is redirected at attach only for a key that is false then; §10: the three keys' "takes effect" column). Section numbers are unchanged from r6. r8 (user decision of 2026-10-18): the user confirmed the `Graphics` page's items of the features implemented (§10 items 5 to 9 and 11 to 13), which are now shown; the others stay hidden until their feature is implemented and confirmed; a change on the page reaches the 2D effects at once as §10's "takes effect" column says. r9 (a tester's report on OpenXR with a Valve Index: smoke turns with the roll of the head): new §14, upright sprites in stereo; static analysis of the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK` of the Torrens and `TECH_HUB` levels, and the global packs under `DATA\SHADERS`) and of the 2015 `AI.exe` by the spec side (the sprite vertex shaders' corner offset in the view plane and its form; the camera-constant upload 0x57A100 and its `ViewMatrix` registers; the vertex constant writer 0x621C20, given to the spec side as an observation and confirmed in the binary); the roll-removal arithmetic derived by the spec side from the requirement and the game's view convention (05 §1); project decisions with their reasons (§14.1: a fix with no key; §14.3: the ease near the vertical and its length; §14.5: axis-locked sprites left as they are). Sections 1 to 13 are unchanged. r10 (a tester's report on OpenXR with a Valve Index, smoke near the floor unlit when looked at directly): the particle lighting lookup in stereo is specified as a v1 fix in 08 §8 (08 r7), pointed to from §4.1; §14.4 states that the upright sprites leave the lookup where it is, from the spec side's reading of the lit sprite shaders in the level packs. Section numbers are unchanged from r9. Revision: r10 -->
+<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). r3 (spec r7 cross-check): 07 §8 item 1 no longer names the viewport setter or a viewport constant, so the viewport setter 0x621350 (it builds one viewport and calls `ID3D11DeviceContext::RSSetViewports`), the constant writers 0x621C20 and 0x621C90 and the pass set-up's type argument are given as this document's own facts, verified by the spec side in the 2015 `AI.exe`, and the velocity shader question no longer assumes a viewport constant; the settings setter labelled `SettingsSetOption` as in 01 §4, and whether it reaches the saved settings left open as 02 §11 item 5 does; the 2D-only effects keep the player's saved settings as 02 §6.5 now requires of v1. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Graphics` page of the options page given exactly (item order, labels, control kinds, value names, steps, description lines, greying and the rule for showing an item), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the game's English menu texts it names read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the anti-aliasing option names from `DATA\ENGINE_SETTINGS.XML`; the `Pixel Scale` item and the Video page's `Shadow Map Resolution` item named by their labels. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Graphics` page is reached from the `MotherVR` page (22 §12.1). r6 (user decision of 2026-10-18, a tester's request): the additions of §6.2 made exact: `ShadowMap4096` adds the option `4096` and `SharpReflections` the option `Alternative` with value 6 (replacing the proposed value 1), both ranked so that they never become the default, the heap additions' names, and an addition the player's file already offers is not made twice; how the Video page shows an option's name and that the C runtime's open of the engine settings file goes through `AI.exe`'s `CreateFileA` import (§1.9), the reflection quality compares in the reflection manager's code (§12 item 6) and the copy's file name (13 §2), read by the spec side in the 2015 `AI.exe`, `DATA\TEXT\ENGLISH\UI.TXT` and `DATA\ENGINE_SETTINGS.XML`. r7: static analysis of the 2015 `AI.exe` by the spec side (the chromatic aberration reader's flag read and the only readers of `+0x1B38`; the film grain reader 0x5F63D0, its only call, its read of the intensity and the only readers of `+0x608`; §1.6, §8); project decisions with their reasons (§8: a value written for a reader's call does not outlive it; a toggle's call is redirected at attach only for a key that is false then; §10: the three keys' "takes effect" column). Section numbers are unchanged from r6. r8 (user decision of 2026-10-18): the user confirmed the `Graphics` page's items of the features implemented (§10 items 5 to 9 and 11 to 13), which are now shown; the others stay hidden until their feature is implemented and confirmed; a change on the page reaches the 2D effects at once as §10's "takes effect" column says. r9 (a tester's report on OpenXR with a Valve Index: smoke turns with the roll of the head): new §14, upright sprites in stereo; static analysis of the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK` of the Torrens and `TECH_HUB` levels, and the global packs under `DATA\SHADERS`) and of the 2015 `AI.exe` by the spec side (the sprite vertex shaders' corner offset in the view plane and its form; the camera-constant upload 0x57A100 and its `ViewMatrix` registers; the vertex constant writer 0x621C20, given to the spec side as an observation and confirmed in the binary); the roll-removal arithmetic derived by the spec side from the requirement and the game's view convention (05 §1); project decisions with their reasons (§14.1: a fix with no key; §14.3: the ease near the vertical and its length; §14.5: axis-locked sprites left as they are). Sections 1 to 13 are unchanged. r10 (a tester's report on OpenXR with a Valve Index, smoke near the floor unlit when looked at directly): the particle lighting lookup in stereo is specified as a v1 fix in 08 §8 (08 r7), pointed to from §4.1; §14.4 states that the upright sprites leave the lookup where it is, from the spec side's reading of the lit sprite shaders in the level packs. Section numbers are unchanged from r9. r11: a comparison of this document with the rendering behaviour of another mod, made by the spec side to find behaviour, fixes and conveniences this project lacks; the game facts it led to were verified by the spec side: the velocity effect's pixel shader in `DATA\SHADERS\UBERSHADER\BESPOKESHADERS_DX11_BIN.PAK` (§12 item 2 answered, §2.2 item 2), the particle pixel shaders' single read of the alpha-light atlas in the Torrens and `TECH_HUB` level packs and its absence from the global packs (§15.2), and the shadow-map size class of each light in the 2015 `AI.exe` (the size table filled at 0x611DC8 from the resolution shifted by the class, the shadow set-up 0x5F4E80 and its only call 0x5F9A67, §16.2); new features as this project's proposals with their reasons: §15, a constant lighting of smoke and fog as an option (a tester's report, 08 §8.5), and §16, full shadow detail at any distance; their keys, the options page's hidden items 15 to 17 and their texts, events, open questions 14 and 15. Sections 1 to 14 keep their numbers. Revision: r11 -->
 
 # 24. Rendering in v2
 
@@ -16,6 +16,8 @@ specifies the v2 rendering features listed in 20 §3.4:
 | 8 | 2D-only effects | `LensFlares`, `ChromaticAberration`, `FilmGrain` | true, true, true |
 | 9 | D3D11 state cost | `StateCache` | false |
 | 14 | Upright sprites in stereo | none: a fix of a stereo defect | (applies whenever a headset runtime is chosen) |
+| 15 | Constant smoke and fog lighting (r11) | `ConstantSmokeLighting`, `ConstantSmokeBrightness` | false, 0.15 |
+| 16 | Full shadow detail at any distance (r11) | `FullShadowDetail` | false |
 
 Every key is in a new section `Graphics` inside `Settings` of
 `mothervr.json` (section 10). With every key at its v1 value the mod is
@@ -348,7 +350,16 @@ these results hold every frame:
    data, not the stale slot 1 of 1.4; eye 1's half gets its velocity
    although the game draws none for it. How is the implementation's
    choice; eye 1's velocity must land in eye 1's half of the velocity
-   target (§12 items 1 and 2 give the viewport and units questions).
+   target (§12 item 1 gives the viewport question). r11, from the game's
+   velocity shader (§12 item 2, answered): it reads the depth at its
+   full-screen texture coordinate and writes the motion in units of that
+   coordinate, with no constant for the viewport. So for an eye's half:
+   the depth must be read in that eye's half of the side-by-side depth
+   texture (eye-local `u` maps to `(u + k) / 2` for eye `k`), and the
+   written motion must be in the units the velocity's reader uses; if
+   that reader offsets by the velocity in coordinates of the whole
+   target, as the temporal resolve does [likely], the horizontal
+   component is half the eye-local one.
 3. **Previous matrices per eye.** "Previous" for an eye means the same
    eye's matrices of the previous rendered stereo frame. The two eyes never
    share a previous matrix.
@@ -452,7 +463,8 @@ GPU at pixel scale 1.0].
 (r10) The lookup of the particle lighting in stereo, which placed the
 lit part of smoke with the wrong scale so that it moved with the head, is
 a v1 fix with no key, 08 §8; this section is about frame-to-frame and
-eye-to-eye differences of the lighting itself.
+eye-to-eye differences of the lighting itself. (r11) A lighting that
+does not depend on the view at all is a separate option, §15.
 
 [guess, to be confirmed in game, §4.4]: smoke, steam, fog and dust
 particles may flicker in brightness from frame to frame or differ between
@@ -842,6 +854,9 @@ missing key reads as its default; unknown keys are kept, 06 §3):
 | `Graphics.ChromaticAberration` | bool | true | | non-bool: default | at once; a key true at attach and turned false later, next launch (§8) |
 | `Graphics.FilmGrain` | bool | true | | non-bool: default | at once; a key true at attach and turned false later, next launch (§8) |
 | `Graphics.StateCache` | bool | false | | non-bool: default | next launch [proposal: the cache is set up with the context wrapper] |
+| `Graphics.ConstantSmokeLighting` | bool | false | | non-bool: default | next launch (the shaders are changed when the game creates them, §15.3) |
+| `Graphics.ConstantSmokeBrightness` | number | 0.15 | 0.0 to 1.0 | outside: nearest bound; non-number: default | next launch, with `ConstantSmokeLighting` |
+| `Graphics.FullShadowDetail` | bool | false | | non-bool: default | at once (next frame) |
 
 All defaults are v1 values (20 §1.1). Each key applies on its own; there
 is no master switch (20 §1.3). A key that applies at the next launch
@@ -856,7 +871,8 @@ a measurement, §2.4, §3.1, §7.1, §9.1]. The user confirmed items 5 to 9
 and 11 to 13 (user decision of 2026-10-18, for the engine settings additions
 of §6 and the 2D effects of §8, which are implemented), so the page shows
 those eight items, in the table's
-order; items 1 to 4, 10 and 14 are not shown. Each item takes effect as
+order; items 1 to 4, 10 and 14 to 17 are not shown (items 15 to 17
+added in r11, not implemented yet). Each item takes effect as
 the table above says: items 5 to 9 at the next launch (their description
 lines start with `Requires restart!`), items 11 to 13 at once, with the
 exception the table gives for a key that was true at attach. The labels, values and description
@@ -888,6 +904,9 @@ page shows the XML option name as the value].
 | 12 | `Chromatic Aberration in VR` | toggle | on / off | `Graphics.ChromaticAberration` | `Off: no color fringes in the headset, whatever the Video setting` | |
 | 13 | `Film Grain in VR` | toggle | on / off | `Graphics.FilmGrain` | `Off: no film grain in the headset, whatever the Video setting` | |
 | 14 | `Graphics State Cache` | toggle | on / off | `Graphics.StateCache` | `Requires restart! Skips repeated graphics state changes` | |
+| 15 | `Constant Smoke Lighting` | toggle | on / off | `Graphics.ConstantSmokeLighting` | `Requires restart! Lights smoke and fog evenly, whatever the lights around` | |
+| 16 | `Smoke Brightness` | list | `0.05`, `0.10`, ... `1.00` (steps of 0.05) | `Graphics.ConstantSmokeBrightness` | `Requires restart! Brightness of smoke and fog with Constant Smoke Lighting` | `Constant Smoke Lighting` off |
+| 17 | `Full Shadow Detail` | toggle | on / off | `Graphics.FullShadowDetail` | `Keeps every shadow at full Shadow Map Resolution in the headset` | |
 
 Items 11 to 13 carry `in VR` because the game's Video page has its own
 `Chromatic Aberration` and `Film Grain Intensity` items, which these do
@@ -938,7 +957,11 @@ Each event must convey:
 - §8: each toggle's state when stereo starts and when it changes;
 - §9: the profile counts when profiling is on (a `DebugOptions` diagnostic);
   that the cache is on;
-- §14: as §14.7.
+- §14: as §14.7;
+- §15: as §15.6;
+- §16: at install, and when stereo starts with the key on: that every
+  shadow uses the full class; with `DebugOptions`, every 900 frames, how
+  many lights had another class from the game (§16.2).
 
 ## 12. Open questions
 
@@ -947,12 +970,22 @@ Each event must convey:
    viewport origin, or rebuild
    it from `{0, 0, w, h}` (the same question as 07 §8 item 1)? Look for: a
    capture of the velocity target after both eyes with §2 on.
-2. **Velocity shader units.** Does the game's velocity shader compute
-   screen positions over the whole target or the bound viewport? Look for:
-   the velocity effect's pixel shader in the post-processing shader pack
-   (`DATA\SHADERS\UBERSHADER\POSTPROCESSINGSHADERS_DX11*.PAK`) and its use
-   of any constant that carries the target's or the viewport's size or
-   offset.
+2. **Velocity shader units.** Answered (r11) [sure for the shader]: the
+   velocity effect's pixel shader is in
+   `DATA\SHADERS\UBERSHADER\BESPOKESHADERS_DX11_BIN.PAK` (the shader that
+   samples `depthSamplerReg` at t8 and reads pixel buffer 2 registers 12
+   to 23, `MotionBlurCurrInvViewProjection`,
+   `MotionBlurPrevViewProjection` and `MotionBlurPrevSecViewProjection`,
+   and vertex buffer 0 registers 16 to 19, `SecondaryInvViewProj`). It
+   reads the depth at its interpolated texture coordinate `t` (input 1),
+   forms the clip position `(2·t.x - 1, 1 - 2·t.y, |depth|, 1)`, takes the
+   world position through the current or the secondary inverse
+   view-projection (by the depth's sign), projects it with the matching
+   previous view-projection and writes `(0.5, -0.5)` times the difference
+   of the two positions, which is the motion in units of `t`. No constant
+   carries the target's or the viewport's size or offset. Consequence:
+   §2.2 item 2. Still open, with item 1: whether `t` spans the viewport
+   (the eye's half) or the whole target in a half-width pass.
 3. **Screen-like surfaces under TAA (§3).** Which materials draw terminal
    and tracker screens, and can they be recognised by shader, by render
    pass or by the interaction state (11 §5.3)?
@@ -996,6 +1029,19 @@ Each event must convey:
 12. **Jitter scale.** Confirm in a capture whether each eye's jitter is a
     quarter pixel horizontally or half that (1.3).
 13. **2020 build.** Every address of this document.
+14. **Shadow size classes (§16).** Whether the shadow maps of class 0 are
+    a pool with fewer maps than there can be shadow-casting lights (the
+    map table at the shadow object's `+0x18FC` and the per-light entries
+    at `+0x187C`, used by 0x5F4E80), so that forcing class 0 could make
+    two lights share one map. Look for: the code that fills those tables
+    (the size table's fill 0x611D00 is its neighbour) and, in game, a room
+    with several shadow-casting lamps with §16 on: every shadow stays
+    where it belongs.
+15. **Readers of the alpha-light atlas (§15).** Whether anything other
+    than the particle pixel shaders of §15.2 reads the atlas or the light
+    lists submitted at 0x592E10 (1.7). Until this is known, §15 changes
+    the shaders only and leaves the game's light submission and the
+    `ALPHALIGHT_TASK` job running (item 4).
 
 ## 13. Changes to v1 documents
 
@@ -1024,6 +1070,10 @@ To be applied in the v1 revision that collects v2 changes (20 §10 item 11):
 - `08-render-fixes.md` §1: a second shader fix, for vertex shaders, is
   24 §14; `11-diagnostics.md` §2.2: its events (24 §14.7) and
   `CreateVertexShader` among the intercepted methods.
+- (r11) `20-v2-overview.md` §3.4: the features of §15 and §16 in its
+  list; `11-diagnostics.md` §2.2: the event of §15.6, and §2 the events of
+  §16 (§11.3); `06-options-and-config.md` §1 needs no change (the keys are
+  in `Graphics`, 24 §10).
 
 ## 14. Upright sprites in stereo (a fix, no key)
 
@@ -1207,3 +1257,154 @@ concern for shader-creation cost). Nothing runs per frame.
 4. Runtime None: unchanged.
 5. The log shows the first `Upright sprites` event after a level loads,
    with a nonzero changed count and none refused.
+
+## 15. Constant smoke and fog lighting (`Graphics.ConstantSmokeLighting`, r11)
+
+### 15.1 What the player gets
+
+Smoke, steam, fog and the other lit particles are lit with one constant
+brightness everywhere: their brightness never changes with the view, the
+head, the eye or the frame. They no longer brighten near lamps or darken
+in shadow. This is offered for players who prefer smoke that always looks
+the same to smoke that follows the scene's lights, and as a remedy for the
+open report of 08 §8.5 (smoke unlit when looked at directly) while that
+report is unresolved [proposal: an option a player chooses, never the
+default, because the game's dark scenes depend on particle lighting,
+§4.2].
+
+### 15.2 Game facts [sure, counted by the spec side]
+
+- In the Torrens and `TECH_HUB` level packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`),
+  72 and 93 pixel shaders bind `alphalightIntensitiesReg_TEX` (slot t9,
+  1.7, 08 §8.1); none of the global packs under `DATA\SHADERS` does, and
+  no vertex shader does.
+- Each of them samples it exactly once. The sample reads the texture's
+  channels x, y and z (the light's colour) into three components of a
+  temporary: `xyz` with the source swizzle `.xyzw` (35 and 46 shaders), or
+  `yzw` with `.wxyz` (37 and 47 shaders). Its coordinate is the
+  interpolated lookup of 08 §8.1.
+- After the sample the shaders scale the light by the vertex colour and by
+  constants (for example pixel buffer 2 register 40) and apply it to the
+  particle's colour.
+- In the `yzw` form the temporary's x component holds a value the shader
+  computed before the sample and uses after it (in the shaders the spec
+  side read, the particle's fade against the depth buffer, which softens
+  where smoke meets the floor and walls).
+
+### 15.3 Required result
+
+While the key is on, in every pixel shader the game creates (while a
+headset runtime is chosen) that samples `alphalightIntensitiesReg_TEX` in
+one of the two forms of §15.2, the three components the sample writes
+hold `(B, B, B)` instead of the sampled light, with `B` the value of
+`Graphics.ConstantSmokeBrightness`. Nothing else in the shader changes:
+the other component of the temporary (in the `yzw` form, the depth fade),
+every value computed before the sample, the texture and sampler
+declarations, the inputs, outputs and signatures stay as they are. A
+shader whose sample differs in any way from the two forms is created
+unchanged. The container rules of 08 §1.4 apply (understood or
+untouched, checksum, fallback to the original on refusal).
+
+`B` is a light intensity in the units the atlas holds, before the
+shader's own colour and scale. Default 0.15 [proposal: a dim neutral
+light, so that smoke reads as a faint grey in the game's dark corridors
+and does not glow; to be tuned in game, §15.5 step 2].
+
+The shaders are changed when the game creates them, so a change of either
+key applies at the next launch; the change then applies to every frame of
+the session, flat frames included. Runtime None: nothing (20 §1.2).
+
+With the key on, the atlas is no longer read by these shaders, so 08 §8.3
+and §4 of this document have no visible effect on them; they stay
+installed as they are. Skipping the game's work that fills the atlas is
+allowed only once §12 item 15 shows that nothing else reads it.
+
+### 15.4 Edge cases, threads, cost
+
+Shader creation happens on whichever thread the game creates shaders on;
+the cheap search of 08 §1.4 applies (a shader without the resource name's
+slot binding of t9 and a sample of t9 is skipped before any checksum).
+Nothing runs per frame. The changed shaders are shorter than the game's
+(no texture read).
+
+| Situation | Rule |
+|---|---|
+| a shader changed by another tool | form or checksum differs: created unchanged |
+| the dither fix (08 §1) or the upright sprites (§14) | independent: 08 §1 changes other instructions of some of these pixel shaders, §14 their vertex shaders; each change keeps the others' instructions |
+| 2020 build | a property of the shader packs, not of `AI.exe`: applies if the packs match [guess] |
+
+### 15.5 Acceptance
+
+1. Key on, after a restart: near steam lit by a lamp (Sevastopol vents,
+   the Torrens), the smoke has the same brightness wherever it is and
+   wherever the player looks; turning the head and closing each eye in
+   turn changes nothing; the edge where smoke meets the floor stays soft.
+2. In a dark corridor with smoke, set `Smoke Brightness` so that smoke is
+   a faint grey and does not glow (restart after each change); record the
+   value and, if it differs much from 0.15, propose it as the default.
+3. Key off, after a restart: the game's lighting (with 08 §8.3) is back.
+4. The log shows the event of §15.6 after a level loads with a nonzero
+   changed count and none refused.
+
+### 15.6 Logging
+
+As §14.7, with the template
+`Constant smoke lighting: {Patched} of {Created} pixel shaders changed so far; {Rejected} refused by the device`
+and, at install, the brightness in use.
+
+## 16. Full shadow detail at any distance (`Graphics.FullShadowDetail`, r11)
+
+### 16.1 Problem
+
+The game gives each shadow-casting light a shadow map of a size class
+every frame; a light of class `i` gets a map of the setting
+ShadowMapResolution divided by 2^i on each side (§16.2). In a headset,
+shadows are seen closer and larger than on a monitor (§6.2), so the
+smaller classes show blocky or blurred shadows, and a light that changes
+class while the player moves shows its shadow sharpening or blurring
+[likely: the class follows the light's rank, §16.2]. [proposal: a v2
+option, for players with GPU time to spare.]
+
+### 16.2 Game facts [sure for the code]
+
+- The shadow object's size table (16-bit sizes from `+0x1954`) is filled
+  at start-up (0x611D00, the loop at 0x611DC8) with the resolution shifted
+  right by the class: class 0 is ShadowMapResolution itself (clamped to
+  512 to 4096, 1.9).
+- Each frame the shadow-casting lights are ranked (0x5F71D0 sorts their
+  entries by a float key, largest first) and each light is set up by
+  0x5F4E80 (thiscall on the shadow object, two stack arguments, the light
+  and its class; `ret 8`), whose only call is at 0x5F9A67. The bytes from
+  0x5F9A5A are `8b 54 0f 0c 8d 04 0f 8b 00 52 50 8b ce e8 14 b4 ff ff`
+  (the class from the light's entry `+0x0C`, the light from its `+0x00`,
+  push both, ECX the shadow object, call). The set-up takes the map size
+  from the size table by the class, and the map from the table at
+  `+0x18FC` by the class (or from the light's own entry at `+0x187C`)
+  [sure for the reads; what the class is chosen from is [likely] the
+  rank].
+
+### 16.3 Required behaviour
+
+While stereo runs and the key is on, every light the game sets up with a
+shadow map gets class 0, so every shadow has the full ShadowMapResolution;
+nothing else of the set-up changes. Otherwise the game's class is used.
+The call at 0x5F9A67 is checked (the bytes of §16.2) before it is changed;
+if it differs, the feature stays off and the log says so.
+
+Implement only after §12 item 14 is answered: if class-0 maps are a pool
+too small for every light, forcing class 0 would make lights share a map,
+and the requirement is then only met by a means that gives each light its
+own full-size map, or the feature is dropped.
+
+Cost: GPU time for rendering every shadow map at full size; to be
+measured in a room with several shadow-casting lamps at pixel scale 1.0,
+and recorded in the commit (STYLEGUIDE §9). Budget [proposal]: at most
+1 ms of GPU time over the key off.
+
+### 16.4 Acceptance
+
+In a room with several shadow-casting lamps (Medical, Seegson
+Synthetics), key on: every shadow is as sharp as the nearest lamp's,
+whichever lamp is nearest; walking through the room, no shadow sharpens
+or blurs; every shadow stays where it belongs. Key off: the game's
+behaviour. The log shows the event of §11.3.
