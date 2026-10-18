@@ -115,6 +115,14 @@ Playing
     seated play, for a low chair or a high stool. Default 0.
   - "EyeForward": -0.2 to 0.2 metres moves your eyes forward of (or back
     from) the character's body. Default 0.
+  - "Visible": which parts of your character you see: "Full" (the
+    default), "ArmsAndHands", "HandsOnly" or "None" (only the item in your
+    hand). Hidden parts are also gone from reflections and shadows.
+  - "RealCrouch": true, in standing play with a calibrated height: crouch
+    for real to make the character crouch, stand up to stand (the game
+    still keeps you down in a vent). Your view stays at your real head.
+    The crouch button keeps working. Default false.
+  - "RoomScale": not available yet; turning it on changes nothing.
 - Hands (preview; Options > MotherVR > Hands), in a "Hands" object
   under "Settings":
   - "Enabled": true uses your tracked controllers in the game (default
@@ -162,6 +170,43 @@ Playing
   - "CrashSafeLog": true writes mothervr.log to disk as it goes, and adds
     the mod's state to a crash record, so the log survives even a PC
     crash. Applies from the next launch. Default false.
+  - "RecenterGesture": true recenters when you hold both grips with both
+    hands at your face for about a second (not while you hold the
+    trigger). Default false.
+  - "HolsterGestures": true: squeeze a grip over your right shoulder for
+    the next weapon, over your left shoulder for the previous one, at
+    your left hip for the flashlight, and in front of your chest for the
+    motion tracker. A squeeze anywhere else aims or raises the tracker as
+    usual. Off in menus and interactions. Default false.
+  - "HidingLean": true: in a locker or other hiding place, lean your head
+    sideways or back to peek and lean. Small movements do nothing.
+    Default false.
+  - "HoldBreathGesture": true: when the game asks you to hold your breath
+    while hiding, cover your mouth with a hand (the grip still works).
+    Default false.
+  - "HudToggleGesture": true: hold your left hand at the side of your
+    head and press Map to hide or show the HUD. It never shows a HUD the
+    game is hiding, for example in a scene. Default false.
+  - "ControllerGlyphs": true makes button prompts and View Controls show
+    the buttons of the controllers you hold (Index, Quest/Touch, WMR, Vive
+    wands, Steam Frame), per hand. It applies the next time a controller
+    is detected (switch it off and on, or restart). Default false.
+- Hud (preview; console commands mvr_*), in a "Hud" object under
+  "Settings":
+  - "Crosshair": "On" (default), "Off", or "Auto" (hidden while you aim
+    with the hand). The ammo count stays.
+  - "Hidden": true starts with the HUD hidden (health, ammo, prompts,
+    objectives); subtitles stay. Default false.
+  - "ItemHighlight": false: items you can pick up do not glow; prompts
+    still work. Default true.
+  - "Placement": "HeadLocked" (default) or "Follow" (level, catches up
+    when you turn more than about 20 degrees); "Distance" 0.6 to 2.0 m,
+    "Width" 0.3 to 1.2 m (a smaller HUD has smaller text), "Pitch" -30 to
+    10 degrees (negative: below your view).
+- Interaction (preview), in an "Interaction" object under "Settings":
+  "TerminalTextScale" 1, 1.25, 1.5 or 1.75 is saved but has no visible
+  effect yet; "PhysicalLevers", "CameraTakeovers", "TerminalDistance" and
+  "RewireDistance" are saved but do nothing in this version.
 - Graphics (preview; mothervr.json only), in a "Graphics" object under
   "Settings", all applied at the next launch:
   - "EngineSettingsOverride": true adds the options below to the game's
@@ -175,6 +220,9 @@ Playing
     Alternative: sharp, mirror-like reflections without blur.
   - "StreamingTextureHeapMB": 0 keeps the game's size, or 300 to 1024.
   - "StreamingModelHeapMB": 0 keeps the game's size, or 128 to 512.
+  - "LensFlares", "ChromaticAberration", "FilmGrain": false turns that
+    effect off in the headset only, whatever the game's Video setting;
+    flat play and your saved game settings are unchanged. Default true.
 
 If something goes wrong
 - The headset shows the game as a flat screen (Theatre), or the game

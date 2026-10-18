@@ -295,6 +295,123 @@ be on. Try on OpenVR and OpenXR, with Dev. Debug Options on.
       launch): `log: crash-safe logging on` at start, no stutter from
       logging; after a crash the `crash: mod state:` line is in the file.
 
+## Gestures and hiding
+
+Controls keys in `mothervr.json`, Dev. Debug Options on.
+
+- [ ] **Recenter gesture.** `"RecenterGesture": true`. Both hands at the
+      face, both grips held under 0.75 s: nothing; over 0.75 s: one
+      recenter. Aiming with the tracker raised for minutes never fires it.
+      Log: `[input] gesture: recenter (both hands at the head, grips held)`
+      once, then the runtime's recenter line.
+- [ ] **Holsters.** `"HolsterGestures": true`. Squeeze over the right
+      shoulder: next weapon; in front of the body: aims as before. At a
+      keypad the same squeeze does nothing. Log: `[input] gesture: holster
+      right shoulder (right hand): next_main_weapon`; at the keypad
+      `... suppressed: interaction`.
+- [ ] **Lean while hiding.** `"HidingLean": true`. In a locker lean your
+      head about 15 cm sideways, then back: the character peeks, then leans
+      back. Log: `[input] gesture: hiding lean reference taken`, `[input]
+      gesture: hiding lean (side ..., forward ...)`, `... released`.
+- [ ] **Hold breath.** `"HoldBreathGesture": true`. At the breathing prompt,
+      a hand over the mouth holds the breath; taking it away lets go. Log:
+      `[input] gesture: hold breath (hand over the mouth)` and `... released`
+      between the `Start_Breathing_Game` and `End_Breathing_Game` lines.
+      The game inputs for lean and breath come from its tutorial texts
+      ([likely]); this check confirms them.
+
+## Controller glyphs
+
+- [ ] **Prompts are never blank.** First start of this build: `MOTHER.PAK`
+      rebuilds and every button prompt shows an image, with Controller
+      Glyphs off and on. Blank prompts mean the glyph names' case does not
+      match what the game looks up.
+- [ ] **Per-controller glyphs.** `"ControllerGlyphs": true` with Index
+      controllers: interact shows the A ring with a bar under its right
+      half, map the A ring with a bar under its left half; View Controls
+      lists `Interact | Right A`, `Map Menu | Left A`. Log: `[input]
+      controller glyphs: left Index, right Index (SteamVR Input)`. Switch to
+      Touch in play: prompts redraw without pressing anything (`left Touch,
+      right Touch`). On OpenXR the line ends `(OpenXR)`. Steam Frame: the
+      flashlight prompt shows the LB tab, the map prompt the View icon.
+- [ ] **D-pad glyphs.** Controller Glyphs off, D-pad Emulation on: weapon
+      cycling prompts show the grey L disc with a triangle at once.
+
+## HUD
+
+- [ ] **Defaults.** No `Hud` keys: the log has the `hud:` and
+      `interaction:` start-up lines and no `[hook] hud ...` group lines;
+      HUD and crosshair as in v1.
+- [ ] **Crosshair off.** `"Hud": {"Crosshair": "Off"}`: raise the revolver,
+      no crosshair, ammo count shown. Log: `[hook] hud crosshair: in place
+      (3 sites)`, `hud: crosshair hidden (Crosshair Off)`. Back to On
+      (`mvr_crosshair 0`): the crosshair returns at the next raise.
+      `"Auto"` with hand aiming: no crosshair while aiming from the hand.
+      Watch for a crash when the setting is changed in play: the sites are
+      written while the game runs.
+- [ ] **HUD hidden.** `"Hidden": true`, restart: no health, ammo or
+      prompts, subtitles shown. Log: `[hook] hud visibility: in place (6
+      sites)`, `hud: HUD hidden (Hud.Hidden)`.
+- [ ] **HUD toggle gesture.** `"Controls": {"HudToggleGesture": true}`:
+      left hand at the head, press Map: the HUD flips and the map stays
+      shut (`hud: toggle gesture fired`). In a scene where the game hides
+      the HUD the gesture does not show it; after the scene a HUD the
+      player hid stays hidden.
+- [ ] **Item highlight off.** `"ItemHighlight": false`: nearby items do not
+      glow, prompts still work (`[hook] hud highlight: in place (2
+      sites)`). Note whether the glow goes at once or after a reload.
+- [ ] **Follow placement.** `"Placement": "Follow", "Pitch": -15`: the HUD
+      sits below the view, level, still for small glances, follows turns
+      over about 20 degrees smoothly, and jumps at once on a snap turn or
+      recenter.
+- [ ] **Unfinished keys.** `"Interaction": {"PhysicalLevers": true}` or
+      `"CameraTakeovers": "Reduced"`: only a one-time "has no effect"
+      line. `"TerminalTextScale": 1.5`: `ui patch: the embedded patch has no
+      variant text150; built without it`.
+
+## Body
+
+- [ ] **Body visibility.** `"Body": {"Visible": ...}` each of
+      `ArmsAndHands`, `HandsOnly`, `None`, in a normal level and in a space
+      suit section: the hidden parts are gone in both eyes, in reflective
+      floors and in the shadow; the held item stays in `None`; other
+      characters are whole. Log: `[hook] body visibility: in place
+      (SkinSetPose calls RVA 002A51D8, 002A536A)`, `[body] player skeleton
+      FEMALEFP: N bones; ...`, `[body] visibility HandsOnly: K of N bones
+      of FEMALEFP collapsed`; no `[body] WARNING a part of the player's
+      model is posed from another skeleton's pose`. Back to `Full`:
+      `[body] visibility Full: the whole body is drawn`. With no `Body`
+      keys: no `body visibility` line, and the body shows as in v1.
+- [ ] **Real crouch.** Standing, calibrated, `"RealCrouch": true`: crouch
+      for real, enter a vent, try to stand inside, leave and stand. The
+      character follows, stays down in the vent, and the view stays at
+      your real head (no double drop: the 0.63 m drop is right). Log:
+      `[body] real crouch: crouch (head ...)` and `stand`; no `[body]
+      WARNING real crouch: the game's requested crouch did not follow a
+      press` (that warning would mean the game's crouch is hold-to-crouch).
+- [ ] **Hand-back.** After a cutscene, ladder, hiding and a death, crouch
+      for real during or just after: within a second the crouch matches.
+      Log: `[body] control hand-back after Cutscene: crouch re-synced after
+      0.5 s`.
+- [ ] **Room-scale.** `"RoomScale": true`: nothing changes; log once
+      `[body] room-scale: off in this build; ...`.
+
+## 2D-only effects
+
+- [ ] **Lens flares.** `"Graphics": {"LensFlares": false}`, stand near
+      flared lights (Torrens, Solomons): no flares in either eye. Log:
+      `[hook] lens flare toggle: in place on 1 sites`, `[render] 2D effects
+      in VR: lens flares off, chromatic aberration game's, film grain
+      game's`.
+- [ ] **Chromatic aberration.** Video setting On, `"ChromaticAberration":
+      false`: no colour fringes at the edges; with runtime None the fringes
+      are back and the Video setting is still On.
+- [ ] **Film grain.** Film Grain 1.0, `"FilmGrain": false`: no grain in the
+      headset; runtime None shows it again.
+- [ ] **Defaults.** All three true: three `... toggle: off; Graphics.X is
+      true, the game's effect is kept in VR` lines and no `[render] 2D
+      effects` line.
+
 ## Options pages
 
 Options > MotherVR has four new entries, Comfort, Controls, Hands and
