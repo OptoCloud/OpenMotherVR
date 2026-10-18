@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its internal names or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons. r5 (spec r6): a tester's report on SteamVR with a Steam Frame headset (input while another window has the desktop focus); project decision of spec r6, with its reason inline (the touchpad scheme's scaled move limited to length 1 as a vector). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the map's digital evaluation (binding flag bit 0x40 marks a composite reference; codes reach the pad methods zero-extended), of the stock ControlToName for codes above 0x17, and of the FollowBehavior fields (the yaw setter, the character's position and its head bone's position); the five pad slots as one patch, checked against their exact functions; the controls help as content, not a page, and its crossing between threads; prompts while the options archive is not in use; VR activity seen by every reader in a game frame; the remap's flag writes given their game reason; thresholds and the initial glyph mode given reasons; keyboard and mouse each read whenever their own device exists; the recenter chord re-armed by release alone; controller identification and the OpenXR actions stated as results; the structure offsets marked as 2015 facts. r7 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (FollowBehavior +0x1C0, +0x1CC and +0x248 are written by vtable slot 6 and the update, slot 8, not by OnActivate; the `Head1` transform is taken with a mode argument of 7); a repeated CreateDevice is not expected (02 §6.1); a set is chosen at stereo device creation for the controls help; the toggled grip states kept when an OpenXR session stops; only `EXITING` sets the game's exit flag (09 §3). r8 (CLEANROOM r3, what a player sees): what a player of the earlier mod saw, read by the spec side (the designs of its controller glyphs, the rows of its controls help, the labels of the toggle-grips and snap rotation options, the values of the segments list), stated exactly where v1 behaves the same; the Index row and the unbound glyph are project decisions, each with its reason inline; the controls help is empty until a set is chosen (project decision). Revision: r8 -->
+<!-- Provenance: game analysis of AI.exe 2015 (disassembly of the input manager, XInput pad device, action maps, device selection, keyboard/mouse devices, FollowBehavior camera, prompt-name builder); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; the earlier mod's observable controls (which physical control drives which game function, which map actions respond to VR controls) restated as requirements, without its internal names or code; user requirements for v1 fixes (thumbstick controllers, bounds safety, input cleared without focus, controls handed to the game right after the frame's poses arrive) and for the runtime input layer (SteamVR Input with default bindings, OpenXR actions, the earlier mod's Touch layout for thumbstick controllers, Index pause on the left trackpad); public OpenVR and OpenXR input APIs; in-game observation by the spec side on the 2015 build with SteamVR and Valve Index controllers, under OpenVR (SteamVR Input) and OpenXR (action-map counts, focus loss, profile binding). r4: virtual codes, remap, pad methods, glyphs, prompt switching and the controls help page restated as required results; invented names removed; constants given reasons. r5 (spec r6): a tester's report on SteamVR with a Steam Frame headset (input while another window has the desktop focus); project decision of spec r6, with its reason inline (the touchpad scheme's scaled move limited to length 1 as a vector). r6 (spec r7, second clean-room review): AI.exe 2015 analysis by the spec side of the map's digital evaluation (binding flag bit 0x40 marks a composite reference; codes reach the pad methods zero-extended), of the stock ControlToName for codes above 0x17, and of the FollowBehavior fields (the yaw setter, the character's position and its head bone's position); the five pad slots as one patch, checked against their exact functions; the controls help as content, not a page, and its crossing between threads; prompts while the options archive is not in use; VR activity seen by every reader in a game frame; the remap's flag writes given their game reason; thresholds and the initial glyph mode given reasons; keyboard and mouse each read whenever their own device exists; the recenter chord re-armed by release alone; controller identification and the OpenXR actions stated as results; the structure offsets marked as 2015 facts. r7 (spec r7 cross-check): AI.exe 2015 analysis by the spec side (FollowBehavior +0x1C0, +0x1CC and +0x248 are written by vtable slot 6 and the update, slot 8, not by OnActivate; the `Head1` transform is taken with a mode argument of 7); a repeated CreateDevice is not expected (02 §6.1); a set is chosen at stereo device creation for the controls help; the toggled grip states kept when an OpenXR session stops; only `EXITING` sets the game's exit flag (09 §3). r8 (CLEANROOM r3, what a player sees): what a player of the earlier mod saw, read by the spec side (the designs of its controller glyphs, the rows of its controls help, the labels of the toggle-grips and snap rotation options, the values of the segments list), stated exactly where v1 behaves the same; the Index row and the unbound glyph are project decisions, each with its reason inline; the controls help is empty until a set is chosen (project decision). r9: Valve's public Steam Frame input documentation (the OpenVR controller type `frame_controller`, its input paths, the OpenXR extension `XR_VALVE_frame_controller_interaction` and its interaction profile `/interaction_profiles/valve/frame_controller_valve`); a tester's report on a Steam Frame (with no binding of its own, the runtime converted the Touch binding and put Flashlight on the left d-pad, so the d-pad did not navigate menus); project decisions with their reasons inline: the Frame's default bindings and controls help, the four d-pad inputs (22 §7), the aim poses declared and bound whatever `Hands.Enabled` is (21 §16), and the notice for a binding without them. Revision: r9 -->
 
 # 04 Input
 
@@ -862,9 +862,9 @@ frame from what the runtime reports:
 
 | Runtime | At stereo device creation | Then, the first time the right-hand controller is identified |
 |---|---|---|
-| OpenVR, SteamVR Input | touchpad set and entries | `Prop_ControllerType_String` of the right-hand role's device: `vive_controller`: touchpad set and entries; `knuckles`: thumbstick set, Index variant of the entries; anything else (`oculus_touch`, `holographic_controller`, unknown): thumbstick set and entries |
+| OpenVR, SteamVR Input | touchpad set and entries | `Prop_ControllerType_String` of the right-hand role's device: `vive_controller`: touchpad set and entries; `knuckles`: thumbstick set, Index variant of the entries; `frame_controller`: thumbstick set, Frame variant of the entries; anything else (`oculus_touch`, `holographic_controller`, unknown): thumbstick set and entries |
 | OpenVR, legacy | touchpad set and entries | no change |
-| OpenXR | thumbstick set and entries | the first frame on which a right-hand profile is known: `htc/vive_controller`: touchpad set and entries; any other: thumbstick set and entries (including Index: under OpenXR its pause entry names the menu button) |
+| OpenXR | thumbstick set and entries | the first frame on which a right-hand profile is known: `htc/vive_controller`: touchpad set and entries; `valve/frame_controller_valve`: thumbstick set, Frame variant of the entries; any other: thumbstick set and entries (including Index: under OpenXR its pause entry names the menu button) |
 
 "Identified" under OpenVR: a hand's controller is identified when the
 runtime first reports a valid device for that hand role, and again
@@ -970,6 +970,14 @@ style of the other rows). Rows 11 and 15 keep `Y` and `X`, matching the
 glyphs Index players see (4.1), although the Index's left buttons are
 marked A and B (§11).
 
+**Frame variant** (Steam Frame, 5.8.2, 5.8.4): the thumbstick rows,
+except row 11 `Flashlight` | `Left Bumper`, row 15 `Map Menu` |
+`View Button`, and a row 17 after them, `Menu Navigation` | `Left D-Pad`
+(project decision: the Frame has its own buttons for these, 5.8.2, and a
+d-pad that moves the selection in menus as a pad's d-pad does, 22 §7; the
+texts follow the style of the other rows). Its glyphs are the thumbstick
+set, so a prompt for Map or Flashlight shows `X` or `Y` as on Index (4.1).
+
 On WMR the thumbstick rows name face buttons for controls that are
 touchpad presses (5.4); this is accepted in v1.
 
@@ -1017,8 +1025,14 @@ consistent and is recommended.)
 |---|---|
 | 2D vector | Move: move X / Y. Turn: turn (x) and, in the thumbstick scheme, previous / next weapon (y) |
 | 1D value, 0..1, pressed above 0.5 (so a trigger works as the default control) | Crouch: crouch. Fire: fire, throw, melee |
-| boolean | Aim: aim (`Input.ToggleGrips`). Tracker: motion tracker (`Input.ToggleGrips`). Interact: interact, and the flashlight when the right hand is near the head. Reload: reload / activate, back in menus. Radial: radial menu. Flashlight: flashlight. Sprint: sprint. Map: map. Pause: pause. Turn engage: touchpad scheme only, engages turning while `Input.SnapRotation` is on (5.2) |
-| pose, one per hand | Hand poses: not used by the game in v1 (5.11) |
+| boolean | Aim: aim (`Input.ToggleGrips`). Tracker: motion tracker (`Input.ToggleGrips`). Interact: interact, and the flashlight when the right hand is near the head. Reload: reload / activate, back in menus. Radial: radial menu. Flashlight: flashlight. Sprint: sprint. Map: map. Pause: pause. Turn engage: touchpad scheme only, engages turning while `Input.SnapRotation` is on (5.2). D-pad up, down, left, right: a controller's own d-pad, which presses every game action whose original pad control is that direction, as a pad's d-pad does (22 §7) |
+| pose, one per hand | Hand poses: not used by the game in v1 (5.11). Hand aim poses: the pointing pose, used while `Hands.Enabled` is on (21 §16) |
+
+The four d-pad inputs are bound by default only on a controller with a
+physical d-pad (the Steam Frame's left hand, 5.8.2): a controller without
+one keeps its v1 layout. The aim poses are declared and bound whatever
+`Hands.Enabled` is, so that turning tracked hands on in the menu applies at
+once (21 §15.1) instead of at the next start.
 
 #### 5.8.2 OpenVR: SteamVR Input
 
@@ -1035,11 +1049,12 @@ available (`VR_GetGenericInterface(IVRInput_Version)` returns non-null):
 2. The manifest (SteamVR's public action manifest format) declares one
    action set (usage `single`); the inputs of 5.8.1 with their types
    (`boolean`, `vector1`, `vector2`, and `pose` for the hand poses); English localisation; and default bindings for the controller
-   types `knuckles`, `oculus_touch`, `holographic_controller` and
-   `vive_controller`, with the assignments in the table below.
+   types `knuckles`, `oculus_touch`, `holographic_controller`,
+   `vive_controller` and `frame_controller` (the Steam Frame), with the
+   assignments in the table below.
 3. A binding a player saved for an older version of the mod may lack
    inputs added later; those read inactive (5.11 logs the case for the
-   hand poses). The implementation may mark binding files with a version
+   hand poses and the aim poses). The implementation may mark binding files with a version
    so players can tell them apart in SteamVR's binding UI.
 4. Call `IVRInput::SetActionManifestPath` with the manifest's absolute path
    (UTF-8), then get the set and action handles (`GetActionSetHandle`,
@@ -1067,27 +1082,43 @@ run.
 Default bindings (`L` / `R` = left / right hand; SteamVR input source path
 under `/user/hand/<hand>/input/`, binding mode, and the mode's input):
 
-| Input | `knuckles` (Index) | `oculus_touch` | `holographic_controller` (WMR) | `vive_controller` (wands) |
-|---|---|---|---|---|
-| Move | L `thumbstick`, `joystick`, `position` | L `joystick`, `joystick`, `position` | L `joystick`, `joystick`, `position` | L `trackpad`, `trackpad`, `position` |
-| Sprint | same source, `click` | same source, `click` | same source, `click` | same source, `click` |
-| Turn | R `thumbstick`, `joystick`, `position` | R `joystick`, `joystick`, `position` | R `joystick`, `joystick`, `position` | R `trackpad`, `trackpad`, `position` |
-| Turn engage | - | - | - | same source, `click` |
-| Radial | same source as Turn, `click` | same source as Turn, `click` | same source as Turn, `click` | R `trackpad`, `dpad` (parameter `sub_mode` = `click`), `center` |
-| Interact | R `a`, `button`, `click` | R `a`, `button`, `click` | R `trackpad`, `dpad` (`sub_mode` `click`), `south` | the R `dpad` source above, `south` |
-| Reload | R `b`, `button`, `click` | R `b`, `button`, `click` | the R `dpad` source above, `north` | the R `dpad` source above, `north` |
-| Map | L `a`, `button`, `click` | L `x`, `button`, `click` | L `trackpad`, `dpad` (`sub_mode` `click`), `south` | L `application_menu`, `button`, `click` |
-| Flashlight | L `b`, `button`, `click` | L `y`, `button`, `click` | the L `dpad` source above, `north` | - (interact near the head) |
-| Crouch | L `trigger`, `trigger`, `pull` | same | same | same |
-| Fire | R `trigger`, `trigger`, `pull` | same | same | same |
-| Tracker | L `grip`, `grab`, `grab` | L `grip`, `button`, `click` | L `grip`, `button`, `click` | L `grip`, `button`, `click` |
-| Aim | R `grip`, `grab`, `grab` | R `grip`, `button`, `click` | R `grip`, `button`, `click` | R `grip`, `button`, `click` |
-| Pause | L `trackpad`, `button`, `click` (Index has no menu button) | L `application_menu`, `button`, `click` (the Touch menu button) | L and R `application_menu`, `button`, `click` (two sources) | R `application_menu`, `button`, `click` |
-| Left / Right hand pose | `/user/hand/<hand>/pose/grip` | `/user/hand/<hand>/pose/openxr_grip` | `pose/grip` | `pose/grip` |
+| Input | `knuckles` (Index) | `oculus_touch` | `holographic_controller` (WMR) | `vive_controller` (wands) | `frame_controller` (Steam Frame) |
+|---|---|---|---|---|---|
+| Move | L `thumbstick`, `joystick`, `position` | L `joystick`, `joystick`, `position` | L `joystick`, `joystick`, `position` | L `trackpad`, `trackpad`, `position` | L `thumbstick`, `joystick`, `position` |
+| Sprint | same source, `click` | same source, `click` | same source, `click` | same source, `click` | same source, `click` |
+| Turn | R `thumbstick`, `joystick`, `position` | R `joystick`, `joystick`, `position` | R `joystick`, `joystick`, `position` | R `trackpad`, `trackpad`, `position` | R `thumbstick`, `joystick`, `position` |
+| Turn engage | - | - | - | same source, `click` | - |
+| Radial | same source as Turn, `click` | same source as Turn, `click` | same source as Turn, `click` | R `trackpad`, `dpad` (parameter `sub_mode` = `click`), `center` | same source as Turn, `click` |
+| Interact | R `a`, `button`, `click` | R `a`, `button`, `click` | R `trackpad`, `dpad` (`sub_mode` `click`), `south` | the R `dpad` source above, `south` | R `a`, `button`, `click` |
+| Reload | R `b`, `button`, `click` | R `b`, `button`, `click` | the R `dpad` source above, `north` | the R `dpad` source above, `north` | R `b`, `button`, `click` |
+| Map | L `a`, `button`, `click` | L `x`, `button`, `click` | L `trackpad`, `dpad` (`sub_mode` `click`), `south` | L `application_menu`, `button`, `click` | L `view`, `button`, `click` |
+| Flashlight | L `b`, `button`, `click` | L `y`, `button`, `click` | the L `dpad` source above, `north` | - (interact near the head) | L `bumper`, `button`, `click` |
+| Crouch | L `trigger`, `trigger`, `pull` | same | same | same | same |
+| Fire | R `trigger`, `trigger`, `pull` | same | same | same | same |
+| Tracker | L `grip`, `grab`, `grab` | L `grip`, `button`, `click` | L `grip`, `button`, `click` | L `grip`, `button`, `click` | L `grip`, `button`, `click` |
+| Aim | R `grip`, `grab`, `grab` | R `grip`, `button`, `click` | R `grip`, `button`, `click` | R `grip`, `button`, `click` | R `grip`, `button`, `click` |
+| Pause | L `trackpad`, `button`, `click` (Index has no menu button) | L `application_menu`, `button`, `click` (the Touch menu button) | L and R `application_menu`, `button`, `click` (two sources) | R `application_menu`, `button`, `click` | R `menu`, `button`, `click` |
+| D-pad up / down / left / right | - | - | - | - | L `dpad_up` / `dpad_down` / `dpad_left` / `dpad_right`, `button`, `click` (four sources) |
+| Left / Right hand pose | `/user/hand/<hand>/pose/grip` | `/user/hand/<hand>/pose/openxr_grip` | `pose/grip` | `pose/grip` | `pose/grip` |
+| Left / Right hand aim pose (21 §16) | `pose/tip` | `pose/openxr_aim` | `pose/tip` | `pose/tip` | `pose/tip` |
 
 The wand's right trackpad appears in two sources (`trackpad` mode for Turn
 and Turn engage, `dpad` mode for the click regions); SteamVR allows this.
 These reproduce 5.3 (Index, Touch), 5.4 (WMR) and 5.2 (wands).
+
+The Steam Frame (project decision, from Valve's published Frame controls:
+on the left a d-pad, a View button and a bumper; on the right A, B, X, Y and
+a Menu button; thumbsticks, triggers and grips on both): it keeps the Touch
+layout where the same buttons exist (5.3: A interact, B reload, the
+thumbsticks, triggers and grips), so a player moving between the two finds
+the same controls. Its left d-pad is the d-pad inputs of 5.8.1, which
+navigate menus and do in play what a pad's d-pad does (22 §7). Map and
+Flashlight, on Touch's left X and Y, go to the left View button and the
+left bumper, the two left buttons the d-pad leaves; Pause is the right
+Menu button. The right X, Y and bumper are left free for the player's own
+bindings. Without a Frame binding SteamVR converts the Touch one, which
+puts Touch's left Y (Flashlight) on the Frame's d-pad: a d-pad that
+toggles the flashlight instead of moving through menus.
 
 Why these pose components: the hand poses are meant to match OpenXR's
 `/input/grip/pose` (palm origin, handle orientation). SteamVR's own
@@ -1138,7 +1169,11 @@ Required when the runtime is OpenXR (09), when the session is created
   is required is which physical control drives which game function, per
   profile. No haptic output in v1;
 - `xrSuggestInteractionProfileBindings` for each profile below (a profile
-  the runtime rejects is logged and skipped; the others still apply), then
+  the runtime rejects is logged and skipped; the others still apply); the
+  Steam Frame profile only when the runtime offers its extension
+  `XR_VALVE_frame_controller_interaction`, which is then enabled at
+  instance creation (a profile path of an extension that is not enabled is
+  not valid), then
   `xrAttachSessionActionSets`; one action space per hand for the grip pose
   (`xrCreateActionSpace` with that hand's subaction path and the identity
   pose). If creating the set or an action, or attaching, fails: log it,
@@ -1173,19 +1208,23 @@ Suggested bindings (paths under `/user/hand/<hand>/`; `L` left, `R` right,
 both hands when not marked). Rows are physical controls; "primary" and
 "secondary" are the lower and upper face buttons (A / X and B / Y):
 
-| Control | `oculus/touch_controller` | `valve/index_controller` | `htc/vive_controller` | `microsoft/motion_controller` | `khr/simple_controller` |
-|---|---|---|---|---|---|
-| grip pose | `input/grip/pose` | same | same | same | same |
-| trigger | `input/trigger/value` | same | same | same | `input/select/click` |
-| squeeze | `input/squeeze/value` | `input/squeeze/value` | `input/squeeze/click` | `input/squeeze/click` | - |
-| stick | `input/thumbstick` | `input/thumbstick` | `input/trackpad` | `input/thumbstick` | - |
-| stick click | `input/thumbstick/click` | `input/thumbstick/click` | `input/trackpad/click` | `input/thumbstick/click` | - |
-| primary | L `input/x/click`, R `input/a/click` | `input/a/click` | - | `input/trackpad/click` | - |
-| secondary | L `input/y/click`, R `input/b/click` | `input/b/click` | - | - | - |
-| menu | L `input/menu/click` | L `input/trackpad/force` | `input/menu/click` | `input/menu/click` | `input/menu/click` |
+| Control | `oculus/touch_controller` | `valve/index_controller` | `htc/vive_controller` | `microsoft/motion_controller` | `khr/simple_controller` | `valve/frame_controller_valve` (Steam Frame) |
+|---|---|---|---|---|---|---|
+| grip pose | `input/grip/pose` | same | same | same | same | same |
+| aim pose (21 §16) | `input/aim/pose` | same | same | same | same | same |
+| trigger | `input/trigger/value` | same | same | same | `input/select/click` | `input/trigger/value` |
+| squeeze | `input/squeeze/value` | `input/squeeze/value` | `input/squeeze/click` | `input/squeeze/click` | - | `input/squeeze/value` |
+| stick | `input/thumbstick` | `input/thumbstick` | `input/trackpad` | `input/thumbstick` | - | `input/thumbstick` |
+| stick click | `input/thumbstick/click` | `input/thumbstick/click` | `input/trackpad/click` | `input/thumbstick/click` | - | `input/thumbstick/click` |
+| primary | L `input/x/click`, R `input/a/click` | `input/a/click` | - | `input/trackpad/click` | - | L `input/view/click`, R `input/a/click` |
+| secondary | L `input/y/click`, R `input/b/click` | `input/b/click` | - | - | - | L `input/bumper/click`, R `input/b/click` |
+| menu | L `input/menu/click` | L `input/trackpad/force` | `input/menu/click` | `input/menu/click` | `input/menu/click` | R `input/menu/click` |
+| d-pad up / down / left / right | - | - | - | - | - | L `input/dpad_up/click` / `input/dpad_down/click` / `input/dpad_left/click` / `input/dpad_right/click` |
 
 (The Index pause is the left trackpad force bound to a boolean action; the
-runtime applies its own press threshold.)
+runtime applies its own press threshold. On the Frame the left "primary" and
+"secondary" are its View button and left bumper, so Map and Flashlight
+land where 5.8.2 puts them.)
 
 Per-hand states to semantic inputs (grip = squeeze > 0.5):
 
@@ -1203,6 +1242,7 @@ Per-hand states to semantic inputs (grip = squeeze > 0.5):
 | Pause | L menu or R menu | R menu |
 | Crouch / Fire | L / R trigger | L / R trigger |
 | Tracker / Aim | L / R grip | L / R grip |
+| D-pad up / down / left / right | the d-pad of either hand (the Frame's left) | - |
 
 #### 5.8.5 Semantic inputs to game actions
 
@@ -1312,10 +1352,15 @@ origin) and its linear velocity, valid or not:
   when the call succeeds, the data is `bActive` and `bPoseIsValid`. When
   controller inputs are bound but a hand pose is not (a custom binding
   saved before the pose actions existed), log once that the binding lacks
-  the hand poses and should be reset to the default. Without SteamVR Input
+  the hand poses and should be reset to the default. Likewise, when a
+  hand's grip pose is tracked but its aim pose action reads inactive (a
+  binding saved before the aim poses were always bound), log once that the
+  binding lacks the aim poses and should be reset. Without SteamVR Input
   no hand poses are available.
 - **OpenXR**: the grip poses and velocities of 5.8.4, located with the
-  frame's views and published together with them.
+  frame's views and published together with them. When a hand's grip is
+  located but its aim pose action reads inactive (the bound profile has no
+  aim pose), log once per hand.
 
 Converted to the game's convention like the head pose (03 §1: negate the X
 and Y basis columns, negate the translation and multiply by the world
@@ -1578,6 +1623,19 @@ Common:
     checks passed: none of the pad slots, the connected flag or the
     left-stick redirect is left applied, the log says the controls area is
     off, and a real pad plays as stock.
+
+Steam Frame (OpenVR and OpenXR):
+
+28. In the main menu and the pause menu the left d-pad moves the selection
+    up, down, left and right, as a pad's d-pad does; in play left / right
+    select the previous / next main weapon (the default d-pad bindings, 22
+    §2.2). The left View button opens the map, the left bumper toggles the
+    flashlight, the right Menu button pauses; the controls help shows the
+    Frame variant (5.7). Under OpenXR the log names the Frame profile.
+29. `Hands.Enabled` turned on in the menu during play, with the default
+    bindings: the hands aim at once, with no notice that the runtime gives
+    no aim pose; with a binding saved before the aim poses were bound, the
+    log says once that it lacks them.
 
 ## 11. Open questions
 

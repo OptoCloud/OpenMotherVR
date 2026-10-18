@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6); r3: second clean-room review: the crash event stated as the state that must hold, at the level of v1's crash record; the gestures and d-pad emulation stated as results with this project's reasons; the HUD game facts of 2.4 re-read by the spec side in the 2015 `AI.exe` and reconciled with 23 (the pending flag of each HUD object, the objects the game's own hide and show touch); this document is the one owner of seated and standing play and the calibration (21 reads them); `EnhancedMode` gates 21 to 24 (20 §1.3; removed in r6); lever interactions own the grips, the move action and turning (23 §3.2). r4 (spec r7 cross-check): the game's event tap function named `ScriptEventTap` and the tracked state the logging of game script events, as 11 §5 now does; the flush thread's exit rule follows 12 §7 (at process exit only the detach line is logged); the change listed for 11 states the crash event's level and timing as §14 does. r5 (CLEANROOM r3, what a player sees may be stated exactly): the v2 options pages given exactly (the `Enhanced Mode` entry and its place on the `MotherVR` page, replaced in r6 by one entry per page, one sub-page per settings section, item order, labels, control kinds, value names, display formats, description lines, greying and hiding rules, the calibration's texts), the glyph designs per controller family in v1's look with a hand mark, the controls help rows per family and for v2 features, and the welcome text once OpenXR is the default, each a project text in the style of the v1 page players know, with its reason; the game's own Camera Speed label and description and its longest stock menu description read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the stock menu movies of the player's `UI.PAK`; the VR-off hotkey's page state stated as v1's (no new text). r6 (user decision of 2026-10-16): no master switch: the `EnhancedMode` key, its toggle, the `Enhanced Mode` entry and page and the greying that depended on it are removed; each key applies on its own with its v1 value as default (20 §1.3); the `MotherVR` page gains the seven v2 sub-page entries directly, after `Input` and before `Dev. Debug Options` (12.1). Revision: r6 -->
+<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6); r3: second clean-room review: the crash event stated as the state that must hold, at the level of v1's crash record; the gestures and d-pad emulation stated as results with this project's reasons; the HUD game facts of 2.4 re-read by the spec side in the 2015 `AI.exe` and reconciled with 23 (the pending flag of each HUD object, the objects the game's own hide and show touch); this document is the one owner of seated and standing play and the calibration (21 reads them); `EnhancedMode` gates 21 to 24 (20 §1.3; removed in r6); lever interactions own the grips, the move action and turning (23 §3.2). r4 (spec r7 cross-check): the game's event tap function named `ScriptEventTap` and the tracked state the logging of game script events, as 11 §5 now does; the flush thread's exit rule follows 12 §7 (at process exit only the detach line is logged); the change listed for 11 states the crash event's level and timing as §14 does. r5 (CLEANROOM r3, what a player sees may be stated exactly): the v2 options pages given exactly (the `Enhanced Mode` entry and its place on the `MotherVR` page, replaced in r6 by one entry per page, one sub-page per settings section, item order, labels, control kinds, value names, display formats, description lines, greying and hiding rules, the calibration's texts), the glyph designs per controller family in v1's look with a hand mark, the controls help rows per family and for v2 features, and the welcome text once OpenXR is the default, each a project text in the style of the v1 page players know, with its reason; the game's own Camera Speed label and description and its longest stock menu description read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the stock menu movies of the player's `UI.PAK`; the VR-off hotkey's page state stated as v1's (no new text). r6 (user decision of 2026-10-16): no master switch: the `EnhancedMode` key, its toggle, the `Enhanced Mode` entry and page and the greying that depended on it are removed; each key applies on its own with its v1 value as default (20 §1.3); the `MotherVR` page gains the seven v2 sub-page entries directly, after `Input` and before `Dev. Debug Options` (12.1). r7: Valve's public Steam Frame input documentation (a controller with a physical d-pad); a tester's report on a Steam Frame (its d-pad toggled the flashlight instead of moving through menus); project decisions with their reasons inline: a controller's own d-pad drives the d-pad actions whatever `Controls.DpadEmulation` is (04 §5.8.1); the d-pad modifier is Sprint's control rather than an input of its own. Revision: r7 -->
 
 # 22. Controls and comfort (v2)
 
@@ -634,9 +634,11 @@ not change with the world's scale].
 
 ## 7. D-pad emulation
 
-**What the player experiences.** On VR controllers, which have no d-pad,
-the game's d-pad functions (2.2) can still be used: weapon cycling in play
-and item navigation in menus and interaction screens.
+**What the player experiences.** On VR controllers, which mostly have no
+d-pad, the game's d-pad functions (2.2) can still be used: weapon cycling
+in play and item navigation in menus and interaction screens. A controller
+that has a d-pad (the Steam Frame's left hand) uses it as a pad's d-pad,
+with or without the emulation.
 
 **Required results.** With `Controls.DpadEmulation` on:
 
@@ -655,16 +657,23 @@ while any of these holds:
   except while 23's lever mapping is active (23 §3.2), which owns the move
   action then;
 - a menu is on the virtual screen (stereo mode 1);
-- the player holds the "d-pad modifier", a new semantic boolean input (04
-  §5.8.1) whose default binding is the left stick click held for 0.3 s; on
-  wands the left touchpad's four edges while clicked.
+- the player holds the "d-pad modifier": the control of Sprint (04
+  §5.8.1), the left stick click in every default binding, held for 0.3 s;
+  on wands Sprint's left touchpad click on one of its four edges (outside
+  the centre zone of 04 §5.1), at once, with the direction of the edge.
+  While the modifier is engaged Sprint reads released; a shorter click, or
+  a wand's click in the pad's centre, stays sprint.
 
 Reasons: the left stick is the one control every supported controller has
 under the left thumb, where a d-pad sits on a pad, so no new reach is
 learned; during interactions and in menus it does not walk the player, so
 its direction is free; elsewhere a deliberate modifier keeps walking
 unaffected, and holding the click (rather than a click alone, which is
-sprint) tells the two apart.
+sprint) tells the two apart. The modifier is Sprint's control rather than
+a runtime input of its own [proposal: one physical control does both, so a
+second input would need a second binding source on the same control in
+every default binding, and a player who moves Sprint in the runtime's
+binding UI moves the modifier with it].
 
 **Direction.** With the left stick at `(x, y)`: a direction is pressed when
 the stick is beyond 0.6 along that axis and the larger of `|x|`, `|y|`
@@ -674,11 +683,13 @@ a d-pad's common use.] While a d-pad direction is pressed from the stick,
 the movement value read from that stick is 0, which meets the "never both"
 result above.
 
-**What it drives** (required result): while a direction is pressed, every
-action of maps 0 and 1 whose **original pad control** (04 §3.2) is that
-d-pad direction (0x04 DPAD_UP, 0x05 DPAD_DOWN, 0x06 DPAD_LEFT, 0x07
-DPAD_RIGHT) has its VR digital state set, merged with v1's state for that
-action by OR. Under the default bindings this is `prev_main_weapon` /
+**What it drives** (required result): while a direction is pressed, from
+the emulation or from a controller's own d-pad (the four d-pad inputs of
+04 §5.8.1), every digital action of maps 0 and 1 whose **original pad
+control** (04 §3.2) is that d-pad direction (0x04 DPAD_UP, 0x05 DPAD_DOWN,
+0x06 DPAD_LEFT, 0x07 DPAD_RIGHT) has its VR digital state set, merged with
+v1's state for that action by OR. A controller's own d-pad may press two
+directions at once, as a pad's may; the emulation presses one. Under the default bindings this is `prev_main_weapon` /
 `next_main_weapon` (map 0, left / right) and `up`, `down`, `left`, `right`
 (map 1). Driving by original control follows whatever the player bound to
 the d-pad and needs no table of actions. Activity (04 §5.1) counts these
@@ -691,7 +702,10 @@ stick direction, or the left touchpad edge on wands) instead of the stock
 d-pad glyph; the designs are the d-pad rows of 10.2, and the controls help
 gains the `D-Pad` row of 10.3.
 
-**With the key off** no d-pad state is written (v1).
+**With the key off** no emulated d-pad state is written (v1). A
+controller's own d-pad still drives the d-pad actions [proposal: it is a
+physical d-pad doing what a pad's d-pad does, and the controllers v1 knows
+have none bound, 04 §5.8.2, so their v1 behaviour is unchanged].
 
 Whether some screens read the pad's d-pad without an action binding, and
 which interaction screens need the d-pad at all, is open (19 item 5).
@@ -1287,6 +1301,7 @@ events. Each is logged once when it happens or changes (11 §3):
 | INF | Config | session start (11 §1.7) | the v2 keys and their values in the settings event |
 | INF | Input | the turning in use changes (snap, game look, smooth) | which; the speed or repeat interval |
 | DBG | Input | turning blocked or unblocked by 4.4 (with `DebugOptions`) | why (interaction kind, breathing game, cutscene) |
+| DBG | Input | the VR d-pad press of 7 changes (with `DebugOptions`) | each direction pressed or not; whether the emulation pressed it |
 | INF | Stereo | play mode or calibration applied | the mode; the height taken, or why none was taken (invalid pose, out of range, no floor reference) |
 | WRN | Stereo | standing mode unavailable on this runtime | the runtime; that play is seated |
 | INF | Stereo | world scale changes | the new value; whether `-vrscale` overrides it |
@@ -1353,7 +1368,9 @@ On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
 8. `DpadEmulation` on: in a menu, the left stick moves the selection as the
    d-pad does on a pad; in play, holding the left stick click 0.3 s and
    pushing left / right cycles weapons; the movement stops while a d-pad
-   direction is pressed.
+   direction is pressed, and a click shorter than 0.3 s still sprints.
+   On a Steam Frame, with the key off, the left d-pad moves the selection
+   in menus and cycles weapons in play.
 9. Recenter gesture: both grips at the face for under 0.75 s does nothing;
    for 0.75 s recenters once (logged "gesture"); aiming with the tracker
    raised never recenters during 10 minutes of play.
@@ -1452,7 +1469,8 @@ Not made here; to be applied in a later revision:
   when `Controls.ControllerGlyphs` is on (10); §6: the repeat interval is
   `Comfort.SnapTurnRepeatMs`, the fade of 4.3, the turning block of 4.4
   and the block during 23's lever mapping (4.1); §7: the look byte rule of
-  4.1; §5.8.1: the d-pad modifier input (7);
+  4.1; §5.8.1: none for the d-pad modifier, which is Sprint's control (7;
+  04 r9 added the four d-pad inputs of a controller's own d-pad);
   §5.8.5: d-pad and holster VR state (7, 8.4) and the Map input consumed by
   the HUD toggle near the head (8.3); §5.10: the near-head test extended to
   the left hand for 8.3; §5.7: with `Controls.ControllerGlyphs` the rows

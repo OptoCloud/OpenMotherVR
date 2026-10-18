@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). Revision: r5 -->
+<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). r6 (project decision: with the aim poses made only at runtime start, turning tracked hands on in the menu left aiming on the head until the next start): the aim pose actions are declared and bound whatever `Hands.Enabled` is, so the key applies at once as §15.1 says; a binding that lacks them is logged. Revision: r6 -->
 
 # 21. Hands and body
 
@@ -52,8 +52,11 @@ their `mothervr.json` key inside `Settings` (06 §1): `Hands.Enabled` is
 
 All keys are in §15. With every key at its default (20 §1.1, §1.3),
 nothing in this document is installed
-or runs (20 §1.1): no game site of §2 is hooked, no action is added to the
-runtime, no per-frame work is spent beyond reading the settings.
+or runs (20 §1.1): no game site of §2 is hooked, no per-frame work is spent
+beyond reading the settings and the runtime's poses. The one exception is
+the aim pose actions (§16), which exist whatever the keys are so that
+`Hands.Enabled` applies at once (§15.1); with the key off nothing uses
+them.
 
 ## 2. Game facts
 
@@ -1186,7 +1189,16 @@ implementation's choice of names (they are not compatibility names); 06
 | Move (left stick) | move | move; written by room-scale follow only while the stick is idle (§11.3) |
 | Flashlight, Interact near the head (04 §5.10) | flashlight | unchanged |
 | Hand poses | read, unused | used (§3) |
-| aim pose (new) | | right and left hand aim poses (§5.2, §6.2): one new pose action per hand in 04 §5.8.2 and one pose action with both subaction paths in 04 §5.8.4 |
+| aim pose (new) | declared, bound and read, unused | right and left hand aim poses (§5.2, §6.2): one new pose action per hand in 04 §5.8.2 and one pose action with both subaction paths in 04 §5.8.4 |
+
+The aim poses are declared and bound whatever `Hands.Enabled` is
+[proposal: an action the runtime is told about only at start would leave
+a player who turns tracked hands on in the menu aiming from the head until
+the next start, against §15.1's "at once"; declaring two pose actions
+costs nothing visible]. A binding saved before they were always declared
+lacks them: when a hand's grip pose is tracked but its aim pose action
+reads inactive, the log says so once (04 §5.11), and aiming stays on the
+game's head ray until the binding is reset to the default.
 | haptic output (new) | | §14.3 |
 
 One owner per input at a time (20 §5): room-scale writes Move only while
@@ -1422,9 +1434,10 @@ Not made here; for the next revisions:
 - `04-input.md` §5.1 ("No haptics in v1") and §5.8.4 ("No haptic output in
   v1"): add that v2 adds haptic outputs when `Hands.Haptics.Enabled` is on
   (21 §14.3).
-- `04-input.md` §5.8.1, §5.8.2, §5.8.4: new inputs when hands are on: an aim
-  pose per hand and the haptic outputs (21 §16), with their default
-  bindings; the saved-binding notice of §5.11 extends to them.
+- `04-input.md` §5.8.1, §5.8.2, §5.8.4: new inputs: an aim pose per hand,
+  always (made in 04 r9), and the haptic outputs when they are on (21
+  §16), with their default bindings; the saved-binding notice of §5.11
+  extends to them (made in 04 r9 for the aim poses).
 - `04-input.md` §5.8.5: Move may be written by room-scale follow while the
   stick is idle (21 §11.3); Crouch may be pressed by real crouch (21 §11.5);
   Fire may be pressed by a melee swing (21 §8).
