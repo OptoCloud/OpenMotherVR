@@ -99,10 +99,16 @@ public:
     // without a floor reference at that recenter.
     std::optional<float> reference_height() const noexcept { return reference_height_; }
 
+    // 21 §11.5: while the game's crouch was engaged by real crouch, the
+    // height the game receives is raised by `game_m` (game metres), so the
+    // eye stays at the real head. Game thread; 0 restores v1.
+    void set_crouch_raise(float game_m) noexcept { crouch_raise_m_ = game_m; }
+
 private:
     // The offset added to the head before scaling, runtime metres in the
     // game's convention: the standing height (22 §6.1) and, as `body`, the
-    // seated eye raise and eye forward (21 §11.2, §11.4).
+    // seated eye raise, eye forward and real crouch's raise (21 §11.2,
+    // §11.4, §11.5).
     struct Offsets {
         util::Vec3 standing{};
         util::Vec3 body{};
@@ -127,6 +133,7 @@ private:
 
     config::PlayMode applied_mode_ = config::PlayMode::Seated;
     bool mode_logged_              = false;
+    float crouch_raise_m_          = 0.0f; // game metres (21 §11.5)
     util::OnceLatch no_floor_logged_;
 };
 

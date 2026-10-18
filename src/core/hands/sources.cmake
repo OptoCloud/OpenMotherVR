@@ -5,6 +5,15 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/activity.h
     ${CMAKE_CURRENT_LIST_DIR}/aim.cpp
     ${CMAKE_CURRENT_LIST_DIR}/aim.h
+    ${CMAKE_CURRENT_LIST_DIR}/body_controls.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/body_controls.h
+    ${CMAKE_CURRENT_LIST_DIR}/body_hider.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/body_hider.h
+    ${CMAKE_CURRENT_LIST_DIR}/body_tuning.h
+    ${CMAKE_CURRENT_LIST_DIR}/body_visibility.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/body_visibility.h
+    ${CMAKE_CURRENT_LIST_DIR}/hand_back.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/hand_back.h
     ${CMAKE_CURRENT_LIST_DIR}/hand_mapping.cpp
     ${CMAKE_CURRENT_LIST_DIR}/hand_mapping.h
     ${CMAKE_CURRENT_LIST_DIR}/hand_track.cpp
@@ -15,6 +24,8 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/hands.h
     ${CMAKE_CURRENT_LIST_DIR}/pose_filter.cpp
     ${CMAKE_CURRENT_LIST_DIR}/pose_filter.h
+    ${CMAKE_CURRENT_LIST_DIR}/real_crouch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/real_crouch.h
     ${CMAKE_CURRENT_LIST_DIR}/tracker_facing.cpp
     ${CMAKE_CURRENT_LIST_DIR}/tracker_facing.h
     ${CMAKE_CURRENT_LIST_DIR}/tuning.h

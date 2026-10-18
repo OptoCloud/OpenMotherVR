@@ -123,6 +123,9 @@ PlaySpace::Offsets PlaySpace::offsets(std::optional<float> floor_y) const noexce
     // 21 §11.2: along the reference's forward. The convention negates
     // positions but not the forward axis: moving forward adds +forward.
     o.body = add(o.body, util::scaled(forward_, settings_.eye_forward_m));
+    // 21 §11.5: real crouch's raise is in game metres; the offsets are
+    // runtime metres before the scale (21 §11.1), and up is -y.
+    if (scale_ > 0.0f) o.body.y -= crouch_raise_m_ / scale_;
     return o;
 }
 
