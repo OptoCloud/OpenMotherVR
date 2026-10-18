@@ -77,17 +77,17 @@ using Clock = std::chrono::steady_clock;
 
 constexpr std::string_view kLogMissingInterface = "openvr: runtime lacks interface {} (error {})";
 constexpr std::string_view kLogInterfaces       = "openvr: interfaces {}, {}, {}";
-constexpr std::string_view kLogCompositorReady  = "openvr: compositor ready, headset pose {}";
-constexpr std::string_view kLogHeadset          = "openvr: {} {}, render tangents v={:.3f} h={:.3f}";
-constexpr std::string_view kLogOverlayFailed    = "openvr: CreateOverlay failed ({})";
-constexpr std::string_view kLogHeadTracking     = "[diag] headset pose {} (tracking result {})";
+// Leads this runtime's "frames now" line.
+constexpr std::string_view kLogSource          = "openvr";
+constexpr std::string_view kLogCompositorReady = "openvr: compositor ready, headset pose {}";
+constexpr std::string_view kLogHeadset         = "openvr: {} {}, render tangents v={:.3f} h={:.3f}";
+constexpr std::string_view kLogOverlayFailed   = "openvr: CreateOverlay failed ({})";
+constexpr std::string_view kLogHeadTracking    = "[diag] headset pose {} (tracking result {})";
 constexpr std::string_view kLogRecenterSkipped =
     "openvr: recenter skipped: headset pose invalid, the previous reference stays";
 constexpr std::string_view kLogRecenter =
     "openvr: recenter: head x=({:.2f} {:.2f} {:.2f}) y=({:.2f} {:.2f} {:.2f}) z=({:.2f} {:.2f} {:.2f}) "
     "pos=({:.2f} {:.2f} {:.2f}) yaw={:.1f} deg{}, activity={}";
-constexpr std::string_view kLogFrameKind       = "[diag] frames now {}";
-constexpr std::string_view kLogFrameKindAlways = "openvr: frames now {}";
 constexpr std::string_view kLogSpaceChanged =
     "openvr: {}: the tracking space moved; the virtual screen is hidden and the reference retaken once the "
     "headset is in use";
@@ -193,8 +193,6 @@ core::input::BodyPoses body_poses(const vr::TrackedDevicePose_t (&poses)[vr::k_u
     }
     return b;
 }
-
-const char* frame_kind_text(bool head_tracked) noexcept { return head_tracked ? "tracked" : "on the screen"; }
 
 // The events after which the poses are in a moved tracking space (03 §6.8),
 // by name for the log; null for any other event. A re-anchor of one
@@ -608,13 +606,7 @@ void OpenVrRuntime::begin_frame(float eye_offsets[6], bool head_tracked) {
     // Screen frames (menus, videos, loading) against tracked ones, once per
     // change: always until the first tracked frame, then with Dev. Debug
     // Options (11 §4.5).
-    switch (frame_kind_log_.next(head_tracked, log_.debug_enabled())) {
-        case core::vr::FrameKindLine::Always:
-            logf(log_, kLogFrameKindAlways, frame_kind_text(head_tracked));
-            break;
-        case core::vr::FrameKindLine::Debug: logf(log_, kLogFrameKind, frame_kind_text(head_tracked)); break;
-        case core::vr::FrameKindLine::None: break;
-    }
+    frame_kind_log_.log(log_, head_tracked, kLogSource);
     cinema_mode_ = !head_tracked;
 }
 

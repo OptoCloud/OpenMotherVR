@@ -56,13 +56,13 @@ using util::Pose;
 using util::pose_matrix;
 using util::Vec3;
 
+// Leads this runtime's "frames now" line.
+constexpr std::string_view kLogSource   = "openxr";
 constexpr std::string_view kLogTangents = "openxr: render tangents v={:.3f} h={:.3f}{}";
 constexpr std::string_view kLogSession  = "openxr: session {}";
 constexpr std::string_view kLogRecenterSkipped =
     "openxr: recenter skipped: head not tracked, the previous reference stays";
-constexpr std::string_view kLogFrameKind       = "[diag] frames now {}";
-constexpr std::string_view kLogFrameKindAlways = "openxr: frames now {}";
-constexpr std::string_view kLogHandsPrefix     = "openxr: hands (head-local m, +x right +y up -z fwd):";
+constexpr std::string_view kLogHandsPrefix = "openxr: hands (head-local m, +x right +y up -z fwd):";
 
 // OpenXR's forward axis (09 §5.2: the screen sits along the reference's
 // forward direction).
@@ -226,12 +226,7 @@ public:
         }
         // Once per change: always until the first tracked frame, then with
         // Dev. Debug Options (11 §4.5).
-        const char* kind = head_tracked ? "tracked" : "on the screen";
-        switch (frame_kind_log_.next(head_tracked, log_.debug_enabled())) {
-            case core::vr::FrameKindLine::Always: logf(log_, kLogFrameKindAlways, kind); break;
-            case core::vr::FrameKindLine::Debug: logf(log_, kLogFrameKind, kind); break;
-            case core::vr::FrameKindLine::None: break;
-        }
+        frame_kind_log_.log(log_, head_tracked, kLogSource);
         cinema_ = !head_tracked;
     }
 

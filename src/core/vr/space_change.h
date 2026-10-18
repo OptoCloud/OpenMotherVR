@@ -1,8 +1,11 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
+#include "core/diag/ports/log.h"
+
 #include <atomic>
 #include <optional>
+#include <string_view>
 
 namespace omvr::core::vr {
 
@@ -45,6 +48,9 @@ enum class FrameKindLine {
 class FrameKindLog {
 public:
     [[nodiscard]] FrameKindLine next(bool head_tracked, bool debug) noexcept;
+    // next() with the log's DebugOptions, writing the line it asks for:
+    // "<runtime>: frames now <kind>" or "[diag] frames now <kind>".
+    void log(diag::ports::Log& log, bool head_tracked, std::string_view runtime);
 
 private:
     std::optional<bool> last_;

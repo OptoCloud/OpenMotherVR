@@ -11,6 +11,7 @@
 #include "core/vr/runtime_choice.h"
 #include "core/vr/space_change.h"
 #include "core/vr/tuning.h"
+#include "fakes/fakes.h"
 
 #include <doctest/doctest.h>
 
@@ -254,4 +255,19 @@ TEST_CASE("frame kind lines: always at start-up, then with DebugOptions") {
     FrameKindLog tracked_first;
     CHECK(tracked_first.next(true, false) == FrameKindLine::Always);
     CHECK(tracked_first.next(false, false) == FrameKindLine::None);
+}
+
+// The lines each runtime writes for those kinds (IN_GAME_CHECKS.md reads them).
+TEST_CASE("frame kind lines: the text written to the log") {
+    omvr::tests::RecordingLog log;
+    FrameKindLog kinds;
+    kinds.log(log, false, "openxr");
+    kinds.log(log, true, "openxr");
+    kinds.log(log, false, "openxr"); // later change, debug off
+    log.debug = true;
+    kinds.log(log, true, "openxr");
+    REQUIRE(log.lines.size() == 3);
+    CHECK(log.lines[0] == "openxr: frames now on the screen");
+    CHECK(log.lines[1] == "openxr: frames now tracked");
+    CHECK(log.lines[2] == "[diag] frames now tracked");
 }
