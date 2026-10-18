@@ -8,6 +8,7 @@
 #include "platform/win32/build_stamp.h"
 #include "platform/win32/constants.h"
 #include "platform/win32/file_io.h"
+#include "platform/win32/last_error.h"
 #include "platform/win32/module.h"
 #include "platform/win32/resources.h"
 #include "platform/win32/text.h"
@@ -53,12 +54,6 @@ bool up_to_date(const std::filesystem::path& file, const FILETIME& stamp) noexce
            ::CompareFileTime(&written, &stamp) == 0;
 }
 
-// Writes all of `data` to `file`.
-bool write_all(const UniqueHandle& file, const void* data, std::size_t size) noexcept {
-    DWORD written = 0;
-    return ::WriteFile(file.get(), data, static_cast<DWORD>(size), &written, nullptr) && written == size;
-}
-
 } // namespace
 
 bool ArchiveFiles::write_resource(int id, const std::filesystem::path& target,
@@ -78,7 +73,7 @@ bool ArchiveFiles::write_resource(int id, const std::filesystem::path& target,
             logf(log_, "payload: cannot create {} err=0x{:08X}", utf8(target), ::GetLastError());
             return false;
         }
-        ok = write_all(h, bytes.data(), bytes.size());
+        ok = write_all(h, bytes, false);
         // Captured before the handle is closed.
         error = ok ? 0 : ::GetLastError();
         // Stamp only a complete file: the stamp is what marks it up to date.
@@ -103,11 +98,11 @@ std::optional<FileIdentity> ArchiveFiles::identity(const std::filesystem::path& 
 
 util::Result<std::vector<std::byte>> ArchiveFiles::read(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary | std::ios::ate);
-    if (!in) return std::unexpected(util::Error{static_cast<std::int32_t>(::GetLastError()), "read"});
+    if (!in) return std::unexpected(last_error("read"));
     std::vector<std::byte> data(static_cast<std::size_t>(in.tellg()));
     in.seekg(0);
     if (!in.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(data.size()))) {
-        return std::unexpected(util::Error{static_cast<std::int32_t>(::GetLastError()), "read"});
+        return std::unexpected(last_error("read"));
     }
     return data;
 }
@@ -144,7 +139,7 @@ void ArchiveFiles::write_sidecar(const std::filesystem::path& file, const FileId
     {
         const UniqueHandle h = create_always(file, GENERIC_WRITE);
         if (!h) return;
-        ok = write_all(h, &id, sizeof(id));
+        ok = write_all(h, std::as_bytes(std::span{&id, 1}), false);
     }
     if (!ok) ::DeleteFileW(file.c_str());
 }

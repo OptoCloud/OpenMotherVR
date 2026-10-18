@@ -1,6 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #include "platform/win32/patching/memory.h"
 
+#include "platform/win32/last_error.h"
 #include "util/sync/once_latch.h"
 
 #include <windows.h>
@@ -18,10 +19,6 @@ constexpr std::string_view kUnprotectLog     = "[hook] cannot unprotect {} bytes
 constexpr std::string_view kWriteFailedLog   = "[hook] write of {} bytes at {} failed: error {}";
 constexpr std::string_view kRestoreLog       = "[hook] cannot restore protection at {}: error {}";
 constexpr std::string_view kReplaceFailedLog = "proxy: interception of {} failed: VirtualProtect error {}";
-
-util::Error windows_error(std::string_view context) noexcept {
-    return {.code = static_cast<std::int32_t>(::GetLastError()), .context = context};
-}
 
 } // namespace
 
@@ -42,7 +39,7 @@ util::Result<void> write_memory(void* dst, std::span<const std::uint8_t> bytes, 
     const std::size_t n = bytes.size();
     DWORD old           = 0;
     if (!::VirtualProtectEx(self, dst, n, PAGE_EXECUTE_READWRITE, &old)) {
-        const auto error = windows_error("unprotect");
+        const auto error = last_error("unprotect");
         ports::logf(log, kUnprotectLog, n, dst, static_cast<DWORD>(error.code));
         return std::unexpected(error);
     }
@@ -50,7 +47,7 @@ util::Result<void> write_memory(void* dst, std::span<const std::uint8_t> bytes, 
     SIZE_T written = 0;
     util::Result<void> result;
     if (!::WriteProcessMemory(self, dst, bytes.data(), n, &written) || written != n) {
-        const auto error = windows_error("write");
+        const auto error = last_error("write");
         ports::logf(log, kWriteFailedLog, n, dst, static_cast<DWORD>(error.code));
         result = std::unexpected(error);
     }

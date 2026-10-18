@@ -2,7 +2,7 @@
 #include "platform/win32/file_io.h"
 
 #include "core/config/tuning.h"
-#include "platform/win32/unique_handle.h"
+#include "platform/win32/last_error.h"
 
 #include <windows.h>
 
@@ -18,18 +18,13 @@ namespace {
 constexpr std::string_view kCreateFailed = "create";
 constexpr std::string_view kWriteFailed  = "write";
 
-util::Error last_error(std::string_view context) noexcept {
-    return {static_cast<std::int32_t>(::GetLastError()), context};
-}
+} // namespace
 
-// Writes all of `data` to `file` and flushes it to disk.
-bool write_whole(const UniqueHandle& file, std::span<const std::byte> data) noexcept {
+bool write_all(const UniqueHandle& file, std::span<const std::byte> data, bool flush) noexcept {
     DWORD written = 0;
     return ::WriteFile(file.get(), data.data(), static_cast<DWORD>(data.size()), &written, nullptr) &&
-           written == data.size() && ::FlushFileBuffers(file.get());
+           written == data.size() && (!flush || ::FlushFileBuffers(file.get()));
 }
-
-} // namespace
 
 util::Result<std::string> FileStore::read(const std::filesystem::path& path) {
     std::ifstream f(path, std::ios::binary);
@@ -64,7 +59,7 @@ util::Result<void> write_file_atomically(const std::filesystem::path& target,
                                                   FILE_ATTRIBUTE_NORMAL, nullptr)};
             if (!file) return std::unexpected(last_error(kCreateFailed));
             // The error is captured before the handle is closed.
-            if (!write_whole(file, data)) result = std::unexpected(last_error(kWriteFailed));
+            if (!write_all(file, data, true)) result = std::unexpected(last_error(kWriteFailed));
         }
         if (result &&
             !::MoveFileExW(temp.c_str(), target.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
