@@ -174,6 +174,14 @@ struct GraphicsSettings {
     bool lens_flares          = true;
     bool chromatic_aberration = true;
     bool film_grain           = true;
+    // Constant smoke and fog lighting (24 §15): read when the game creates
+    // its device, so a change applies at the next launch. The brightness is
+    // a light intensity in the atlas's units, in [0, 1].
+    bool constant_smoke_lighting    = false;
+    float constant_smoke_brightness = kConstantSmokeBrightnessDefault;
+    // Full shadow detail (24 §16): the key only; the feature waits on 24
+    // §12 item 14 and has no effect in this build.
+    bool full_shadow_detail = false;
 };
 
 // v2 interactions (spec 23 §8). Each default is v1's behaviour.

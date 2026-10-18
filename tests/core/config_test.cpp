@@ -17,6 +17,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -142,6 +143,50 @@ TEST_CASE("sanitize: v2 ranges (spec 22 §3.1, 21 §15)") {
     CHECK(s.comfort.standing_eye_height == 1.75f);
     CHECK(s.comfort.vignette == 0.4f);
     CHECK(s.body.eye_forward == 0.0f);
+}
+
+// Spec 24 §10 r11: the keys of §15 and §16, file only (items 15 to 17 are
+// not shown).
+TEST_CASE("Graphics r11 keys: defaults, the brightness's range, the file") {
+    const Settings defaults{};
+    CHECK_FALSE(defaults.graphics.constant_smoke_lighting);
+    CHECK(defaults.graphics.constant_smoke_brightness == 0.15f);
+    CHECK_FALSE(defaults.graphics.full_shadow_detail);
+
+    Settings s;
+    for (const auto& [in, out] : std::vector<std::pair<float, float>>{
+             {0.0f, 0.0f}, {0.4f, 0.4f}, {1.0f, 1.0f}, {-0.5f, 0.0f}, {7.0f, 1.0f}, {std::nanf(""), 0.15f}}) {
+        s.graphics.constant_smoke_brightness = in;
+        sanitize(s);
+        CHECK(s.graphics.constant_smoke_brightness == out);
+    }
+
+    json root                    = json::object();
+    root["Settings"]["Graphics"] = {{"ConstantSmokeLighting", true},
+                                    {"ConstantSmokeBrightness", 0.3},
+                                    {"FullShadowDetail", 1},
+                                    {"Unknown", "kept"}};
+    Settings read                = read_config(root);
+    CHECK(read.graphics.constant_smoke_lighting);
+    CHECK(read.graphics.constant_smoke_brightness == doctest::Approx(0.3f));
+    CHECK_FALSE(read.graphics.full_shadow_detail); // non-bool: default
+
+    root["Settings"]["Graphics"]["ConstantSmokeBrightness"] = "bright";
+    root["Settings"]["Graphics"]["ConstantSmokeLighting"]   = "on";
+    read                                                    = read_config(root);
+    CHECK(read.graphics.constant_smoke_brightness == 0.15f); // non-number: default
+    CHECK_FALSE(read.graphics.constant_smoke_lighting);
+
+    read.graphics.full_shadow_detail = true;
+    write_config(root, read);
+    CHECK(root["Settings"]["Graphics"]["Unknown"] == "kept");
+    CHECK(root["Settings"]["Graphics"]["ConstantSmokeLighting"] == false);
+    CHECK(root["Settings"]["Graphics"]["ConstantSmokeBrightness"] == doctest::Approx(0.15));
+    CHECK(root["Settings"]["Graphics"]["FullShadowDetail"] == true);
+
+    for (const char* name :
+         {"mvr_constantsmokelighting", "mvr_constantsmokebrightness", "mvr_fullshadowdetail"})
+        CHECK(find_command(name) == nullptr);
 }
 
 TEST_CASE("sanitize: comfort ranges (spec 22 §3.1)") {
@@ -308,8 +353,9 @@ TEST_CASE("describe names each setting by its key path") {
 }
 
 TEST_CASE("the settings table: commands and their rules") {
-    // 15 of v1 and Discord, 38 of the v2 pages, 8 Graphics, 13 Interaction and Hud
-    CHECK(settings_table().size() == 74);
+    // 15 of v1 and Discord, 38 of the v2 pages, 8 Graphics, 13 Interaction and
+    // Hud, and the 3 file-only Graphics keys of spec 24 r11
+    CHECK(settings_table().size() == 77);
     const SettingRow* row = find_command("mvr_pixelscale");
     REQUIRE(row != nullptr);
     CHECK(row->rule == CommandRule::PixelScale);
@@ -338,11 +384,17 @@ TEST_CASE("the settings table: every v2 key has its own command and push") {
     int v2_rows = 0;
     for (const SettingRow& row : settings_table()) {
         // Interaction.FastAnimations is reserved: file only (spec 23 §4.6).
-        const bool v2 = row.section == Section::Comfort || row.section == Section::Controls ||
-                        row.section == Section::Hands || row.section == Section::HandsHaptics ||
-                        row.section == Section::Body || row.section == Section::Graphics ||
-                        ((row.section == Section::Interaction || row.section == Section::Hud) &&
-                         key(row) != "FastAnimations");
+        // Graphics items 15 to 17 are not shown yet (spec 24 §10 r11): file
+        // only.
+        const bool hidden_graphics = row.path == "Graphics.ConstantSmokeLighting" ||
+                                     row.path == "Graphics.ConstantSmokeBrightness" ||
+                                     row.path == "Graphics.FullShadowDetail";
+        const bool v2              = row.section == Section::Comfort || row.section == Section::Controls ||
+                                     row.section == Section::Hands || row.section == Section::HandsHaptics ||
+                                     row.section == Section::Body ||
+                                     (row.section == Section::Graphics && !hidden_graphics) ||
+                                     ((row.section == Section::Interaction || row.section == Section::Hud) &&
+                                      key(row) != "FastAnimations");
         if (!row.command.empty()) CHECK(commands.insert(row.command).second);
         if (!v2) {
             CHECK(row.push.empty());

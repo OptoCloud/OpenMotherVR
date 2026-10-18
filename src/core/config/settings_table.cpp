@@ -217,6 +217,15 @@ constexpr std::array kRows{
                 "setMotherChromaticAberration"),
     post_fx_row("Graphics.FilmGrain", &at<&Settings::graphics, &GraphicsSettings::film_grain>,
                 "mvr_filmgrain", "setMotherFilmGrain"),
+    // 24 §15, §16 (r11): no page item yet (24 §10: items 15 to 17 are not
+    // shown), so file only. FullShadowDetail is the key alone: its feature
+    // waits on 24 §12 item 14.
+    SettingRow{Section::Graphics, "Graphics.ConstantSmokeLighting",
+               &at<&Settings::graphics, &GraphicsSettings::constant_smoke_lighting>},
+    SettingRow{Section::Graphics, "Graphics.ConstantSmokeBrightness",
+               &at<&Settings::graphics, &GraphicsSettings::constant_smoke_brightness>},
+    SettingRow{Section::Graphics, "Graphics.FullShadowDetail",
+               &at<&Settings::graphics, &GraphicsSettings::full_shadow_detail>},
     // v2 (spec 23 §8): the Interaction and HUD pages. FastAnimations is
     // reserved (23 §4.6): file only, no page item.
     page_row(Section::Interaction, "Interaction.PhysicalLevers",
@@ -330,6 +339,10 @@ void sanitize(Settings& cfg) noexcept {
     const auto heap = [](int& mb, int lo, int hi) { mb = mb <= 0 ? 0 : std::clamp(mb, lo, hi); };
     heap(cfg.graphics.streaming_texture_heap_mb, kTextureHeapMbMin, kTextureHeapMbMax);
     heap(cfg.graphics.streaming_model_heap_mb, kModelHeapMbMin, kModelHeapMbMax);
+    // Outside [0, 1]: the nearest bound; NaN: the default (spec 24 §10).
+    float& smoke = cfg.graphics.constant_smoke_brightness;
+    smoke        = std::isnan(smoke) ? kConstantSmokeBrightnessDefault
+                                     : std::clamp(smoke, 0.0f, kConstantSmokeBrightnessMax);
 
     // Spec 23 §8: the activation distances are 0 or [min, max] (a value in
     // (0, min) becomes min); the text scale is the nearest step; the HUD

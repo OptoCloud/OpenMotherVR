@@ -77,6 +77,12 @@ inline constexpr int kTextureHeapMbMax = 1024;
 inline constexpr int kModelHeapMbMin   = 128;
 inline constexpr int kModelHeapMbMax   = 512;
 
+// Graphics.ConstantSmokeBrightness (spec 24 §10, §15.3): the light the
+// particles get with Graphics.ConstantSmokeLighting, held to [0, 1]; the
+// default is a dim neutral light, to be tuned in game (24 §15.5).
+inline constexpr float kConstantSmokeBrightnessDefault = 0.15f;
+inline constexpr float kConstantSmokeBrightnessMax     = 1.0f;
+
 // -vrscale <s>: the world scale accepted, and the scale without a usable
 // value (spec 03 §1, 06 §2).
 inline constexpr float kWorldScaleMin     = 0.495f;
