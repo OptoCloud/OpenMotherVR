@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6); r3: second clean-room review: the crash event stated as the state that must hold, at the level of v1's crash record; the gestures and d-pad emulation stated as results with this project's reasons; the HUD game facts of 2.4 re-read by the spec side in the 2015 `AI.exe` and reconciled with 23 (the pending flag of each HUD object, the objects the game's own hide and show touch); this document is the one owner of seated and standing play and the calibration (21 reads them); `EnhancedMode` gates 21 to 24 (20 §1.3; removed in r6); lever interactions own the grips, the move action and turning (23 §3.2). r4 (spec r7 cross-check): the game's event tap function named `ScriptEventTap` and the tracked state the logging of game script events, as 11 §5 now does; the flush thread's exit rule follows 12 §7 (at process exit only the detach line is logged); the change listed for 11 states the crash event's level and timing as §14 does. r5 (CLEANROOM r3, what a player sees may be stated exactly): the v2 options pages given exactly (the `Enhanced Mode` entry and its place on the `MotherVR` page, replaced in r6 by one entry per page, one sub-page per settings section, item order, labels, control kinds, value names, display formats, description lines, greying and hiding rules, the calibration's texts), the glyph designs per controller family in v1's look with a hand mark, the controls help rows per family and for v2 features, and the welcome text once OpenXR is the default, each a project text in the style of the v1 page players know, with its reason; the game's own Camera Speed label and description and its longest stock menu description read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the stock menu movies of the player's `UI.PAK`; the VR-off hotkey's page state stated as v1's (no new text). r6 (user decision of 2026-10-16): no master switch: the `EnhancedMode` key, its toggle, the `Enhanced Mode` entry and page and the greying that depended on it are removed; each key applies on its own with its v1 value as default (20 §1.3); the `MotherVR` page gains the seven v2 sub-page entries directly, after `Input` and before `Dev. Debug Options` (12.1). r7: Valve's public Steam Frame input documentation (a controller with a physical d-pad); a tester's report on a Steam Frame (its d-pad toggled the flashlight instead of moving through menus); project decisions with their reasons inline: a controller's own d-pad drives the d-pad actions whatever `Controls.DpadEmulation` is (04 §5.8.1); the d-pad modifier is Sprint's control rather than an input of its own. Revision: r7 -->
+<!-- Provenance: game analysis of AI.exe 2015 (PE timestamp 0x54E3199D) by the spec side: the input action name table and its indices, the game's UI object lookup and the HUD movies' hide and show methods, the hiding place's breathing-game messages passed to the script event tap, the peek action and the CameraPeek tuning names; the game's own data files (`DATA\INPUT.XML` default bindings, `DATA\UI.PAK` movies that define the HUD hide functions); game facts of the v1 documents 02 to 14, cited by section; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked [proposal]; user requirements of the v2 roadmap (smooth turning, comfort options, seated and standing play, gestures, per-controller glyphs, OpenXR as the default runtime, a way to turn VR off, crash-safe logging); public OpenVR, OpenXR, D3D11 and Win32 documentation. 2020 values: none, every 2020 address is `?` and every feature here stays off on the 2020 build; r2: v1's crash record (11 r3 §6.1) taken as the base of the crash-safe log's crash event (project decision of spec r6); r3: second clean-room review: the crash event stated as the state that must hold, at the level of v1's crash record; the gestures and d-pad emulation stated as results with this project's reasons; the HUD game facts of 2.4 re-read by the spec side in the 2015 `AI.exe` and reconciled with 23 (the pending flag of each HUD object, the objects the game's own hide and show touch); this document is the one owner of seated and standing play and the calibration (21 reads them); `EnhancedMode` gates 21 to 24 (20 §1.3; removed in r6); lever interactions own the grips, the move action and turning (23 §3.2). r4 (spec r7 cross-check): the game's event tap function named `ScriptEventTap` and the tracked state the logging of game script events, as 11 §5 now does; the flush thread's exit rule follows 12 §7 (at process exit only the detach line is logged); the change listed for 11 states the crash event's level and timing as §14 does. r5 (CLEANROOM r3, what a player sees may be stated exactly): the v2 options pages given exactly (the `Enhanced Mode` entry and its place on the `MotherVR` page, replaced in r6 by one entry per page, one sub-page per settings section, item order, labels, control kinds, value names, display formats, description lines, greying and hiding rules, the calibration's texts), the glyph designs per controller family in v1's look with a hand mark, the controls help rows per family and for v2 features, and the welcome text once OpenXR is the default, each a project text in the style of the v1 page players know, with its reason; the game's own Camera Speed label and description and its longest stock menu description read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the stock menu movies of the player's `UI.PAK`; the VR-off hotkey's page state stated as v1's (no new text). r6 (user decision of 2026-10-16): no master switch: the `EnhancedMode` key, its toggle, the `Enhanced Mode` entry and page and the greying that depended on it are removed; each key applies on its own with its v1 value as default (20 §1.3); the `MotherVR` page gains the seven v2 sub-page entries directly, after `Input` and before `Dev. Debug Options` (12.1). r7: Valve's public Steam Frame input documentation (a controller with a physical d-pad); a tester's report on a Steam Frame (its d-pad toggled the flashlight instead of moving through menus); project decisions with their reasons inline: a controller's own d-pad drives the d-pad actions whatever `Controls.DpadEmulation` is (04 §5.8.1); the d-pad modifier is Sprint's control rather than an input of its own. r8: the breathing game's tutorial texts and the head-tracking option text read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` (the inputs that lean and hold breath in a hiding place, 2.3), so 9.2 and 9.3 are no longer kept off; project decisions with their reasons inline: the axes the head's lean drives (9.2), a holster press while holsters are off, an interaction beginning during a holster hold, the recenter gesture not counting a grip a holster holds (8.2, 8.4); acceptance items 18 and 19. r9: the Steam Frame as a glyph family (10.1 to 10.3: its identification, its prompts' designs and the bumper and View designs, its controls help rows, from 04 r9's Frame controls); project decisions with their reasons inline: the per-hand rule for two families that put a function on different hands and for a hand not identified yet, the d-pad glyphs of 7 with `Controls.ControllerGlyphs` off, a controller's own d-pad keeping the game's d-pad glyphs, the family change logged; the hiding rows of 10.3 no longer wait for 9.2 and 9.3 (r8). r10 (spec-side game analysis, static, 23 r6): 8.3 tells the game's own HUD hide from the mod's by wrapping the scripted HUD entity's methods. Revision: r10 -->
 
 # 22. Controls and comfort (v2)
 
@@ -173,8 +173,25 @@ virtualisation (04 §3.2), never through an assumed preset.
 - `hiding_visibility_start` / `hiding_visibility_finish` reach the tap
   as v1 already uses them (11 §5.3).
 
-Which control the breathing game reads to hold breath, and which inputs
-lean the view in a hiding place, are not verified (19 items 3 and 4).
+- The game's own tutorial texts for the breathing game, in
+  `DATA\TEXT\ENGLISH\UI.TXT` (UTF-16; each `#name#` is shown as the
+  glyph of the control bound to that action, 2.1), name the inputs of a
+  hiding place [sure for the texts]:
+
+  | Text id | Text |
+  |---|---|
+  | `AI_UI_TUTORIAL_BREATHING_TUTORIAL_1` | `Press #button_mash# to exit` / `#move# to peek` |
+  | `AI_UI_TUTORIAL_BREATHING_TUTORIAL_2` | `Hold #aim# to hold breath` |
+  | `AI_UI_TUTORIAL_BREATHING_TUTORIAL_3` | `Hold #move# down to lean back` |
+  | `AI_UI_TUTORIAL_BREATHING_TUTORIAL_3_KB` | `Hold #move_back# to lean back` |
+
+  So in a hiding place the movement stick (map 0 analog `x_axis` and
+  `y_axis`; `move_back` on the keyboard) peeks and leans, down leaning
+  back, and `aim` (map 0 digital 0x0A) holds the breath [likely: the game's
+  own instructions to the player; to be confirmed in play, 19 items 3 and
+  4]. The same file's `AI_UI_HEAD_TRACKING_TUTORIAL` says the game's own
+  head tracking option applies tracked head movement to the character
+  "when in peek mode", for "peeking over objects and around corners".
 
 ### 2.4 The HUD movies and how the game hides them [sure]
 
@@ -750,7 +767,9 @@ screen re-placed (05 §3.2e). It is logged with the trigger "gesture".
 
 **False triggers.** Not while Fire is pressed; the timer restarts whenever
 either condition breaks. The grips still drive Aim and the tracker while
-the gesture is held (v1 behaviour of the grips is not changed).
+the gesture is held (v1 behaviour of the grips is not changed). A grip held
+by a holster (8.4) does not count as pressed here [proposal: one owner per
+input at a time, 20 §5].
 
 ### 8.3 HUD toggle
 
@@ -792,6 +811,15 @@ Before first use the six sites of 2.4 are verified (prologue bytes, the
 `push` operands pointing at the named strings). A mismatch turns the HUD
 toggle off and is logged.
 
+The game's own hide is told apart from the mod's [r10, from 23 §2.7 r6]:
+`+0x40` is set by the same methods whichever side calls them, so the mod
+notes the game's intent where the game expresses it, in the scripted HUD
+entity's four methods (23 §2.7: each is wrapped in its method-table slot,
+records "the game hides" or "the game shows", then runs as before). The
+mod shows a movie only when it hid it and the game's last intent is not
+"hide". The 2.4 lookup is made only while the game's UI-ready byte (23
+§2.7) is set.
+
 ### 8.4 Holster gestures
 
 **Gesture** [proposal]. A grip press that begins while the hand is in one
@@ -815,7 +843,12 @@ not counted by `Input.ToggleGrips`) until it is released [proposal: one
 owner per input at a time, 20 §5]. Grip presses that begin outside every
 zone behave as v1.
 
-Holsters are off during interactions and in mode 1.
+Holsters are off during interactions and in mode 1: a grip press that
+begins in a zone then behaves as v1. When an interaction or a menu begins
+while a holster holds its action, the action is released and the grip
+stays the holster's until it is released [proposal: the action lets go at
+once, and the grip does not turn into Aim or the tracker under the
+player's hand].
 
 ## 9. Hiding: lean and hold breath
 
@@ -843,14 +876,22 @@ produces none [proposal: a deliberate lean is well beyond 8 cm, a breath or
 a nod stays within 5 cm; hysteresis avoids chatter]. The amount is
 proportional up to 0.25 m, then full.
 
-**Which game input leans.** Not verified (19 item 3). Candidates in order:
-the `peek` action (map 0 digital 0x12) together with the movement axes
-(map 0 analog 0 and 1) [guess: the peek system's "peek control" tuning
-names, 2.3]; the movement axes alone [guess]. Until confirmed, the
-implementation keeps this feature off (the key is accepted and stored, the
-page shows its item greyed with the description of 12.2, the log says
-why). The method to confirm it is in
-19 item 3.
+**Which game input leans.** The movement axes, map 0 analog 0 (`x_axis`)
+and 1 (`y_axis`), as the game's tutorial says (2.3) [likely; acceptance 18
+confirms it in play]. The head-frame offset drives them so [proposal: the
+stick has two axes, and the game's own text makes "down" the lean back]:
+
+- sideways (x) drives `x_axis`, right positive;
+- forward and back (-z) drives `y_axis`, forward positive, so leaning back
+  is the stick held down;
+- a rise (+y) drives `y_axis` forward as well, the larger of the two
+  applying, so rising from behind cover peeks out; a duck drives nothing
+  (sitting lower in a hiding place is not a lean).
+
+Each of the three has its own hysteresis (the 0.08 m and 0.05 m above).
+The reference is taken at the first controls write with a valid head pose
+after hiding begins and is dropped when hiding ends; a menu or a missing
+head pose gives no lean and keeps the reference.
 
 While the lean drives the movement axes, the left stick's own movement
 value is added and the sum clamped to [-1, 1] (04 §5.1).
@@ -869,8 +910,11 @@ point close to the mouth of an average adult wearing a headset; 12 cm is
 "hand over mouth", not "hand near the face"]. It is released when the hand
 moves beyond 0.18 m. The game's own control keeps working.
 
-**Which game input holds breath.** Not verified (19 item 4). Until it is,
-this feature stays off as 9.2 does.
+**Which game input holds breath.** `aim` (map 0 digital 0x0A), as the
+game's tutorial says (2.3) [likely; acceptance 19 confirms it in play]. The
+gesture presses it in addition to the right grip's Aim (04 §5.8.1),
+merged by OR, so the grip keeps holding the breath too. Not while a menu
+is on the virtual screen (mode 1): the game is paused.
 
 ## 10. Per-controller button glyphs
 
@@ -889,6 +933,7 @@ controller's own control (its shape and its label):
 | Touch (Quest, Rift) | `oculus_touch`; `/interaction_profiles/oculus/touch_controller` | A / B right, X / Y left, menu button |
 | WMR | `holographic_controller`; `/interaction_profiles/microsoft/motion_controller` | touchpad halves for the face-button roles (04 §5.4) |
 | Vive wand | `vive_controller`; `/interaction_profiles/htc/vive_controller` | the touchpad set of 04 §4.1 |
+| Steam Frame | `frame_controller`; `/interaction_profiles/valve/frame_controller_valve` | A / B right, View button, bumper and d-pad left, Menu right (04 §5.8.2) |
 | generic | anything else, or `khr/simple_controller` | the thumbstick set of 04 §4.1 (v1 images) |
 
 The glyph for a prompt is the one of the control that drives the
@@ -899,18 +944,38 @@ click; both show the trackpad press glyph of 10.2.
 
 **Per hand.** Controls of the left hand use the left controller's family,
 controls of the right hand the right one's [proposal: mixed controllers are
-rare, but the rule costs nothing and is never wrong].
+rare, but the rule costs nothing and is never wrong]. Where two families
+put a function on different hands (Pause: the left hand on Index and
+Touch, the right on the wand and the Frame), the left controller decides
+every function its own default binding puts on the left hand, and the
+right controller every other one [proposal: each controller drives the
+game through its own binding, so the control on the left controller is the
+one that works for a left-hand function]. A hand not identified yet counts
+as holding the other hand's family; until either hand is identified, v1's
+set applies (04 §5.5).
 
 **Following changes.** The family is re-evaluated at every controller
 identification (OpenVR: each change of the device in a hand role, 04
-§5.5; OpenXR: each interaction profile change). When a family changes, the
+§5.5; OpenXR: each interaction profile change, at which both hands'
+current profiles are read). `Controls.ControllerGlyphs` itself is read at
+each identification (3.1): switched off, v1's set and rows return at the
+next one. Each change of a family while the key is on is logged once,
+with both hands' families and the runtime's input path (acceptance 12).
+When a family changes, the
 glyph names change on the render thread as v1 requires (04 §3.6: a complete
 name, never a mix) and the prompts on screen redraw by the mechanism of 04
 §4.2, without the player touching another device. The controls help page
 (04 §5.7) is pushed with that family's rows (10.3) at the next push.
 
 **d-pad and v2 inputs.** With d-pad emulation on, d-pad codes get the
-emulated control's glyph (7). With holsters, gestures and hiding features,
+emulated control's glyph (7), whatever `Controls.ControllerGlyphs` says:
+with it off, from v1's set, the left stick's directions for the
+thumbstick set and the left touchpad's quarters for the touchpad set
+(10.2's d-pad row). A change of `Controls.DpadEmulation` changes these
+glyphs at once, with the redraw above. A controller with a d-pad of its own
+(the Steam Frame, 04 §5.8.1) keeps the game's d-pad glyphs, with or without
+the emulation [proposal: the stock d-pad glyph already shows the control
+that drives these functions there]. With holsters, gestures and hiding features,
 no prompt changes (the game has no prompt for them); the controls help
 lists them (10.3).
 
@@ -932,6 +997,8 @@ stick glyphs light grey (about 192 grey) with black letters. The designs:
 | touchpad left, right quarter | the same ring with its left or right quarter filled [proposal: the v1 wedge style for the two directions v1 did not need] |
 | touchpad anywhere | the thin white ring filled white over its whole area [proposal: a press anywhere on the pad, unlike every region design] |
 | trackpad press (Index) | an upright white rounded oblong, the shape of the Index trackpad, filled white [proposal: the Index pad is oblong, not round, and the press is anywhere on it] |
+| left bumper (Steam Frame) | a light-grey tab like the left grip's but lower, rounded on its left, with a black `LB` [proposal: the bumper is a small button above the trigger, and the player sees no stock `LB` glyph while VR glyphs show, 04 §4.1] |
+| View button (Steam Frame) | a white ring with two overlapping white rectangle outlines, the front one lower and to the right [proposal: the common "view" icon, unlike the menu button's bars] |
 | unbound | 04 §4.1's design |
 
 **Hand mark** [proposal]. Where one family uses the same design for a
@@ -946,18 +1013,18 @@ not fit beside a letter already in the ring.
 Which design each prompt shows, by the stock pad control the game asks
 about (04 §4.1):
 
-| Stock pad control (function) | Index | Touch | WMR, SteamVR Input | WMR, OpenXR | Vive wand | generic |
-|---|---|---|---|---|---|---|
-| A (interact) | `A`, right | `A` | touchpad lower half, right | touchpad anywhere, right | touchpad lower half, right | as v1 (04 §4.1, thumbstick set) |
-| B (radial menu) | right stick click | right stick click | right stick click | right stick click | touchpad centre, right | as v1 |
-| X (reload / activate) | `B`, right | `B` | touchpad upper half, right | unbound (no reload control, 04 §5.4) | touchpad upper half, right | as v1 |
-| Y (flashlight) | `B`, left | `Y` | touchpad upper half, left | the game's own name (only interact near the head, as 04 §4.1 does for wands) | the game's own name (04 §4.1) | as v1 |
-| BACK (map) | `A`, left | `X` | touchpad lower half, left | touchpad anywhere, left | menu button, left | as v1 |
-| START (pause) | trackpad press | menu button | menu button | menu button | menu button, right | as v1 |
-| LB (motion tracker) | left grip | left grip | left grip | left grip | left grip | left grip |
-| RB (aim) | right grip | right grip | right grip | right grip | right grip | right grip |
-| d-pad up, down, left, right (only with 7 on) | left stick in that direction | the same | the same | the same | touchpad quarter in that direction, left | left stick in that direction |
-| every other pad code | the game's own name (04 §4.1) | | | | | |
+| Stock pad control (function) | Index | Touch | WMR, SteamVR Input | WMR, OpenXR | Vive wand | Steam Frame | generic |
+|---|---|---|---|---|---|---|---|
+| A (interact) | `A`, right | `A` | touchpad lower half, right | touchpad anywhere, right | touchpad lower half, right | `A` | as v1 (04 §4.1, thumbstick set) |
+| B (radial menu) | right stick click | right stick click | right stick click | right stick click | touchpad centre, right | right stick click | as v1 |
+| X (reload / activate) | `B`, right | `B` | touchpad upper half, right | unbound (no reload control, 04 §5.4) | touchpad upper half, right | `B` | as v1 |
+| Y (flashlight) | `B`, left | `Y` | touchpad upper half, left | the game's own name (only interact near the head, as 04 §4.1 does for wands) | the game's own name (04 §4.1) | left bumper | as v1 |
+| BACK (map) | `A`, left | `X` | touchpad lower half, left | touchpad anywhere, left | menu button, left | View button | as v1 |
+| START (pause) | trackpad press | menu button | menu button | menu button | menu button, right | menu button | as v1 |
+| LB (motion tracker) | left grip | left grip | left grip | left grip | left grip | left grip | left grip |
+| RB (aim) | right grip | right grip | right grip | right grip | right grip | right grip | right grip |
+| d-pad up, down, left, right (only with 7 on) | left stick in that direction | the same | the same | the same | touchpad quarter in that direction, left | the game's own name (its own d-pad, 10.1) | left stick in that direction |
+| every other pad code | the game's own name (04 §4.1) | | | | | | |
 
 "right" and "left" in a cell are the hand marks above. Under OpenVR without SteamVR
 Input (legacy, 04 §5.8.3) every controller is driven as a wand and shows
@@ -965,9 +1032,11 @@ the wand column and rows.
 
 **Resources.** 14 gains these images in the stock glyph format (14 §2.9),
 drawn by this project from the designs above, and registers their input
-ids in the 19 movies (14 §3.4). Ids and file names are the
-implementation's choice under 04 §4.1's constraints. When the patched
-archive is not in use, stock glyphs stay (04 §4.2).
+ids in the 19 movies (14 §3.4), whatever `Controls.ControllerGlyphs` says
+(the archive is linked at launch, the key applies at an identification).
+Ids and file names are the implementation's choice under 04 §4.1's
+constraints. When the patched archive is not in use, stock glyphs stay
+(04 §4.2).
 
 ### 10.3 Controls help rows
 
@@ -995,6 +1064,11 @@ name right-hand controls]):
   `Right Touchpad Click`; rows 10 and 11 left out (no such control, 04
   §5.4); row 12 `Flashlight [Press Interact near Head]` |
   `Right Touchpad Click`; row 15 `Map Menu` | `Left Touchpad Click`.
+- Steam Frame: the Frame variant of 04 §5.7 (its `Left Bumper`,
+  `View Button` and `Left D-Pad` rows), which already names the Frame's
+  own buttons.
+- Under OpenVR without SteamVR Input (legacy): the wand's rows, as the
+  glyphs (10.2).
 
 The control texts follow v1's styles: `Left` / `Right` written out in the
 thumbstick families' rows, `L` / `R` in the wand's.
@@ -1015,11 +1089,12 @@ style is in brackets.
 | | `Previous Weapon [Grip over Left Shoulder]` | `Left Grip` (wand: `L Grip`) |
 | | `Flashlight [Grip at Left Hip]` | `Left Grip` (wand: `L Grip`) |
 | | `Motion Tracker [Grip at Chest]` | `Left or Right Grip` (wand: `L or R Grip`) |
-| `Controls.HidingLean` (once 9.2 is confirmed) | `Lean [While Hiding]` | `Lean Your Head` |
-| `Controls.HoldBreathGesture` (once 9.3 is confirmed) | `Hold Breath [While Hiding]` | `Hand over Mouth` |
+| `Controls.HidingLean` | `Lean [While Hiding]` | `Lean Your Head` |
+| `Controls.HoldBreathGesture` | `Hold Breath [While Hiding]` | `Hand over Mouth` |
 
 **With the key off**, v1's choice of glyphs and rows applies exactly; the
-rows of v2 features are still appended while their keys are in effect.
+d-pad glyphs of 7 (10.1) and the rows of v2 features still apply while
+their keys are in effect.
 
 ## 11. OpenXR as the default runtime
 
@@ -1172,8 +1247,8 @@ greyed, its slider shows the switch's value, and its description is
 | 3 | `Recenter Gesture` | toggle | on / off | `Controls.RecenterGesture` | `Hold both grips with both hands at your face to recenter` |
 | 4 | `HUD Toggle Gesture` | toggle | on / off | `Controls.HudToggleGesture` | `Left hand at your head and Map Menu hides or shows the HUD, prompts included` |
 | 5 | `Holster Gestures` | toggle | on / off | `Controls.HolsterGestures` | `Grip over a shoulder: weapons. Left hip: flashlight. Chest: motion tracker` |
-| 6 | `Lean While Hiding` | toggle | on / off | `Controls.HidingLean` | `Lean in a hiding place by leaning your head` (`Not available yet` until 9.2 is confirmed) |
-| 7 | `Hold Breath Gesture` | toggle | on / off | `Controls.HoldBreathGesture` | `Cover your mouth with a hand to hold your breath while hiding` (`Not available yet` until 9.3 is confirmed) |
+| 6 | `Lean While Hiding` | toggle | on / off | `Controls.HidingLean` | `Lean in a hiding place by leaning your head` |
+| 7 | `Hold Breath Gesture` | toggle | on / off | `Controls.HoldBreathGesture` | `Cover your mouth with a hand to hold your breath while hiding` |
 | 8 | `Per-Controller Glyphs` | toggle | on / off | `Controls.ControllerGlyphs` | `Button prompts show the buttons of the controllers you are holding` |
 | 9 | `VR Off Hotkey` | toggle | on / off | `Controls.VrOffHotkey` | `Hold Right Ctrl + Right Shift + F10 for 1 second to turn VR off until restart` |
 | 10 | `Crash-Safe Log` | toggle | on / off | `Controls.CrashSafeLog` | `Requires restart! Writes the log to disk at once, so it survives a system crash` |
@@ -1305,11 +1380,10 @@ events. Each is logged once when it happens or changes (11 §3):
 | INF | Stereo | play mode or calibration applied | the mode; the height taken, or why none was taken (invalid pose, out of range, no floor reference) |
 | WRN | Stereo | standing mode unavailable on this runtime | the runtime; that play is seated |
 | INF | Stereo | world scale changes | the new value; whether `-vrscale` overrides it |
-| INF | Input | a gesture fired | which (recenter, HUD hidden or shown, holster and its action) |
+| INF | Input | a gesture fired | which (recenter, HUD hidden or shown, holster and its action, the hiding lean starting and ending, the breath held and released) |
 | WRN | UI | the HUD toggle cannot be installed | the site that failed its check (12 §4) |
 | INF | Input | the controller family for a hand changes (with `Controls.ControllerGlyphs`) | the hand; the family; the glyph set chosen |
 | INF | Diagnostics | the breathing game starts and ends (tap) | the state, as 11 §4.3 gated by `DebugOptions` |
-| WRN | Input | a feature whose game input is unconfirmed is requested (9.2, 9.3) | which; that it stays off |
 | INF | Stereo | VR turned off by the hotkey | that it was the player's request; that a restart turns it on |
 | ERR | Load | crash event (14) | the content of 14; the same level as v1's crash record (11 §6.1), since both describe one crash |
 
@@ -1386,7 +1460,12 @@ On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
     mark and the map prompt the `A` ring with the left one (10.2), and
     `View Controls` lists `Interact` | `Right A` and `Map Menu` | `Left A`
     (10.3). With the recenter gesture on, `View Controls` ends with
-    `Recenter [Both Hands near Head]` | `Hold Both Grips`.
+    `Recenter [Both Hands near Head]` | `Hold Both Grips`. With a Steam
+    Frame, the flashlight prompt shows the bumper glyph, the map prompt
+    the View glyph and weapon-cycling prompts the game's d-pad glyphs, and
+    `View Controls` lists `Map Menu` | `View Button`. With the key off and
+    `DpadEmulation` on, weapon-cycling prompts show the left stick
+    direction glyphs.
 13. OpenXR default (once decided): delete `mothervr.json`; the new file
     says `"OpenXR"` and OpenXR starts; a v1 file with `"OpenVR"` still
     starts OpenVR.
@@ -1410,6 +1489,13 @@ On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
 17. With `DebugOptions` on, hide in a locker until the Alien searches it:
     the log shows `Start_Breathing_Game` and `End_Breathing_Game` around
     the breathing prompt (confirms 9.1).
+18. `HidingLean` on, in a locker: leaning the head 15 cm sideways peeks
+    that way and leaning back leans the character back, as the stick does;
+    breathing and small nods lean nothing; the log shows the lean starting
+    and ending (confirms 19 item 3).
+19. `HoldBreathGesture` on, at the breathing prompt: a hand over the mouth
+    holds the breath as the right grip does, and moving it away lets go;
+    the log shows the breath held and released (confirms 19 item 4).
 
 ## 19. Open questions
 
@@ -1422,13 +1508,17 @@ On the 2015 build, headset worn, with OpenVR and with OpenXR unless noted.
    gamepad device (2.2) and the stock layout of 04 §2.4 disagree (aim,
    tracker, crouch, peek). To resolve: the same log as item 1 shows each
    action's original pad code.
-3. **The lean input while hiding** (9.2). To resolve: with `DebugOptions`
+3. **The lean input while hiding** (9.2): [likely] the movement axes,
+   from the game's tutorial text since r8 (2.3); acceptance 18 confirms
+   it. If it fails, to resolve: with `DebugOptions`
    on, a real pad and the event tap (11 §5) installed, hide in a locker and
    lean with the pad as the game's prompt says; log, between
    `hiding_visibility_start` and `_finish`, every virtual code the game
    queries with a non-zero answer (IsDown, GetValue, GetAxis), once per
    code. The codes map to actions through item 1.
-4. **The hold-breath input** (9.3): the same method between
+4. **The hold-breath input** (9.3): [likely] `aim`, from the game's
+   tutorial text since r8 (2.3); acceptance 19 confirms it. If it fails,
+   the same method between
    `Start_Breathing_Game` and `End_Breathing_Game`, pressing the control
    the breathing prompt shows.
 5. **Screens that need the d-pad** (7): which interaction screens (keypads,
@@ -1503,9 +1593,9 @@ Not made here; to be applied in a later revision:
 - `13-distribution.md` §5.3: the welcome text with OpenXR as default
   (11), word for word; the player guide: the new settings, gestures and
   the hotkey.
-- `14-ui-resources.md` §2.9, §3.1, §3.4: glyph images per controller family
-  and for the emulated d-pad, drawn to the designs of 10.2 (10, 7); the v2
-  pages and items with their labels and description lines (12).
+- `14-ui-resources.md` §3.1: the v2 pages and items with their labels and
+  description lines (12). (§2.9 and §3.4, the glyph images per controller
+  family and for the emulated d-pad, were applied in 14 r6.)
 - `ANSWERS.md`: record the user decisions this document leaves open
   (OpenXR default, the proposals marked here) and the user decision of
   2026-10-16 that there is no master switch (20 §1.3).
