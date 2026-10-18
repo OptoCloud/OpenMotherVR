@@ -29,6 +29,7 @@ constexpr const char* kControlsKey  = "Controls";
 constexpr const char* kHandsKey     = "Hands";
 constexpr const char* kHapticsKey   = "Haptics";
 constexpr const char* kBodyKey      = "Body";
+constexpr const char* kGraphicsKey  = "Graphics";
 
 // The layout earlier builds of this project wrote: a top-level object
 // "DebugOptions" holding "SkipStartupIntro" and "DevDebugOptions".
@@ -45,6 +46,7 @@ const char* section_key(Section s) noexcept {
         case Section::Hands: return kHandsKey;
         case Section::HandsHaptics: return kHapticsKey;
         case Section::Body: return kBodyKey;
+        case Section::Graphics: return kGraphicsKey;
         case Section::Settings: break;
     }
     return nullptr;

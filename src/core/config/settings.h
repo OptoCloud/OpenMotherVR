@@ -30,6 +30,7 @@ namespace omvr::core::config {
 //       "Controls": { ... },   (ours, v2: spec 22 §3.1)
 //       "Hands":    { ..., "Haptics": { ... } },   (ours, v2: spec 21 §15.1)
 //       "Body":     { ... },   (ours, v2: spec 21 §15.2)
+//       "Graphics": { ... },   (ours, v2: spec 24 §10)
 //       "DebugOptions":     bool,   (the "Dev. Debug Options" flag)
 //       "SkipStartupIntro": bool
 //     }
@@ -153,6 +154,18 @@ struct BodySettings {
     bool real_crouch       = false;
 };
 
+// v2 rendering (spec 24 §10). Each default is v1's behaviour. Read at
+// attach: the engine settings override and its additions apply from the
+// next launch (24 §6.1).
+struct GraphicsSettings {
+    bool engine_settings_override = false;
+    bool shadow_map_4096          = false;
+    bool sharp_reflections        = false;
+    // Megabytes; 0 keeps the game's own size.
+    int streaming_texture_heap_mb = 0;
+    int streaming_model_heap_mb   = 0;
+};
+
 struct DebugSettings {
     bool skip_startup_intro = false;
     // "Dev. Debug Options" in the MotherVR menu: unhides Select Level and the
@@ -172,6 +185,7 @@ struct Settings {
     ControlsSettings controls{};
     HandsSettings hands{};
     BodySettings body{};
+    GraphicsSettings graphics{};
     // Ours: show the game and the VR runtime on the player's Discord
     // profile. Stored as Settings.DiscordRichPresence.
     bool discord_rich_presence = true;

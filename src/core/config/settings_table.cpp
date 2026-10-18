@@ -62,6 +62,11 @@ float& eye_forward(Settings& s) noexcept { return s.body.eye_forward; }
 bool& room_scale(Settings& s) noexcept { return s.body.room_scale; }
 float& seated_eye_raise(Settings& s) noexcept { return s.body.seated_eye_raise; }
 bool& real_crouch(Settings& s) noexcept { return s.body.real_crouch; }
+bool& engine_settings_override(Settings& s) noexcept { return s.graphics.engine_settings_override; }
+bool& shadow_map_4096(Settings& s) noexcept { return s.graphics.shadow_map_4096; }
+bool& sharp_reflections(Settings& s) noexcept { return s.graphics.sharp_reflections; }
+int& streaming_texture_heap_mb(Settings& s) noexcept { return s.graphics.streaming_texture_heap_mb; }
+int& streaming_model_heap_mb(Settings& s) noexcept { return s.graphics.streaming_model_heap_mb; }
 
 // What the v2 commands accept (spec 22 §3.1, 21 §15): the keys' ranges,
 // and 0 where it means off or not calibrated.
@@ -196,6 +201,17 @@ constexpr std::array kRows{
              "setMotherSeatedEyeRaise", CommandRule::Number, kSeatedEyeRaise),
     page_row(Section::Body, "RealCrouch", "Body.RealCrouch", &real_crouch, "mvr_realcrouch",
              "setMotherRealCrouch"),
+    // v2 (spec 24 §10), file only: the Graphics page's items are shown only
+    // once the user has confirmed them (24 §10), so these have no command
+    // or push yet. Read at attach.
+    SettingRow{Section::Graphics, "EngineSettingsOverride", "Graphics.EngineSettingsOverride",
+               &engine_settings_override},
+    SettingRow{Section::Graphics, "ShadowMap4096", "Graphics.ShadowMap4096", &shadow_map_4096},
+    SettingRow{Section::Graphics, "SharpReflections", "Graphics.SharpReflections", &sharp_reflections},
+    SettingRow{Section::Graphics, "StreamingTextureHeapMB", "Graphics.StreamingTextureHeapMB",
+               &streaming_texture_heap_mb},
+    SettingRow{Section::Graphics, "StreamingModelHeapMB", "Graphics.StreamingModelHeapMB",
+               &streaming_model_heap_mb},
 };
 
 } // namespace
@@ -355,6 +371,11 @@ void sanitize(Settings& cfg) noexcept {
     in_or(cfg.hands.haptics.strength, 0.0f, kHapticStrengthMax, kHapticStrengthMax);
     clamped(cfg.body.eye_forward, kEyeForwardMax);
     clamped(cfg.body.seated_eye_raise, kSeatedEyeRaiseMax);
+
+    // 0 (the game's) or [min, max]; a negative size is 0 (spec 24 §10).
+    const auto heap = [](int& mb, int lo, int hi) { mb = mb <= 0 ? 0 : std::clamp(mb, lo, hi); };
+    heap(cfg.graphics.streaming_texture_heap_mb, kTextureHeapMbMin, kTextureHeapMbMax);
+    heap(cfg.graphics.streaming_model_heap_mb, kModelHeapMbMin, kModelHeapMbMax);
 }
 
 } // namespace omvr::core::config

@@ -308,7 +308,7 @@ TEST_CASE("describe names each setting by its key path") {
 }
 
 TEST_CASE("the settings table: commands and their rules") {
-    CHECK(settings_table().size() == 53); // 15 of v1 and Discord, 38 of v2
+    CHECK(settings_table().size() == 58); // 15 of v1 and Discord, 38 of the v2 pages, 5 Graphics
     const SettingRow* row = find_command("mvr_pixelscale");
     REQUIRE(row != nullptr);
     CHECK(row->rule == CommandRule::PixelScale);

@@ -68,6 +68,15 @@ inline constexpr float kHapticStrengthMax    = 1.0f;
 inline constexpr float kEyeForwardMax     = 0.20f;
 inline constexpr float kSeatedEyeRaiseMax = 0.50f;
 
+// Graphics.StreamingTextureHeapMB and StreamingModelHeapMB, megabytes (spec
+// 24 §6.2, §10): 0 keeps the game's size; any other value is held to [min,
+// max], a negative one is 0. The minimums are the stock sizes; the maximums
+// keep a 32-bit process's address space safe.
+inline constexpr int kTextureHeapMbMin = 300;
+inline constexpr int kTextureHeapMbMax = 1024;
+inline constexpr int kModelHeapMbMin   = 128;
+inline constexpr int kModelHeapMbMax   = 512;
+
 // -vrscale <s>: the world scale accepted, and the scale without a usable
 // value (spec 03 §1, 06 §2).
 inline constexpr float kWorldScaleMin     = 0.495f;
