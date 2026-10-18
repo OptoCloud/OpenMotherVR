@@ -9,7 +9,9 @@
 #include "game/stereo/pov.h"
 #include "game/stereo/stereo_objects.h"
 #include "loader/context.h"
+#include "loader/hooks/body_hooks.h"
 #include "loader/hooks/guard.h"
+#include "loader/hooks/hud_hooks.h"
 #include "loader/hooks/pad_hooks.h"
 #include "loader/hooks/stereo_device_hooks.h"
 
@@ -202,8 +204,15 @@ int __fastcall stereo_update(StereoManager* self, void*, float /*dt*/) noexcept 
         if (auto* runtime = game::load_backend(*device); runtime && runtime->tracking_space_changed())
             ctx.update.request_recenter();
         update_play_space(ctx, *device);
+        // 22 §8.2, §15: the two-handed recenter, asked for on the render
+        // thread, taken here as a manual recenter.
+        if (ctx.gestures.take_recenter()) ctx.update.request_recenter();
         const UpdateOutput out = ctx.update.run(gather(ctx, *self, *device));
         apply(ctx, *self, *device, out);
+        // 23 §7, 22 §8.3: the HUD options' game-thread work.
+        hud_on_stereo_update(out.yaw.has_value() || out.recenter);
+        // 21 §10 to §12: body visibility, real crouch, the control hand-back.
+        body_on_stereo_update(*device);
     });
     return 0;
 }
@@ -214,8 +223,7 @@ float* __cdecl place_virtual_screen(float* out, float, float inv_aspect, float) 
 }
 
 float* __cdecl place_hud_panel(float* out, float, float inv_aspect, float) noexcept {
-    return place_quad(
-        out, core::stereo::hud_panel_quad(game::stereo::view_matrix(context().addresses), inv_aspect));
+    return place_quad(out, hud_panel_for_frame(game::stereo::view_matrix(context().addresses), inv_aspect));
 }
 
 // Mode 0: 3D world with the HUD panel. Mode 1: the virtual screen (menus,

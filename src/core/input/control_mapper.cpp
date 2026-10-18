@@ -99,6 +99,19 @@ private:
     bool active_ = false;
 };
 
+// 22 §8.4, §9: the holster actions held, the lean added to the stick's
+// movement (the sum clamped as every analog value is, 04 §5.1) and the
+// hold-breath input, merged with what the controls press.
+void apply_gestures(GameActions& a, const GestureResult& g) noexcept {
+    a.next_weapon |= g.next_weapon;
+    a.prev_weapon |= g.prev_weapon;
+    a.flashlight |= g.torch;
+    a.tracker |= g.tracker;
+    a.aim |= g.hold_breath;
+    a.move_x = std::clamp(a.move_x + g.lean.x, -kAnalogLimit, kAnalogLimit);
+    a.move_y = std::clamp(a.move_y + g.lean.y, -kAnalogLimit, kAnalogLimit);
+}
+
 // Player map (names from the controls help, 04 §2.4).
 void write_player_map(TierWriter& w, const Controls& c, const GameActions& a) noexcept {
     using namespace game::player_action;
@@ -189,12 +202,24 @@ Controls ControlMapper::apply_dpad(const Controls& in) noexcept {
 }
 
 void ControlMapper::write(const Controls& in, bool near_head) noexcept {
-    const Controls c  = apply_dpad(in);
+    schemes_.refresh(); // the d-pad glyphs follow Controls.DpadEmulation (22 §7)
+    Controls c = apply_dpad(in);
+    // 22 §8: the gestures see the controls as read; a grip a holster took
+    // drives neither Aim nor the tracker, nor counts for ToggleGrips.
+    GestureResult gestures;
+    // Run with every gesture off too, so each one's state resets (v1: no
+    // effect).
+    if (gestures_) {
+        gestures = gestures_->update(c, clock_.now());
+        if (gestures.grip_consumed[kLeftHand]) c.grip_l = false;
+        if (gestures.grip_consumed[kRightHand]) c.grip_r = false;
+    }
     const bool toggle = settings_.toggle_grips;
     grips_.update(c.grip_r, c.grip_l, toggle);
-    const bool aim            = toggle ? grips_.aim() : c.grip_r;
-    const bool tracker        = toggle ? grips_.tracker() : c.grip_l && !c.radial;
-    const GameActions actions = game_actions(c, near_head, settings_.snap_rotation, aim, tracker);
+    const bool aim      = toggle ? grips_.aim() : c.grip_r;
+    const bool tracker  = toggle ? grips_.tracker() : c.grip_l && !c.radial;
+    GameActions actions = game_actions(c, near_head, settings_.snap_rotation, aim, tracker);
+    apply_gestures(actions, gestures);
 
     auto& tiers = pad_.tiers();
     TierWriter player{tiers[game::kPlayerMap]};
@@ -206,5 +231,10 @@ void ControlMapper::write(const Controls& in, bool near_head) noexcept {
 }
 
 void ControlMapper::set_scheme(ControlScheme scheme) noexcept { schemes_.set(scheme); }
+
+void ControlMapper::identify_controller(std::size_t hand, ControllerSource source,
+                                        std::string_view id) noexcept {
+    schemes_.identify(hand, source, id);
+}
 
 } // namespace omvr::core::input

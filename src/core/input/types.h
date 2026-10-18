@@ -3,11 +3,15 @@
 
 #include "util/math/vec.h"
 
+#include <array>
+#include <cmath>
+
 // VR controllers as the game sees them: one frame of semantic controls,
 // whichever runtime read them (04 §5.8.1).
 namespace omvr::core::input {
 
 using util::Vec2;
+using util::Vec3;
 
 // The four directions of a d-pad, each pressed or not (22 §7). A real
 // d-pad sets any of them; the emulation one at a time.
@@ -17,6 +21,29 @@ struct Dpad {
     [[nodiscard]] constexpr bool any() const noexcept { return up || down || left || right; }
     friend constexpr bool operator==(const Dpad&, const Dpad&) = default;
 };
+
+// The head and the hands as the runtime reported them for the frame its
+// controls were read in (22 §8.1): positions in the runtime's tracking
+// space (+Y up, -Z forward), metres before the world scale. A position
+// whose flag is false is not used. Read-out for the gestures of 22 §8, §9.
+struct BodyPoses {
+    Vec3 head;
+    float head_yaw  = 0;              // radians about +Y; 0 faces -Z
+    bool head_valid = false;          // the head pose was valid
+    std::array<Vec3, 2> hands{};      // grip positions, left then right
+    std::array<bool, 2> hand_valid{}; // that hand's grip pose was valid
+    bool focused = false;             // the runtime gives this app input focus (04 §5.1)
+};
+
+// The head yaw of BodyPoses from the head's forward (-Z) and up (+Y) axes in
+// tracking space: the heading of the forward axis, from the up axis where
+// the forward axis is near vertical (looking straight up or down), so the
+// yaw stays defined at any pitch. Pure.
+inline float head_yaw(const Vec3& forward, const Vec3& up) noexcept {
+    const float x = forward.x - forward.y * up.x;
+    const float z = forward.z - forward.y * up.z;
+    return std::atan2(-x, -z);
+}
 
 // One frame of semantic controls (04 §5.8.1), written to the game's action
 // tiers by the ControlsSink. Render thread.
@@ -30,6 +57,7 @@ struct Controls {
     bool map = false, flashlight = false, pause = false;
     bool touchpad_scheme = false; // the touchpad scheme of 04 §5.2 (Vive wands)
     Dpad dpad;                    // a controller's own d-pad (04 §5.8.1, 22 §7)
+    BodyPoses poses;              // the frame's head and hands (22 §8.1); none by default
 };
 
 // One hand's controller as a runtime reports it, before the scheme of
@@ -60,5 +88,13 @@ struct TouchpadRegions {
 // Frame: the Steam Frame controllers, thumbsticks with Map, Flashlight and
 // Pause on their own buttons and a d-pad (04 §5.7).
 enum class ControlScheme { Touchpad, Thumbstick, Index, Frame };
+
+// How a runtime reads the controllers, which decides what identifies one
+// and which default binding it has (04 §5.8, 22 §10.1).
+enum class ControllerSource {
+    SteamVrInput, // OpenVR with IVRInput: Prop_ControllerType_String
+    OpenVrLegacy, // OpenVR without IVRInput: every controller is a wand
+    OpenXr,       // the hand's interaction profile path
+};
 
 } // namespace omvr::core::input

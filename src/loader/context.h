@@ -6,14 +6,19 @@
 #include "core/diag/flush_schedule.h"
 #include "core/diag/logger.h"
 #include "core/diag/thread_roles.h"
+#include "core/hands/body_controls.h"
+#include "core/hands/body_hider.h"
+#include "core/hands/hand_back.h"
 #include "core/hands/hands.h"
 #include "core/hands/haptics.h"
+#include "core/hands/real_crouch.h"
 #include "core/input/control_mapper.h"
 #include "core/input/control_scheme.h"
 #include "core/input/glyphs.h"
 #include "core/input/interaction_state.h"
 #include "core/input/virtual_pad.h"
 #include "core/render/alpha_light.h"
+#include "core/render/post_fx.h"
 #include "core/render/shader_fix_stats.h"
 #include "core/stereo/comfort_view.h"
 #include "core/stereo/desktop_window.h"
@@ -35,14 +40,21 @@
 #include "core/ui/play_state.h"
 #include "core/ui/settings_push.h"
 #include "core/ui/ui_archive.h"
+#include "core/ui/crosshair_gate.h"
+#include "core/ui/hud_placement.h"
+#include "core/ui/hud_toggle.h"
+#include "core/ui/hud_visibility.h"
 #include "core/vr/runtime_detector.h"
 #include "core/vr/runtime_failure.h"
 #include "game/addresses.h"
 #include "game/input/input_manager.h"
 #include "game/layout.h"
 #include "game/stereo/follow_camera.h"
+#include "game/stereo/post_fx_effects.h"
 #include "game/ui/console.h"
 #include "game/ui/script_vars.h"
+#include "game/ui/hud_objects.h"
+#include "loader/gesture_context.h"
 #include "loader/headset_audio.h"
 #include "loader/hook_targets.h"
 #include "loader/launch_options.h"
@@ -118,6 +130,9 @@ struct Context {
     // Where the left stick is free for the d-pad (22 §7); over `manager`
     // and `interactions`, declared below.
     StickContextView stick_context;
+    // The body gestures (22 §8.2, §8.4, §9) over the same state.
+    GestureContextView gesture_context;
+    core::input::Gestures gestures;
     core::input::ControlMapper controls;
     core::input::InteractionState interactions;
     // hands (21): the tracked hands, aim from the hand, the tracker in hand
@@ -125,6 +140,23 @@ struct Context {
     // haptics (21 §14): the game's feedback on the controllers, game
     // threads to the render thread
     core::hands::Haptics haptics;
+    // The HUD options (23 §7, 22 §8.3): the player's HUD state (game
+    // thread; the gesture's toggle from the render thread), the crosshair
+    // gate (the HUD update), the panel placement (the overlay draw), the
+    // toggle gesture in front of `controls` (render thread), and the game
+    // functions their hooks call.
+    core::ui::HudVisibility hud_visibility;
+    core::ui::CrosshairGate crosshair;
+    core::ui::HudPlacer hud_placer;
+    core::ui::HudToggleSink hud_toggle;
+    game::ui::HudTargets hud_targets{};
+    // body (21 §10 to §12): body visibility (game thread to the final-pose
+    // jobs), real crouch and the control hand-back (game thread), and real
+    // crouch's presses in front of `hud_toggle` (render thread).
+    core::hands::BodyHider body_hider;
+    core::hands::RealCrouch real_crouch;
+    core::hands::HandBack hand_back;
+    core::hands::BodyControls body_controls;
     // ui
     core::ui::SettingsPush settings_push;
     core::ui::Commands commands;
@@ -170,6 +202,10 @@ struct Context {
     // Dev. Debug Options: the particle lighting lookup's correction, logged
     // once per change (dumps/13). Render thread.
     core::render::AlphaLightTrace alpha_light_trace;
+    // The 2D-only effect toggles (24 §8): their keys, main to render
+    // thread, and the game functions their replacements call.
+    core::render::PostFxEffects post_fx;
+    game::stereo::PostFxEffectTargets post_fx_targets{};
     // proxy, hooks
     platform::d3d11::SystemD3d11 system_d3d11;
     std::atomic<bool> ui_set_only{false};

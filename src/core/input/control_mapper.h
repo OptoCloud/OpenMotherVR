@@ -5,6 +5,7 @@
 #include "core/diag/ports/log.h"
 #include "core/input/control_scheme.h"
 #include "core/input/dpad_emulation.h"
+#include "core/input/gestures.h"
 #include "core/input/ports/controls_sink.h"
 #include "core/input/ports/stick_context.h"
 
@@ -22,6 +23,7 @@ struct ControlMapperDeps {
     const ports::StickContext& stick;         // where the left stick is free for the d-pad
     const diag::ports::Clock& clock;          // the d-pad modifier's hold
     diag::ports::Log& log;                    // the d-pad's changes, with DebugOptions
+    Gestures* gestures = nullptr;             // the body gestures of 22 §8, §9; none: v1
 };
 
 // VR controls into the gamepad action tiers (04 §5.8.5).
@@ -38,11 +40,14 @@ public:
           controls_(deps.controls),
           stick_(deps.stick),
           clock_(deps.clock),
-          log_(deps.log) {}
+          log_(deps.log),
+          gestures_(deps.gestures) {}
 
     // Render thread.
     void write(const Controls& c, bool right_hand_near_head) noexcept override;
     void set_scheme(ControlScheme scheme) noexcept override;
+    void identify_controller(std::size_t hand, ControllerSource source,
+                             std::string_view id) noexcept override;
 
 private:
     // The d-pad of 22 §7 for this write: the press handed to the pad, and
@@ -72,6 +77,7 @@ private:
     const ports::StickContext& stick_;
     const diag::ports::Clock& clock_;
     diag::ports::Log& log_;
+    Gestures* gestures_;
     GripToggles grips_;
     DpadEmulation dpad_;
     Dpad dpad_logged_{}; // the press last logged (render thread)

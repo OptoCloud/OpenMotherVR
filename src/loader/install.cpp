@@ -18,6 +18,7 @@
 #include "core/config/ports/launch_switches.h"
 #include "core/config/settings_table.h"
 #include "core/stereo/blinders.h"
+#include "core/ui/ui_patch.h"
 #include "game/build.h"
 #include "game/code_address.h"
 #include "game/game_image.h"
@@ -30,12 +31,15 @@
 #include "game/sites/ui_set.h"
 #include "loader/context.h"
 #include "loader/hooks/alpha_light_hooks.h"
+#include "loader/hooks/body_hooks.h"
 #include "loader/hooks/event_tap_hook.h"
 #include "loader/hooks/file_hooks.h"
 #include "loader/hooks/hand_hooks.h"
 #include "loader/hooks/haptic_hooks.h"
+#include "loader/hooks/hud_hooks.h"
 #include "loader/hooks/menu_hooks.h"
 #include "loader/hooks/pad_hooks.h"
+#include "loader/hooks/post_fx_hooks.h"
 #include "loader/hooks/render_fix_hooks.h"
 #include "loader/hooks/stereo_device_hooks.h"
 #include "loader/hooks/stereo_update_hooks.h"
@@ -120,7 +124,12 @@ int ui_set_sites(bool mod_archive) noexcept {
 bool install_ui_set(Context& ctx, const GameImage& g, Patcher& p, const std::filesystem::path& game_dir,
                     bool& mod_archive) noexcept {
     const auto stamp = platform::win32::this_module_build_filetime();
-    mod_archive      = sites::redirect_ui_archive(g, p, ctx.ui_archive.deploy(game_dir, stamp));
+    // 23 §6.2: the terminal text size is a layout change of the VR set.
+    const auto variant =
+        ctx.ui_set_only.load(std::memory_order_acquire)
+            ? core::ui::UiVariant{}
+            : core::ui::terminal_text_variant(ctx.settings.current().interaction.terminal_text_scale);
+    mod_archive = sites::redirect_ui_archive(g, p, ctx.ui_archive.deploy(game_dir, stamp, variant));
     if (!mod_archive) {
         // The stock movies register no VR glyph ids: keep the game's pad glyphs.
         ctx.pad.use_stock_glyphs_only();
@@ -197,6 +206,8 @@ bool install_game_side(Context& ctx, const GameImage& g, Patcher& p, bool mod_ar
     // wrapper also pushes the settings.
     sites::area_on(ctx.log, kOptionsUi, ui_set_sites(mod_archive));
     sites::install_render_fixes(g, p, render_fix_hooks(ctx));
+    // v2 2D-only effects (24 §8): a toggle's site only for a key that is false.
+    hooks::install_post_fx_effects(g, p);
     return true;
 }
 
@@ -251,8 +262,12 @@ bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept {
                            install_patches_and_controls(ctx, g, patcher);
     // v2 hands (21): their sites only once Hands.Enabled is on.
     if (installed) hooks::prepare_hands(g);
+    // v2 body visibility (21 §10): its sites only once Body.Visible is not Full.
+    if (installed) hooks::prepare_body(g);
     // v2 haptics (21 §14): their sites only with Hands.Haptics.Enabled at start.
     if (installed) hooks::prepare_haptics(g);
+    // v2 interactions and HUD (23): their sites only once a key asks for them.
+    if (installed) hooks::prepare_hud(g);
     // v2 engine settings override (24 §6): on its own, also when a core
     // site failed or the runtime will not start (24 §11.1), decided before
     // the game's display initialisation reads its settings file.

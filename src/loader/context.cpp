@@ -29,12 +29,12 @@ std::unique_ptr<core::vr::ports::VrRuntime> make_runtime(Context& c, core::vr::D
     core::vr::ports::HapticSource* haptics =
         c.settings.current().hands.haptics.enabled && hooks::haptics_installed() ? &c.haptics : nullptr;
     if (chosen == core::vr::DetectResult::Chosen::OpenVR) {
-        return platform::openvr::make_openvr_runtime({c.log, c.clock, c.failure, c.archive_files, c.controls,
+        return platform::openvr::make_openvr_runtime({c.log, c.clock, c.failure, c.archive_files, c.body_controls,
                                                       c.dialogs, c.runtimes.last_result().openvr_runtime_path,
                                                       aim_poses, haptics});
     }
     return platform::openxr::make_openxr_runtime(
-        {c.log, c.xr, c.controls, c.headset_audio, c.console, aim_poses, haptics});
+        {c.log, c.xr, c.body_controls, c.headset_audio, c.console, aim_poses, haptics});
 }
 
 } // namespace
@@ -53,14 +53,19 @@ Context::Context(void* self) noexcept
       runtime_state(runtimes, stereo, launch),
       play_space_control(calibration, clock, launch),
       display_reset(console, runtime_state, log),
-      schemes(glyphs),
+      schemes(glyphs, settings.current().controls, log),
       pad(glyphs, log),
       stick_context(manager, interactions),
-      controls(
-          {pad, schemes, settings.current().input, settings.current().controls, stick_context, clock, log}),
+      gesture_context(manager, interactions),
+      gestures({settings.current().controls, gesture_context, log}),
+      controls({pad, schemes, settings.current().input, settings.current().controls, stick_context, clock,
+                log, &gestures}),
       interactions(log),
       hands(settings.current().hands, log),
       haptics(settings.current().hands.haptics, clock, log),
+      hud_toggle({controls, settings.current().controls, hud_visibility, clock, log}),
+      body_hider(log),
+      body_controls(hud_toggle, clock),
       settings_push(
           {script_vars, display_reset, schemes, settings.current(), runtime_state, play_space_control, log}),
       commands(settings, display_reset, console, play_space_control, log),

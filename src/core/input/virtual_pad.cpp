@@ -113,6 +113,11 @@ ActivityResult VirtualPad::on_activity(bool stock_activity, PlayerDevices device
     } else if (device_pulse_) {
         device_pulse_  = false;
         result.devices = DeviceSwitch::RestorePad;
+    } else if (devices == PlayerDevices::Both && glyphs_.take_redraw() && shows_vr_glyphs()) {
+        // The VR glyph names changed (22 §10.1): the same redraw as a change
+        // of glyph mode.
+        device_pulse_  = true;
+        result.devices = DeviceSwitch::PulseKeyboard;
     }
     return result;
 }

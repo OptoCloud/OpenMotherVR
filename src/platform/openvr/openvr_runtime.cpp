@@ -172,6 +172,28 @@ input::HandInput legacy_hand(const vr::VRControllerState_t& s) noexcept {
 // The translation column of a 3x4 tracking matrix.
 util::Vec3 translation(const float (&m)[3][4]) noexcept { return {m[0][3], m[1][3], m[2][3]}; }
 
+// 22 §8.1: the head and hands of one controls write, in tracking space
+// (metres before the world scale), for the gestures.
+core::input::BodyPoses body_poses(const vr::TrackedDevicePose_t (&poses)[vr::k_unMaxTrackedDeviceCount],
+                                  const vr::TrackedDeviceIndex_t (&index)[kHandCount],
+                                  bool focused) noexcept {
+    core::input::BodyPoses b;
+    b.focused       = focused;
+    const auto& hmd = poses[vr::k_unTrackedDeviceIndex_Hmd];
+    if (hmd.bPoseIsValid) {
+        const auto& m = hmd.mDeviceToAbsoluteTracking.m;
+        b.head        = translation(m);
+        b.head_yaw    = core::input::head_yaw({-m[0][2], -m[1][2], -m[2][2]}, {m[0][1], m[1][1], m[2][1]});
+        b.head_valid  = true;
+    }
+    for (std::size_t h = 0; h < kHandCount; ++h) {
+        if (index[h] >= vr::k_unMaxTrackedDeviceCount || !poses[index[h]].bPoseIsValid) continue;
+        b.hands[h]      = translation(poses[index[h]].mDeviceToAbsoluteTracking.m);
+        b.hand_valid[h] = true;
+    }
+    return b;
+}
+
 const char* frame_kind_text(bool head_tracked) noexcept { return head_tracked ? "tracked" : "on the screen"; }
 
 // The events after which the poses are in a moved tracking space (03 §6.8),
@@ -768,6 +790,11 @@ void OpenVrRuntime::note_controller(std::size_t hand, vr::TrackedDeviceIndex_t i
     char type[kPropertyBufferSize]{};
     system_->GetStringTrackedDeviceProperty(index, vr::Prop_ControllerType_String, type, sizeof(type));
     logf(log_, kLogController, hand == 0 ? "left" : "right", type, index);
+    // 22 §10.1: each hand's family picks its glyphs (Controls.ControllerGlyphs).
+    controls_.identify_controller(
+        hand,
+        actions_.ready() ? input::ControllerSource::SteamVrInput : input::ControllerSource::OpenVrLegacy,
+        type);
     if (hand == 1 && actions_.ready() && !glyphs_chosen_) {
         glyphs_chosen_ = true;
         controls_.set_scheme(scheme_for(type));
@@ -797,7 +824,8 @@ void OpenVrRuntime::write_controls() {
         near_head = poses[index[1]].bPoseIsValid && input::near_head(translation(hand), translation(head));
     }
 
-    const Controls c = actions_.ready() ? actions_.poll() : legacy_controls(index);
+    Controls c = actions_.ready() ? actions_.poll() : legacy_controls(index);
+    c.poses    = body_poses(poses, index, system_->IsInputAvailable());
     controls_.write(c, near_head);
     play_haptics(poses, index);
 }

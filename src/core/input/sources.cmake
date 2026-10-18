@@ -11,9 +11,15 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/controller_mapping.h
     ${CMAKE_CURRENT_LIST_DIR}/dpad_emulation.cpp
     ${CMAKE_CURRENT_LIST_DIR}/dpad_emulation.h
+    ${CMAKE_CURRENT_LIST_DIR}/gesture_geometry.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/gesture_geometry.h
+    ${CMAKE_CURRENT_LIST_DIR}/gestures.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/gestures.h
     ${CMAKE_CURRENT_LIST_DIR}/glyph_ids.h
     ${CMAKE_CURRENT_LIST_DIR}/glyphs.cpp
     ${CMAKE_CURRENT_LIST_DIR}/glyphs.h
+    ${CMAKE_CURRENT_LIST_DIR}/glyphs_rule.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/glyphs_rule.h
     ${CMAKE_CURRENT_LIST_DIR}/interaction_state.cpp
     ${CMAKE_CURRENT_LIST_DIR}/interaction_state.h
     ${CMAKE_CURRENT_LIST_DIR}/remap.h

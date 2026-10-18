@@ -40,9 +40,16 @@ struct HandState {
     core::input::Dpad dpad{}; // a d-pad (the Steam Frame's left hand, 22 §7)
 };
 
+// XR_MAX_PATH_LENGTH (checked in input.cpp).
+inline constexpr std::size_t kProfileNameSize = 256;
+
 struct ControllerState {
     std::array<HandState, core::vr::kHandCount> hands{};
     ControllerFamily family = ControllerFamily::Unknown;
+    // Each hand's interaction profile path, empty when none is bound, read
+    // at every profile change; the count of changes read (22 §10.1).
+    std::array<std::array<char, kProfileNameSize>, core::vr::kHandCount> profiles{};
+    unsigned profile_generation = 0;
     // The session has input focus: the last xrSyncActions returned
     // XR_SUCCESS, not XR_SESSION_NOT_FOCUSED (a dashboard over the game).
     bool focused = false;

@@ -423,19 +423,43 @@ private:
             return;
         }
         const ControllerState& s = xr_.controllers();
+        if (s.profile_generation != profiles_seen_) {
+            profiles_seen_ = s.profile_generation;
+            for (std::size_t h = 0; h < s.profiles.size(); ++h)
+                controls_.identify_controller(h, input::ControllerSource::OpenXr, s.profiles[h].data());
+        }
         if (s.family != ControllerFamily::Unknown && !glyphs_chosen_) {
             glyphs_chosen_ = true;
             controls_.set_scheme(s.family == ControllerFamily::Touchpad ? input::ControlScheme::Touchpad
                                  : s.family == ControllerFamily::Frame  ? input::ControlScheme::Frame
                                                                         : input::ControlScheme::Thumbstick);
         }
-        const input::Controls c = map_controls(s);
+        input::Controls c = map_controls(s);
         // The right hand near the head turns Interact into the flashlight
         // (04 §5.10).
         const auto& R        = s[Hand::Right];
-        const Pose head      = xr_.views().head;
+        const auto views     = xr_.views();
+        const Pose head      = views.head;
         const bool near_head = R.grip_valid && input::near_head(R.grip.position, head.position);
+        c.poses              = body_poses(s, head, views.head_valid);
         controls_.write(c, near_head);
+    }
+
+    // 22 §8.1: the head of the located views and the hands synced with
+    // them, in the seated space (metres before the world scale), for the
+    // gestures.
+    static input::BodyPoses body_poses(const ControllerState& s, const Pose& head, bool head_valid) noexcept {
+        input::BodyPoses b;
+        b.focused    = s.focused;
+        b.head       = head.position;
+        b.head_yaw   = input::head_yaw(util::rotate(head.orientation, {0.0f, 0.0f, -1.0f}),
+                                       util::rotate(head.orientation, {0.0f, 1.0f, 0.0f}));
+        b.head_valid = head_valid;
+        for (std::size_t h = 0; h < kHandCount; ++h) {
+            b.hands[h]      = s.hands[h].grip.position;
+            b.hand_valid[h] = s.hands[h].grip_valid;
+        }
+        return b;
     }
 
     void set_fov(const std::array<FovAngles, kEyeCount>& fov) {
@@ -464,6 +488,8 @@ private:
     bool glyphs_chosen_ = false;
     bool fov_known_     = false;
     core::vr::FrameKindLog frame_kind_log_; // render thread
+    // Render thread: the profile changes handed to identify_controller (22 §10.1).
+    unsigned profiles_seen_ = 0;
     FovTangents eye_fov_[kEyeCount]{};
     RenderTangents render_{kDefaultTangent, kDefaultTangent};
     // Render thread: each eye's offset from the head, kept while the views

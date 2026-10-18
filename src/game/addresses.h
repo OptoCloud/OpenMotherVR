@@ -285,6 +285,40 @@ inline const HapticRvas& haptic_rvas(GameBuild version) noexcept {
     return version == GameBuild::Patched2020 ? kHapticRvas2020 : kHapticRvas2015;
 }
 
+// Body visibility's game sites (spec 21 §2.3, §10, §20); it also uses the
+// player of HandRvas. 2015 RVAs, checked in the 2015 AI.exe by the spec
+// side; the 2020 ones are unknown, so the feature stays off on that build.
+struct BodyRvas {
+    // 21 §2.3: FinalPoseStep (thiscall on the animation component, no
+    // args), its cdecl thunk, and the `push FinalPoseThunk` of the pass
+    // that queues one job per character: checked to confirm the step runs
+    // only as those jobs.
+    std::uint32_t final_pose_step;
+    std::uint32_t final_pose_thunk;
+    std::uint32_t final_pose_job_push;
+    // 21 §2.3: SkinSetPose (thiscall on a render object: model-space bone
+    // transforms, count; ret 8) and its two calls in FinalPoseStep: the
+    // model's one render object, and each of its six part objects.
+    std::uint32_t skin_set_pose;
+    std::uint32_t skin_call_single;
+    std::uint32_t skin_call_parts;
+};
+
+inline constexpr BodyRvas kBodyRvas2015 = {
+    .final_pose_step     = 0x002A5040,
+    .final_pose_thunk    = 0x002A55E0,
+    .final_pose_job_push = 0x002A5655,
+    .skin_set_pose       = 0x0028E9A0,
+    .skin_call_single    = 0x002A51D8,
+    .skin_call_parts     = 0x002A536A,
+};
+
+inline constexpr BodyRvas kBodyRvas2020 = {};
+
+inline const BodyRvas& body_rvas(GameBuild version) noexcept {
+    return version == GameBuild::Patched2020 ? kBodyRvas2020 : kBodyRvas2015;
+}
+
 // The engine settings load (spec 24 §1.9, §6.1). Nothing is written there:
 // the game opens the file through the C runtime's fopen, which reaches
 // AI.exe's CreateFileA import, and the file hooks redirect that open. The
@@ -312,6 +346,47 @@ inline constexpr EngineSettingsRvas kEngineSettingsRvas2020 = {};
 
 inline const EngineSettingsRvas& engine_settings_rvas(GameBuild version) noexcept {
     return version == GameBuild::Patched2020 ? kEngineSettingsRvas2020 : kEngineSettingsRvas2015;
+}
+
+// The 2D-only effects in stereo (spec 24 §1.6, §1.8, §8): the calls of the
+// lens flare draw and of the post-processing readers of chromatic
+// aberration and film grain. 2015 RVAs, checked in the 2015 AI.exe
+// (timestamp 0x54E3199D); the 2020 ones are unknown (24 §12 item 13), so the
+// toggles stay off on that build.
+struct PostFxEffectRvas {
+    // `push 1; call LensFlareGet; mov ecx, eax; call LensFlareDraw` in the
+    // post-processing render; the call of the draw is 9 bytes in.
+    std::uint32_t lens_flare_site;
+    std::uint32_t lens_flare_get;  // cdecl, no args: the lens flare object
+    std::uint32_t lens_flare_draw; // thiscall (int pass), ret 4
+    // `mov ecx, ebx; call ChromaticAberration` in the post-processing render.
+    std::uint32_t chromatic_aberration_call;
+    std::uint32_t chromatic_aberration; // thiscall, no args
+    // Its `cmp byte ptr [esi+0x1B38], 0`, the flag's only reader.
+    std::uint32_t chromatic_aberration_read;
+    // `mov ecx, esi; call FilmGrain`, the grain reader's only call.
+    std::uint32_t film_grain_call;
+    std::uint32_t film_grain; // thiscall, no args
+    // Its `movss xmm1, [esi+0x608]`, the intensity's only reader.
+    std::uint32_t film_grain_read;
+};
+
+inline constexpr PostFxEffectRvas kPostFxEffectRvas2015 = {
+    .lens_flare_site           = 0x00609AD0,
+    .lens_flare_get            = 0x005B61D0,
+    .lens_flare_draw           = 0x005D3970,
+    .chromatic_aberration_call = 0x006093E9,
+    .chromatic_aberration      = 0x005F1E00,
+    .chromatic_aberration_read = 0x005F1E74,
+    .film_grain_call           = 0x006005DF,
+    .film_grain                = 0x005F63D0,
+    .film_grain_read           = 0x005F65A8,
+};
+
+inline constexpr PostFxEffectRvas kPostFxEffectRvas2020 = {};
+
+inline const PostFxEffectRvas& post_fx_effect_rvas(GameBuild version) noexcept {
+    return version == GameBuild::Patched2020 ? kPostFxEffectRvas2020 : kPostFxEffectRvas2015;
 }
 
 // Sites and bytes the original writes but codes inline in FUN_1001d6f0
@@ -350,6 +425,91 @@ inline constexpr InlineSites kInlineSites2020 = {
 
 inline const InlineSites& inline_sites(GameBuild version) noexcept {
     return version == GameBuild::Patched2020 ? kInlineSites2020 : kInlineSites2015;
+}
+
+// The HUD options (spec 23 §7, 22 §2.4, §8.3). 2015 RVAs, checked in the
+// 2015 AI.exe (timestamp 0x54E3199D) against the bytes the spec gives; the
+// 2020 ones are unknown (23: `?` throughout), so the HUD options stay off
+// on that build.
+struct HudRvas {
+    // 22 §2.4: the UI manager, its object lookup and movie invoke, the two
+    // HUD objects' hide and show methods, and the strings the game passes.
+    std::uint32_t ui_manager_ptr;      // global: the UI manager
+    std::uint32_t ui_ready;            // byte the game tests before each lookup of these objects
+    std::uint32_t ui_find_object;      // thiscall (manager, name), ret 4
+    std::uint32_t ui_invoke;           // thiscall (object, function name), ret 4
+    std::uint32_t weapon_hud_hide;     // thiscall (weaponstuff), plain ret
+    std::uint32_t weapon_hud_show;     //
+    std::uint32_t pickup_hud_hide;     // thiscall (pickupOverlay), plain ret
+    std::uint32_t pickup_hud_show;     //
+    std::uint32_t weaponstuff_name;    // "weaponstuff"
+    std::uint32_t pickup_overlay_name; // "pickupOverlay"
+    std::uint32_t force_hidden_name;   // "force_hud_hidden"
+    std::uint32_t force_visible_name;  // "force_hud_visible"
+    // 23 §2.7, 22 §2.4: the method table of the scripted entity that hides
+    // and shows the HUD (six slots), and the four methods it holds, each
+    // thiscall with two stack arguments, ret 8.
+    std::uint32_t hud_entity_methods;
+    std::uint32_t hud_entity_hide;     // slots 0 and 2
+    std::uint32_t hud_entity_show_alt; // slots 1 and 3
+    std::uint32_t hud_entity_hide_alt; // slot 4
+    std::uint32_t hud_entity_show;     // slot 5
+    // 23 §2.7: CrosshairUpdate, its one call, and its two invokes of the
+    // movie's ShowCrosshairs and HideCrosshairs with their names.
+    std::uint32_t crosshair_update;
+    std::uint32_t crosshair_update_call;
+    std::uint32_t show_crosshairs_call;
+    std::uint32_t hide_crosshairs_call;
+    std::uint32_t show_crosshairs_name;
+    std::uint32_t hide_crosshairs_name;
+    // 23 §2.6: IconHighlightUpdate (thiscall (icon manager, icon record),
+    // ret 4) and its two calls in the icon update.
+    std::uint32_t icon_highlight;
+    std::uint32_t icon_highlight_call_a;
+    std::uint32_t icon_highlight_call_b;
+};
+
+inline constexpr HudRvas kHudRvas2015 = {
+    .ui_manager_ptr        = 0x0134A78C,
+    .ui_ready              = 0x01240F27,
+    .ui_find_object        = 0x00410420,
+    .ui_invoke             = 0x004081E0,
+    .weapon_hud_hide       = 0x0040C220,
+    .weapon_hud_show       = 0x0040C250,
+    .pickup_hud_hide       = 0x0040ADC0,
+    .pickup_hud_show       = 0x0040ADE0,
+    .weaponstuff_name      = 0x00DC6CE8,
+    .pickup_overlay_name   = 0x00DC3934,
+    .force_hidden_name     = 0x00EFB2D8,
+    .force_visible_name    = 0x00EFB2EC,
+    .hud_entity_methods    = 0x00DFD014,
+    .hud_entity_hide       = 0x001094A0,
+    .hud_entity_show_alt   = 0x00109770,
+    .hud_entity_hide_alt   = 0x00109680,
+    .hud_entity_show       = 0x001095A0,
+    .crosshair_update      = 0x004371F0,
+    .crosshair_update_call = 0x00437345,
+    .show_crosshairs_call  = 0x004372C4,
+    .hide_crosshairs_call  = 0x00437318,
+    .show_crosshairs_name  = 0x00EFEA94,
+    .hide_crosshairs_name  = 0x00EFEA84,
+    .icon_highlight        = 0x003A3420,
+    .icon_highlight_call_a = 0x003C586C,
+    .icon_highlight_call_b = 0x003C594C,
+};
+
+inline constexpr HudRvas kHudRvas2020 = {};
+
+static_assert(
+    [] {
+        constexpr std::size_t kRows = sizeof(HudRvas) / sizeof(std::uint32_t);
+        const auto rows             = std::bit_cast<std::array<std::uint32_t, kRows>>(kHudRvas2015);
+        return std::ranges::none_of(rows, [](std::uint32_t rva) { return rva == 0; });
+    }(),
+    "every HUD row has its 2015 RVA");
+
+inline const HudRvas& hud_rvas(GameBuild version) noexcept {
+    return version == GameBuild::Patched2020 ? kHudRvas2020 : kHudRvas2015;
 }
 
 // The selected per-build table, rebased onto the running AI.exe.
