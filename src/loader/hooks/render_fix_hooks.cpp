@@ -105,11 +105,13 @@ void __fastcall render_reflection(void* pov, void*) noexcept {
     auto& ctx               = context();
     StereoInterface* dev    = game::stereo::load_device(ctx.manager);
     const DeviceState state = dev ? game::stereo::load_state(*dev) : DeviceState::None;
-    ctx.reflections.note_pov({.pov    = pov,
-                              .flags  = game::stereo::pov_flags(pov),
-                              .state  = dev ? static_cast<int>(state) : -1,
-                              .width  = game::stereo::pov_target_width(pov),
-                              .height = game::stereo::pov_target_height(pov)});
+    ctx.reflections.note_pov(
+        {.pov     = pov,
+         .flags   = game::stereo::pov_flags(pov),
+         .state   = dev ? static_cast<int>(state) : -1,
+         .width   = game::stereo::pov_target_width(pov),
+         .height  = game::stereo::pov_target_height(pov),
+         .quality = game::stereo::reflection_quality(ctx.targets.render_fixes.reflection)});
     if (!ctx.reflections.per_eye(dev && state == DeviceState::Running, game::stereo::pov_renders(pov))) {
         game::stereo::render_reflection_flat(ctx.targets.render_fixes.reflection,
                                              pov); // flat, or nothing to render: as the game does

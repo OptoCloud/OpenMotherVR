@@ -25,6 +25,9 @@ inline constexpr std::ptrdiff_t kPovTargetHeight = 0x340;
 inline constexpr std::ptrdiff_t kPovFlags        = 0x36B; // see the flag bits below
 inline constexpr std::ptrdiff_t kPovEye          = 0x378; // -1 none; selects the viewport half
 
+// The reflection manager's quality, setting 0x10's value (07 §1).
+inline constexpr std::ptrdiff_t kReflectionQuality = 0x60;
+
 // POV flag bits (+0x36B).
 inline constexpr std::uint8_t kPovFlagActive  = 0x01;
 inline constexpr std::uint8_t kPovFlagRenders = 0x10;
@@ -42,6 +45,7 @@ struct ReflectionTargets {
     void* update_frustum;      // POV frustum update
     void** renderer_eye_owner; // its +0x2C is the renderer's current eye
     std::uint8_t* clear;       // the game's clear of the bound target
+    void** reflection_manager; // its +0x60 is the planar reflection quality
 };
 
 // The main view's world-to-view matrix (row vectors, left-handed, metres):
@@ -57,6 +61,10 @@ bool gate_reflection_clear(const ReflectionTargets& targets, core::diag::ports::
 std::uint8_t pov_flags(const void* pov) noexcept;
 // The POV is active and renders this frame.
 bool pov_renders(const void* pov) noexcept;
+// The planar reflection quality, setting 0x10's value (07 §1, 24 §1.9);
+// -1 before the game has a reflection manager. Render thread.
+std::int32_t reflection_quality(const ReflectionTargets& targets) noexcept;
+
 // Its render target's size.
 std::int32_t pov_target_width(const void* pov) noexcept;
 std::int32_t pov_target_height(const void* pov) noexcept;

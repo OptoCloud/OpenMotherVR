@@ -125,6 +125,7 @@ struct ReconRvas {
     std::uint32_t pov_update_frustum;     // POV frustum from its view/proj (thiscall, no args)
     std::uint32_t renderer_eye_owner;     // global pointer; its +0x2C is the current eye
     std::uint32_t clear_render_target;    // clear of the bound target (cdecl); 6-byte prologue
+    std::uint32_t reflection_manager;     // global pointer; its +0x60 is the quality (07 §1, 24 §1.9)
 
     // Anti-aliasing in stereo.
     std::uint32_t stereo_output_draw_call; // `call FullscreenDraw` in the final post chain's stereo path
@@ -176,6 +177,7 @@ inline constexpr ReconRvas kReconRvas2015 = {
     .pov_update_frustum      = 0x005B2FB0,
     .renderer_eye_owner      = 0x013583E4,
     .clear_render_target     = 0x00621770,
+    .reflection_manager      = 0x0135835C,
     .stereo_output_draw_call = 0x006101DC,
     .fullscreen_draw         = 0x005A0980,
     .postfx_instance         = 0x005F19C0,

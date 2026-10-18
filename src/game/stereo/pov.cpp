@@ -105,6 +105,11 @@ bool pov_renders(const void* pov) noexcept {
     return (pov_flags(pov) & kActiveAndRenders) == kActiveAndRenders;
 }
 
+std::int32_t reflection_quality(const ReflectionTargets& targets) noexcept {
+    const void* manager = *targets.reflection_manager;
+    return manager ? field<std::int32_t>(manager, kReflectionQuality) : -1;
+}
+
 std::int32_t pov_target_width(const void* pov) noexcept { return field<std::int32_t>(pov, kPovTargetWidth); }
 
 std::int32_t pov_target_height(const void* pov) noexcept {

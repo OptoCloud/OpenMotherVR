@@ -7,6 +7,7 @@
 #include "core/stereo/visibility_trace.h"
 #include "core/stereo/mirror_layout.h"
 #include "core/stereo/mode_policy.h"
+#include "core/stereo/reflection_pass.h"
 #include "core/stereo/render_target.h"
 #include "core/stereo/scene_tracker.h"
 #include "core/stereo/snap_turn.h"
@@ -466,3 +467,35 @@ TEST_CASE("stereo AA logs each decision once") {
 }
 
 } // namespace
+
+namespace {
+
+class NoKeys final : public omvr::core::stereo::ports::Keyboard {
+public:
+    bool ctrl_and_alt_held() const noexcept override { return false; }
+    bool key_down(omvr::core::stereo::ports::Key) const noexcept override { return false; }
+};
+
+} // namespace
+
+TEST_CASE("reflection POV log: a new POV, a flag change and a quality change each log once (07 §6)") {
+    const NoKeys keys;
+    const omvr::core::config::Settings settings{};
+    omvr::tests::RecordingLog log;
+    omvr::core::stereo::ReflectionPass pass(keys, settings, log);
+    int pov = 0;
+    omvr::core::stereo::ReflectionPovInfo info{
+        .pov = &pov, .flags = 0x00, .state = 2, .width = 640, .height = 360, .quality = 3};
+    pass.note_pov(info);
+    pass.note_pov(info);
+    CHECK(log.lines.size() == 1);
+    CHECK(log.contains("quality 3"));
+    info.flags = 0x11;
+    pass.note_pov(info);
+    CHECK(log.lines.size() == 2);
+    info.quality = 6;
+    pass.note_pov(info);
+    pass.note_pov(info);
+    CHECK(log.lines.size() == 3);
+    CHECK(log.contains("quality 6"));
+}

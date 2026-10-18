@@ -116,6 +116,7 @@ void fix_reflections(const GameImage& g, Patcher& p, const ReconRvas& r,
         .update_frustum      = g.at_rva(r.pov_update_frustum),
         .renderer_eye_owner  = CodeAddress{g.at_rva(r.renderer_eye_owner)},
         .clear               = g.at_rva(r.clear_render_target),
+        .reflection_manager  = CodeAddress{g.at_rva(r.reflection_manager)},
     };
     if (!p.redirect_call(site, hooks.render_reflection, "reflections")) return;
     // render_reflection renders flat until the clear gate is in, so the

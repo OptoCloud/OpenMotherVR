@@ -12,19 +12,21 @@ namespace {
 
 constexpr std::string_view kRenderedLog = "[stereo] reflections rendered per eye";
 constexpr std::string_view kPovLog =
-    "[stereo] reflection POV {} flags 0x{:02X} -> 0x{:02X} (state {}, size {}x{})";
+    "[stereo] reflection POV {} flags 0x{:02X} -> 0x{:02X} (state {}, size {}x{}, quality {})";
 
 } // namespace
 
 void ReflectionPass::note_pov(const ReflectionPovInfo& info) noexcept {
     auto it =
         std::ranges::find_if(seen_, [&](const SeenPov& e) { return e.pov == info.pov || e.pov == nullptr; });
-    if (it == seen_.end() || (it->pov != nullptr && it->flags == info.flags) || lines_ >= kReflectionLogLines)
-        return;
+    if (it == seen_.end() || lines_ >= kReflectionLogLines) return;
+    const bool pov_changed = it->pov == nullptr || it->flags != info.flags;
+    if (!pov_changed && info.quality == quality_) return;
     ++lines_;
     diag::ports::logf(log_, kPovLog, info.pov, it->pov ? it->flags : -1, info.flags, info.state, info.width,
-                      info.height);
-    *it = {info.pov, info.flags};
+                      info.height, info.quality);
+    *it      = {info.pov, info.flags};
+    quality_ = info.quality;
 }
 
 bool ReflectionPass::take_capture_request() noexcept {

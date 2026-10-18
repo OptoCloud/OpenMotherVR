@@ -20,6 +20,7 @@ struct ReflectionPovInfo {
     int state;          // the device state, -1 without a device
     std::int32_t width; // its render target's size
     std::int32_t height;
+    std::int32_t quality = -1; // the reflection quality setting (07 §1, §6), -1 unknown
 };
 
 // Planar reflections (07).
@@ -42,8 +43,8 @@ public:
     // one); without it the fix stays off. Set once at attach.
     void set_ready(bool ready) noexcept { ready_ = ready; }
 
-    // Logs each reflection POV and every change of its flags, up to
-    // kReflectionLogLines lines.
+    // Logs each reflection POV, every change of its flags and every change
+    // of the quality setting, up to kReflectionLogLines lines.
     void note_pov(const ReflectionPovInfo& pov) noexcept;
 
     // The POV renders per eye: the fix is in, stereo runs, and the POV is
@@ -73,6 +74,7 @@ private:
     };
     std::array<SeenPov, kReflectionPovSlots> seen_{};
     int lines_             = 0;
+    int quality_           = -2; // last logged quality; -2 before the first line
     bool capture_key_down_ = false;
     util::OnceLatch rendered_logged_;
 };
