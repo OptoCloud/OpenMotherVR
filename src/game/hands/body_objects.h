@@ -67,9 +67,24 @@ struct SkeletonRead {
     std::size_t count = 0;
 };
 
-// Reads the skeleton; false when it has no bones, more than kMaxSkeletonBones
-// (`count` then says how many), or a bone without a name.
-bool read_skeleton(const void* skeleton, SkeletonRead& out) noexcept;
+// What read_skeleton found.
+enum class SkeletonReadResult : std::uint8_t {
+    Ok,
+    NoBones,      // the bone count is not above 0
+    NoArrays,     // the bone or parent array pointer is null
+    TooManyBones, // more than kMaxSkeletonBones
+    UnnamedBone,  // a bone without a name
+};
+
+// Reads the skeleton into `out` (its bones when the result is Ok).
+// `raw_count`: the bone count as read; `unnamed`: with UnnamedBone, the
+// first bone without a name.
+struct SkeletonReadInfo {
+    SkeletonReadResult result = SkeletonReadResult::Ok;
+    std::int32_t raw_count    = 0;
+    std::size_t unnamed       = 0;
+};
+SkeletonReadInfo read_skeleton(const void* skeleton, SkeletonRead& out) noexcept;
 
 // The pose's model-space bone transforms (the array FinalPoseStep hands the
 // render objects, 21 §2.3) and their count. Job thread of the pose's step.

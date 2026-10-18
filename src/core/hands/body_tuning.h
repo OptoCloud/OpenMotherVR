@@ -16,6 +16,12 @@ using BodySeconds = std::chrono::duration<float>;
 // triangle shared with a drawn bone never shades from a zero normal.
 inline constexpr float kCollapseScale = 1.0e-3f;
 
+// 21 §10.2 (r8) [proposal]: a player skeleton that could not be read is
+// read again this often until it can be, so a value set before the game
+// has the player's skeleton ready (a menu, a level load) takes effect once
+// it is; a read costs a walk of at most 256 bones.
+inline constexpr BodySeconds kSkeletonRetry{1.0f};
+
 // 21 §11.5 [proposal]: the character crouches when the head's height above
 // the floor falls below kCrouchBelow * h and stands when it rises above
 // kStandAbove * h (h: the calibrated standing eye height).

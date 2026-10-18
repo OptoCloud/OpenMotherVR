@@ -1,10 +1,11 @@
 // OpenMotherVR-Provenance: clean
 // core/hands body features (spec 21 §10 to §12). Expected values are the
 // spec's: the bone groups of 21 §2.3 and the Body.Visible table of §10.2,
-// the collapse rule of §10.2, the real crouch thresholds 0.78 h and 0.86 h,
-// the 100 ms press and 0.5 s retry of §11.5, the 0.5 s settle of §12.2 item
-// 3, the game's crouch drop of 0.63 m from its own data (§11.5), and the
-// offsets in runtime metres before the scale (§11.1).
+// the collapse rule and the 1 s re-read of §10.2, the real crouch
+// thresholds 0.78 h and 0.86 h, the 100 ms press and 0.5 s retry of §11.5,
+// the 0.5 s settle of §12.2 item 3, the game's crouch drop of 0.63 m from
+// its own data (§11.5), and the offsets in runtime metres before the scale
+// (§11.1).
 
 #include "core/hands/body_controls.h"
 #include "core/hands/body_hider.h"
@@ -21,6 +22,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -237,13 +239,14 @@ TEST_CASE("body hider: publishes a plan only while something is hidden and the d
     const auto s     = female_fp();
     const auto bones = s.bones();
     const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "FEMALEFP"};
+    const BodyTime t{std::chrono::seconds(100)};
 
-    CHECK_FALSE(hider.wants_bones(BodyVisible::Full, player)); // the default reads nothing
-    hider.update(BodyVisible::Full, true, player, nullptr);
+    CHECK_FALSE(hider.wants_bones(BodyVisible::Full, player, t)); // the default reads nothing
+    hider.update(BodyVisible::Full, true, player, nullptr, t);
     CHECK(hider.current() == nullptr);
 
-    REQUIRE(hider.wants_bones(BodyVisible::HandsOnly, player));
-    hider.update(BodyVisible::HandsOnly, true, player, &bones);
+    REQUIRE(hider.wants_bones(BodyVisible::HandsOnly, player, t));
+    hider.update(BodyVisible::HandsOnly, true, player, &bones, t);
     const HiddenPose* p = hider.current();
     REQUIRE(p != nullptr);
     CHECK(p->pose == 0x2000);
@@ -252,17 +255,17 @@ TEST_CASE("body hider: publishes a plan only while something is hidden and the d
     CHECK(log.contains("[body] player skeleton FEMALEFP"));
     CHECK(log.contains("[body] visibility HandsOnly"));
 
-    // The same skeleton and value: no new read, the same plan.
-    CHECK_FALSE(hider.wants_bones(BodyVisible::HandsOnly, player));
-    hider.update(BodyVisible::HandsOnly, true, player, nullptr);
+    // The same skeleton and value: no new read, the same plan, also later.
+    CHECK_FALSE(hider.wants_bones(BodyVisible::HandsOnly, player, t + 10s));
+    hider.update(BodyVisible::HandsOnly, true, player, nullptr, t + 10s);
     CHECK(hider.current() == p);
 
     // Without a running device nothing is hidden (20 §1.2).
-    hider.update(BodyVisible::HandsOnly, false, player, nullptr);
+    hider.update(BodyVisible::HandsOnly, false, player, nullptr, t + 10s);
     CHECK(hider.current() == nullptr);
 
     // Back to Full: nothing hidden, and that is said once.
-    hider.update(BodyVisible::Full, true, player, nullptr);
+    hider.update(BodyVisible::Full, true, player, nullptr, t + 10s);
     CHECK(hider.current() == nullptr);
     CHECK(log.contains("[body] visibility Full"));
 }
@@ -274,12 +277,96 @@ TEST_CASE("body hider: a skeleton without the bones is drawn whole and logged on
     s.add("DallasFP:Hips", -1);
     const auto bones = s.bones();
     const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "DALLASFP"};
-    hider.update(BodyVisible::None, true, player, &bones);
+    const BodyTime t{std::chrono::seconds(100)};
+    hider.update(BodyVisible::None, true, player, &bones, t);
     CHECK(hider.current() == nullptr);
     CHECK(log.contains("no bone Spine by name"));
     const auto lines = log.lines.size();
-    hider.update(BodyVisible::None, true, player, &bones);
+    // Read and found lacking: not read again (it will not gain the bones).
+    CHECK_FALSE(hider.wants_bones(BodyVisible::None, player, t + 5s));
+    hider.update(BodyVisible::None, true, player, &bones, t + 5s);
     CHECK(log.lines.size() == lines);
+}
+
+// 21 §10.2 (r8): a value set while the game cannot give the player's
+// skeleton (the pause or main menu, a level load) takes effect once it can,
+// without another change of the setting.
+TEST_CASE("body hider: an unreadable skeleton is read again every second until it can be") {
+    RecordingLog log;
+    BodyHider hider{log};
+    const auto s     = female_fp();
+    const auto bones = s.bones();
+    const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "FEMALEFP"};
+    const BodyTime t{std::chrono::seconds(100)};
+    const SkeletonReadFault unnamed{SkeletonFault::UnnamedBone, 70, 0};
+
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t));
+    hider.update(BodyVisible::ArmsAndHands, true, player, nullptr, t, unnamed);
+    CHECK(hider.current() == nullptr);
+    CHECK(
+        log.contains("[body] WARNING the player's skeleton FEMALEFP could not be read (a bone without a "
+                     "name: bone 0 of 70); the body is drawn whole until it can be, read again every 1 s"));
+    const auto lines = log.lines.size();
+
+    // Not before the second is up; then again, and the same fault is not
+    // logged again.
+    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t + 500ms));
+    hider.update(BodyVisible::ArmsAndHands, true, player, nullptr, t + 500ms);
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t + 1s));
+    hider.update(BodyVisible::ArmsAndHands, true, player, nullptr, t + 1s, unnamed);
+    CHECK(hider.current() == nullptr);
+    CHECK(log.lines.size() == lines);
+
+    // Readable at last: the plan is made and published, with the usual lines.
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t + 2s));
+    hider.update(BodyVisible::ArmsAndHands, true, player, &bones, t + 2s);
+    REQUIRE(hider.current() != nullptr);
+    CHECK(log.contains("[body] visibility ArmsAndHands"));
+    // And then not read again.
+    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t + 10s));
+}
+
+TEST_CASE("body hider: an unreadable skeleton is logged once per change") {
+    RecordingLog log;
+    BodyHider hider{log};
+    const PlayerSkeleton menu{0x1000, 0x2000, 0x3000, "FEMALEFP"};
+    const BodyTime t{std::chrono::seconds(100)};
+    const SkeletonReadFault no_bones{SkeletonFault::NoBones, 0, 0};
+    const auto warnings = [&] {
+        std::size_t n = 0;
+        for (const auto& l : log.lines)
+            if (l.find("could not be read") != std::string::npos) ++n;
+        return n;
+    };
+
+    hider.update(BodyVisible::HandsOnly, true, menu, nullptr, t, no_bones);
+    CHECK(warnings() == 1);
+    CHECK(log.contains("(no bones, 0 bones)"));
+    // Retried with the same result: quiet.
+    for (int i = 1; i <= 5; ++i)
+        hider.update(BodyVisible::HandsOnly, true, menu, nullptr, t + i * 1s, no_bones);
+    CHECK(warnings() == 1);
+    // Another fault: said once.
+    const SkeletonReadFault no_arrays{SkeletonFault::NoArrays, 70, 0};
+    hider.update(BodyVisible::HandsOnly, true, menu, nullptr, t + 6s, no_arrays);
+    CHECK(warnings() == 2);
+    // A new value: a new read at once, said once.
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, menu, t + 6s));
+    hider.update(BodyVisible::ArmsAndHands, true, menu, nullptr, t + 6s, no_arrays);
+    CHECK(warnings() == 3);
+    // No player (a level load): nothing read, nothing said.
+    const PlayerSkeleton loading{};
+    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, loading, t + 20s));
+    hider.update(BodyVisible::ArmsAndHands, true, loading, nullptr, t + 20s);
+    CHECK(warnings() == 3);
+    // The level's player: a new pose and skeleton, read at once.
+    const auto s     = female_fp();
+    const auto bones = s.bones();
+    const PlayerSkeleton level{0x5000, 0x6000, 0x7000, "FEMALEFP"};
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, level, t + 20s));
+    hider.update(BodyVisible::ArmsAndHands, true, level, &bones, t + 20s);
+    CHECK(hider.current() != nullptr);
+    CHECK(warnings() == 3);
 }
 
 namespace {

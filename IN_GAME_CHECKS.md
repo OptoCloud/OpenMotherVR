@@ -404,6 +404,18 @@ Controls keys in `mothervr.json`, Dev. Debug Options on.
       model is posed from another skeleton's pose`. Back to `Full`:
       `[body] visibility Full: the whole body is drawn`. With no `Body`
       keys: no `body visibility` line, and the body shows as in v1.
+- [ ] **Body visibility set in a menu, and from the file.** Set `Body`
+      to `Arms and Hands` on the Body options page in the pause
+      menu and again in the main menu, then load a level; also start the
+      game with `"Body": {"Visible": "HandsOnly"}` and load a level. In
+      the level the hidden parts are gone without touching the setting
+      again. Log: if the skeleton cannot be read yet, one `[body] WARNING
+      the player's skeleton NAME could not be read (REASON, N bones); the
+      body is drawn whole until it can be, read again every 1 s` per
+      change (not repeated every second), then `[body] visibility
+      ArmsAndHands: K of N bones of FEMALEFP collapsed` once the player is
+      in the level. If the warning stays and the visibility line never
+      comes, send the log: REASON says what the skeleton lacks.
 - [ ] **Real crouch.** Standing, calibrated, `"RealCrouch": true`: crouch
       for real, enter a vent, try to stand inside, leave and stand. The
       character follows, stays down in the vent, and the view stays at

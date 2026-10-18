@@ -51,22 +51,37 @@ std::string_view skeleton_name(const void* skeleton) noexcept {
     return havok_string(skeleton, kSkeletonName);
 }
 
-bool read_skeleton(const void* skeleton, SkeletonRead& out) noexcept {
-    out.count           = 0;
-    const auto n        = read<std::int32_t>(skeleton, kSkeletonBoneCount);
+SkeletonReadInfo read_skeleton(const void* skeleton, SkeletonRead& out) noexcept {
+    out.count = 0;
+    SkeletonReadInfo info;
+    info.raw_count      = read<std::int32_t>(skeleton, kSkeletonBoneCount);
     const void* bones   = pointer_at(skeleton, kSkeletonBones);
     const void* parents = pointer_at(skeleton, kSkeletonParents);
-    if (n <= 0 || !bones || !parents) return false;
-    out.count = static_cast<std::size_t>(n);
-    if (out.count > kMaxSkeletonBones) return false;
+    if (info.raw_count <= 0) {
+        info.result = SkeletonReadResult::NoBones;
+        return info;
+    }
+    if (!bones || !parents) {
+        info.result = SkeletonReadResult::NoArrays;
+        return info;
+    }
+    out.count = static_cast<std::size_t>(info.raw_count);
+    if (out.count > kMaxSkeletonBones) {
+        info.result = SkeletonReadResult::TooManyBones;
+        return info;
+    }
     for (std::size_t i = 0; i < out.count; ++i) {
         const auto offset = static_cast<std::ptrdiff_t>(i);
         out.names[i]      = havok_string(bones, offset * kSkeletonBoneStride);
         out.parents[i] =
             read<std::int16_t>(parents, offset * static_cast<std::ptrdiff_t>(sizeof(std::int16_t)));
-        if (out.names[i].empty()) return false;
+        if (out.names[i].empty()) {
+            info.result  = SkeletonReadResult::UnnamedBone;
+            info.unnamed = i;
+            return info;
+        }
     }
-    return true;
+    return info;
 }
 
 const void* pose_model_data(const void* pose) noexcept { return pointer_at(pose, kPoseModelData); }

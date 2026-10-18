@@ -102,8 +102,22 @@ hands::Activity read_activity(Context& ctx, game::StereoInterface& device, void*
     return hands::activity(in);
 }
 
-// 21 §10: the plan for this frame's skeleton, published for the jobs.
-void update_visibility(Context& ctx, BodyVisible v, bool running, void* player) noexcept {
+hands::SkeletonFault fault_of(game::hands::SkeletonReadResult r) noexcept {
+    using R = game::hands::SkeletonReadResult;
+    switch (r) {
+        case R::Ok: break;
+        case R::NoBones: return hands::SkeletonFault::NoBones;
+        case R::NoArrays: return hands::SkeletonFault::NoArrays;
+        case R::TooManyBones: return hands::SkeletonFault::TooManyBones;
+        case R::UnnamedBone: return hands::SkeletonFault::UnnamedBone;
+    }
+    return hands::SkeletonFault::Unknown;
+}
+
+// 21 §10: the plan for this frame's skeleton, published for the jobs. A
+// skeleton that cannot be read yet is read again until it can be (21 §10.2).
+void update_visibility(Context& ctx, BodyVisible v, bool running, void* player,
+                       std::chrono::steady_clock::time_point now) noexcept {
     if (v != BodyVisible::Full && !sites_tried) install_sites(ctx);
     if (!sites_in) v = BodyVisible::Full;
     hands::PlayerSkeleton skeleton;
@@ -112,13 +126,21 @@ void update_visibility(Context& ctx, BodyVisible v, bool running, void* player) 
                     game::hands::skeleton_name(pose->skeleton)};
     }
     std::optional<hands::SkeletonBones> bones;
+    hands::SkeletonReadFault fault;
+    // Read only when asked: once per change, and once a second while the
+    // skeleton cannot be read (no walk of the bones every frame).
     game::hands::SkeletonRead read;
-    if (ctx.body_hider.wants_bones(v, skeleton) &&
-        game::hands::read_skeleton(game::CodeAddress{static_cast<std::uint32_t>(skeleton.skeleton)}, read)) {
-        bones = hands::SkeletonBones{std::span{read.names}.first(read.count),
-                                     std::span{read.parents}.first(read.count)};
+    if (ctx.body_hider.wants_bones(v, skeleton, now)) {
+        const auto info = game::hands::read_skeleton(
+            game::CodeAddress{static_cast<std::uint32_t>(skeleton.skeleton)}, read);
+        if (info.result == game::hands::SkeletonReadResult::Ok) {
+            bones = hands::SkeletonBones{std::span{read.names}.first(read.count),
+                                         std::span{read.parents}.first(read.count)};
+        } else {
+            fault = {fault_of(info.result), info.raw_count, info.unnamed};
+        }
     }
-    ctx.body_hider.update(v, running, skeleton, bones ? &*bones : nullptr);
+    ctx.body_hider.update(v, running, skeleton, bones ? &*bones : nullptr, now, fault);
 }
 
 std::string_view press_name(hands::CrouchPress p) noexcept {
@@ -171,7 +193,7 @@ void body_on_stereo_update(game::StereoInterface& device) noexcept {
         const bool running      = game::stereo::load_state(device) == game::DeviceState::Running;
         const auto now          = ctx.clock.now();
 
-        update_visibility(ctx, body.visible, running, player);
+        update_visibility(ctx, body.visible, running, player, now);
         const hands::Activity activity = read_activity(ctx, device, player);
         if (const auto ended = ctx.hand_back.update(activity)) {
             ctx.real_crouch.on_hand_back(now);

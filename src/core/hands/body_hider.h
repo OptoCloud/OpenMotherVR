@@ -7,7 +7,9 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 // Body visibility over frames (spec 21 §10, §17, §18): the game thread
@@ -34,20 +36,40 @@ struct PlayerSkeleton {
     std::string_view name; // the skeleton's own name, for the log
 };
 
+using BodyTime = std::chrono::steady_clock::time_point;
+
+// Why the game side could not read the player's skeleton (21 §10.2, §18),
+// for the log.
+enum class SkeletonFault : std::uint8_t {
+    Unknown,      // not said
+    NoBones,      // the bone count is not above 0
+    NoArrays,     // the bone or parent array pointer is null
+    TooManyBones, // more bones than the reader holds
+    UnnamedBone,  // a bone without a name
+};
+struct SkeletonReadFault {
+    SkeletonFault fault = SkeletonFault::Unknown;
+    std::int32_t count  = 0; // the skeleton's bone count as read
+    std::size_t bone    = 0; // UnnamedBone: the first bone without a name
+};
+
 class BodyHider final {
 public:
     explicit BodyHider(diag::ports::Log& log) noexcept : log_(log) {}
 
-    // Game thread. Whether update() needs the bones of `skeleton` this frame
-    // (a new skeleton or a new value while one is to be hidden).
-    bool wants_bones(config::BodyVisible v, const PlayerSkeleton& s) const noexcept;
+    // Game thread. Whether update() needs the bones of `skeleton` this frame:
+    // a new skeleton, pose or value while one is to be hidden, or, after a
+    // skeleton could not be read, every kSkeletonRetry until it is (21 §10.2).
+    bool wants_bones(config::BodyVisible v, const PlayerSkeleton& s, BodyTime now) const noexcept;
 
     // Game thread, each frame. `running`: the stereo device runs (20 §1.2:
     // nothing hidden otherwise). `bones` as read for `s.skeleton` when
-    // wants_bones asked for them, else null. Logs once per skeleton and per
-    // change of what is hidden (21 §18).
-    void update(config::BodyVisible v, bool running, const PlayerSkeleton& s,
-                const SkeletonBones* bones) noexcept;
+    // wants_bones asked for them; null when they were not asked for or could
+    // not be read, and then `fault` says why. Logs once per skeleton, per
+    // change of what is hidden, and an unreadable skeleton once until the
+    // skeleton, pose, value or fault changes (21 §18).
+    void update(config::BodyVisible v, bool running, const PlayerSkeleton& s, const SkeletonBones* bones,
+                BodyTime now, const SkeletonReadFault& fault = {}) noexcept;
 
     // Job threads: the plan to apply, or null when nothing is hidden. Valid
     // until the game thread's next update; the final-pose pass returns only
@@ -62,6 +84,7 @@ private:
     void build(config::BodyVisible v, const PlayerSkeleton& s, const SkeletonBones& bones) noexcept;
     void log_skeleton(const PlayerSkeleton& s, const SkeletonBones& bones, PlanResult r) noexcept;
     void log_job_reports() noexcept;
+    void log_unreadable(const PlayerSkeleton& s, const SkeletonReadFault& fault) noexcept;
 
     diag::ports::Log& log_;
     std::array<HiddenPose, 2> buffers_{};
@@ -74,6 +97,10 @@ private:
     std::uintptr_t built_pose_       = 0;
     bool built_ok_                   = false;
     bool built_any_                  = false;
+    // The last build could not read the skeleton: when to read it again, and
+    // the fault last logged for this skeleton, pose and value (none: not yet).
+    std::optional<BodyTime> retry_at_;
+    std::optional<SkeletonFault> unreadable_logged_;
     // The skeletons already logged (21 §18: the first time each is seen).
     std::array<std::uintptr_t, 8> logged_skeletons_{};
     std::size_t logged_count_ = 0;

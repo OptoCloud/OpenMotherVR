@@ -2,8 +2,10 @@
 #include "core/hands/body_hider.h"
 
 #include "core/config/settings_table.h"
+#include "core/hands/body_tuning.h"
 
 #include <algorithm>
+#include <format>
 
 namespace omvr::core::hands {
 
@@ -23,7 +25,8 @@ constexpr std::string_view kLogTooMany =
 constexpr std::string_view kLogBadParents =
     "[body] WARNING player skeleton {}: its parent indices are not a tree; the body is drawn whole with it";
 constexpr std::string_view kLogUnreadable =
-    "[body] WARNING the player's skeleton could not be read; the body is drawn whole";
+    "[body] WARNING the player's skeleton {} could not be read ({}); the body is drawn whole until it "
+    "can be, read again every {:.0f} s";
 constexpr std::string_view kLogHidden = "[body] visibility {}: {} of {} bones of {} collapsed";
 constexpr std::string_view kLogWhole  = "[body] visibility Full: the whole body is drawn";
 constexpr std::string_view kLogApplied =
@@ -31,6 +34,18 @@ constexpr std::string_view kLogApplied =
 constexpr std::string_view kLogOtherPose =
     "[body] WARNING a part of the player's model is posed from another skeleton's pose and stays drawn "
     "(21 §22 item 27)";
+
+// The fault as the log says it.
+std::string_view fault_text(SkeletonFault f) noexcept {
+    switch (f) {
+        case SkeletonFault::Unknown: return "no reason given";
+        case SkeletonFault::NoBones: return "no bones";
+        case SkeletonFault::NoArrays: return "no bone or parent array";
+        case SkeletonFault::TooManyBones: return "too many bones";
+        case SkeletonFault::UnnamedBone: return "a bone without a name";
+    }
+    return "?";
+}
 
 // The index of a bone by its name without prefix, -1 when absent.
 int index_of(const SkeletonBones& b, std::string_view name) noexcept {
@@ -41,13 +56,15 @@ int index_of(const SkeletonBones& b, std::string_view name) noexcept {
 
 } // namespace
 
-bool BodyHider::wants_bones(BodyVisible v, const PlayerSkeleton& s) const noexcept {
+bool BodyHider::wants_bones(BodyVisible v, const PlayerSkeleton& s, BodyTime now) const noexcept {
     if (v == BodyVisible::Full || s.pose == 0) return false;
-    return !built_any_ || v != built_value_ || s.skeleton != built_skeleton_ || s.pose != built_pose_;
+    if (!built_any_ || v != built_value_ || s.skeleton != built_skeleton_ || s.pose != built_pose_)
+        return true;
+    return retry_at_ && now >= *retry_at_;
 }
 
-void BodyHider::update(BodyVisible v, bool running, const PlayerSkeleton& s,
-                       const SkeletonBones* bones) noexcept {
+void BodyHider::update(BodyVisible v, bool running, const PlayerSkeleton& s, const SkeletonBones* bones,
+                       BodyTime now, const SkeletonReadFault& fault) noexcept {
     log_job_reports();
     if (v == BodyVisible::Full && built_any_ && built_value_ != BodyVisible::Full) {
         log_.line(kLogWhole);
@@ -57,19 +74,41 @@ void BodyHider::update(BodyVisible v, bool running, const PlayerSkeleton& s,
         current_.store(nullptr, std::memory_order_release);
         return;
     }
-    if (wants_bones(v, s)) {
+    if (wants_bones(v, s, now)) {
+        const bool changed =
+            !built_any_ || v != built_value_ || s.skeleton != built_skeleton_ || s.pose != built_pose_;
+        if (changed) unreadable_logged_.reset();
         built_any_      = true;
         built_value_    = v;
         built_skeleton_ = s.skeleton;
         built_pose_     = s.pose;
         built_ok_       = false;
+        retry_at_.reset();
         if (bones) {
             build(v, s, *bones);
         } else {
-            log_.line(kLogUnreadable);
+            // 21 §10.2: not ready yet (a menu, a level load) or not readable
+            // at all: read again until it is, logged once per change.
+            retry_at_ = now + std::chrono::duration_cast<BodyTime::duration>(kSkeletonRetry);
+            log_unreadable(s, fault);
         }
     }
     current_.store(built_ok_ ? &buffers_[next_ ^ 1U] : nullptr, std::memory_order_release);
+}
+
+void BodyHider::log_unreadable(const PlayerSkeleton& s, const SkeletonReadFault& fault) noexcept {
+    if (unreadable_logged_ == fault.fault) return;
+    unreadable_logged_ = fault.fault;
+    // A fixed buffer: the game thread logs without allocating here.
+    std::array<char, 96> why{};
+    const auto text = fault_text(fault.fault);
+    const auto r =
+        fault.fault == SkeletonFault::UnnamedBone
+            ? std::format_to_n(why.data(), why.size(), "{}: bone {} of {}", text, fault.bone, fault.count)
+            : std::format_to_n(why.data(), why.size(), "{}, {} bones", text, fault.count);
+    const std::string_view reason{why.data(), static_cast<std::size_t>(r.out - why.data())};
+    logf(log_, kLogUnreadable, s.name.empty() ? std::string_view{"(no name)"} : s.name, reason,
+         kSkeletonRetry.count());
 }
 
 void BodyHider::build(BodyVisible v, const PlayerSkeleton& s, const SkeletonBones& bones) noexcept {
