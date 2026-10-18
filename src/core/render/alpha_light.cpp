@@ -1,7 +1,11 @@
 // OpenMotherVR-Provenance: clean
 #include "core/render/alpha_light.h"
 
+#include "util/math/angle.h"
+
+#include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace omvr::core::render {
 
@@ -34,6 +38,28 @@ bool AlphaLightTrace::changed(int eye, const NdcScaleOffset& game) noexcept {
     Last& last = last_[eye == 1 ? 1 : 0];
     if (last.any && same(game, last.value)) return false;
     last = {.value = game, .any = true};
+    return true;
+}
+
+CameraGap atlas_camera_gap(const util::Vec3& atlas_forward, const util::Vec3& atlas_position,
+                           const util::Matrix44& eye_view) noexcept {
+    const util::Vec3 eye_forward = util::column3(eye_view, util::kForwardAxis);
+    const float lengths          = util::length(atlas_forward) * util::length(eye_forward);
+    const float cosine           = lengths > 0.0f ? util::dot(atlas_forward, eye_forward) / lengths
+                                                  : std::numeric_limits<float>::quiet_NaN();
+    return {.angle_deg  = std::acos(std::clamp(cosine, -1.0f, 1.0f)) * util::kRadToDeg,
+            .distance_m = util::distance(atlas_position, util::camera_position(eye_view.data()))};
+}
+
+bool AlphaLightTrace::camera_sample_due(int eye) noexcept {
+    const std::size_t slot = eye == 1 ? 1 : 0;
+    if (slot < previous_slot_) { // back from eye 1: a new frame
+        sampling_ = frames_.tick();
+        sampled_  = {};
+    }
+    previous_slot_ = slot;
+    if (!sampling_ || sampled_[slot]) return false;
+    sampled_[slot] = true;
     return true;
 }
 

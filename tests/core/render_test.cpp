@@ -2,7 +2,7 @@
 // core/render: the DXBC checksum against fxc's own on the project's mirror
 // shaders, the position-dither fix on synthetic pixel shaders in the
 // layouts of 08 §1.1, run through a small evaluator, and the particle
-// lighting lookup in stereo.
+// lighting lookup in stereo with its diagnostic (08 §8).
 
 #include "core/render/alpha_light.h"
 #include "core/render/dither_fix.h"
@@ -554,6 +554,49 @@ TEST_CASE("the particle lighting trace reports each eye's answer once per change
     CHECK_FALSE(trace.changed(1, a));
     CHECK(trace.changed(0, b));
     CHECK_FALSE(trace.changed(1, a));
+}
+
+// 08 §8.5: the angle between the forward axes and the distance between the
+// positions, with the eye's camera read from its view (05 §1).
+omvr::util::Matrix44 view_of(const omvr::util::Vec3& right, const omvr::util::Vec3& up,
+                             const omvr::util::Vec3& fwd, const omvr::util::Vec3& pos) {
+    using omvr::util::dot;
+    return {right.x, up.x, fwd.x, 0.0f, right.y,          up.y,          fwd.y,          0.0f,
+            right.z, up.z, fwd.z, 0.0f, -dot(pos, right), -dot(pos, up), -dot(pos, fwd), 1.0f};
+}
+
+TEST_CASE("the atlas camera and an eye half the eye distance apart, looking the same way") {
+    const omvr::util::Vec3 atlas_pos{1.0f, 1.6f, -2.0f};
+    const auto view     = view_of({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1.032f, 1.6f, -2.0f});
+    const CameraGap gap = atlas_camera_gap({0, 0, 1}, atlas_pos, view);
+    CHECK(gap.angle_deg == doctest::Approx(0.0f).epsilon(1e-3));
+    CHECK(gap.distance_m == doctest::Approx(0.032f));
+}
+
+TEST_CASE("an eye turned 10 degrees from the atlas camera") {
+    const float a = 10.0f / 57.29578f;
+    const omvr::util::Vec3 fwd{std::sin(a), 0.0f, std::cos(a)};
+    const omvr::util::Vec3 right{std::cos(a), 0.0f, -std::sin(a)};
+    const auto view     = view_of(right, {0, 1, 0}, fwd, {3.0f, 1.0f, 4.0f});
+    const CameraGap gap = atlas_camera_gap({0, 0, 2}, {0, 1, 0}, view); // an axis not of unit length
+    CHECK(gap.angle_deg == doctest::Approx(10.0f).epsilon(1e-3));
+    CHECK(gap.distance_m == doctest::Approx(5.0f));
+    CHECK(std::isnan(atlas_camera_gap({0, 0, 0}, {0, 1, 0}, view).angle_deg));
+}
+
+TEST_CASE("the camera diagnostic samples each eye once every 900 frames") {
+    AlphaLightTrace trace;
+    int due = 0, first_frame = -1;
+    for (int frame = 0; frame <= 1800; ++frame) {
+        for (const int eye : {0, 0, 0, 1, 1}) {
+            if (trace.camera_sample_due(eye)) {
+                ++due;
+                if (first_frame < 0) first_frame = frame;
+            }
+        }
+    }
+    CHECK(first_frame == 900);
+    CHECK(due == 4); // frames 900 and 1800, both eyes
 }
 
 } // namespace

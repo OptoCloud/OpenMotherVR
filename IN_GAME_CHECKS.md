@@ -74,6 +74,15 @@ side of the head and Map hides or shows the HUD (`[diag] hud: ...`).
       with your head. Smoke at the edge of view looks as it does straight
       ahead; both eyes match. Log: `[hook] particle lighting: in place on 1
       sites` and one `[diag] particle lighting: eye N ...` line per eye.
+- [ ] **Floor smoke looked at directly (08 §8.5).** Smoke near the floor,
+      partly in light: look straight at it, then keep it in the corner of
+      the eye; hold the head still for 30 s, then turn it quickly. Log,
+      every 900 frames: `[diag] Particle lighting: atlas camera vs eye N:
+      A deg, D m apart`. Head still, about 0 deg and about 0.03 m (half
+      the eye distance): the cameras agree; several degrees with the head
+      still, or a gap that grows with head speed: they belong to different
+      frames. Also compare runtime None (smoke at the centre, then the edge
+      of the screen) and step back from the smoke while looking at it.
 - [ ] **Metal and glass alike across the view at pixel scale 2.0
       (08 §1.6).** OpenXR or OpenVR at pixel scale 2.0: the ceiling grill,
       the staircases and a window that looked metallic or opaque only in
