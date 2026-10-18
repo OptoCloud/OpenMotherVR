@@ -29,8 +29,8 @@ public:
                                      std::int64_t period) noexcept;
 
 private:
-    std::uint32_t frames_ = 0, same_ = 0, one_early_ = 0, other_ = 0, known_ = 0;
-    double sum_ = 0.0;
+    PoseAgeReport counts_{}; // the counts so far; mean is set when reported
+    double sum_ = 0.0;       // of the known ages, in periods
 };
 
 } // namespace omvr::core::vr

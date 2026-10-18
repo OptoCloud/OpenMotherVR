@@ -15,20 +15,21 @@ std::optional<PoseAgeReport> PoseAge::add(std::int64_t frame_time, std::int64_t 
         known ? static_cast<double>(frame_time - rendered_for) / static_cast<double>(period) : 0.0;
     const long long whole = std::llround(periods);
     if (known && whole == 0)
-        ++same_;
+        ++counts_.same;
     else if (known && whole == 1)
-        ++one_early_;
+        ++counts_.one_early;
     else
-        ++other_;
+        ++counts_.other;
     if (known) {
         sum_ += periods;
-        ++known_;
+        ++counts_.known;
     }
-    if (++frames_ < diag::kDebugLogPeriodFrames) return std::nullopt;
+    if (++counts_.frames < diag::kDebugLogPeriodFrames) return std::nullopt;
 
     // The mean is over the frames whose age is known (11 §4.1).
-    const PoseAgeReport report{frames_, same_, one_early_, other_, known_, known_ ? sum_ / known_ : 0.0};
-    *this = PoseAge{};
+    PoseAgeReport report = counts_;
+    report.mean          = report.known ? sum_ / report.known : 0.0;
+    *this                = PoseAge{};
     return report;
 }
 
