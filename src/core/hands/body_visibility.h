@@ -41,10 +41,14 @@ inline constexpr std::size_t kBoneTransformSize = 0x30;
 static_assert(sizeof(BoneTransform) == kBoneTransformSize);
 
 // The skeleton as read from the game: each bone's name and its parent's
-// index (-1 for a root), in bone order.
+// index (-1 for a root), in bone order. The names are the skeleton's own,
+// or those of the first-person bone table (21 §2.3, r10) for a skeleton
+// that carries none and matched it by name, bone count and parents; there
+// a bone the table does not name has an empty name.
 struct SkeletonBones {
     std::span<const std::string_view> names;
     std::span<const std::int16_t> parents;
+    bool names_from_table = false;
 };
 
 // The name without a namespace prefix: the game's tools write bones as

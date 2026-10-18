@@ -100,6 +100,7 @@ hands::SkeletonFault fault_of(game::hands::SkeletonReadResult r) noexcept {
         case R::NoArrays: return hands::SkeletonFault::NoArrays;
         case R::TooManyBones: return hands::SkeletonFault::TooManyBones;
         case R::UnnamedBone: return hands::SkeletonFault::UnnamedBone;
+        case R::TableMismatch: return hands::SkeletonFault::TableMismatch;
     }
     return hands::SkeletonFault::Unknown;
 }
@@ -125,9 +126,9 @@ void update_visibility(Context& ctx, BodyVisible v, bool running, void* player,
             game::CodeAddress{static_cast<std::uint32_t>(skeleton.skeleton)}, read);
         if (info.result == game::hands::SkeletonReadResult::Ok) {
             bones = hands::SkeletonBones{std::span{read.names}.first(read.count),
-                                         std::span{read.parents}.first(read.count)};
+                                         std::span{read.parents}.first(read.count), read.names_from_table};
         } else {
-            fault = {fault_of(info.result), info.raw_count, info.unnamed};
+            fault = {fault_of(info.result), info.raw_count, info.bone};
         }
     }
     ctx.body_hider.update(v, running, skeleton, bones ? &*bones : nullptr, now, fault);

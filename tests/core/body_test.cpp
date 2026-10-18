@@ -3,7 +3,8 @@
 // spec's: the bone groups of 21 §2.3 and the Body.Visible table of §10.2,
 // the collapse rule and the 1 s re-read of §10.2, the real crouch
 // thresholds 0.78 h and 0.86 h, the 100 ms press and 0.5 s retry of §11.5,
-// the 0.5 s settle of §12.2 item 3, the game's crouch drop of 0.63 m from
+// the 0.5 s settle of §12.2 item 3, the first-person bone table of §2.3
+// (r10), the game's crouch drop of 0.63 m from
 // its own data (§11.5), and the offsets in runtime metres before the scale
 // (§11.1).
 
@@ -16,12 +17,15 @@
 #include "core/stereo/play_space.h"
 #include "core/vr/pose_convert.h"
 #include "fakes/fakes.h"
+#include "game/hands/skeleton_names.h"
 
 #include <doctest/doctest.h>
 
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -367,6 +371,200 @@ TEST_CASE("body hider: an unreadable skeleton is logged once per change") {
     hider.update(BodyVisible::ArmsAndHands, true, level, &bones, t + 20s);
     CHECK(hider.current() != nullptr);
     CHECK(warnings() == 3);
+}
+
+// ---- The first-person bone table (21 §2.3, r10) ----------------------------
+// Expected values are the rows of the spec's table: index, name, parent.
+
+namespace {
+
+namespace gh = omvr::game::hands;
+
+struct TableRow {
+    std::size_t first;
+    std::vector<std::string_view> names;
+    std::vector<std::int16_t> parents;
+};
+
+// The spec's table, row by row.
+std::vector<TableRow> spec_rows() {
+    return {
+        {0, {""}, {-1}},
+        {1, {"Head", "Head1"}, {0, 1}},
+        {3,
+         {"LeftShoulder", "LeftArm", "LeftArmRoll", "LeftForeArm", "LeftForeArmRoll", "LeftForeArmRoll1",
+          "LeftHand"},
+         {1, 3, 4, 4, 6, 6, 6}},
+        {10,
+         {"LeftHandIndex1", "LeftHandIndex2", "LeftHandIndex3", "LeftHandMiddle1", "LeftHandMiddle2",
+          "LeftHandMiddle3", "LeftHandPinky1", "LeftHandPinky2", "LeftHandPinky3", "LeftHandRing1",
+          "LeftHandRing2", "LeftHandRing3", "LeftHandThumb1", "LeftHandThumb2", "LeftHandThumb3",
+          "LeftWeaponBone"},
+         {9, 10, 11, 9, 13, 14, 9, 16, 17, 9, 19, 20, 9, 22, 23, 9}},
+        {26,
+         {"RightShoulder", "RightArm", "RightArmRoll", "RightForeArm", "RightForeArmRoll",
+          "RightForeArmRoll1", "RightHand"},
+         {1, 26, 27, 27, 29, 29, 29}},
+        {33,
+         {"RightHandIndex1", "RightHandIndex2", "RightHandIndex3", "RightHandMiddle1", "RightHandMiddle2",
+          "RightHandMiddle3", "RightHandPinky1", "RightHandPinky2", "RightHandPinky3", "RightHandRing1",
+          "RightHandRing2", "RightHandRing3", "RightHandThumb1", "RightHandThumb2", "RightHandThumb3",
+          "RightWeaponBone"},
+         {32, 33, 34, 32, 36, 37, 32, 39, 40, 32, 42, 43, 32, 45, 46, 32}},
+        {49,
+         {"Hips", "Pelvis", "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase", "RightUpLeg", "RightLeg",
+          "RightFoot", "RightToeBase"},
+         {0, 49, 50, 51, 52, 53, 50, 55, 56, 57}},
+        {59, {"Spine", "Spine1", "Spine2", "Spine3", "Neck"}, {49, 59, 60, 61, 62}},
+        {64, {"L_Foot", "L_Hand", "R_Foot", "R_Hand", ""}, {0, 0, 0, 0, 0}},
+    };
+}
+
+SkeletonBones table_bones() { return {gh::kFirstPersonBoneNames, gh::kFirstPersonBoneParents, true}; }
+
+std::size_t table_index(std::string_view name) {
+    for (std::size_t i = 0; i < gh::kFirstPersonBoneNames.size(); ++i)
+        if (gh::kFirstPersonBoneNames[i] == name) return i;
+    FAIL("no bone ", name);
+    return 0;
+}
+
+} // namespace
+
+TEST_CASE("bone table: the spec's names and parents of FEMALEFP and SPACESUITFP") {
+    REQUIRE(gh::kFirstPersonBoneCount == 69);
+    std::size_t covered = 0;
+    for (const auto& row : spec_rows()) {
+        REQUIRE(row.names.size() == row.parents.size());
+        for (std::size_t k = 0; k < row.names.size(); ++k) {
+            const std::size_t i = row.first + k;
+            CAPTURE(i);
+            CHECK(gh::kFirstPersonBoneNames[i] == row.names[k]);
+            CHECK(gh::kFirstPersonBoneParents[i] == row.parents[k]);
+            ++covered;
+        }
+    }
+    CHECK(covered == 69);
+    // Acceptance item 2: the hands 9 and 32, Spine 59, the shoulders 3 and
+    // 26, the arms 4 and 27.
+    CHECK(table_index("LeftHand") == 9);
+    CHECK(table_index("RightHand") == 32);
+    CHECK(table_index("Spine") == 59);
+    CHECK(table_index("LeftShoulder") == 3);
+    CHECK(table_index("RightShoulder") == 26);
+    CHECK(table_index("LeftArm") == 4);
+    CHECK(table_index("RightArm") == 27);
+}
+
+TEST_CASE("bone table: used only for the two skeletons, by their exact name") {
+    CHECK(gh::uses_first_person_table("FEMALEFP"));
+    CHECK(gh::uses_first_person_table("SPACESUITFP"));
+    CHECK_FALSE(gh::uses_first_person_table("FemaleFP"));
+    CHECK_FALSE(gh::uses_first_person_table("FEMALEFP "));
+    CHECK_FALSE(gh::uses_first_person_table("DALLASFP"));
+    CHECK_FALSE(gh::uses_first_person_table(""));
+}
+
+TEST_CASE("bone table: the bone count and every parent must match") {
+    std::array<std::int16_t, 69> parents = gh::kFirstPersonBoneParents;
+    CHECK(gh::first_table_difference(69, parents) == gh::kNoDifference);
+    // A parent differs: its index.
+    parents[5] = 3;
+    CHECK(gh::first_table_difference(69, parents) == 5);
+    parents[5]  = gh::kFirstPersonBoneParents[5];
+    parents[68] = 63;
+    CHECK(gh::first_table_difference(69, parents) == 68);
+    parents[68] = 0;
+    // Another bone count with matching parents: the first index one has and
+    // the other lacks.
+    CHECK(gh::first_table_difference(70, parents) == 69);
+    CHECK(gh::first_table_difference(40, std::span{parents}.first(40)) == 40);
+    // Fewer bones and a parent that differs before the end: that index.
+    parents[2] = 0;
+    CHECK(gh::first_table_difference(40, std::span{parents}.first(40)) == 2);
+}
+
+TEST_CASE("collapse plan: the table's skeleton plans, its unnamed bones are body") {
+    const SkeletonBones s = table_bones();
+    CHECK(first_missing_bone(s).empty());
+    CollapsePlan plan;
+    REQUIRE(build_collapse_plan(s, BodyVisible::Full, plan) == PlanResult::Ok);
+    CHECK(plan.hidden == 0);
+
+    REQUIRE(build_collapse_plan(s, BodyVisible::HandsOnly, plan) == PlanResult::Ok);
+    CHECK(plan.count == 69);
+    for (const std::size_t i : {9U, 10U, 24U, 25U, 32U, 47U, 48U}) // hands, fingers, weapon bones
+        CHECK(kept(plan, i));
+    for (const std::size_t i : {0U, 1U, 3U, 8U, 26U, 49U, 59U, 63U, 65U, 68U}) {
+        CAPTURE(i);
+        CHECK_FALSE(kept(plan, i));
+    }
+    // The left forearm roll shrinks into its wrist.
+    REQUIRE(plan.bones[8].anchor_count == 1);
+    CHECK(plan.bones[8].anchors[0] == 9);
+
+    REQUIRE(build_collapse_plan(s, BodyVisible::ArmsAndHands, plan) == PlanResult::Ok);
+    for (const std::size_t i : {3U, 4U, 9U, 26U, 27U, 32U}) CHECK(kept(plan, i));
+    // Head, the arms' parent, collapses between the two shoulder joints.
+    REQUIRE(plan.bones[1].anchor_count == 2);
+    CHECK(plan.bones[1].anchors[0] == 3);
+    CHECK(plan.bones[1].anchors[1] == 26);
+
+    REQUIRE(build_collapse_plan(s, BodyVisible::None, plan) == PlanResult::Ok);
+    CHECK(plan.hidden == 67);
+    CHECK(kept(plan, 25));
+    CHECK(kept(plan, 48));
+}
+
+TEST_CASE("body hider: the log says where the names came from (21 §18, r10)") {
+    const TimePoint t{std::chrono::seconds(100)};
+    SUBCASE("from the table") {
+        RecordingLog log;
+        BodyHider hider{log};
+        const auto bones = table_bones();
+        const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "SPACESUITFP"};
+        hider.update(BodyVisible::HandsOnly, true, player, &bones, t);
+        CHECK(hider.current() != nullptr);
+        CHECK(
+            log.contains("[body] player skeleton SPACESUITFP: 69 bones; LeftShoulder 3, RightShoulder 26, "
+                         "LeftArm 4, RightArm 27, LeftHand 9, RightHand 32, Spine 59; names from the "
+                         "first-person bone table (21 §2.3): bone count and parents match"));
+    }
+    SUBCASE("from the skeleton") {
+        RecordingLog log;
+        BodyHider hider{log};
+        const auto s     = female_fp();
+        const auto bones = s.bones();
+        const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "DLCFP"};
+        hider.update(BodyVisible::HandsOnly, true, player, &bones, t);
+        CHECK(log.contains("; names from the skeleton"));
+    }
+}
+
+TEST_CASE("body hider: a skeleton of the table's name that does not match is rejected once") {
+    RecordingLog log;
+    BodyHider hider{log};
+    const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "FEMALEFP"};
+    const TimePoint t{std::chrono::seconds(100)};
+    const SkeletonReadFault mismatch{SkeletonFault::TableMismatch, 70, 69};
+    const auto warnings = [&] {
+        std::size_t n = 0;
+        for (const auto& l : log.lines)
+            if (l.find("rejected") != std::string::npos) ++n;
+        return n;
+    };
+
+    hider.update(BodyVisible::HandsOnly, true, player, nullptr, t, mismatch);
+    CHECK(hider.current() == nullptr);
+    CHECK(
+        log.contains("[body] WARNING player skeleton FEMALEFP: rejected, 70 bones and the first bone that "
+                     "differs from the first-person bone table (21 §2.3) is 69; its bones are not named "
+                     "from the table and the body is drawn whole, read again every 1 s"));
+    CHECK_FALSE(log.contains("could not be read"));
+    for (int i = 1; i <= 3; ++i)
+        hider.update(BodyVisible::HandsOnly, true, player, nullptr, t + i * 1s, mismatch);
+    CHECK(warnings() == 1);
+    CHECK(hider.current() == nullptr);
 }
 
 namespace {

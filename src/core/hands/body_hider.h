@@ -45,11 +45,17 @@ enum class SkeletonFault : std::uint8_t {
     NoArrays,     // the bone or parent array pointer is null
     TooManyBones, // more bones than the reader holds
     UnnamedBone,  // a bone without a name
+    // A skeleton of a first-person table's name whose bone count or parents
+    // are not the table's (21 §2.3, r10): rejected, not posed with the
+    // table's bone meanings.
+    TableMismatch,
 };
 struct SkeletonReadFault {
     SkeletonFault fault = SkeletonFault::Unknown;
     std::int32_t count  = 0; // the skeleton's bone count as read
-    std::size_t bone    = 0; // UnnamedBone: the first bone without a name
+    // UnnamedBone: the first bone without a name; TableMismatch: the first
+    // index whose parent differs from the table's.
+    std::size_t bone = 0;
 };
 
 class BodyHider final {

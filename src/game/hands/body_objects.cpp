@@ -3,10 +3,16 @@
 
 #include "game/code_address.h"
 #include "game/field.h"
+#include "game/hands/skeleton_names.h"
+
+#include <algorithm>
+#include <span>
 
 namespace omvr::game::hands {
 
 namespace {
+
+static_assert(kFirstPersonBoneCount <= kMaxSkeletonBones);
 
 // A Havok string pointer's characters, up to kMaxBoneName of them.
 std::string_view havok_string(const void* object, std::ptrdiff_t offset) noexcept {
@@ -17,6 +23,37 @@ std::string_view havok_string(const void* object, std::ptrdiff_t offset) noexcep
     std::size_t n = 0;
     while (n < kMaxBoneName && s[n] != '\0') ++n;
     return {s, n};
+}
+
+// The parent index of bone `i`.
+std::int16_t parent_at(const void* parents, std::size_t i) noexcept {
+    return read_field<std::int16_t>(
+        parents, static_cast<std::ptrdiff_t>(i) * static_cast<std::ptrdiff_t>(sizeof(std::int16_t)));
+}
+
+// 21 §2.3 (r10): a first-person skeleton carries no bone names; it is read
+// with the table's when its count and parents show it is the table's
+// skeleton. Only the parents are read: its bone array has no names.
+SkeletonReadInfo read_table_skeleton(const void* skeleton, SkeletonReadInfo info,
+                                     SkeletonRead& out) noexcept {
+    const void* parents = pointer_field(skeleton, kSkeletonParents);
+    if (!parents) {
+        info.result = SkeletonReadResult::NoArrays;
+        return info;
+    }
+    const auto count   = static_cast<std::size_t>(info.raw_count);
+    const auto checked = std::min(count, kFirstPersonBoneCount);
+    for (std::size_t i = 0; i < checked; ++i) out.parents[i] = parent_at(parents, i);
+    const std::size_t differs = first_table_difference(count, std::span{out.parents}.first(checked));
+    if (differs != kNoDifference) {
+        info.result = SkeletonReadResult::TableMismatch;
+        info.bone   = differs;
+        return info;
+    }
+    std::ranges::copy(kFirstPersonBoneNames, out.names.begin());
+    out.count            = kFirstPersonBoneCount;
+    out.names_from_table = true;
+    return info;
 }
 
 } // namespace
@@ -36,15 +73,17 @@ std::string_view skeleton_name(const void* skeleton) noexcept {
 }
 
 SkeletonReadInfo read_skeleton(const void* skeleton, SkeletonRead& out) noexcept {
-    out.count = 0;
+    out.count            = 0;
+    out.names_from_table = false;
     SkeletonReadInfo info;
-    info.raw_count      = read_field<std::int32_t>(skeleton, kSkeletonBoneCount);
-    const void* bones   = pointer_field(skeleton, kSkeletonBones);
-    const void* parents = pointer_field(skeleton, kSkeletonParents);
+    info.raw_count = read_field<std::int32_t>(skeleton, kSkeletonBoneCount);
     if (info.raw_count <= 0) {
         info.result = SkeletonReadResult::NoBones;
         return info;
     }
+    if (uses_first_person_table(skeleton_name(skeleton))) return read_table_skeleton(skeleton, info, out);
+    const void* bones   = pointer_field(skeleton, kSkeletonBones);
+    const void* parents = pointer_field(skeleton, kSkeletonParents);
     if (!bones || !parents) {
         info.result = SkeletonReadResult::NoArrays;
         return info;
@@ -55,13 +94,11 @@ SkeletonReadInfo read_skeleton(const void* skeleton, SkeletonRead& out) noexcept
         return info;
     }
     for (std::size_t i = 0; i < out.count; ++i) {
-        const auto offset = static_cast<std::ptrdiff_t>(i);
-        out.names[i]      = havok_string(bones, offset * kSkeletonBoneStride);
-        out.parents[i] =
-            read_field<std::int16_t>(parents, offset * static_cast<std::ptrdiff_t>(sizeof(std::int16_t)));
+        out.names[i]   = havok_string(bones, static_cast<std::ptrdiff_t>(i) * kSkeletonBoneStride);
+        out.parents[i] = parent_at(parents, i);
         if (out.names[i].empty()) {
-            info.result  = SkeletonReadResult::UnnamedBone;
-            info.unnamed = i;
+            info.result = SkeletonReadResult::UnnamedBone;
+            info.bone   = i;
             return info;
         }
     }

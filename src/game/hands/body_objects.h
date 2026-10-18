@@ -60,29 +60,36 @@ std::optional<PlayerPose> player_pose(void* character) noexcept;
 std::string_view skeleton_name(const void* skeleton) noexcept;
 
 // The skeleton's bones read into fixed arrays: names (views into the
-// game's strings, valid while the skeleton lives) and parent indices.
+// game's strings, valid while the skeleton lives, or into the table of
+// skeleton_names.h) and parent indices.
 struct SkeletonRead {
     std::array<std::string_view, kMaxSkeletonBones> names{};
     std::array<std::int16_t, kMaxSkeletonBones> parents{};
-    std::size_t count = 0;
+    std::size_t count     = 0;
+    bool names_from_table = false; // the names are the table's (21 §2.3, r10)
 };
 
 // What read_skeleton found.
 enum class SkeletonReadResult : std::uint8_t {
     Ok,
-    NoBones,      // the bone count is not above 0
-    NoArrays,     // the bone or parent array pointer is null
-    TooManyBones, // more than kMaxSkeletonBones
-    UnnamedBone,  // a bone without a name
+    NoBones,       // the bone count is not above 0
+    NoArrays,      // the bone or parent array pointer is null
+    TooManyBones,  // more than kMaxSkeletonBones
+    UnnamedBone,   // a bone without a name
+    TableMismatch, // a skeleton of the table's name without its bone count and parents
 };
 
-// Reads the skeleton into `out` (its bones when the result is Ok).
-// `raw_count`: the bone count as read; `unnamed`: with UnnamedBone, the
-// first bone without a name.
+// Reads the skeleton into `out` (its bones when the result is Ok). A
+// skeleton named in kFirstPersonSkeletons takes its names from that table
+// when its bone count and parents are the table's (21 §2.3, r10), and is
+// rejected with TableMismatch otherwise; any other skeleton is read by its
+// own bone names. `raw_count`: the bone count as read; `bone`: with
+// UnnamedBone the first bone without a name, with TableMismatch the first
+// index that differs from the table.
 struct SkeletonReadInfo {
     SkeletonReadResult result = SkeletonReadResult::Ok;
     std::int32_t raw_count    = 0;
-    std::size_t unnamed       = 0;
+    std::size_t bone          = 0;
 };
 SkeletonReadInfo read_skeleton(const void* skeleton, SkeletonRead& out) noexcept;
 

@@ -16,7 +16,10 @@ using diag::ports::logf;
 
 constexpr std::string_view kLogSkeleton =
     "[body] player skeleton {}: {} bones; LeftShoulder {}, RightShoulder {}, LeftArm {}, RightArm {}, "
-    "LeftHand {}, RightHand {}, Spine {}";
+    "LeftHand {}, RightHand {}, Spine {}; names from {}";
+constexpr std::string_view kNamesOwn = "the skeleton";
+constexpr std::string_view kNamesTable =
+    "the first-person bone table (21 §2.3): bone count and parents match";
 constexpr std::string_view kLogMissing =
     "[body] WARNING player skeleton {}: no bone {} by name; the body is drawn whole with it (21 §10.2)";
 constexpr std::string_view kLogTooMany =
@@ -27,6 +30,10 @@ constexpr std::string_view kLogBadParents =
 constexpr std::string_view kLogUnreadable =
     "[body] WARNING the player's skeleton {} could not be read ({}); the body is drawn whole until it "
     "can be, read again every {:.0f} s";
+constexpr std::string_view kLogRejected =
+    "[body] WARNING player skeleton {}: rejected, {} bones and the first bone that differs from the "
+    "first-person bone table (21 §2.3) is {}; its bones are not named from the table and the body is drawn "
+    "whole, read again every {:.0f} s";
 constexpr std::string_view kLogHidden = "[body] visibility {}: {} of {} bones of {} collapsed";
 constexpr std::string_view kLogWhole  = "[body] visibility Full: the whole body is drawn";
 constexpr std::string_view kLogApplied =
@@ -43,6 +50,7 @@ std::string_view fault_text(SkeletonFault f) noexcept {
         case SkeletonFault::NoArrays: return "no bone or parent array";
         case SkeletonFault::TooManyBones: return "too many bones";
         case SkeletonFault::UnnamedBone: return "a bone without a name";
+        case SkeletonFault::TableMismatch: return "not the first-person bone table's skeleton";
     }
     return "?";
 }
@@ -95,6 +103,12 @@ void BodyHider::update(BodyVisible v, bool running, const PlayerSkeleton& s, con
 void BodyHider::log_unreadable(const PlayerSkeleton& s, const SkeletonReadFault& fault) noexcept {
     if (unreadable_logged_ == fault.fault) return;
     unreadable_logged_ = fault.fault;
+    const auto name    = s.name.empty() ? std::string_view{"(no name)"} : s.name;
+    if (fault.fault == SkeletonFault::TableMismatch) {
+        // 21 §2.3 (r10): a different skeleton under a known name.
+        logf(log_, kLogRejected, name, fault.count, fault.bone, kSkeletonRetry.count());
+        return;
+    }
     // A fixed buffer: the game thread logs without allocating here.
     std::array<char, 96> why{};
     const auto text = fault_text(fault.fault);
@@ -103,8 +117,7 @@ void BodyHider::log_unreadable(const PlayerSkeleton& s, const SkeletonReadFault&
             ? std::format_to_n(why.data(), why.size(), "{}: bone {} of {}", text, fault.bone, fault.count)
             : std::format_to_n(why.data(), why.size(), "{}, {} bones", text, fault.count);
     const std::string_view reason{why.data(), static_cast<std::size_t>(r.out - why.data())};
-    logf(log_, kLogUnreadable, s.name.empty() ? std::string_view{"(no name)"} : s.name, reason,
-         kSkeletonRetry.count());
+    logf(log_, kLogUnreadable, name, reason, kSkeletonRetry.count());
 }
 
 void BodyHider::build(BodyVisible v, const PlayerSkeleton& s, const SkeletonBones& bones) noexcept {
@@ -129,7 +142,8 @@ void BodyHider::log_skeleton(const PlayerSkeleton& s, const SkeletonBones& bones
         case PlanResult::Ok:
             logf(log_, kLogSkeleton, s.name, bones.names.size(), index_of(bones, "LeftShoulder"),
                  index_of(bones, "RightShoulder"), index_of(bones, "LeftArm"), index_of(bones, "RightArm"),
-                 index_of(bones, "LeftHand"), index_of(bones, "RightHand"), index_of(bones, "Spine"));
+                 index_of(bones, "LeftHand"), index_of(bones, "RightHand"), index_of(bones, "Spine"),
+                 bones.names_from_table ? kNamesTable : kNamesOwn);
             break;
         case PlanResult::MissingBones: logf(log_, kLogMissing, s.name, first_missing_bone(bones)); break;
         case PlanResult::TooManyBones:

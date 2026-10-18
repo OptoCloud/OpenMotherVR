@@ -447,6 +447,20 @@ Controls keys in `mothervr.json`, Dev. Debug Options on.
       ArmsAndHands: K of N bones of FEMALEFP collapsed` once the player is
       in the level. If the warning stays and the visibility line never
       comes, send the log: REASON says what the skeleton lacks.
+- [ ] **Bone names from the first-person table (21 §2.3, r10).** With
+      `"Body": {"Visible": "HandsOnly"}`, load a normal level, then a space
+      suit section. Log, once per skeleton: `[body] player skeleton
+      FEMALEFP: 69 bones; LeftShoulder 3, RightShoulder 26, LeftArm 4,
+      RightArm 27, LeftHand 9, RightHand 32, Spine 59; names from the
+      first-person bone table (21 §2.3): bone count and parents match`, the
+      same for `SPACESUITFP`, then `[body] visibility HandsOnly: K of 69
+      bones of FEMALEFP collapsed`; no `a bone without a name` warning
+      (the tester's log before the fix had `could not be read (a bone
+      without a name: bone 0 of 69)`). Only the hands and the held item
+      are drawn. A `[body] WARNING player skeleton FEMALEFP: rejected, N
+      bones and the first bone that differs from the first-person bone
+      table ...` instead means the skeleton is not the table's (the 2020
+      build's data, or another mod's skeleton): send the log.
 - [ ] **Real crouch.** Standing, calibrated, `"RealCrouch": true`: crouch
       for real, enter a vent, try to stand inside, leave and stand. The
       character follows, stays down in the vent, and the view stays at
