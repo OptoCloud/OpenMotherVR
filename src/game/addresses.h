@@ -298,6 +298,56 @@ inline constexpr HapticRvas kHapticRvas2020 = {};
 inline constexpr PerBuild<HapticRvas> kHapticRvas{kHapticRvas2015, kHapticRvas2020};
 static_assert(all_rows_known(kHapticRvas2015), "every haptic row has its 2015 RVA");
 
+// The player's actions and animations, and the physics velocity helper
+// (spec 21 §2.7, §2.11, §20, r11). 2015 RVAs, checked in the 2015 AI.exe
+// by the spec side; the 2020 ones are unknown, so these features stay off
+// on that build.
+struct ActionRvas {
+    // 21 §2.11: the two start methods of ACT_PLAYER_MELEE (thiscall, no
+    // args, plain ret) and the vtables whose slot 24 holds them.
+    std::uint32_t melee_start_a;
+    std::uint32_t melee_vtable_a;
+    std::uint32_t melee_start_b;
+    std::uint32_t melee_vtable_b;
+    // 21 §2.11: the start methods of the scripted player actions
+    // (thiscall, no args, plain ret).
+    std::uint32_t melee_kill_start;
+    std::uint32_t trap_break_start;
+    std::uint32_t melee_intercept_start;
+    std::uint32_t impact_standing_start;
+    std::uint32_t trap_victim_start;
+    // 21 §2.11: the play-animation command's request and its counterpart
+    // (thiscall, two args, ret 8), slots +0x3D0 and +0x3D4 of its method
+    // table.
+    std::uint32_t play_animation_request;
+    std::uint32_t play_animation_counterpart;
+    std::uint32_t play_animation_table;
+    // 21 §2.7: SetBodyVelocities (cdecl: physics object, linear and
+    // angular velocity pointers).
+    std::uint32_t set_body_velocities;
+};
+
+inline constexpr ActionRvas kActionRvas2015 = {
+    .melee_start_a              = 0x00268670,
+    .melee_vtable_a             = 0x00EAC528,
+    .melee_start_b              = 0x00268AF0,
+    .melee_vtable_b             = 0x00EAC5E8,
+    .melee_kill_start           = 0x0026DC20,
+    .trap_break_start           = 0x0026E3F0,
+    .melee_intercept_start      = 0x002702C0,
+    .impact_standing_start      = 0x002737E0,
+    .trap_victim_start          = 0x00275560,
+    .play_animation_request     = 0x00130A70,
+    .play_animation_counterpart = 0x00130CE0,
+    .play_animation_table       = 0x00E34960,
+    .set_body_velocities        = 0x003EF590,
+};
+
+inline constexpr ActionRvas kActionRvas2020 = {};
+
+inline constexpr PerBuild<ActionRvas> kActionRvas{kActionRvas2015, kActionRvas2020};
+static_assert(all_rows_known(kActionRvas2015), "every action row has its 2015 RVA");
+
 // Body visibility's game sites (spec 21 §2.3, §10, §20); it also uses the
 // player of HandRvas. 2015 RVAs, checked in the 2015 AI.exe by the spec
 // side; the 2020 ones are unknown, so the feature stays off on that build.
