@@ -59,9 +59,6 @@ public:
     // Takes `module`, then releases the reference held before, if any.
     void reset(void* module = nullptr) noexcept;
 
-    // Gives the reference up without releasing it.
-    void* release() noexcept { return std::exchange(module_, nullptr); }
-
 private:
     void* module_ = nullptr;
 };

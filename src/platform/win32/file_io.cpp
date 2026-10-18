@@ -18,6 +18,13 @@ namespace {
 constexpr std::string_view kCreateFailed = "create";
 constexpr std::string_view kWriteFailed  = "write";
 
+// The temporary file write_file_atomically writes `target` through.
+std::filesystem::path temporary_path_for(const std::filesystem::path& target) {
+    auto temp = target;
+    temp += core::config::kTemporaryFileSuffix;
+    return temp;
+}
+
 } // namespace
 
 bool write_all(const UniqueHandle& file, std::span<const std::byte> data, bool flush) noexcept {
@@ -41,12 +48,6 @@ util::Result<bool> FileStore::exists(const std::filesystem::path& path) {
     const bool there = std::filesystem::exists(path, ec);
     if (ec) return std::unexpected(util::Error{ec.value(), "exists"});
     return there;
-}
-
-std::filesystem::path temporary_path_for(const std::filesystem::path& target) {
-    auto temp = target;
-    temp += core::config::kTemporaryFileSuffix;
-    return temp;
 }
 
 util::Result<void> write_file_atomically(const std::filesystem::path& target,

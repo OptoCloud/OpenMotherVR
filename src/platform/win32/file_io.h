@@ -31,9 +31,6 @@ public:
 util::Result<void> write_file_atomically(const std::filesystem::path& target,
                                          std::span<const std::byte> data) noexcept;
 
-// The temporary file write_file_atomically writes `target` through.
-std::filesystem::path temporary_path_for(const std::filesystem::path& target);
-
 // Writes all of `data` to `file`, then, with `flush`, flushes it to disk.
 // False if any of it failed; GetLastError() says why.
 bool write_all(const UniqueHandle& file, std::span<const std::byte> data, bool flush) noexcept;

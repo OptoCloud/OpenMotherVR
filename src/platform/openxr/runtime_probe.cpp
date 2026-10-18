@@ -76,7 +76,7 @@ bool usable_from_x86(core::diag::ports::Log& log, const std::filesystem::path& m
         if (lib.is_relative()) lib = manifest.parent_path() / lib;
         const WORD m = win32::pe_machine(lib);
         logf(log, kLogManifestLibrary, utf8(manifest), utf8(lib), m);
-        return m == IMAGE_FILE_MACHINE_I386;
+        return m == win32::kMachineI386;
     } catch (const std::exception& e) {
         logf(log, kLogManifestUnreadable, utf8(manifest), e.what());
         return false;

@@ -110,12 +110,11 @@ std::string binding_file_name(const std::string& controller);
 
 // The default binding file of each controller type, by controller name,
 // binding the grip and aim poses; with `haptics` the vibration outputs too.
-std::vector<std::pair<std::string, nlohmann::json>> default_bindings(bool haptics = false);
+std::vector<std::pair<std::string, nlohmann::json>> default_bindings(bool haptics);
 
 // The action manifest naming `bindings` as the defaults, declaring the
 // actions, the grip and aim poses and, with `haptics`, the vibration outputs.
-nlohmann::json manifest(const std::vector<std::pair<std::string, nlohmann::json>>& bindings,
-                        bool haptics = false);
+nlohmann::json manifest(const std::vector<std::pair<std::string, nlohmann::json>>& bindings, bool haptics);
 
 // False, logged with the Windows error, when the file cannot be written: the
 // caller then falls back to the legacy controller path, and the log must say
