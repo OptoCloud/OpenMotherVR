@@ -8,7 +8,6 @@
 #include "core/hands/activity.h"
 #include "core/hands/tuning.h"
 #include "core/hands/body_visibility.h"
-#include "core/ui/play_state.h"
 #include "game/code_address.h"
 #include "game/hands/body_objects.h"
 #include "game/hands/body_sites.h"
@@ -17,6 +16,7 @@
 #include "game/patcher.h"
 #include "game/stereo/stereo_objects.h"
 #include "loader/context.h"
+#include "loader/hooks/activity_input.h"
 #include "loader/hooks/guard.h"
 #include "util/sync/once_latch.h"
 #include "util/time/steady.h"
@@ -89,18 +89,7 @@ void* find_player_character(Context& ctx) noexcept {
 
 // 21 §12.1: the episodes, from the signals the hands use (21 §4.4).
 hands::Activity read_activity(Context& ctx, game::StereoInterface& device, void* player) noexcept {
-    hands::ActivityInput in;
-    in.enabled          = true;
-    in.stereo_running   = game::stereo::load_state(device) == game::DeviceState::Running;
-    in.world_mode       = ctx.manager.mode == game::kStereoModeWorld;
-    in.player           = player != nullptr;
-    in.alive            = player && game::hands::alive(player);
-    in.follow_active    = ctx.follow.active();
-    in.cutscene_or_fade = ctx.scene.cutscene_or_fade();
-    in.menu_screen      = ctx.play.screen() != core::ui::Screen::None;
-    in.interaction      = ctx.interactions.in_interaction();
-    in.hiding           = ctx.interactions.hiding();
-    return hands::activity(in);
+    return hands::activity(activity_input(ctx, device, player));
 }
 
 hands::SkeletonFault fault_of(game::hands::SkeletonReadResult r) noexcept {

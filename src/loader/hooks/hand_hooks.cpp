@@ -7,12 +7,12 @@
 #include "core/hands/hand_aim.h"
 #include "core/hands/types.h"
 #include "core/stereo/types.h"
-#include "core/ui/play_state.h"
 #include "game/hands/hand_objects.h"
 #include "game/hands/hand_sites.h"
 #include "game/patcher.h"
 #include "game/stereo/stereo_objects.h"
 #include "loader/context.h"
+#include "loader/hooks/activity_input.h"
 #include "loader/hooks/guard.h"
 #include "loader/hooks/haptic_hooks.h"
 
@@ -80,19 +80,7 @@ hands::HandFrame read_frame(core::vr::ports::VrRuntime& runtime, const util::Mat
 
 // 21 §4.4: the frame's signals, all from v1's own state.
 hands::ActivityInput read_activity(Context& ctx, game::StereoInterface& si) noexcept {
-    hands::ActivityInput in;
-    in.enabled          = true;
-    in.stereo_running   = game::stereo::load_state(si) == game::DeviceState::Running;
-    in.world_mode       = ctx.manager.mode == game::kStereoModeWorld;
-    void* player        = game::hands::player_character(ctx.targets.hands);
-    in.player           = player != nullptr;
-    in.alive            = player && game::hands::alive(player);
-    in.follow_active    = ctx.follow.active();
-    in.cutscene_or_fade = ctx.scene.cutscene_or_fade();
-    in.menu_screen      = ctx.play.screen() != core::ui::Screen::None;
-    in.interaction      = ctx.interactions.in_interaction();
-    in.hiding           = ctx.interactions.hiding();
-    return in;
+    return activity_input(ctx, si, game::hands::player_character(ctx.targets.hands));
 }
 
 } // namespace
