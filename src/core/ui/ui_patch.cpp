@@ -1,13 +1,16 @@
 #include "core/ui/ui_patch.h"
 
+#include "core/config/settings_table.h"
 #include "core/config/tuning.h"
 #include "core/diag/log_format.h"
 #include "core/ui/pak2.h"
 #include "util/binary/reader.h"
 #include "util/hash/crc32.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -103,11 +106,34 @@ EntryResult read_entry_data(Reader& r, PatchEntry kind, const StockEntries& stoc
     return apply_delta(r, *base, e.data) ? EntryResult::Ok : EntryResult::Malformed;
 }
 
+// A variant entry's tag (after kVariantSeparator), with `name` cut to the
+// entry it is a variant of; empty for an ordinary entry.
+std::string variant_tag(std::string& name) {
+    const auto at = name.find(kVariantSeparator);
+    if (at == std::string::npos) return {};
+    std::string tag = name.substr(at + 1);
+    name.resize(at);
+    return tag;
+}
+
+// Puts the variant `e` in place of the entry of its name in `out`; false
+// when there is none before it.
+bool substitute(std::vector<OutEntry>& out, OutEntry&& e) {
+    for (OutEntry& o : out) {
+        if (o.name != e.name) continue;
+        o.data = std::move(e.data);
+        return true;
+    }
+    return false;
+}
+
 // The output archive's entries, or nullopt (logged where the reason is
-// one a player can act on).
+// one a player can act on). `used` is set when a variant tagged `variant`
+// was put in.
 std::optional<std::vector<OutEntry>> read_entries(Reader& r, std::uint32_t count, const StockEntries& stock,
                                                   diag::ports::Log& log,
-                                                  const std::filesystem::path& stock_path) {
+                                                  const std::filesystem::path& stock_path,
+                                                  std::string_view variant, bool& used) {
     std::vector<OutEntry> out;
     out.reserve(count);
     for (std::uint32_t i = 0; i < count; ++i) {
@@ -116,6 +142,7 @@ std::optional<std::vector<OutEntry>> read_entries(Reader& r, std::uint32_t count
         const auto kind       = static_cast<PatchEntry>(r.get<std::uint8_t>());
         if (!r.ok()) return std::nullopt;
         OutEntry e{std::string(reinterpret_cast<const char*>(name_bytes.data()), name_len), {}};
+        const std::string tag    = variant_tag(e.name);
         const EntryResult result = read_entry_data(r, kind, stock, e);
         if (result == EntryResult::WrongStock) {
             logf(log, "ui patch: {} in {} is not the version the patch was made for", e.name,
@@ -123,7 +150,12 @@ std::optional<std::vector<OutEntry>> read_entries(Reader& r, std::uint32_t count
             return std::nullopt;
         }
         if (result != EntryResult::Ok || !r.ok()) return std::nullopt;
-        out.push_back(std::move(e));
+        if (tag.empty()) {
+            out.push_back(std::move(e));
+        } else if (!variant.empty() && tag == variant) {
+            if (!substitute(out, std::move(e))) return std::nullopt;
+            used = true;
+        }
     }
     return out;
 }
@@ -135,9 +167,21 @@ bool is_patch(std::span<const std::byte> magic) noexcept {
 
 } // namespace
 
+UiVariant terminal_text_variant(float scale) noexcept {
+    // The tags scripts/ui_patch.py gives the TERMINALINTERACTION.GFX
+    // variants, in the order of config::kTerminalTextScales.
+    constexpr std::string_view kTags[] = {"", "text125", "text150", "text175"};
+    static_assert(std::size(kTags) == config::kTerminalTextScales.size());
+    const float step = config::terminal_text_step(scale);
+    for (std::size_t i = 0; i < config::kTerminalTextScales.size(); ++i) {
+        if (config::kTerminalTextScales[i] == step) return {kTags[i], static_cast<int>(i)};
+    }
+    return {};
+}
+
 bool build_ui_archive(ports::ArchiveFiles& files, diag::ports::Log& log,
                       const std::filesystem::path& stock_path, std::span<const std::byte> patch,
-                      const std::filesystem::path& target) noexcept {
+                      const std::filesystem::path& target, std::string_view variant) noexcept {
     try {
         const auto stock_file = files.read(stock_path);
         const auto stock      = stock_file ? read_pak(*stock_file) : std::nullopt;
@@ -155,8 +199,16 @@ bool build_ui_archive(ports::ArchiveFiles& files, diag::ports::Log& log,
             return false;
         }
 
-        const auto out = read_entries(r, count, *stock, log, stock_path);
+        bool used      = false;
+        const auto out = read_entries(r, count, *stock, log, stock_path, variant, used);
         if (!out) return false;
+        if (!variant.empty()) {
+            if (used) {
+                logf(log, "ui patch: variant {} built in", variant);
+            } else {
+                logf(log, "ui patch: the embedded patch has no variant {}; built without it", variant);
+            }
+        }
         if (!write_pak(files, log, target, align, *out)) {
             logf(log, "ui patch: cannot write {}", path_text(target));
             return false;

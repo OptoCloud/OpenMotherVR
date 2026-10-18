@@ -5,8 +5,17 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/commands.h
     ${CMAKE_CURRENT_LIST_DIR}/compat_messages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/compat_messages.h
+    ${CMAKE_CURRENT_LIST_DIR}/crosshair_gate.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/crosshair_gate.h
     ${CMAKE_CURRENT_LIST_DIR}/display_reset.cpp
     ${CMAKE_CURRENT_LIST_DIR}/display_reset.h
+    ${CMAKE_CURRENT_LIST_DIR}/hud_placement.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/hud_placement.h
+    ${CMAKE_CURRENT_LIST_DIR}/hud_toggle.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/hud_toggle.h
+    ${CMAKE_CURRENT_LIST_DIR}/hud_tuning.h
+    ${CMAKE_CURRENT_LIST_DIR}/hud_visibility.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/hud_visibility.h
     ${CMAKE_CURRENT_LIST_DIR}/notices.cpp
     ${CMAKE_CURRENT_LIST_DIR}/notices.h
     ${CMAKE_CURRENT_LIST_DIR}/pak2.cpp
@@ -20,6 +29,7 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/settings_push.cpp
     ${CMAKE_CURRENT_LIST_DIR}/settings_push.h
     ${CMAKE_CURRENT_LIST_DIR}/tuning.h
+    ${CMAKE_CURRENT_LIST_DIR}/types.h
     ${CMAKE_CURRENT_LIST_DIR}/ui_archive.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ui_archive.h
     ${CMAKE_CURRENT_LIST_DIR}/ui_contract.h

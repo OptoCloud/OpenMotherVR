@@ -34,11 +34,30 @@ enum class DeltaOp : std::uint8_t {
     Insert = 1, // u32 length, the bytes
 };
 
+// A variant entry (spec 23 §6.2): an entry named `<name>` kVariantSeparator
+// `<tag>` is an alternative form of the entry `<name>` before it, made
+// from the same stock entry. It replaces that entry when `<tag>` is the
+// variant asked for and is left out otherwise, so a patch without variant
+// entries builds as before. '|' cannot be in a game file name.
+inline constexpr char kVariantSeparator = '|';
+
 // Applies `patch` to the archive at `stock` and writes the result to
-// `target` (PAK2). False, with nothing written, if the stock archive is not
-// the one the patch was made for (another game version or language) or
-// anything is malformed. Logs why. Game thread at attach.
+// `target` (PAK2), with the variant entries tagged `variant` (none when
+// empty). False, with nothing written, if the stock archive is not the one
+// the patch was made for (another game version or language) or anything
+// is malformed. Logs why. Game thread at attach.
 bool build_ui_archive(ports::ArchiveFiles& files, diag::ports::Log& log, const std::filesystem::path& stock,
-                      std::span<const std::byte> patch, const std::filesystem::path& target) noexcept;
+                      std::span<const std::byte> patch, const std::filesystem::path& target,
+                      std::string_view variant = {}) noexcept;
+
+// The variant tag of the terminal text size `scale` (spec 23 §6.2): empty
+// for 1.0 (the movie as v1 links it), "text125", "text150" or "text175".
+// `key` is 0 to 3, the step's place in config::kTerminalTextScales: part of
+// the archive's staleness key.
+struct UiVariant {
+    std::string_view tag;
+    int key = 0;
+};
+UiVariant terminal_text_variant(float scale) noexcept;
 
 } // namespace omvr::core::ui

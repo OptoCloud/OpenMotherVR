@@ -3,9 +3,11 @@
 #include "core/diag/ports/log.h"
 #include "core/ui/ports/archive_files.h"
 #include "core/ui/ports/dialogs.h"
+#include "core/ui/ui_patch.h"
 
 #include <cstdint>
 #include <filesystem>
+#include <string_view>
 
 namespace omvr::core::ui {
 
@@ -28,15 +30,20 @@ public:
     // must then leave the game's UI archive alone (the options page is
     // missing, VR still works).
     //
+    // `variant` selects the patch's variant entries (spec 23 §6.2: the
+    // terminal text size); its key is folded into the stamp, so a change
+    // of it rebuilds the archive once.
+    //
     // From: FUN_1001e720 @ 0x1001e720.
-    bool deploy(const std::filesystem::path& game_dir, std::int64_t build_stamp) noexcept;
+    bool deploy(const std::filesystem::path& game_dir, std::int64_t build_stamp,
+                UiVariant variant = {}) noexcept;
 
 private:
     // Reuses MOTHER.PAK if it is current, else builds it (unless `may_build`
     // is false: another process holds the build lock).
     bool reuse_or_build(const std::filesystem::path& stock, const std::filesystem::path& target,
                         const std::filesystem::path& sidecar, const ports::FileIdentity& source,
-                        std::int64_t build_stamp, bool may_build) noexcept;
+                        std::int64_t build_stamp, bool may_build, std::string_view variant) noexcept;
 
     ports::ArchiveFiles& files_;
     ports::Dialogs& dialogs_;

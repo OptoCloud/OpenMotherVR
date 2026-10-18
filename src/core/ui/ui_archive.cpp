@@ -39,7 +39,7 @@ bool UiArchiveDeployer::reuse_or_build(const std::filesystem::path& stock,
                                        const std::filesystem::path& target,
                                        const std::filesystem::path& sidecar,
                                        const ports::FileIdentity& source, std::int64_t build_stamp,
-                                       bool may_build) noexcept {
+                                       bool may_build, std::string_view variant) noexcept {
     if (files_.stamped(target, build_stamp) && files_.read_sidecar(sidecar) == source) {
         logf(log_, "payload: {} is current", path_text(target));
         return true;
@@ -55,15 +55,18 @@ bool UiArchiveDeployer::reuse_or_build(const std::filesystem::path& stock,
     // Built from the player's own UI.PAK and the embedded patch; no game
     // files ship with the mod.
     files_.remove(sidecar);
-    if (!build_ui_archive(files_, log_, stock, files_.payload(ports::ResourceId::UiPatch), target))
+    if (!build_ui_archive(files_, log_, stock, files_.payload(ports::ResourceId::UiPatch), target, variant))
         return false;
     files_.stamp(target, build_stamp);
     files_.write_sidecar(sidecar, source);
     return true;
 }
 
-bool UiArchiveDeployer::deploy(const std::filesystem::path& game_dir, std::int64_t build_stamp) noexcept {
+bool UiArchiveDeployer::deploy(const std::filesystem::path& game_dir, std::int64_t build_stamp,
+                               UiVariant variant) noexcept {
     const ArchivePaths paths = archive_paths(game_dir);
+    // The archive is a function of the variant too (100 ns per step).
+    build_stamp += variant.key;
 
     // MOTHER.PAK is built from UI.PAK, so a game update or a language switch
     // that replaces UI.PAK makes it stale even when the DLL is unchanged.
@@ -81,7 +84,8 @@ bool UiArchiveDeployer::deploy(const std::filesystem::path& game_dir, std::int64
     const ports::LockState lock = files_.lock(kArchiveLockName, kArchiveLockWait);
     // Without a mutex at all (cannot be created) build as before.
     const bool may_build = lock.held || !lock.exists;
-    const bool ok = reuse_or_build(paths.stock, paths.target, paths.sidecar, *source, build_stamp, may_build);
+    const bool ok = reuse_or_build(paths.stock, paths.target, paths.sidecar, *source, build_stamp, may_build,
+                                   variant.tag);
     files_.unlock();
     return ok;
 }

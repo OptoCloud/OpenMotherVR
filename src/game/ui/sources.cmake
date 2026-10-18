@@ -3,6 +3,10 @@
 target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/console.cpp
     ${CMAKE_CURRENT_LIST_DIR}/console.h
+    ${CMAKE_CURRENT_LIST_DIR}/hud_objects.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/hud_objects.h
+    ${CMAKE_CURRENT_LIST_DIR}/hud_sites.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/hud_sites.h
     ${CMAKE_CURRENT_LIST_DIR}/script_vars.cpp
     ${CMAKE_CURRENT_LIST_DIR}/script_vars.h
 )
