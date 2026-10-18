@@ -52,12 +52,12 @@ public:
     // Someone is wearing the headset, upright: a pose taken now is a good
     // recenter reference. (Not in the original, which recenters at launch
     // whatever the headset is doing.)
-    virtual bool headset_in_use() { return true; }
+    virtual bool headset_in_use() = 0;
 
     // Whether the last head_yaw_pose took a new reference. False when the
     // head pose was invalid: the previous reference was handed back, and the
     // caller queues a retake (03 §2.1, 09 §5.5). Game thread.
-    virtual bool recenter_taken() const { return true; }
+    virtual bool recenter_taken() const = 0;
 
     // The runtime moved its tracking space under the mod since the last
     // call (OpenVR: a new chaperone universe or a zero-pose reset, 03 §6.8):
@@ -77,24 +77,24 @@ public:
     //
     // The runtime has a floor reference (OpenVR's standing universe;
     // OpenXR's STAGE or LOCAL_FLOOR space). Fixed once the runtime runs.
-    virtual bool has_floor() const { return false; }
+    virtual bool has_floor() const = 0;
     // The floor's height in the space of the head pose head_pose or
     // head_yaw_pose last returned, located for the same instant. None
     // without a floor reference, or before the floor was first located.
-    virtual std::optional<float> floor_height() { return std::nullopt; }
+    virtual std::optional<float> floor_height() = 0;
     // The head's height above the floor from the newest valid head pose,
     // read fresh as headset_in_use reads it (menus call no head_pose). None
     // without a floor reference or a valid pose.
-    virtual std::optional<float> head_height_above_floor() { return std::nullopt; }
+    virtual std::optional<float> head_height_above_floor() = 0;
 
     // The player turned VR off (22 §13): the device has already detached
     // and no new call will come. Stop showing the game in the headset and
     // hand the game released VR controls; an OpenXR session is ended in API
     // order (xrRequestExitSession, xrEndSession at STOPPING) before its
     // instance is destroyed. Render thread, once.
-    virtual void stop() {}
+    virtual void stop() = 0;
 
-    // ---- Controller poses (not in the original; groundwork for the hands) ----
+    // ---- Controller poses (not in the original) ----
     //
     // `hand` 0 = left, 1 = right. Game thread, like head_pose.
     //
@@ -106,20 +106,20 @@ public:
     // is rendering (or, before any head pose this frame, the newest one), so
     // hands and head line up. False, `out` untouched, when that hand is not
     // tracked.
-    virtual bool hand_pose(int /*hand*/, util::Matrix34& /*out*/, float /*world_scale*/) { return false; }
+    virtual bool hand_pose(int hand, util::Matrix34& out, float world_scale) = 0;
 
     // The grip's linear velocity at the same instant, in the game's
     // convention (to_game_pose maps a position p to -world_scale * p, so a
     // velocity v to -world_scale * v): game units per second. Both runtimes
     // report it with the pose. False, `out` untouched, when not tracked.
-    virtual bool hand_velocity(int /*hand*/, float (& /*out*/)[3], float /*world_scale*/) { return false; }
+    virtual bool hand_velocity(int hand, float (&out)[3], float world_scale) = 0;
 
     // The controller's aim (pointing) pose (OpenXR /input/aim/pose; on
     // OpenVR the pose action bound to the controller's pointing pose,
     // spec 21 §5.2, §16), in hand_pose's space, convention and prediction.
     // Only while the runtime was started with the aim pose actions (Hands
     // Enabled at start, 21 §1). False, `out` untouched, when not tracked.
-    virtual bool aim_pose(int /*hand*/, util::Matrix34& /*out*/, float /*world_scale*/) { return false; }
+    virtual bool aim_pose(int hand, util::Matrix34& out, float world_scale) = 0;
 };
 
 } // namespace omvr::core::vr::ports
