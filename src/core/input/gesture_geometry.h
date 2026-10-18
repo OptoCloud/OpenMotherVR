@@ -13,9 +13,6 @@
 // them owns their state.
 namespace omvr::core::input {
 
-inline constexpr std::size_t kLeftHand  = 0;
-inline constexpr std::size_t kRightHand = 1;
-
 // The head frame of 22 §8.1: origin at a head position, rotated by the
 // inverse of a head yaw only, so x is right, y up and z back whatever the
 // head's pitch and roll.

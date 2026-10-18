@@ -28,8 +28,6 @@ constexpr std::string_view kReasonFocus       = "no input focus, or focus return
 constexpr std::string_view kReasonMenu        = "menu";
 constexpr std::string_view kReasonInteraction = "interaction";
 
-std::string_view hand_name(std::size_t hand) noexcept { return hand == kLeftHand ? "left" : "right"; }
-
 std::string_view zone_name(Holster z) noexcept {
     switch (z) {
         case Holster::RightShoulder: return "right shoulder";

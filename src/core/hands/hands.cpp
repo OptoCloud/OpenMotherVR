@@ -25,8 +25,6 @@ constexpr std::string_view kLogNoAim =
 constexpr std::string_view kLogAim =
     "[diag] hands: aim ray start ({:.2f} {:.2f} {:.2f}) dir ({:+.2f} {:+.2f} {:+.2f}) weight {:.2f}";
 
-const char* side(std::size_t h) noexcept { return h == kLeft ? "left" : "right"; }
-
 const char* class_name(WeaponClass c) noexcept {
     switch (c) {
         case WeaponClass::NoWeapon: return "no weapon (aim pose)";
@@ -74,7 +72,7 @@ void Hands::update_hand(std::size_t h, const HandFrame& frame, float dt_s, float
     }
     const auto change = track_[h].update(Seconds{dt_s}, grip, aim);
     if (change != HandTrack::Change::None) {
-        logf(log_, kLogHand, side(h), change == HandTrack::Change::Lost ? "lost" : "tracked");
+        logf(log_, kLogHand, hand_name(h), change == HandTrack::Change::Lost ? "lost" : "tracked");
     }
 }
 
@@ -121,7 +119,7 @@ std::optional<Hands::View> Hands::fresh_view(TimePoint now) const noexcept {
 bool Hands::aim_wanted(TimePoint now) const noexcept {
     if (!settings_.enabled || !settings_.aim_from_hand) return false;
     const auto view = fresh_view(now);
-    return view && view->hands[kRight].weight > 0.0f;
+    return view && view->hands[kRightHand].weight > 0.0f;
 }
 
 Hands::AimResult Hands::aim(const AimRay& game, const CameraPose& camera,
@@ -133,7 +131,7 @@ Hands::AimResult Hands::aim(const AimRay& game, const CameraPose& camera,
     if (class_logged_.changed(c) && log_.debug_enabled()) {
         logf(log_, kLogClass, class_name(c), type ? static_cast<int>(*type) : 0);
     }
-    const HandView& right = view->hands[kRight];
+    const HandView& right = view->hands[kRightHand];
     if (!aims_from_hand(c) || !(right.weight > 0.0f)) return {};
     if (!right.has_aim) {
         if (!no_aim_noted_) log_.line(kLogNoAim);
@@ -155,11 +153,11 @@ Hands::AimResult Hands::aim(const AimRay& game, const CameraPose& camera,
 
 std::optional<util::Vec2> Hands::tracker_facing(const CameraPose& camera, TimePoint now) noexcept {
     const auto view = settings_.enabled && settings_.tracker_in_hand ? fresh_view(now) : std::nullopt;
-    if (!view || !(view->hands[kLeft].weight > 0.0f) || !view->hands[kLeft].has_aim) {
+    if (!view || !(view->hands[kLeftHand].weight > 0.0f) || !view->hands[kLeftHand].has_aim) {
         tracker_.reset();
         return std::nullopt;
     }
-    return tracker_.update(pointing(to_world(camera, view->hands[kLeft].aim)));
+    return tracker_.update(pointing(to_world(camera, view->hands[kLeftHand].aim)));
 }
 
 } // namespace omvr::core::hands

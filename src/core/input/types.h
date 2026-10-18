@@ -7,12 +7,23 @@
 
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <string_view>
 
 // VR controllers as the game sees them: one frame of semantic controls,
 // whichever runtime read them (04 §5.8.1).
 namespace omvr::core::input {
 
 using util::TimePoint;
+
+// The hands by index, in every per-hand array of the mod: left, then right.
+inline constexpr std::size_t kLeftHand  = 0;
+inline constexpr std::size_t kRightHand = 1;
+
+// A hand as the log names it.
+[[nodiscard]] constexpr std::string_view hand_name(std::size_t hand) noexcept {
+    return hand == kLeftHand ? "left" : "right";
+}
 using util::Vec2;
 using util::Vec3;
 

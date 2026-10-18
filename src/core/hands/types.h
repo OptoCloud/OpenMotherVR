@@ -1,6 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
+#include "core/input/types.h"
 #include "core/vr/types.h"
 #include "game/constants.h"
 #include "util/math/matrix.h"
@@ -18,8 +19,9 @@
 // hand and the head of one frame compare directly.
 namespace omvr::core::hands {
 
-inline constexpr std::size_t kLeft  = 0;
-inline constexpr std::size_t kRight = 1;
+using input::hand_name;
+using input::kLeftHand;
+using input::kRightHand;
 using util::TimePoint;
 using vr::kHandCount;
 
