@@ -6,8 +6,7 @@
 #include "core/stereo/ports/virtual_screen.h"
 #include "core/stereo/types.h"
 #include "core/vr/runtime_detector.h"
-
-#include <mutex>
+#include "util/sync/once_latch.h"
 
 namespace omvr::core::stereo {
 
@@ -41,7 +40,7 @@ private:
     StereoDevice& stereo_;
     vr::RuntimeDetector& runtimes_;
     diag::ports::Log& log_;
-    std::once_flag started_;
+    util::OnceLatch started_; // one thread: the render thread's Present
     bool recenter_held_ = false;
 };
 

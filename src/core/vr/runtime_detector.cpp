@@ -18,7 +18,7 @@ constexpr std::string_view kLogChosen = "vr probe: chosen={}";
 
 } // namespace
 
-DetectResult RuntimeDetector::detect() noexcept {
+void RuntimeDetector::detect() noexcept {
     DetectResult r{};
 
     // OpenVR via openvrpaths.vrpath (the probe logs what it found).
@@ -43,7 +43,6 @@ DetectResult RuntimeDetector::detect() noexcept {
     r.chosen = choose_runtime(r);
     diag::ports::logf(log_, kLogChosen, to_string(r.chosen));
     last_ = r;
-    return r;
 }
 
 const DetectResult& RuntimeDetector::last_result() noexcept {

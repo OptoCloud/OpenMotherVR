@@ -34,17 +34,15 @@ public:
                     ports::RuntimeProbe& openxr) noexcept
         : log_(log), settings_(settings), switches_(switches), openvr_(openvr), openxr_(openxr) {}
 
-    // Probe and decide. Reads the settings and the command line, and logs
-    // each step so the log shows why the runtime was picked. The result is
-    // cached; last_result() returns it without probing again.
-    DetectResult detect() noexcept;
-
-    // The result of the most recent detect(); runs detect() on first use,
-    // so detection happens when the stereo device is created rather than in
-    // DllMain. Any thread.
+    // The detection result; probes on first use, so detection happens when
+    // the stereo device is created rather than in DllMain. Any thread.
     const DetectResult& last_result() noexcept;
 
 private:
+    // Probe and decide into last_. Reads the settings and the command line,
+    // and logs each step so the log shows why the runtime was picked.
+    void detect() noexcept;
+
     diag::ports::Log& log_;
     const config::Settings& settings_;
     const config::ports::LaunchSwitches& switches_;

@@ -29,13 +29,12 @@ bool VirtualScreenPolicy::drives_frames() noexcept {
 // 09 §8: the session is bound to the game's own device so the game's images can be
 // copied into runtime swapchains without sharing.
 void VirtualScreenPolicy::start_once(SwapchainHandle swapchain) noexcept {
-    std::call_once(started_, [this, swapchain]() {
-        log_.line(kStartingLog);
-        if (const auto started = screen_.start(swapchain)) {
-            stereo_.set_vr_session_active(*started);
-            if (!*started) log_.line(kInitFailedLog);
-        }
-    });
+    if (!started_.first()) return;
+    log_.line(kStartingLog);
+    if (const auto started = screen_.start(swapchain)) {
+        stereo_.set_vr_session_active(*started);
+        if (!*started) log_.line(kInitFailedLog);
+    }
 }
 
 bool VirtualScreenPolicy::on_present(SwapchainHandle swapchain) noexcept {
