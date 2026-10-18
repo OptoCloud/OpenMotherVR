@@ -1,10 +1,10 @@
 // OpenMotherVR-Provenance: clean
 #include "platform/d3d11/swapchain.h"
 
+#include "platform/win32/com_ptr.h"
 #include "platform/win32/window/game_window.h"
 
 #include <dxgi.h>
-#include <wrl/client.h>
 
 namespace omvr::platform::d3d11 {
 
@@ -45,8 +45,8 @@ void fit_game_window(IDXGISwapChain* sc, bool vr, ports::Log& log) noexcept {
 void no_alt_enter_while_vr(IDXGISwapChain* sc, void* window, bool vr, ports::Log& log) noexcept {
     const auto hwnd = static_cast<HWND>(window);
     if (!hwnd || !vr) return;
-    Microsoft::WRL::ComPtr<IDXGIFactory> factory;
-    HRESULT hr = sc->GetParent(IID_PPV_ARGS(factory.GetAddressOf()));
+    win32::ComPtr<IDXGIFactory> factory;
+    HRESULT hr = sc->GetParent(IID_PPV_ARGS(factory.put()));
     if (SUCCEEDED(hr) && factory) hr = factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
     if (FAILED(hr)) ports::logf(log, kAltEnterKeptLog, static_cast<unsigned>(hr));
 }

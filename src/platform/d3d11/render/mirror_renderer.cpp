@@ -17,6 +17,7 @@ namespace {
 
 using core::stereo::MirrorConstants;
 using win32::ComPtr;
+using win32::release_one;
 
 #include "platform/d3d11/render/shaders/mirror_shaders.inc"
 
@@ -33,14 +34,6 @@ constexpr UINT kConstantSlot = 0;
 constexpr UINT kSamplerSlot  = 0;
 // One full-window triangle strip.
 constexpr UINT kStripVertices = 4;
-
-template <class T>
-void release_one(T*& p) noexcept {
-    if (p) {
-        p->Release();
-        p = nullptr;
-    }
-}
 
 D3D11_SAMPLER_DESC bilinear_clamp() noexcept {
     D3D11_SAMPLER_DESC s{};

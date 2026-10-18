@@ -81,10 +81,10 @@ const XrCompositionLayerBaseHeader* Session::Impl::screen_layer(FrameLayers& lay
     ID3D11Texture2D* src = state.screen_image;
     D3D11_BOX box        = to_box(state.screen_region);
     ComPtr<ID3D11Texture2D> back;
-    if (!src && swapchain && SUCCEEDED(swapchain->GetBuffer(0, IID_PPV_ARGS(back.GetAddressOf())))) {
+    if (!src && swapchain && SUCCEEDED(swapchain->GetBuffer(0, IID_PPV_ARGS(back.put())))) {
         D3D11_TEXTURE2D_DESC d{};
         back->GetDesc(&d);
-        src = back.Get();
+        src = back.get();
         box = {0, 0, 0, d.Width, d.Height, 1};
     }
     if (!src) return nullptr;

@@ -10,12 +10,14 @@
 #include <array>
 #include <cstring>
 #include <string_view>
+#include <utility>
 
 namespace omvr::platform::d3d11 {
 
 namespace {
 
 using core::stereo::VignetteConstants;
+using win32::release_one;
 
 #include "platform/d3d11/render/shaders/vignette_shaders.inc"
 
@@ -36,14 +38,6 @@ constexpr UINT kStripVertices = 4;
 constexpr UINT kSavedSrvSlots  = D3D11_COMMONSHADER_INPUT_RESOURCE_REGISTER_COUNT;
 constexpr UINT kSavedTargets   = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
 constexpr UINT kSavedViewports = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-
-template <class T>
-void release_one(T*& p) noexcept {
-    if (p) {
-        p->Release();
-        p = nullptr;
-    }
-}
 
 template <class T, std::size_t N>
 void release_all(std::array<T*, N>& ps) noexcept {
@@ -156,21 +150,13 @@ private:
 
 } // namespace
 
-VignetteRenderer::~VignetteRenderer() { release(); }
+VignetteRenderer::VignetteRenderer(core::diag::ports::Log& log) noexcept : log_(log) {}
 
-bool VignetteRenderer::ready() const noexcept { return vs_ && ps_ && cb_ && blend_ && rtv_; }
-
-void VignetteRenderer::release() noexcept {
-    release_one(vs_);
-    release_one(ps_);
-    release_one(cb_);
-    release_one(blend_);
-    release_one(rtv_);
-    target_ = {};
-}
+VignetteRenderer::~VignetteRenderer() = default;
 
 void VignetteRenderer::configure(core::vr::GpuDevice gpu_device, core::vr::GpuTexture target) noexcept {
-    release();
+    pass_                    = {};
+    target_                  = {};
     ID3D11Device* device     = to_d3d(gpu_device);
     ID3D11Texture2D* texture = to_d3d(target);
     if (!device || !texture) return;
@@ -180,11 +166,12 @@ void VignetteRenderer::configure(core::vr::GpuDevice gpu_device, core::vr::GpuTe
         core::diag::ports::logf(log_, kNotTargetLog, static_cast<int>(td.Format));
         return;
     }
+    Pass p;
     std::string_view what = "vertex shader";
-    HRESULT hr            = device->CreateVertexShader(kVignetteVS, sizeof(kVignetteVS), nullptr, &vs_);
+    HRESULT hr            = device->CreateVertexShader(kVignetteVS, sizeof(kVignetteVS), nullptr, p.vs.put());
     if (SUCCEEDED(hr)) {
         what = "pixel shader";
-        hr   = device->CreatePixelShader(kVignettePS, sizeof(kVignettePS), nullptr, &ps_);
+        hr   = device->CreatePixelShader(kVignettePS, sizeof(kVignettePS), nullptr, p.ps.put());
     }
     if (SUCCEEDED(hr)) {
         what = "constant buffer";
@@ -194,12 +181,12 @@ void VignetteRenderer::configure(core::vr::GpuDevice gpu_device, core::vr::GpuTe
                                    D3D11_CPU_ACCESS_WRITE,
                                    0,
                                    0};
-        hr = device->CreateBuffer(&cb, nullptr, &cb_);
+        hr = device->CreateBuffer(&cb, nullptr, p.cb.put());
     }
     if (SUCCEEDED(hr)) {
         what                     = "blend state";
         const D3D11_BLEND_DESC b = multiply_blend();
-        hr                       = device->CreateBlendState(&b, &blend_);
+        hr                       = device->CreateBlendState(&b, p.blend.put());
     }
     if (SUCCEEDED(hr)) {
         what = "target view";
@@ -207,13 +194,14 @@ void VignetteRenderer::configure(core::vr::GpuDevice gpu_device, core::vr::GpuTe
         rv.Format = view_format(td.Format);
         rv.ViewDimension =
             td.SampleDesc.Count > 1 ? D3D11_RTV_DIMENSION_TEXTURE2DMS : D3D11_RTV_DIMENSION_TEXTURE2D;
-        hr = device->CreateRenderTargetView(texture, &rv, &rtv_);
+        hr = device->CreateRenderTargetView(texture, &rv, p.rtv.put());
     }
-    if (FAILED(hr) || !ready()) {
-        release();
+    if (FAILED(hr) || !p.ready()) {
+        p = {};
         core::diag::ports::logf(log_, kCreateFailedLog, what, static_cast<unsigned long>(hr));
         return;
     }
+    pass_   = std::move(p);
     target_ = target;
     width_  = static_cast<float>(td.Width);
     height_ = static_cast<float>(td.Height);
@@ -221,31 +209,33 @@ void VignetteRenderer::configure(core::vr::GpuDevice gpu_device, core::vr::GpuTe
 
 void VignetteRenderer::draw(core::vr::GpuContext context, core::vr::GpuTexture target,
                             const VignetteConstants& constants) noexcept {
-    if (!ready()) return;
+    if (!pass_.ready()) return;
     if (target != target_) {
         if (other_target_logged_.first()) log_.line(kOtherTargetLog);
         return;
     }
     ID3D11DeviceContext* ctx = to_d3d(context);
     D3D11_MAPPED_SUBRESOURCE mapped{};
-    if (FAILED(ctx->Map(cb_, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) return;
+    ID3D11Buffer* const cb = pass_.cb.get();
+    if (FAILED(ctx->Map(cb, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) return;
     std::memcpy(mapped.pData, &constants, sizeof(constants));
-    ctx->Unmap(cb_, 0);
+    ctx->Unmap(cb, 0);
 
     const SavedState saved(ctx);
-    ctx->OMSetRenderTargets(1, &rtv_, nullptr);
-    ctx->OMSetBlendState(blend_, nullptr, D3D11_DEFAULT_SAMPLE_MASK);
+    ID3D11RenderTargetView* const rtv = pass_.rtv.get();
+    ctx->OMSetRenderTargets(1, &rtv, nullptr);
+    ctx->OMSetBlendState(pass_.blend.get(), nullptr, D3D11_DEFAULT_SAMPLE_MASK);
     const D3D11_VIEWPORT vp{0.0f, 0.0f, width_, height_, 0.0f, 1.0f};
     ctx->RSSetViewports(1, &vp);
     ctx->RSSetState(nullptr);
     ctx->IASetInputLayout(nullptr);
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-    ctx->VSSetShader(vs_, nullptr, 0);
-    ctx->PSSetShader(ps_, nullptr, 0);
+    ctx->VSSetShader(pass_.vs.get(), nullptr, 0);
+    ctx->PSSetShader(pass_.ps.get(), nullptr, 0);
     ctx->GSSetShader(nullptr, nullptr, 0);
     ctx->HSSetShader(nullptr, nullptr, 0);
     ctx->DSSetShader(nullptr, nullptr, 0);
-    ctx->PSSetConstantBuffers(kConstantSlot, 1, &cb_);
+    ctx->PSSetConstantBuffers(kConstantSlot, 1, &cb);
     ctx->Draw(kStripVertices, 0);
 }
 

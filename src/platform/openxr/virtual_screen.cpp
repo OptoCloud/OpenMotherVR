@@ -13,9 +13,9 @@ namespace omvr::platform::openxr {
 std::optional<bool> VirtualScreen::start(core::stereo::SwapchainHandle handle) noexcept {
     IDXGISwapChain* swapchain = d3d11::to_d3d(handle);
     ComPtr<ID3D11Device> device;
-    if (!swapchain || FAILED(swapchain->GetDevice(IID_PPV_ARGS(device.GetAddressOf())))) return std::nullopt;
+    if (!swapchain || FAILED(swapchain->GetDevice(IID_PPV_ARGS(device.put())))) return std::nullopt;
     // The session takes its own reference; ours goes at the end of the scope.
-    return session_.init(d3d11::gpu_device(device.Get())).ok;
+    return session_.init(d3d11::gpu_device(device.get())).ok;
 }
 
 void VirtualScreen::recenter() noexcept { session_.recenter(); }

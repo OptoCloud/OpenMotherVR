@@ -4,6 +4,7 @@
 #include "core/diag/ports/log.h"
 #include "core/stereo/types.h"
 #include "core/vr/types.h"
+#include "platform/win32/com_ptr.h"
 #include "util/sync/once_latch.h"
 
 struct ID3D11BlendState;
@@ -20,7 +21,8 @@ namespace omvr::platform::d3d11 {
 
 class VignetteRenderer final {
 public:
-    explicit VignetteRenderer(core::diag::ports::Log& log) noexcept : log_(log) {}
+    // Both defined where the D3D11 types are complete (they release pass_).
+    explicit VignetteRenderer(core::diag::ports::Log& log) noexcept;
     ~VignetteRenderer();
     VignetteRenderer(const VignetteRenderer&)            = delete;
     VignetteRenderer& operator=(const VignetteRenderer&) = delete;
@@ -41,16 +43,18 @@ public:
               const core::stereo::VignetteConstants& constants) noexcept;
 
 private:
-    bool ready() const noexcept;
-    void release() noexcept;
+    // The pass's objects: all of them, or none.
+    struct Pass {
+        win32::ComPtr<ID3D11VertexShader> vs;
+        win32::ComPtr<ID3D11PixelShader> ps;
+        win32::ComPtr<ID3D11Buffer> cb;
+        win32::ComPtr<ID3D11BlendState> blend;
+        win32::ComPtr<ID3D11RenderTargetView> rtv;
+        bool ready() const noexcept { return vs && ps && cb && blend && rtv; }
+    };
 
     core::diag::ports::Log& log_;
-    // Owned here, released only by release().
-    ID3D11VertexShader* vs_      = nullptr;
-    ID3D11PixelShader* ps_       = nullptr;
-    ID3D11Buffer* cb_            = nullptr;
-    ID3D11BlendState* blend_     = nullptr;
-    ID3D11RenderTargetView* rtv_ = nullptr;
+    Pass pass_;
     core::vr::GpuTexture target_ = {};
     float width_                 = 0.0f;
     float height_                = 0.0f;

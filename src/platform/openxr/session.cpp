@@ -197,8 +197,8 @@ void Session::Impl::teardown() {
     floor_available.store(false, std::memory_order_relaxed);
     state.session.reset();
     state.instance.reset();
-    state.context.Reset();
-    state.device.Reset();
+    state.context.reset();
+    state.device.reset();
     state = State{};
     published_views.store({});
 }
@@ -210,10 +210,10 @@ void Session::Impl::teardown() {
 // log (11 §2.4).
 void Session::Impl::warn_adapter_mismatch(ID3D11Device* device, const XrGraphicsRequirementsD3D11KHR& reqs) {
     ComPtr<IDXGIDevice> dxgi;
-    if (FAILED(device->QueryInterface(IID_PPV_ARGS(dxgi.GetAddressOf())))) return;
+    if (FAILED(device->QueryInterface(IID_PPV_ARGS(dxgi.put())))) return;
     ComPtr<IDXGIAdapter> adapter;
     DXGI_ADAPTER_DESC desc{};
-    if (SUCCEEDED(dxgi->GetAdapter(adapter.GetAddressOf())) && SUCCEEDED(adapter->GetDesc(&desc)) &&
+    if (SUCCEEDED(dxgi->GetAdapter(adapter.put())) && SUCCEEDED(adapter->GetDesc(&desc)) &&
         !same_adapter(desc.AdapterLuid, reqs.adapterLuid)) {
         logf(log, kLogAdapterMismatch, win32::utf8(std::filesystem::path{desc.Description}),
              static_cast<std::uint32_t>(desc.AdapterLuid.HighPart), desc.AdapterLuid.LowPart,
@@ -222,8 +222,8 @@ void Session::Impl::warn_adapter_mismatch(ID3D11Device* device, const XrGraphics
 }
 
 bool Session::Impl::create_session(ID3D11Device* device) {
-    state.device = device; // a reference of our own (ComPtr assignment adds one)
-    device->GetImmediateContext(state.context.GetAddressOf());
+    state.device = ComPtr<ID3D11Device>::share(device); // a reference of our own
+    device->GetImmediateContext(state.context.put());
 
     XrGraphicsBindingD3D11KHR binding{XR_TYPE_GRAPHICS_BINDING_D3D11_KHR};
     binding.device = device;

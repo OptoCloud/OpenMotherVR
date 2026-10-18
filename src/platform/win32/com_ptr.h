@@ -30,6 +30,12 @@ public:
         return owner;
     }
 
+    // Takes a reference of its own to `p` (AddRef), which the caller keeps.
+    static ComPtr share(T* p) noexcept {
+        if (p) p->AddRef();
+        return adopt(p);
+    }
+
     T* get() const noexcept { return ptr_; }
     T* operator->() const noexcept { return ptr_; }
     explicit operator bool() const noexcept { return ptr_ != nullptr; }
@@ -38,8 +44,24 @@ public:
         if (T* p = std::exchange(ptr_, nullptr)) p->Release();
     }
 
+    // Releases what is held and returns the slot for an out parameter.
+    T** put() noexcept {
+        reset();
+        return &ptr_;
+    }
+
 private:
     T* ptr_ = nullptr;
 };
+
+// Releases `p` and clears it: for raw COM pointers kept where a ComPtr
+// cannot be (the game's layout, arrays a D3D11 call fills).
+template <class T>
+void release_one(T*& p) noexcept {
+    if (p) {
+        p->Release();
+        p = nullptr;
+    }
+}
 
 } // namespace omvr::platform::win32

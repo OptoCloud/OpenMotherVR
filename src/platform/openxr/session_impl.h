@@ -15,9 +15,8 @@
 #include "platform/openxr/xr_convert.h"
 #include "platform/openxr/xr_handle.h"
 #include "platform/openxr/xr_headers.h"
+#include "platform/win32/com_ptr.h"
 #include "util/sync/seqlock.h"
-
-#include <wrl/client.h>
 
 #include <array>
 #include <atomic>
@@ -28,7 +27,7 @@
 
 namespace omvr::platform::openxr {
 
-using Microsoft::WRL::ComPtr;
+using win32::ComPtr;
 
 struct Session::Impl {
     Impl(core::diag::ports::Log& log_port, const core::diag::ports::Clock& clock_port,
