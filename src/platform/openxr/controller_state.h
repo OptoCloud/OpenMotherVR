@@ -12,15 +12,11 @@
 
 #include <array>
 #include <cstddef>
+#include <optional>
 
 namespace omvr::platform::openxr {
 
 enum class Hand : int { Left = 0, Right = 1 };
-
-// Two control schemes: thumbstick controllers (Touch, Index, WMR, and the
-// Steam Frame, which has its own controls help) and touchpad controllers
-// (Vive wands), where touchpad regions stand in for face buttons (04 §5.5).
-enum class ControllerFamily { Unknown, Thumbstick, Touchpad, Frame };
 
 struct HandState {
     bool active     = false; // controller present and bound
@@ -45,7 +41,11 @@ inline constexpr std::size_t kProfileNameSize = 256;
 
 struct ControllerState {
     std::array<HandState, core::vr::kHandCount> hands{};
-    ControllerFamily family = ControllerFamily::Unknown;
+    // The right hand's control scheme, none while it has no profile:
+    // Thumbstick (Touch, Index, WMR), Frame (the Steam Frame, thumbstick
+    // controls with their own help) or Touchpad (Vive wands, where touchpad
+    // regions stand in for face buttons, 04 §5.5).
+    std::optional<core::input::ControlScheme> family;
     // Each hand's interaction profile path, empty when none is bound, read
     // at every profile change; the count of changes read (22 §10.1).
     std::array<std::array<char, kProfileNameSize>, core::vr::kHandCount> profiles{};

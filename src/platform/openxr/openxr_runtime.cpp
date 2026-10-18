@@ -89,8 +89,8 @@ input::HandInput hand_input(const HandState& h) noexcept {
 input::Controls map_controls(const ControllerState& s) noexcept {
     const input::HandInput left  = hand_input(s[Hand::Left]);
     const input::HandInput right = hand_input(s[Hand::Right]);
-    return s.family == ControllerFamily::Touchpad ? input::touchpad_controls(left, right)
-                                                  : input::thumbstick_controls(left, right);
+    return s.family == input::ControlScheme::Touchpad ? input::touchpad_controls(left, right)
+                                                      : input::thumbstick_controls(left, right);
 }
 
 // ---- The runtime -------------------------------------------------------------------
@@ -423,11 +423,9 @@ private:
             for (std::size_t h = 0; h < s.profiles.size(); ++h)
                 controls_.identify_controller(h, input::ControllerSource::OpenXr, s.profiles[h].data());
         }
-        if (s.family != ControllerFamily::Unknown && !glyphs_chosen_) {
+        if (s.family && !glyphs_chosen_) {
             glyphs_chosen_ = true;
-            controls_.set_scheme(s.family == ControllerFamily::Touchpad ? input::ControlScheme::Touchpad
-                                 : s.family == ControllerFamily::Frame  ? input::ControlScheme::Frame
-                                                                        : input::ControlScheme::Thumbstick);
+            controls_.set_scheme(*s.family);
         }
         input::Controls c = map_controls(s);
         // The right hand near the head turns Interact into the flashlight

@@ -137,7 +137,7 @@ void Input::suggest_all() noexcept {
             }));
 
     // Vive wands: the touchpad is the stick; face buttons come from touchpad
-    // regions in the game mapping (ControllerFamily::Touchpad).
+    // regions in the game mapping (ControlScheme::Touchpad).
     suggest("/interaction_profiles/htc/vive_controller",
             with_common({
                 {&a.trigger, "input/trigger/value", "input/trigger/value"},
@@ -405,14 +405,15 @@ void Input::on_interaction_profile_changed() noexcept {
     ++state_.profile_generation;
     // The right hand's profile picks the family (04 §5.8.4).
     if (!bound[1]) {
-        state_.family = ControllerFamily::Unknown;
+        state_.family.reset();
         log_.line(kLogNoProfile);
         return;
     }
     const char* name = state_.profiles[1].data();
-    state_.family    = std::strstr(name, kViveProfile)                   ? ControllerFamily::Touchpad
-                       : std::strcmp(name, kFrameControllerProfile) == 0 ? ControllerFamily::Frame
-                                                                         : ControllerFamily::Thumbstick;
+    using core::input::ControlScheme;
+    state_.family = std::strstr(name, kViveProfile)                   ? ControlScheme::Touchpad
+                    : std::strcmp(name, kFrameControllerProfile) == 0 ? ControlScheme::Frame
+                                                                      : ControlScheme::Thumbstick;
     logf(log_, kLogProfile, name);
     log_haptic_binding();
 }
