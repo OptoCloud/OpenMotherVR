@@ -61,8 +61,7 @@ private:
     bool on_prefixed_event(std::string_view text) noexcept;
 
     diag::ports::Log& log_;
-    std::atomic<bool> in_interaction_{false};
-    std::atomic<Interaction> interaction_{Interaction::None};
+    std::atomic<Interaction> interaction_{Interaction::None}; // None: not in an interaction
     std::atomic<bool> hiding_{false};
     std::atomic<bool> breathing_game_{false};
     std::mutex mutex_;                        // guards seen_; never held across a game call

@@ -50,7 +50,6 @@ bool is_end(std::string_view text) noexcept {
 } // namespace
 
 void InteractionState::end_interaction() noexcept {
-    in_interaction_.store(false, std::memory_order_relaxed);
     interaction_.store(Interaction::None, std::memory_order_relaxed);
 }
 
@@ -61,7 +60,6 @@ bool InteractionState::on_prefixed_event(std::string_view text) noexcept {
         if (!text.starts_with(k.prefix)) continue;
         const auto suffix = text.substr(k.prefix.size());
         if (suffix == game::kEventStartSuffix) {
-            in_interaction_.store(true, std::memory_order_relaxed);
             interaction_.store(k.kind, std::memory_order_relaxed);
             return true;
         }
@@ -77,9 +75,8 @@ bool InteractionState::on_prefixed_event(std::string_view text) noexcept {
 bool InteractionState::on_event(std::string_view text) noexcept {
     if (is_chatter(text)) return false;
     if (text == game::kEventStartInteraction) {
-        in_interaction_.store(true, std::memory_order_relaxed);
-        if (interaction_.load(std::memory_order_relaxed) == Interaction::None)
-            interaction_.store(Interaction::Generic, std::memory_order_relaxed);
+        Interaction none = Interaction::None;
+        interaction_.compare_exchange_strong(none, Interaction::Generic, std::memory_order_relaxed);
         return true;
     }
     if (text == game::kEventHidingStart) {
@@ -117,9 +114,7 @@ void InteractionState::log_event(std::string_view text, bool changed) noexcept {
     } catch (...) {}
 }
 
-bool InteractionState::in_interaction() const noexcept {
-    return in_interaction_.load(std::memory_order_relaxed);
-}
+bool InteractionState::in_interaction() const noexcept { return interaction() != Interaction::None; }
 Interaction InteractionState::interaction() const noexcept {
     return interaction_.load(std::memory_order_relaxed);
 }
