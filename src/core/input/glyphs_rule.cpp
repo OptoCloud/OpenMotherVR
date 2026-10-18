@@ -130,8 +130,6 @@ const Column& column(GlyphFamily family, ControllerSource source) noexcept {
     return kTouch;
 }
 
-bool is_dpad(int code) noexcept { return code >= game::kPadDpadUp && code <= game::kPadDpadRight; }
-
 const char* stock_name(int code) noexcept {
     return code >= 0 && static_cast<std::size_t>(code) < kStockPadNames.size()
                ? kStockPadNames[static_cast<std::size_t>(code)]
@@ -181,7 +179,7 @@ const char* family_glyph(GlyphFamily left, GlyphFamily right, ControllerSource s
     if (right == GlyphFamily::Unknown) right = left;
     if (right == GlyphFamily::Unknown) return nullptr;
     if (code < 0 || static_cast<std::size_t>(code) >= kGlyphCodes) return stock_name(code);
-    if (is_dpad(code) && !dpad_emulation) return stock_name(code);
+    if (is_dpad_code(code) && !dpad_emulation) return stock_name(code);
 
     const auto i      = static_cast<std::size_t>(code);
     const Entry& on_l = column(left, source)[i];
@@ -194,7 +192,7 @@ const char* family_glyph(GlyphFamily left, GlyphFamily right, ControllerSource s
 
 const char* scheme_glyph(ControlScheme scheme, int code, bool dpad_emulation) noexcept {
     const bool touchpad = scheme == ControlScheme::Touchpad;
-    if (is_dpad(code)) {
+    if (is_dpad_code(code)) {
         // A controller's own d-pad (the Frame) shows the game's d-pad.
         if (!dpad_emulation || scheme == ControlScheme::Frame) return stock_name(code);
         return glyph_or_stock((touchpad ? kWand : kTouch)[static_cast<std::size_t>(code)], code);

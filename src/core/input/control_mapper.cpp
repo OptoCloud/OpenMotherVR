@@ -160,12 +160,6 @@ void write_menu_map(TierWriter& w, const Controls& c, const GameActions& a) noex
 
 constexpr std::string_view kLogDpad = "[input] d-pad up {} down {} left {} right {} (emulated {})";
 
-// 22 §7: a controller's own d-pad and the emulation both press.
-Dpad either(Dpad a, Dpad b) noexcept {
-    return {
-        .up = a.up || b.up, .down = a.down || b.down, .left = a.left || b.left, .right = a.right || b.right};
-}
-
 } // namespace
 
 void ControlMapper::GripToggles::update(bool grip_r, bool grip_l, bool toggle) noexcept {
@@ -187,7 +181,7 @@ Controls ControlMapper::apply_dpad(const Controls& in) noexcept {
     Controls c = in;
     if (emu.stick_used) c.move = {};
     if (emu.modifier_held) c.sprint = false;
-    c.dpad = either(in.dpad, emu.dpad);
+    c.dpad = in.dpad | emu.dpad; // 22 §7: a controller's own d-pad and the emulation both press
     pad_.set_dpad(c.dpad);
     // Dev. Debug Options: each change of the press, so a tester's log shows
     // the d-pad reaching the game (11 §4.3).

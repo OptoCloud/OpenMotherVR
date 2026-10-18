@@ -26,9 +26,6 @@ constexpr std::string_view kStockGlyphsLog =
 constexpr std::uint8_t dpad_bit(int pad_code) noexcept {
     return static_cast<std::uint8_t>(1u << static_cast<unsigned>(pad_code - game::kPadDpadUp));
 }
-constexpr bool is_dpad_code(int pad_code) noexcept {
-    return pad_code >= game::kPadDpadUp && pad_code <= game::kPadDpadRight;
-}
 
 } // namespace
 

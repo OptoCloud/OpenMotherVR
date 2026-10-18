@@ -1,6 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
+#include "game/constants.h"
 #include "util/math/vec.h"
 #include "util/time/steady.h"
 
@@ -22,7 +23,19 @@ struct Dpad {
 
     [[nodiscard]] constexpr bool any() const noexcept { return up || down || left || right; }
     friend constexpr bool operator==(const Dpad&, const Dpad&) = default;
+    // Both pressing: a direction either one presses.
+    friend constexpr Dpad operator|(const Dpad& a, const Dpad& b) noexcept {
+        return {.up    = a.up || b.up,
+                .down  = a.down || b.down,
+                .left  = a.left || b.left,
+                .right = a.right || b.right};
+    }
 };
+
+// The game's pad codes of the four d-pad directions (04 §2.3: DPAD_UP..DPAD_RIGHT).
+[[nodiscard]] constexpr bool is_dpad_code(int pad_code) noexcept {
+    return pad_code >= game::kPadDpadUp && pad_code <= game::kPadDpadRight;
+}
 
 // The head and the hands as the runtime reported them for the frame its
 // controls were read in (22 §8.1): positions in the runtime's tracking

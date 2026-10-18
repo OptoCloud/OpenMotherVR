@@ -16,10 +16,7 @@ Controls common_controls(const HandInput& left, const HandInput& right) noexcept
     c.grip_r    = right.grip;
     c.sprint    = left.stick_click;
     // A d-pad on either controller (the Steam Frame has one on the left).
-    c.dpad = {.up    = left.dpad.up || right.dpad.up,
-              .down  = left.dpad.down || right.dpad.down,
-              .left  = left.dpad.left || right.dpad.left,
-              .right = left.dpad.right || right.dpad.right};
+    c.dpad = left.dpad | right.dpad;
     return c;
 }
 
