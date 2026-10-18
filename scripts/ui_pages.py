@@ -1,6 +1,6 @@
-"""Add the v2 options pages (Comfort, Controls, Hands, Body) to the menu
-movies of a modded UI archive, giving the archive scripts/ui_patch.py makes
-its patch from.
+"""Add the v2 options pages (Comfort, Controls, Hands, Body, Interaction,
+HUD, Graphics) to the menu movies of a modded UI archive, giving the archive
+scripts/ui_patch.py makes its patch from.
 
     python -I scripts/ui_pages.py <MotherVR 0.8.1 MOTHER.PAK> <out.PAK> <work dir>
         [--ffdec <path to ffdec.jar>]
@@ -45,7 +45,7 @@ CALLS = [
 ]
 # Names the recompiled class must define.
 REQUIRED = ["motherV2Build", "motherV2SetRunning", "setMotherSmoothTurnSpeed", "setMotherRealCrouch",
-            "setMotherWorldScaleSwitch"]
+            "setMotherWorldScaleSwitch", "setMotherHudPitch", "setMotherFilmGrain"]
 
 
 def ffdec(jar: Path, *args: str) -> None:

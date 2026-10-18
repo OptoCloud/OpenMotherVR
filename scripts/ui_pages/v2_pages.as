@@ -1,10 +1,11 @@
       // ---- MotherVR v2 pages -------------------------------------------
       // Spliced into frontend.GameMenu of NEWFRONTENDMENU, PAUSEMENU and
       // GAMEOVERMENU by scripts/ui_pages.py. One sub-page per settings
-      // section of mothervr.json (Comfort, Controls, Hands, Body; spec 22
-      // §12, 21 §15.3), with the spec's exact labels, values and description
-      // lines. A control sends "mvr_<name> <value>" through
-      // ExternalInterface.call directly (spec 06 §4.1); the DLL pushes each
+      // section of mothervr.json (Comfort, Controls, Hands, Body,
+      // Interaction, HUD, Graphics; spec 22 §12, 21 §15.3, 23 §8, 24 §10),
+      // with the spec's exact labels, values and description lines. A
+      // control sends "mvr_<name> <value>" through ExternalInterface.call
+      // directly (spec 06 §4.1); the DLL pushes each
       // value through the public setMother* functions below, which never
       // send a command back (spec 06 §4.3).
 
@@ -30,6 +31,12 @@
 
       protected var _motherBodyItem:MenuItemExpandable;
 
+      protected var _motherInteractionItem:MenuItemExpandable;
+
+      protected var _motherHudItem:MenuItemExpandable;
+
+      protected var _motherGraphicsItem:MenuItemExpandable;
+
       protected var _motherCalibrateItem:MenuItem;
 
       protected var _motherV2Items:Object;
@@ -53,11 +60,17 @@
          this._motherControlsItem = new MenuItemExpandable("Controls");
          this._motherHandsItem = new MenuItemExpandable("Hands");
          this._motherBodyItem = new MenuItemExpandable("Body");
+         this._motherInteractionItem = new MenuItemExpandable("Interaction");
+         this._motherHudItem = new MenuItemExpandable("HUD");
+         this._motherGraphicsItem = new MenuItemExpandable("Graphics");
          // After Input, before Dev. Debug Options (spec 22 §12.1).
          this._motherOptionsItem.page.addItemAtIndex(this._motherComfortItem,3);
          this._motherOptionsItem.page.addItemAtIndex(this._motherControlsItem,4);
          this._motherOptionsItem.page.addItemAtIndex(this._motherHandsItem,5);
          this._motherOptionsItem.page.addItemAtIndex(this._motherBodyItem,6);
+         this._motherOptionsItem.page.addItemAtIndex(this._motherInteractionItem,7);
+         this._motherOptionsItem.page.addItemAtIndex(this._motherHudItem,8);
+         this._motherOptionsItem.page.addItemAtIndex(this._motherGraphicsItem,9);
 
          page = this._motherComfortItem.page;
          this.motherV2List(page,"SmoothTurnSpeed","Smooth Turn Speed","mvr_smoothturnspeed",this.motherV2Steps(0,15,24,1,30),this.motherV2Labels(0,15,24,1,30,"","°/s"),"Needs Snap Rotation off. Controller Sensitivity applies only when this is Off");
@@ -106,7 +119,53 @@
          this.motherV2Slider(page,"SeatedEyeRaise","Seated Eye Raise","mvr_seatedeyeraise",this.motherV2Steps(-50,5,21,100,0),"Raises (positive) or lowers the view when seated, in metres");
          this.motherV2Toggle(page,"RealCrouch","Real Crouch","mvr_realcrouch","Crouch for real to crouch in the game. Needs Standing play and a calibration");
 
+         // Spec 23 §8. Levers by Hand, Camera Takeovers and the two distances
+         // have no effect in this build (23 §12), so they are shown greyed.
+         page = this._motherInteractionItem.page;
+         this.motherV2Toggle(page,"PhysicalLevers","Levers by Hand","mvr_physicallevers","Not available yet");
+         this.motherV2List(page,"CameraTakeovers","Camera Takeovers","mvr_cameratakeovers",[0,1],["Game","Reduced"],"Not available yet");
+         this.motherV2List(page,"TerminalDistance","Terminal Distance","mvr_terminaldistance",this.motherV2Steps(0,1,16,10,6),this.motherV2Tenths(this.motherV2Steps(0,1,16,10,6)," m"),"Not available yet");
+         this.motherV2List(page,"RewireDistance","Rewire Distance","mvr_rewiredistance",this.motherV2Steps(0,1,16,10,6),this.motherV2Tenths(this.motherV2Steps(0,1,16,10,6)," m"),"Not available yet");
+         this.motherV2List(page,"TerminalTextScale","Terminal Text Size","mvr_terminaltextscale",[1,1.25,1.5,1.75],["100%","125%","150%","175%"],"Requires restart! Larger text on terminal screens");
+
+         page = this._motherHudItem.page;
+         this.motherV2List(page,"Crosshair","Crosshair","mvr_crosshair",[0,1,2],["On","Off","Auto"],"Auto: hidden while the weapon aims from your hand");
+         this.motherV2Toggle(page,"HudHidden","Hide HUD","mvr_hidehud","Starts with the HUD hidden, prompts and objectives included");
+         this.motherV2Toggle(page,"ItemHighlight","Item Highlight","mvr_itemhighlight","Glow on items you can pick up. A change may apply only from the next level");
+         this.motherV2List(page,"HudPlacement","HUD Placement","mvr_hudplacement",[0,1],["Head-Locked","Follow"],"Follow: the HUD stays level and catches up when you turn");
+         this.motherV2Slider(page,"HudDistance","HUD Distance","mvr_huddistance",this.motherV2Steps(6,1,15,10,0),"Distance of the HUD from your eyes, in metres");
+         this.motherV2Slider(page,"HudWidth","HUD Width","mvr_hudwidth",this.motherV2Steps(30,5,19,100,0),"Width in metres. A smaller HUD also makes its text smaller");
+         this.motherV2Slider(page,"HudPitch","HUD Pitch","mvr_hudpitch",this.motherV2Steps(-30,5,9,1,0),"Moves the HUD below (negative) or above your view, in degrees");
+
+         // Spec 24 §10: the items of the features in this build (5 to 9,
+         // 11 to 13); the others are not shown.
+         page = this._motherGraphicsItem.page;
+         this.motherV2Toggle(page,"EngineSettingsOverride","Engine Settings Override","mvr_enginesettingsoverride","Requires restart! Adds the VR options below to the game\'s graphics settings");
+         this.motherV2Toggle(page,"ShadowMap4096","4096 Shadow Maps","mvr_shadowmap4096","Requires restart! Adds 4096 to Shadow Map Resolution in the Video options");
+         this.motherV2Toggle(page,"SharpReflections","Sharp Reflections","mvr_sharpreflections","Requires restart! Adds a Planar Reflections option without blur");
+         this.motherV2List(page,"StreamingTextureHeapMB","Texture Streaming Memory","mvr_streamingtextureheap",[0,300,400,500,600,700,800,900,1000,1024],["Game","300 MB","400 MB","500 MB","600 MB","700 MB","800 MB","900 MB","1000 MB","1024 MB"],"Requires restart! Memory for streaming textures. Game: the game\'s own size");
+         this.motherV2List(page,"StreamingModelHeapMB","Model Streaming Memory","mvr_streamingmodelheap",[0,128,192,256,320,384,448,512],["Game","128 MB","192 MB","256 MB","320 MB","384 MB","448 MB","512 MB"],"Requires restart! Memory for streaming models. Game: the game\'s own size");
+         this.motherV2Toggle(page,"LensFlares","Lens Flares in VR","mvr_lensflares","Off: no lens flares in the headset");
+         this.motherV2Toggle(page,"ChromaticAberration","Chromatic Aberration in VR","mvr_chromaticaberration","Off: no color fringes in the headset, whatever the Video setting");
+         this.motherV2Toggle(page,"FilmGrain","Film Grain in VR","mvr_filmgrain","Off: no film grain in the headset, whatever the Video setting");
+
          this.motherV2UpdateState();
+      }
+
+      // "0.6 m", "1.0 m": one decimal and `suffix`, "Off" for 0 (spec 23
+      // §8: a list value is read as a measure, so it keeps its unit).
+      protected function motherV2Tenths(values:Array, suffix:String) : Array
+      {
+         var labels:Array = new Array();
+         var tenths:int = 0;
+         var i:int = 0;
+         while(i < values.length)
+         {
+            tenths = int(Math.round(values[i] * 10));
+            labels.push(tenths == 0 ? "Off" : String(int(tenths / 10)) + "." + String(tenths % 10) + suffix);
+            i++;
+         }
+         return labels;
       }
 
       // `count` values first/den, (first + step)/den, ...; with `offFirst`
@@ -309,6 +368,7 @@
          var tracked:Boolean = false;
          var haptics:Boolean = false;
          var standing:Boolean = false;
+         var engine:Boolean = false;
          var worldScale:* = null;
          if(this._motherV2Items == null)
          {
@@ -318,6 +378,9 @@
          this._motherControlsItem.enabled = this._motherV2Running;
          this._motherHandsItem.enabled = this._motherV2Running;
          this._motherBodyItem.enabled = this._motherV2Running;
+         this._motherInteractionItem.enabled = this._motherV2Running;
+         this._motherHudItem.enabled = this._motherV2Running;
+         this._motherGraphicsItem.enabled = this._motherV2Running;
          tracked = this.motherV2On("HandsEnabled");
          this.motherV2Enable("AimFromHand",tracked);
          this.motherV2Enable("TrackerInHand",tracked);
@@ -329,6 +392,15 @@
          this.motherV2Enable("FlashlightAim",false);
          this.motherV2Enable("HidingLean",false);
          this.motherV2Enable("HoldBreathGesture",false);
+         this.motherV2Enable("PhysicalLevers",false);
+         this.motherV2Enable("CameraTakeovers",false);
+         this.motherV2Enable("TerminalDistance",false);
+         this.motherV2Enable("RewireDistance",false);
+         engine = this.motherV2On("EngineSettingsOverride");
+         this.motherV2Enable("ShadowMap4096",engine);
+         this.motherV2Enable("SharpReflections",engine);
+         this.motherV2Enable("StreamingTextureHeapMB",engine);
+         this.motherV2Enable("StreamingModelHeapMB",engine);
          haptics = this.motherV2On("HapticsEnabled");
          this.motherV2Enable("HapticsStrength",haptics);
          this.motherV2Enable("HapticsGameRumble",haptics);
@@ -607,4 +679,104 @@
       public function setMotherRealCrouch(param1:Boolean) : void
       {
          this.motherV2Set("RealCrouch",param1);
+      }
+
+      public function setMotherPhysicalLevers(param1:Boolean) : void
+      {
+         this.motherV2Set("PhysicalLevers",param1);
+      }
+
+      public function setMotherCameraTakeovers(param1:Number) : void
+      {
+         this.motherV2Set("CameraTakeovers",param1);
+      }
+
+      public function setMotherTerminalDistance(param1:Number) : void
+      {
+         this.motherV2Set("TerminalDistance",param1);
+      }
+
+      public function setMotherRewireDistance(param1:Number) : void
+      {
+         this.motherV2Set("RewireDistance",param1);
+      }
+
+      public function setMotherTerminalTextScale(param1:Number) : void
+      {
+         this.motherV2Set("TerminalTextScale",param1);
+      }
+
+      public function setMotherCrosshair(param1:Number) : void
+      {
+         this.motherV2Set("Crosshair",param1);
+      }
+
+      public function setMotherHudHidden(param1:Boolean) : void
+      {
+         this.motherV2Set("HudHidden",param1);
+      }
+
+      public function setMotherItemHighlight(param1:Boolean) : void
+      {
+         this.motherV2Set("ItemHighlight",param1);
+      }
+
+      public function setMotherHudPlacement(param1:Number) : void
+      {
+         this.motherV2Set("HudPlacement",param1);
+      }
+
+      public function setMotherHudDistance(param1:Number) : void
+      {
+         this.motherV2Set("HudDistance",param1);
+      }
+
+      public function setMotherHudWidth(param1:Number) : void
+      {
+         this.motherV2Set("HudWidth",param1);
+      }
+
+      public function setMotherHudPitch(param1:Number) : void
+      {
+         this.motherV2Set("HudPitch",param1);
+      }
+
+      public function setMotherEngineSettingsOverride(param1:Boolean) : void
+      {
+         this.motherV2Set("EngineSettingsOverride",param1);
+      }
+
+      public function setMotherShadowMap4096(param1:Boolean) : void
+      {
+         this.motherV2Set("ShadowMap4096",param1);
+      }
+
+      public function setMotherSharpReflections(param1:Boolean) : void
+      {
+         this.motherV2Set("SharpReflections",param1);
+      }
+
+      public function setMotherStreamingTextureHeapMB(param1:Number) : void
+      {
+         this.motherV2Set("StreamingTextureHeapMB",param1);
+      }
+
+      public function setMotherStreamingModelHeapMB(param1:Number) : void
+      {
+         this.motherV2Set("StreamingModelHeapMB",param1);
+      }
+
+      public function setMotherLensFlares(param1:Boolean) : void
+      {
+         this.motherV2Set("LensFlares",param1);
+      }
+
+      public function setMotherChromaticAberration(param1:Boolean) : void
+      {
+         this.motherV2Set("ChromaticAberration",param1);
+      }
+
+      public function setMotherFilmGrain(param1:Boolean) : void
+      {
+         this.motherV2Set("FilmGrain",param1);
       }
