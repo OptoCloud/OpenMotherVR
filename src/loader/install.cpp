@@ -253,9 +253,14 @@ bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept {
     if (installed) hooks::prepare_hands(g);
     // v2 haptics (21 §14): their sites only with Hands.Haptics.Enabled at start.
     if (installed) hooks::prepare_haptics(g);
+    // v2 engine settings override (24 §6): on its own, also when a core
+    // site failed or the runtime will not start (24 §11.1), decided before
+    // the game's display initialisation reads its settings file.
+    const bool engine_settings = hooks::prepare_engine_settings(g, game_dir);
     // The level for the Discord activity; runtime None leaves the game's
     // imports alone like everything else outside the UI set.
-    if (installed && ctx.settings.current().discord_rich_presence) hooks::watch_game_file_opens(ai_base);
+    const bool levels = installed && ctx.settings.current().discord_rich_presence;
+    if (levels || engine_settings) hooks::watch_game_file_opens(ai_base, levels);
     return installed;
 }
 

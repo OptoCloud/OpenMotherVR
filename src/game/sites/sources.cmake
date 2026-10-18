@@ -3,6 +3,8 @@
 target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/controls.cpp
     ${CMAKE_CURRENT_LIST_DIR}/controls.h
+    ${CMAKE_CURRENT_LIST_DIR}/engine_settings.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/engine_settings.h
     ${CMAKE_CURRENT_LIST_DIR}/game_behaviour.cpp
     ${CMAKE_CURRENT_LIST_DIR}/game_behaviour.h
     ${CMAKE_CURRENT_LIST_DIR}/render_fixes.cpp

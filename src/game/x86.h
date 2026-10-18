@@ -27,6 +27,7 @@ inline constexpr std::uint8_t kPushImm8    = 0x6A; // push imm8
 inline constexpr std::uint8_t kPushEbp     = 0x55;
 inline constexpr std::uint8_t kPushEcx     = 0x51;
 inline constexpr std::uint8_t kPushEbx     = 0x53;
+inline constexpr std::uint8_t kPushEax     = 0x50;
 inline constexpr std::uint8_t kMovEaxImm32 = 0xB8; // mov eax, imm32
 inline constexpr std::uint8_t kMovClImm8   = 0xB1; // mov cl, imm8
 inline constexpr std::uint8_t kMovRm8R8    = 0x88; // mov r/m8, r8

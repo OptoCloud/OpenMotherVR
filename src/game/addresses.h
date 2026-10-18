@@ -283,6 +283,35 @@ inline const HapticRvas& haptic_rvas(GameBuild version) noexcept {
     return version == GameBuild::Patched2020 ? kHapticRvas2020 : kHapticRvas2015;
 }
 
+// The engine settings load (spec 24 §1.9, §6.1). Nothing is written there:
+// the game opens the file through the C runtime's fopen, which reaches
+// AI.exe's CreateFileA import, and the file hooks redirect that open. The
+// site and the path pointer are checked so the redirect is only made on
+// the build whose load is known. 2015 RVAs, checked in the 2015 AI.exe
+// (timestamp 0x54E3199D); the 2020 ones are unknown (24 §12 item 13), so
+// the override stays off on that build.
+struct EngineSettingsRvas {
+    // `mov eax, [path pointer]; push 1; push eax; lea ecx, [esp+0x38];
+    // call XmlLoad` in the display initialisation's settings parse.
+    std::uint32_t load_site;
+    // The pointer to "DATA\engine_settings.xml" (SettingNameTable entry).
+    std::uint32_t path_pointer;
+    // The XML reader's load (thiscall(path, flag), ret 8).
+    std::uint32_t xml_load;
+};
+
+inline constexpr EngineSettingsRvas kEngineSettingsRvas2015 = {
+    .load_site    = 0x005AFD02,
+    .path_pointer = 0x0124FC9C,
+    .xml_load     = 0x00462500,
+};
+
+inline constexpr EngineSettingsRvas kEngineSettingsRvas2020 = {};
+
+inline const EngineSettingsRvas& engine_settings_rvas(GameBuild version) noexcept {
+    return version == GameBuild::Patched2020 ? kEngineSettingsRvas2020 : kEngineSettingsRvas2015;
+}
+
 // Sites and bytes the original writes but codes inline in FUN_1001d6f0
 // instead of keeping them in its address table.
 struct InlineSites {
