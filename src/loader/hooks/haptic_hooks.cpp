@@ -37,27 +37,21 @@ constexpr std::string_view kLogUnverified =
     "haptics: no pulse for hacking steps or the Alien close by: no verified game signal (21 §22 items 18, "
     "19)";
 constexpr std::string_view kLogTrackerGate =
-    "haptics: the tracker ticks while the VR tracker control holds it raised (whether the game scans with "
-    "it lowered is open, 21 §22 item 7)";
+    "haptics: the tracker ticks only on a scan that shows a contact in range while it is raised (21 §14.4)";
 constexpr std::string_view kLogNoSource = "haptics: off; none of their game sources is in place";
 constexpr std::string_view kLogFirstRumble =
     "haptics: the game set its rumble for the first time (thread {} {}, low {:.2f} high {:.2f})";
-constexpr std::string_view kLogRumbleStats =
-    "[diag] haptics: game rumble set {} times since the last line, last low {:.2f} high {:.2f}";
 
-// The player map's tier of the virtual pad (04 §3): the VR fire and tracker
-// controls as the game is given them.
+// The player map's tier of the virtual pad (04 §3): the VR fire control as
+// the game is given it.
 constexpr std::size_t kPlayerTier = 0;
 
 // Which sources went in, set at attach before the game's threads run.
 game::hands::HapticSitesOutcome sources{};
 bool installed = false;
 
-// The rumble hook's thread, the game thread's debug line: how often the
-// game sets its rumble (21 §22 item 9). Relaxed: counters for a log line.
-std::atomic<std::uint32_t> rumble_calls{0};
-std::atomic<float> last_low{0.0f};
-std::atomic<float> last_high{0.0f};
+// The rumble hook's first call is logged once with its thread (21 §22
+// item 9). Relaxed: a flag for a log line.
 std::atomic<bool> rumble_seen{false};
 util::FramePeriod stats_period{core::diag::kDebugLogPeriodFrames}; // game thread
 
@@ -68,9 +62,6 @@ int __fastcall rumble_set_motors(void* self, void* edx, float low, float high) n
     auto& ctx = context();
     guarded("RumbleSetMotors", [&] {
         ctx.haptics.on_rumble(low, high, ctx.clock.now());
-        rumble_calls.fetch_add(1, std::memory_order_relaxed);
-        last_low.store(low, std::memory_order_relaxed);
-        last_high.store(high, std::memory_order_relaxed);
         if (rumble_seen.exchange(true, std::memory_order_relaxed)) return;
         const std::uint32_t id = ctx.current_thread.id();
         logf(ctx.log, kLogFirstRumble, id, core::diag::thread_name(ctx.thread_roles.role_of(id)), low, high);
@@ -96,10 +87,10 @@ hands::FireSample read_fire(Context& ctx, void* player) noexcept {
     return f;
 }
 
-void log_rumble_stats(Context& ctx) noexcept {
+// 21 §18 (r11): the rumble levels received and played, every 900 frames.
+void log_rumble_window(Context& ctx) noexcept {
     if (!stats_period.tick() || !ctx.log.debug_enabled()) return;
-    logf(ctx.log, kLogRumbleStats, rumble_calls.exchange(0, std::memory_order_relaxed),
-         last_low.load(std::memory_order_relaxed), last_high.load(std::memory_order_relaxed));
+    ctx.haptics.log_rumble_window();
 }
 
 void log_settings(Context& ctx) noexcept {
@@ -129,7 +120,7 @@ void haptics_on_head_pose() noexcept {
         void* player = game::hands::player_character(ctx.targets.hands);
         ctx.haptics.on_health(player ? std::optional{game::hands::health(player)} : std::nullopt);
         if (sources.firing) ctx.haptics.on_fire(read_fire(ctx, player), ctx.clock.now());
-        if (sources.rumble) log_rumble_stats(ctx);
+        if (sources.rumble) log_rumble_window(ctx);
     });
 }
 
@@ -139,10 +130,11 @@ void haptics_on_interaction() noexcept {
     ctx.haptics.on_interaction(ctx.interactions.interaction());
 }
 
-void haptics_on_tracker_scan() noexcept {
-    if (!installed || !sources.tracker) return;
-    auto& ctx = context();
-    ctx.haptics.on_tracker_scan(vr_down(ctx, game::player_action::kTracker));
+// 21 §2.6, §14.4 item 6: the scan's result (a contact within range) and
+// the tracker's raised byte, both needed for a tick.
+void haptics_on_tracker_scan(const void* tracker, bool contact) noexcept {
+    if (!installed || !sources.tracker || !tracker) return;
+    context().haptics.on_tracker_scan(contact, game::hands::tracker_raised(tracker));
 }
 
 bool haptics_installed() noexcept { return installed; }

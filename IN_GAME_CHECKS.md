@@ -26,12 +26,12 @@ What each vibration should feel like (amplitude 0 to 1 before
 |---|---|---|---|
 | One revolver or shotgun shot | one sharp short tap (0.60, 60 ms) | right | `firing pulse, amplitude 0.60, 60 ms` |
 | Hold the flamethrower | a soft buzz (0.30) for as long as it fires | right | `firing pulse, amplitude 0.30` repeating |
-| Tracker raised | a faint tick per scan (0.15, 20 ms) | left | `tracker pulse` |
+| Tracker raised with a contact on it | a faint tick per scan (0.15, 20 ms); nothing with the tracker empty | left | none (ticks are not logged) |
 | A small hit | a medium thump (about 0.4 to 0.5, 150 ms) | both | `damage pulse, amplitude 0.4x, 150 ms` |
 | A big hit | a stronger thump, more health lost is stronger | both | higher amplitude |
 | Death | one long strong buzz (1.00, 600 ms) | both | `death pulse, amplitude 1.00, 600 ms` |
 | Hacking device or cutting torch starts and ends | a light tap (0.40, 80 ms) each time | both | `hacking pulse, amplitude 0.40, 80 ms` |
-| Explosions, heavy doors, the Alien's attacks | follows the game's pad rumble, ends within 0.5 s of it | left low motor, right high | `game rumble set N times ...` |
+| Explosions, heavy doors, the Alien's attacks | follows the game's pad rumble as a pad's motors would feel; quiet levels give nothing | left low motor, right high | `game rumble since the last line: highest level ...` |
 
 Report per row: whether it happened, whether it came from the right
 controller, whether it felt too weak, too strong or wrong in kind (a buzz
@@ -292,9 +292,18 @@ be on. Try on OpenVR and OpenXR, with Dev. Debug Options on.
       harder for bigger hits (`[diag] haptics: damage pulse, amplitude
       ...`). Die: one long strong buzz (`death pulse`). Healing with a
       medikit and reloading a save give none.
-- [ ] **Tracker.** Hold the tracker up: a faint tick in the left
-      controller each scan (about twice a second); none with it lowered.
-      With `"Input": {"ToggleGrips": true}`, ticks while toggled up.
+- [ ] **Tracker, nothing on it (21 §14.4, acceptance 22).** Hold the
+      tracker up with nothing near for 30 s: no vibration on either hand
+      (the tester's "constant vibration when holding up the scanner").
+      Log, every 900 frames while the game sends a level: `[diag] haptics:
+      game rumble since the last line: highest level low L high H, N
+      calls, highest amplitude played A`: note L and H (expected about
+      0.08) and that A is 0.000.
+- [ ] **Tracker, a contact.** With a contact on the tracker (the Alien or
+      an android moving within range): one faint tick per scan in the
+      left controller, about twice a second; none once the contact is out
+      of range or the tracker is lowered. With `"Input": {"ToggleGrips":
+      true}`, the same while toggled up.
 - [ ] **Firing.** Revolver, shotgun, bolt gun: one buzz in the right
       controller per pull (`firing pulse, amplitude 0.60`); the
       flamethrower buzzes softly for as long as it fires. No buzz for melee,
@@ -306,10 +315,12 @@ be on. Try on OpenVR and OpenXR, with Dev. Debug Options on.
       Alien's attacks, heavy doors): the left controller follows the pad's
       low motor, the right the high motor. Log: `haptics: the game set its
       rumble for the first time (thread ...)` names the thread, and with
-      Debug Options `[diag] haptics: game rumble set N times ...` every
-      900 frames says how often the game sets it (21 §22 item 9: whether it
-      rumbles at all without a pad connected). A level the game stops
-      renewing ends after 0.5 s: no buzz stays on in the pause menu.
+      Debug Options the `game rumble since the last line` line every 900
+      frames gives the levels, the calls and the amplitude played (21 §22
+      item 9: whether it rumbles at all without a pad connected). A pipe
+      bomb exploding nearby: a strong rumble on both hands (levels near 1,
+      amplitude played near 1). A level the game does not send again ends
+      after 0.5 s: no buzz stays on in the pause menu.
 - [ ] **Real pad.** With an Xbox pad connected the pad still rumbles.
 - [ ] **No focus, lost hand.** With the SteamVR dashboard or the Quest menu
       open nothing vibrates; a covered controller gets nothing.

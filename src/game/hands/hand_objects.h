@@ -49,6 +49,9 @@ inline constexpr std::ptrdiff_t kWeaponType = 0xD4;
 // The tracker's horizontal facing the scan reads: x and z.
 inline constexpr std::ptrdiff_t kTrackerFacingX = 0xF0;
 inline constexpr std::ptrdiff_t kTrackerFacingZ = 0xF8;
+// 21 §2.6 (r11): the tracker's byte that is set while it is raised and in
+// use [likely]; its caller ANDs the scan's result with it.
+inline constexpr std::ptrdiff_t kTrackerRaised = 0x1378;
 
 // The AI.exe functions and globals the hand hooks use, found by the
 // installer (21 §20) and set once before any call is redirected.
@@ -102,5 +105,8 @@ struct TrackerFacing {
 };
 TrackerFacing read_tracker_facing(const void* tracker) noexcept;
 void write_tracker_facing(void* tracker, TrackerFacing f) noexcept;
+
+// The tracker's raised byte is set (21 §2.6). The scan's thread.
+bool tracker_raised(const void* tracker) noexcept;
 
 } // namespace omvr::game::hands

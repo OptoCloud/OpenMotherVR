@@ -127,6 +127,10 @@ TrackerFacing read_tracker_facing(const void* tracker) noexcept {
     return {read_field<float>(tracker, kTrackerFacingX), read_field<float>(tracker, kTrackerFacingZ)};
 }
 
+bool tracker_raised(const void* tracker) noexcept {
+    return read_field<std::uint8_t>(tracker, kTrackerRaised) != 0;
+}
+
 void write_tracker_facing(void* tracker, TrackerFacing f) noexcept {
     write_field(tracker, kTrackerFacingX, f.x);
     write_field(tracker, kTrackerFacingZ, f.z);

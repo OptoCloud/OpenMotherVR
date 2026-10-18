@@ -69,7 +69,8 @@ inline constexpr float kDamagePerLostMaximum = 2.0f;
 inline constexpr Seconds kDamageDuration{0.15f};
 inline constexpr float kDeathAmplitude = 1.0f;
 inline constexpr Seconds kDeathDuration{0.6f};
-// A tick per tracker scan, felt but faint.
+// 21 §14.4 item 6: a tick per tracker scan that shows a contact, felt but
+// faint.
 inline constexpr float kTrackerPingAmplitude = 0.15f;
 inline constexpr Seconds kTrackerPingDuration{0.02f};
 // A shot; the flamethrower's softer pulse repeats while the fire control is
@@ -81,19 +82,36 @@ inline constexpr Seconds kFlameDuration{0.06f};
 inline constexpr float kHackingAmplitude = 0.4f;
 inline constexpr Seconds kHackingDuration{0.08f};
 
-// 21 §14.3: the game's rumble is played while its level is above this, as a
-// series of short vibrations renewed each frame. Each lasts
+// 21 §14.3: the game's rumble is played as a series of short vibrations
+// renewed each frame while its amplitude (§14.4) is not 0. Each lasts
 // kRumbleRenewal: longer than a frame at any rate the headset runs (so
 // the series has no gaps) and short enough that the vibration ends soon
 // after the level drops (implementation choice).
-inline constexpr float kRumbleFloor = 0.02f;
 inline constexpr Seconds kRumbleRenewal{0.05f};
-// A rumble level the game has not set again for this long counts as 0
-// (implementation choice: the game's own pad stop at 0xFE7698 writes the
-// pad directly, not through RumbleSetMotors, 21 §2.9, so a level could
-// otherwise be left on; whether the game renews a held level is open,
-// 21 §22 item 9).
+// 21 §14.4 item 4 [proposal]: a level is held from one RumbleSetMotors call
+// to the next, as the pad's motors hold their speed (the game sends a pair
+// only when it changes, 21 §2.9), and dropped to 0 when no call came for
+// this long: a safety against a level stuck on after the game's audio
+// stops, for example at a pause.
 inline constexpr Seconds kRumbleStale{0.5f};
+
+// 21 §2.9: the game's pad curve in RumbleSetMotors, a level L (0 to 1) to a
+// motor speed out of kMotorFullSpeed. At or below kPadDeadZone both motors
+// stop. The low-frequency motor rises along one line up to kPadLowKnee and
+// a steeper one above it; the high-frequency motor along one line.
+inline constexpr float kMotorFullSpeed    = 65535.0f;
+inline constexpr float kPadDeadZone       = 0.05f;
+inline constexpr float kPadLowKnee        = 0.4f;
+inline constexpr float kPadLowSlopeBelow  = 11468.626f;
+inline constexpr float kPadLowOffsetBelow = 5242.8f;
+inline constexpr float kPadLowSlopeAbove  = 75365.25f;
+inline constexpr float kPadLowOffsetAbove = -9830.25f;
+inline constexpr float kPadHighSlope      = 57343.0f;
+inline constexpr float kPadHighOffset     = 8192.0f;
+// 21 §14.4 item 3 [proposal]: an amplitude (the motor speed fraction
+// squared, item 2) below this is not played: below 5 % of full output a VR
+// actuator gives a buzz with no information.
+inline constexpr float kRumbleAmplitudeFloor = 0.05f;
 
 // 21 §14.2, §14.3: the vibration frequency asked of the runtimes with
 // vibration actions: 0, the runtime's default (OpenXR spells it

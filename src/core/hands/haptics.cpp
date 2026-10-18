@@ -4,6 +4,7 @@
 #include "core/hands/hand_aim.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <string_view>
 #include <utility>
@@ -17,6 +18,9 @@ using util::after;
 using vr::ports::HapticHand;
 
 constexpr std::string_view kLogPulse = "[diag] haptics: {} pulse, amplitude {:.2f}, {:.0f} ms";
+constexpr std::string_view kLogRumbleWindow =
+    "[diag] haptics: game rumble since the last line: highest level low {:.3f} high {:.3f}, {} calls, "
+    "highest amplitude played {:.3f}";
 
 constexpr float kMillisecondsPerSecond = 1000.0f;
 
@@ -42,8 +46,18 @@ const char* event_name(HapticEvent e) noexcept {
 
 std::size_t slot(HapticEvent e) noexcept { return static_cast<std::size_t>(e); }
 
-// A level from the game: 0 to 1, and 0 at or below the floor (or NaN).
-float audible(float level) noexcept { return level > kRumbleFloor ? std::min(level, 1.0f) : 0.0f; }
+// Raises `slot` to `value` when it is higher (NaN never is). Relaxed: a
+// value for a log line.
+void store_max(std::atomic<float>& slot, float value) noexcept {
+    float seen = slot.load(std::memory_order_relaxed);
+    while (value > seen && !slot.compare_exchange_weak(seen, value, std::memory_order_relaxed)) {}
+}
+
+float pad_motor_units(float level, PadMotor motor) noexcept {
+    if (motor == PadMotor::High) return kPadHighSlope * level + kPadHighOffset;
+    return level <= kPadLowKnee ? kPadLowSlopeBelow * level + kPadLowOffsetBelow
+                                : kPadLowSlopeAbove * level + kPadLowOffsetAbove;
+}
 
 } // namespace
 
@@ -52,6 +66,18 @@ float damage_amplitude(std::uint16_t before, std::uint16_t after, std::uint16_t 
     if (maximum == 0) return kHapticMaxAmplitude;
     const float lost = static_cast<float>(before - after) / static_cast<float>(maximum);
     return std::min(kDamageBase + kDamagePerLostMaximum * lost, kHapticMaxAmplitude);
+}
+
+float pad_motor_speed(float level, PadMotor motor) noexcept {
+    // NaN fails the comparison and stops the motor, as at the dead zone.
+    if (!(level > kPadDeadZone)) return 0.0f;
+    return std::min(pad_motor_units(std::min(level, 1.0f), motor) / kMotorFullSpeed, 1.0f);
+}
+
+float rumble_amplitude(float level, PadMotor motor) noexcept {
+    const float speed     = pad_motor_speed(level, motor);
+    const float amplitude = speed * speed;
+    return amplitude < kRumbleAmplitudeFloor ? 0.0f : amplitude;
 }
 
 // ---- Game side ------------------------------------------------------------------
@@ -104,8 +130,8 @@ void Haptics::on_interaction(input::Interaction kind) noexcept {
     emit(HapticEvent::Hacking, {kHackingAmplitude, kHackingDuration});
 }
 
-void Haptics::on_tracker_scan(bool raised) noexcept {
-    if (raised && settings_.tracker)
+void Haptics::on_tracker_scan(bool contact, bool raised) noexcept {
+    if (contact && raised && settings_.tracker)
         emit(HapticEvent::TrackerPing, {kTrackerPingAmplitude, kTrackerPingDuration});
 }
 
@@ -113,6 +139,29 @@ void Haptics::on_rumble(float low, float high, TimePoint now) noexcept {
     rumble_low_.store(low, std::memory_order_relaxed);
     rumble_high_.store(high, std::memory_order_relaxed);
     rumble_stamp_.store(now);
+    window_calls_.fetch_add(1, std::memory_order_relaxed);
+    store_max(window_low_, low);
+    store_max(window_high_, high);
+}
+
+RumbleWindow Haptics::take_rumble_window() noexcept {
+    // The next window starts with the level still held, so a steady rumble
+    // the game sent once is reported for as long as it plays.
+    const bool held = rumble_held(clock_.now());
+    RumbleWindow w;
+    w.calls          = window_calls_.exchange(0, std::memory_order_relaxed);
+    w.highest_low    = window_low_.exchange(held ? rumble_low_.load(std::memory_order_relaxed) : 0.0f,
+                                            std::memory_order_relaxed);
+    w.highest_high   = window_high_.exchange(held ? rumble_high_.load(std::memory_order_relaxed) : 0.0f,
+                                             std::memory_order_relaxed);
+    w.highest_played = window_played_.exchange(0.0f, std::memory_order_relaxed);
+    return w;
+}
+
+void Haptics::log_rumble_window() noexcept {
+    const RumbleWindow w = take_rumble_window();
+    if (!(w.highest_low > 0.0f) && !(w.highest_high > 0.0f)) return;
+    logf(log_, kLogRumbleWindow, w.highest_low, w.highest_high, w.calls, w.highest_played);
 }
 
 // ---- Render side ----------------------------------------------------------------
@@ -137,23 +186,31 @@ std::array<bool, kHandCount> Haptics::take_events(TimePoint now) noexcept {
     return started;
 }
 
-// The game's rumble per hand (21 §14.2), 0 when off, stale or below the
-// floor.
-std::array<float, kHandCount> Haptics::rumble_levels(TimePoint now) const noexcept {
+bool Haptics::rumble_held(TimePoint now) const noexcept {
     const auto set = rumble_stamp_.load();
-    if (!settings_.game_rumble || !set || now > util::after(*set, kRumbleStale)) return {};
-    return {audible(rumble_low_.load(std::memory_order_relaxed)),
-            audible(rumble_high_.load(std::memory_order_relaxed))};
+    return set && now <= util::after(*set, kRumbleStale);
+}
+
+// The game's rumble per hand (21 §14.2, §14.4): each channel's held level
+// through the pad curve, squared, 0 below the floor; 0 when off or when no
+// call came for kRumbleStale.
+std::array<float, kHandCount> Haptics::rumble_amplitudes(TimePoint now) const noexcept {
+    if (!settings_.game_rumble || !rumble_held(now)) return {};
+    return {rumble_amplitude(rumble_low_.load(std::memory_order_relaxed), PadMotor::Low),
+            rumble_amplitude(rumble_high_.load(std::memory_order_relaxed), PadMotor::High)};
 }
 
 vr::ports::HapticFrame Haptics::next(bool focus, const std::array<bool, kHandCount>& tracked) noexcept {
     const TimePoint now                        = clock_.now();
     const std::array<bool, kHandCount> started = take_events(now);
-    const std::array<float, kHandCount> rumble = rumble_levels(now);
+    const std::array<float, kHandCount> rumble = rumble_amplitudes(now);
+    // 21 §14.4 item 5: Strength after the floor, so a lower strength never
+    // turns a felt rumble into a constant faint buzz.
     const float strength = std::clamp(std::isnan(settings_.strength) ? 0.0f : settings_.strength, 0.0f, 1.0f);
     vr::ports::HapticFrame frame{};
     for (std::size_t h = 0; h < kHandCount; ++h) {
         frame[h] = plan_hand(h, now, started[h], rumble[h], strength, focus && tracked[h]);
+        if (rumble[h] > 0.0f && frame[h].play) store_max(window_played_, frame[h].amplitude);
     }
     return frame;
 }

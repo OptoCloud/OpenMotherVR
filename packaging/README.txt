@@ -146,9 +146,12 @@ Playing
       binding for the game made before needs a reset to the default.
     - "Strength": 0 to 1 scales every vibration (default 1).
     - "GameRumble": the game's own pad rumble, low motor in the left
-      hand and high motor in the right. "Damage": being hurt and dying.
-      "Tracker": a tick in the left hand per scan while the motion
-      tracker is up. "Firing": a buzz in the right hand per shot.
+      hand and high motor in the right, as strong as a pad's motors would
+      feel it; the game's quiet rumble (such as while the motion tracker
+      is up) is too faint to play. "Damage": being hurt and dying.
+      "Tracker": a faint tick in the left hand per scan while the raised
+      motion tracker shows a contact. "Firing": a buzz in the right hand
+      per shot.
       "Hacking": the start and end of hacking and cutting. Each
       default true.
 - Controls (preview; Options > MotherVR > Controls), in a "Controls"

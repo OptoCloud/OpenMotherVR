@@ -22,9 +22,9 @@ void haptics_on_head_pose() noexcept;
 // and end of hacking and cutting. Game thread.
 void haptics_on_interaction() noexcept;
 
-// TrackerScan ran (the hook of hand_hooks.cpp, shared with the tracker in
-// hand). The scan's thread.
-void haptics_on_tracker_scan() noexcept;
+// TrackerScan ran on `tracker` and returned `contact` (the hook of
+// hand_hooks.cpp, shared with the tracker in hand). The scan's thread.
+void haptics_on_tracker_scan(const void* tracker, bool contact) noexcept;
 
 // The haptics' game sources are in place: the runtime is handed the
 // haptic output (21 §14.3). Read when the runtime starts.

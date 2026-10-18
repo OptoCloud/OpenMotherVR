@@ -10,8 +10,10 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <optional>
 
 namespace {
@@ -122,17 +124,19 @@ TEST_CASE("haptics: a pulse is played once, for its duration, and Strength scale
     CHECK(r.frame()[1].level == 0.0f); // over after 150 ms
 }
 
-TEST_CASE("haptics: a tracker scan ticks the left hand only while raised") {
+TEST_CASE("haptics: a tracker scan ticks the left hand only with a contact in range while raised") {
     Rig r;
-    r.haptics.on_tracker_scan(false);
+    r.haptics.on_tracker_scan(false, true); // raised, nothing on it
     check_silent(r.frame()[0]);
-    r.haptics.on_tracker_scan(true);
+    r.haptics.on_tracker_scan(true, false); // a contact, but not raised
+    check_silent(r.frame()[0]);
+    r.haptics.on_tracker_scan(true, true);
     const auto f = r.frame();
     check_pulse(f[0], 0.15f, 0.02f);
     check_silent(f[1]);
     r.clock.advance(30ms); // the 20 ms tick is over
     r.settings.tracker = false;
-    r.haptics.on_tracker_scan(true);
+    r.haptics.on_tracker_scan(true, true);
     check_silent(r.frame()[0]);
 }
 
@@ -206,22 +210,73 @@ TEST_CASE("haptics: cutting pulses as hacking does; other interactions do not") 
     check_pulse(r.frame()[1], 0.4f, 0.08f);
 }
 
+TEST_CASE("haptics: the game's pad curve gives each motor's speed (21 §2.9)") {
+    // At or below 0.05 both motors stop.
+    CHECK(pad_motor_speed(0.0f, PadMotor::Low) == 0.0f);
+    CHECK(pad_motor_speed(0.05f, PadMotor::Low) == 0.0f);
+    CHECK(pad_motor_speed(0.05f, PadMotor::High) == 0.0f);
+    CHECK(pad_motor_speed(std::nanf(""), PadMotor::High) == 0.0f);
+    // Low motor: 11468.626 L + 5242.8 up to 0.4, 75365.25 L - 9830.25 above.
+    CHECK(pad_motor_speed(0.08f, PadMotor::Low) ==
+          doctest::Approx((11468.626f * 0.08f + 5242.8f) / 65535.0f));
+    CHECK(pad_motor_speed(0.4f, PadMotor::Low) == doctest::Approx((11468.626f * 0.4f + 5242.8f) / 65535.0f));
+    CHECK(pad_motor_speed(0.5f, PadMotor::Low) == doctest::Approx((75365.25f * 0.5f - 9830.25f) / 65535.0f));
+    // High motor: 57343 L + 8192.
+    CHECK(pad_motor_speed(0.08f, PadMotor::High) == doctest::Approx((57343.0f * 0.08f + 8192.0f) / 65535.0f));
+    CHECK(pad_motor_speed(0.5f, PadMotor::High) == doctest::Approx((57343.0f * 0.5f + 8192.0f) / 65535.0f));
+    // 1.0 runs both at full speed; nothing above it.
+    CHECK(pad_motor_speed(1.0f, PadMotor::Low) == doctest::Approx(1.0f));
+    CHECK(pad_motor_speed(1.0f, PadMotor::High) == doctest::Approx(1.0f));
+    CHECK(pad_motor_speed(2.0f, PadMotor::High) == doctest::Approx(1.0f));
+    // The spec's examples: a level of 0.08 runs the motors at about 9 % and
+    // 20 %.
+    CHECK(pad_motor_speed(0.08f, PadMotor::Low) == doctest::Approx(0.094f).epsilon(0.01));
+    CHECK(pad_motor_speed(0.08f, PadMotor::High) == doctest::Approx(0.195f).epsilon(0.01));
+}
+
+TEST_CASE("haptics: a rumble level plays at the motor speed squared, nothing below 0.05 (21 §14.4)") {
+    CHECK(rumble_amplitude(1.0f, PadMotor::Low) == doctest::Approx(1.0f));
+    CHECK(rumble_amplitude(1.0f, PadMotor::High) == doctest::Approx(1.0f));
+    // The tracker's level 0.08: about 0.01 and 0.04, both under the floor.
+    CHECK(rumble_amplitude(0.08f, PadMotor::Low) == 0.0f);
+    CHECK(rumble_amplitude(0.08f, PadMotor::High) == 0.0f);
+    const float low  = (75365.25f * 0.5f - 9830.25f) / 65535.0f;
+    const float high = (57343.0f * 0.5f + 8192.0f) / 65535.0f;
+    CHECK(rumble_amplitude(0.5f, PadMotor::Low) == doctest::Approx(low * low));
+    CHECK(rumble_amplitude(0.5f, PadMotor::High) == doctest::Approx(high * high));
+}
+
 TEST_CASE("haptics: the game's rumble is renewed each frame, low motor left, high motor right") {
     Rig r;
-    r.haptics.on_rumble(0.5f, 0.8f, r.now());
-    auto f = r.frame();
-    check_pulse(f[0], 0.5f, kRumbleRenewal.count());
-    check_pulse(f[1], 0.8f, kRumbleRenewal.count());
+    r.haptics.on_rumble(1.0f, 0.5f, r.now());
+    const float high = rumble_amplitude(0.5f, PadMotor::High);
+    auto f           = r.frame();
+    check_pulse(f[0], 1.0f, kRumbleRenewal.count());
+    check_pulse(f[1], high, kRumbleRenewal.count());
     r.clock.advance(11ms);
-    check_pulse(r.frame()[0], 0.5f, kRumbleRenewal.count());
+    check_pulse(r.frame()[0], 1.0f, kRumbleRenewal.count());
 
-    // At or below 0.02 it is off: what was playing is stopped.
-    r.haptics.on_rumble(0.02f, 0.0f, r.now());
+    // A quiet level (the raised tracker's 0.08) plays nothing: what was
+    // playing is stopped.
+    r.haptics.on_rumble(0.08f, 0.08f, r.now());
     f = r.frame();
     CHECK_FALSE(f[0].play);
+    CHECK_FALSE(f[1].play);
     CHECK(f[0].stop);
     CHECK(f[1].stop);
     CHECK_FALSE(r.frame()[0].stop); // once
+}
+
+TEST_CASE("haptics: a rumble level is held until the next call; Strength applies after the floor") {
+    Rig r;
+    r.settings.strength = 0.1f;
+    r.haptics.on_rumble(1.0f, 1.0f, r.now()); // sent once, as the game does for a steady level
+    r.clock.advance(300ms);
+    // 0.1 is below the floor, but the floor is on the amplitude before
+    // Strength: the rumble is felt, weaker.
+    check_pulse(r.frame()[0], 0.1f, kRumbleRenewal.count());
+    r.haptics.on_rumble(0.0f, 0.0f, r.now());
+    CHECK(r.frame()[0].stop);
 }
 
 TEST_CASE("haptics: a rumble level not set again for 0.5 s ends; GameRumble off plays none") {
@@ -240,7 +295,7 @@ TEST_CASE("haptics: a rumble level not set again for 0.5 s ends; GameRumble off 
 
 TEST_CASE("haptics: rumble and a pulse together play the larger; the pulse resumes when rumble ends") {
     Rig r;
-    r.haptics.on_rumble(0.2f, 0.2f, r.now());
+    r.haptics.on_rumble(0.5f, 0.5f, r.now()); // 0.18 and 0.32: weaker than the pulse
     r.haptics.on_interaction(Interaction::Hacking);
     check_pulse(r.frame()[0], 0.4f, kRumbleRenewal.count());
     r.clock.advance(20ms);
@@ -271,4 +326,33 @@ TEST_CASE("haptics: nothing without input focus or for a lost hand, and nothing 
     f = r.frame(true, {false, true});
     check_silent(f[0]);
     check_pulse(f[1], 0.4f, 0.08f);
+}
+
+TEST_CASE("haptics: the debug window gives the highest levels, the calls and the highest played") {
+    Rig r;
+    r.haptics.log_rumble_window();
+    CHECK(r.log.lines.empty()); // no level was set: no line
+
+    r.haptics.on_rumble(0.08f, 0.08f, r.now());
+    r.haptics.on_rumble(1.0f, 0.3f, r.now());
+    r.haptics.on_rumble(0.2f, 0.6f, r.now());
+    r.settings.strength = 0.5f;
+    (void)r.frame(); // plays half the amplitude of the last pair
+    const float played =
+        std::max(rumble_amplitude(0.2f, PadMotor::Low), rumble_amplitude(0.6f, PadMotor::High)) * 0.5f;
+    const RumbleWindow w = r.haptics.take_rumble_window();
+    CHECK(w.calls == 3);
+    CHECK(w.highest_low == doctest::Approx(1.0f));
+    CHECK(w.highest_high == doctest::Approx(0.6f));
+    CHECK(w.highest_played == doctest::Approx(played));
+
+    // The held level starts the next window, so a steady rumble keeps
+    // being reported; once dropped, nothing is logged.
+    r.haptics.log_rumble_window();
+    CHECK(r.log.contains("game rumble since the last line: highest level low 0.200 high 0.600, 0 calls"));
+    r.clock.advance(600ms);
+    r.haptics.log_rumble_window(); // the window still began with 0.2 / 0.6
+    r.log.lines.clear();
+    r.haptics.log_rumble_window();
+    CHECK(r.log.lines.empty());
 }

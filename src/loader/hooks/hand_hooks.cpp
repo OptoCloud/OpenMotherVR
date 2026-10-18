@@ -140,7 +140,7 @@ bool __fastcall tracker_scan(void* tracker, void*) noexcept {
     });
     const bool result = game::hands::call_tracker_scan(t, tracker);
     if (saved) game::hands::write_tracker_facing(tracker, *saved);
-    guarded("TrackerScan haptics", [] { haptics_on_tracker_scan(); });
+    guarded("TrackerScan haptics", [&] { haptics_on_tracker_scan(tracker, result); });
     return result;
 }
 
