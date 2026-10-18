@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were verified by the spec side in the game's data; the existence of a terminal font change and of lever input emulation was known from the analysis of another mod. The camera takeover sites of 2.4 were located with the help of that analysis and verified. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). r2: second clean-room review: terminal text steps derived from this project's own legibility criterion; the reduced animation set defined by a criterion; facts with no use removed; item highlight stated as a result; the HUD game facts cited from 22 §2.4 (one description); the tap's thread left open as 11 §8 does; lever interactions own turning and the move action (22 §4.1, §7); the master switch of 20 §1.3. r3 (spec r7 cross-check): the controls help cited from 04 §5.7 (it is not in 06); the interaction names passed to `ScriptEventTap` (11 §5.1). r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Interaction` and `HUD` pages of the options page given exactly (item order, labels, control kinds, value names, ranges, steps and display formats, description lines, greying), and the controls help rows of the lever mapping, as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the activation distances' suggested values move from a first offered value to the item's description. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Interaction` and `HUD` pages are reached from the `MotherVR` page (22 §12.1). r6 (spec-side game analysis of the 2015 `AI.exe`, static, while implementing 5 to 7): the icon highlight update and its "highlight disabled" bit (2.6; §12 item 7 resolved for the update, the receiver of its messages left open); the crosshair update's two invoke sites and the movie invoke's missing null check (2.7); the scripted HUD entity's four methods and the six table slots they fill, and the UI-ready byte the game tests before each lookup (2.7, §12 item 10 in part); the terminal text steps built as tagged variant entries of the UI patch (6.2). Revision: r6 -->
+<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were verified by the spec side in the game's data; the existence of a terminal font change and of lever input emulation was known from the analysis of another mod. The camera takeover sites of 2.4 were located with the help of that analysis and verified. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). r2: second clean-room review: terminal text steps derived from this project's own legibility criterion; the reduced animation set defined by a criterion; facts with no use removed; item highlight stated as a result; the HUD game facts cited from 22 §2.4 (one description); the tap's thread left open as 11 §8 does; lever interactions own turning and the move action (22 §4.1, §7); the master switch of 20 §1.3. r3 (spec r7 cross-check): the controls help cited from 04 §5.7 (it is not in 06); the interaction names passed to `ScriptEventTap` (11 §5.1). r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Interaction` and `HUD` pages of the options page given exactly (item order, labels, control kinds, value names, ranges, steps and display formats, description lines, greying), and the controls help rows of the lever mapping, as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the activation distances' suggested values move from a first offered value to the item's description. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Interaction` and `HUD` pages are reached from the `MotherVR` page (22 §12.1). r6 (spec-side game analysis of the 2015 `AI.exe`, static, while implementing 5 to 7): the icon highlight update and its "highlight disabled" bit (2.6; §12 item 7 resolved for the update, the receiver of its messages left open); the crosshair update's two invoke sites and the movie invoke's missing null check (2.7); the scripted HUD entity's four methods and the six table slots they fill, and the UI-ready byte the game tests before each lookup (2.7, §12 item 10 in part); the terminal text steps built as tagged variant entries of the UI patch (6.2). r7 (spec-side analysis of the stock `TERMINALINTERACTION.GFX`, `FONTS_EN.GFX`, `DATA\FONT_CONFIG.XML` and `DATA\TEXT\ENGLISH\*.TXT`, static, while building the terminal text steps): the containers of the entry titles and folder names, the fonts' line boxes, and the sizes the steps give them (2.8, 6.2); the stock English texts carry no font size (§12 item 9 resolved for English); the scroll range compared with the line pitch the font gives (§12 item 13, new); `Levers by Hand` and `Camera Takeovers` shown greyed while their features have no effect (section 8, under 22 §12.1's rule). Revision: r7 -->
 
 # 23. Interactions and HUD
 
@@ -285,6 +285,20 @@ sizes in stage units, font height in pixels):
 | 67, 79, 91 | none | | `$JixellationBold`, 14 to 18 | branding lines |
 | 9, 11 to 20, 43, 45, 82, 84 | | | 23 to 96 | keypad digits, lock and title screens |
 
+Containers and fonts [sure, read in the movie and the fonts by the spec
+side]: each entry title (character 33, placed in sprite 34 at -285, -18.4)
+sits on its entry's background bar (sprite 32 in sprite 34, 50.5 units
+tall, from -27.45 to 23.05 in the entry); the two entries are 58.4 units
+apart. Each folder name (character 49, in sprite 50, placed in sprite 55 at
+27.1, -12.7) sits in its folder tile (shapes 48, 51 and 53 of sprite 55,
+202 x 122 units, -74 to 128 by -74 to 48); the four tiles are 128.6 units
+apart. The records give each field 2 px of leading and 2 px of gutter on
+each side. `DATA\FONT_CONFIG.XML` maps `$JixellationBold` and
+`$JixellationReg` to `Jixellation` bold and normal, whose `FONTS_EN.GFX`
+records give a line box (ascent plus descent) of 1.311 and 1.223 times the
+font height. So the stock folder field (106.5 units) holds three lines of
+its 20 px text, and the body's lines are about `1.223 h + 2` px apart.
+
 `TerminalContentPage.set_description_text` sets the body field's height to
 5000 and fills its `htmlText`; scrolling moves the field's `y`, and
 `scroll_up` clamps it with `numLines * LINE_HEIGHT - TEXT_PAGE_HEIGHT`,
@@ -534,7 +548,19 @@ change of the VR set (14 §1.3, §3.6):
   still reaches the last line;
 - entry titles (character 33) and folder names (character 49) scale by
   `t` as far as their containers allow without overlapping (14 §3.6.1
-  bounds), and are narrowed and wrapped as 14 §3.6.1 says when needed;
+  bounds), and are narrowed and wrapped as 14 §3.6.1 says when needed.
+  With the containers of 2.8 [project decision, from those bounds]: a
+  title's font height is `round(23 x t)`, at most 34 px, and its field
+  grows about its stock vertical centre to hold one line (line box plus
+  gutters), staying inside its bar, whose room about that centre allows
+  49 units, so 34 px; its width stays 453. A folder name's font height is
+  `round(20 x t)`, at most 26 px, and its field keeps its top, grows down
+  to the tile's bottom (113.95 units) and widens about its centre to 200
+  units, so it still holds the three lines it holds in stock; its text
+  wraps into those lines as before. So the titles are 29, 34 and 34 px and
+  the folder names 25, 26 and 26 px at the three steps. A title too long
+  for its field at the larger size is cut at the field's right edge, as in
+  stock [guess: titles are short; check in game];
 - keypad digits, lock screens, branding lines and the attract movie are
   unchanged (they are already large or not read).
 
@@ -720,7 +746,13 @@ gets, in the fewest words that fit the stock description length, 22
 | 5 | `Terminal Text Size` | list | `100%`, `125%`, `150%`, `175%` | `Interaction.TerminalTextScale` | `Requires restart! Larger text on terminal screens` |
 
 Items 3 and 4 are shown greyed with `Not available yet` until the game's
-activation for these devices is located (5.2; 22 §12.1). The distances
+activation for these devices is located (5.2; 22 §12.1). Items 1 and 2
+are shown greyed with `Not available yet` while their features have no
+effect, that is until §12 items 2 to 4 (levers) and 5, 6 and 12 (camera
+takeovers) are resolved [project decision of r7, under 22 §12.1's rule
+for an item whose game input or site is not yet confirmed: a control that
+changes nothing must not look like a setting that works]. Their keys are
+kept and still set from the file. The distances
 show one decimal and the unit (`1.0 m`) [proposal: a list value is read as
 a measure, so it keeps its unit, while a slider's number does not, 22
 §12.1].
@@ -814,8 +846,9 @@ OpenXR unless stated.
 11. With every key at its default, the frame time on a terminal and in
     gameplay equals v1 within measurement noise (20 §1.1 rule 2).
 12. The `Interaction` and `HUD` pages show the labels, values, order and
-    description lines of section 8; `Terminal Distance` and
-    `Rewire Distance` are greyed with `Not available yet` while 5.2 is open;
+    description lines of section 8; `Levers by Hand`, `Camera Takeovers`,
+    `Terminal Distance` and `Rewire Distance` are greyed with `Not
+    available yet` while their features have no effect (section 8);
     with `Levers by Hand` on, `View Controls` ends with the two rows of
     3.1.
 
@@ -848,8 +881,10 @@ OpenXR unless stated.
 8. **Terminal screen placement.** Whether the terminal UI is drawn on the
    in-world display (2.8), where that display is, and whether a touch or
    pointer input to it is feasible (3.2).
-9. **Body text format.** Whether the game's terminal HTML carries font
-   sizes of its own that would override 6.2's default format.
+9. **Body text format.** (Resolved in r7 for English: the `<font>` tags
+   of `DATA\TEXT\ENGLISH\*.TXT` carry only a colour, and the movie's own
+   recolouring adds only colours, so the body is shown at the field's own
+   size.) Still open: the other languages' texts.
 10. **The scripted HUD entity.** (Its four methods: 2.7, r6.) The class
     owning the method table at 0xDFD014 (2.7), and whether other HUD movies (objectives, subtitles)
     are hidden by other means in scripted scenes.
@@ -862,6 +897,14 @@ OpenXR unless stated.
     `1ST_PERSON` animation set's names and keep those whose device class
     (2.2) is not traversal; confirm with the tap's log (11 §4.3) which of
     them play during each interaction kind.
+13. **Scroll range and line pitch.** `scroll_up` stops at `numLines x
+    LINE_HEIGHT - 10` (2.8), while the body's lines are about `1.223 h +
+    2` px apart (2.8: 26.5 px in stock, 44.8 px at 35 px). If the game's
+    lines are that far apart, the range ends before the last line once a
+    document has more lines than about four times a page (17 lines in
+    stock, 10 at 1.75), in stock as with the steps of 6.2. Look for: a
+    long log (over 40 lines at 1.75) scrolled to its end; if the last line
+    is not reached, `LINE_HEIGHT` becomes the measured pitch.
 
 ## 13. Changes to v1 documents
 
