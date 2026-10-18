@@ -87,4 +87,27 @@ inline constexpr float kWorldScaleDefault = 1.0f;
 // eyes are supersampled enough that it costs about 0.6 ms GPU for little gain.
 inline constexpr float kStereoAaMaxAutoScale = 1.3f;
 
+// Interaction.TerminalDistance and RewireDistance, metres (spec 23 §5.3):
+// 0 keeps the game's own; any other value is held to [min, max]. Below
+// 0.6 m the head would be at the screen's surface.
+inline constexpr float kActivationDistanceMin = 0.6f;
+inline constexpr float kActivationDistanceMax = 2.0f;
+
+// Interaction.TerminalTextScale (spec 23 §6.2): the listed steps; any other
+// value becomes the nearest. 1.75 keeps about 30 characters on a line of
+// the 620-unit body field.
+inline constexpr std::array<float, 4> kTerminalTextScales{1.0f, 1.25f, 1.5f, 1.75f};
+inline constexpr float kTerminalTextScaleDefault = 1.0f;
+
+// The HUD panel (spec 23 §7.4, §8): the defaults are v1's (05 §4.3), and
+// the ranges held to.
+inline constexpr float kHudDistanceDefault = 1.0f;
+inline constexpr float kHudDistanceMin     = 0.6f;
+inline constexpr float kHudDistanceMax     = 2.0f;
+inline constexpr float kHudWidthDefault    = 0.55f;
+inline constexpr float kHudWidthMin        = 0.3f;
+inline constexpr float kHudWidthMax        = 1.2f;
+inline constexpr float kHudPitchMin        = -30.0f; // degrees
+inline constexpr float kHudPitchMax        = 10.0f;
+
 } // namespace omvr::core::config

@@ -31,6 +31,7 @@ namespace omvr::core::config {
 //       "Hands":    { ..., "Haptics": { ... } },   (ours, v2: spec 21 §15.1)
 //       "Body":     { ... },   (ours, v2: spec 21 §15.2)
 //       "Graphics": { ... },   (ours, v2: spec 24 §10)
+//       "Interaction": { ... }, "Hud": { ... },   (ours, v2: spec 23 §8)
 //       "DebugOptions":     bool,   (the "Dev. Debug Options" flag)
 //       "SkipStartupIntro": bool
 //     }
@@ -64,6 +65,10 @@ enum class StereoAA { Auto = 0, On = 1, Off = 2 };
 enum class PlayMode { Seated = 0, Standing = 1 };
 enum class FlashlightAim { Head = 0, LeftHand = 1, RightHand = 2 };
 enum class BodyVisible { Full = 0, ArmsAndHands = 1, HandsOnly = 2, None = 3 };
+// Spec 23 §8.
+enum class CameraTakeovers { Game = 0, Reduced = 1 };
+enum class CrosshairMode { On = 0, Off = 1, Auto = 2 };
+enum class HudPlacement { HeadLocked = 0, Follow = 1 };
 
 // Defaults are the original's, except the runtime (see Config).
 struct RenderingSettings {
@@ -164,6 +169,34 @@ struct GraphicsSettings {
     // Megabytes; 0 keeps the game's own size.
     int streaming_texture_heap_mb = 0;
     int streaming_model_heap_mb   = 0;
+    // The 2D-only effects in the headset (24 §8): false turns the game's
+    // effect off while stereo runs, whatever the player's game setting.
+    bool lens_flares          = true;
+    bool chromatic_aberration = true;
+    bool film_grain           = true;
+};
+
+// v2 interactions (spec 23 §8). Each default is v1's behaviour.
+struct InteractionSettings {
+    bool physical_levers             = false;
+    CameraTakeovers camera_takeovers = CameraTakeovers::Game;
+    bool fast_animations             = false; // reserved (23 §4.6): no effect
+    // Metres; 0 keeps the game's own activation.
+    float terminal_distance = 0.0f;
+    float rewire_distance   = 0.0f;
+    // Read at attach: the UI archive is built at launch (23 §6.2).
+    float terminal_text_scale = kTerminalTextScaleDefault;
+};
+
+// v2 HUD (spec 23 §8). Each default is v1's behaviour (05 §4.3).
+struct HudSettings {
+    CrosshairMode crosshair = CrosshairMode::On;
+    bool hidden             = false; // the HUD starts each session hidden
+    bool item_highlight     = true;
+    HudPlacement placement  = HudPlacement::HeadLocked;
+    float distance          = kHudDistanceDefault; // metres
+    float width             = kHudWidthDefault;    // metres
+    float pitch             = 0.0f;                // degrees, negative below the view
 };
 
 struct DebugSettings {
@@ -186,6 +219,8 @@ struct Settings {
     HandsSettings hands{};
     BodySettings body{};
     GraphicsSettings graphics{};
+    InteractionSettings interaction{};
+    HudSettings hud{};
     // Ours: show the game and the VR runtime on the player's Discord
     // profile. Stored as Settings.DiscordRichPresence.
     bool discord_rich_presence = true;

@@ -67,6 +67,22 @@ bool& shadow_map_4096(Settings& s) noexcept { return s.graphics.shadow_map_4096;
 bool& sharp_reflections(Settings& s) noexcept { return s.graphics.sharp_reflections; }
 int& streaming_texture_heap_mb(Settings& s) noexcept { return s.graphics.streaming_texture_heap_mb; }
 int& streaming_model_heap_mb(Settings& s) noexcept { return s.graphics.streaming_model_heap_mb; }
+bool& lens_flares(Settings& s) noexcept { return s.graphics.lens_flares; }
+bool& chromatic_aberration(Settings& s) noexcept { return s.graphics.chromatic_aberration; }
+bool& film_grain(Settings& s) noexcept { return s.graphics.film_grain; }
+bool& physical_levers(Settings& s) noexcept { return s.interaction.physical_levers; }
+CameraTakeovers& camera_takeovers(Settings& s) noexcept { return s.interaction.camera_takeovers; }
+bool& fast_animations(Settings& s) noexcept { return s.interaction.fast_animations; }
+float& terminal_distance(Settings& s) noexcept { return s.interaction.terminal_distance; }
+float& rewire_distance(Settings& s) noexcept { return s.interaction.rewire_distance; }
+float& terminal_text_scale(Settings& s) noexcept { return s.interaction.terminal_text_scale; }
+CrosshairMode& crosshair(Settings& s) noexcept { return s.hud.crosshair; }
+bool& hud_hidden(Settings& s) noexcept { return s.hud.hidden; }
+bool& item_highlight(Settings& s) noexcept { return s.hud.item_highlight; }
+HudPlacement& hud_placement(Settings& s) noexcept { return s.hud.placement; }
+float& hud_distance(Settings& s) noexcept { return s.hud.distance; }
+float& hud_width(Settings& s) noexcept { return s.hud.width; }
+float& hud_pitch(Settings& s) noexcept { return s.hud.pitch; }
 
 // What the v2 commands accept (spec 22 §3.1, 21 §15): the keys' ranges,
 // and 0 where it means off or not calibrated.
@@ -81,6 +97,12 @@ constexpr CommandRange kHandSmoothing{0.0f, kHandSmoothingMax};
 constexpr CommandRange kHapticStrength{0.0f, kHapticStrengthMax};
 constexpr CommandRange kEyeForward{-kEyeForwardMax, kEyeForwardMax};
 constexpr CommandRange kSeatedEyeRaise{-kSeatedEyeRaiseMax, kSeatedEyeRaiseMax};
+// Spec 23 §8.
+constexpr CommandRange kActivationDistance{kActivationDistanceMin, kActivationDistanceMax, true};
+constexpr CommandRange kTerminalTextScale{kTerminalTextScales.front(), kTerminalTextScales.back()};
+constexpr CommandRange kHudDistance{kHudDistanceMin, kHudDistanceMax};
+constexpr CommandRange kHudWidth{kHudWidthMin, kHudWidthMax};
+constexpr CommandRange kHudPitch{kHudPitchMin, kHudPitchMax};
 
 // A row of the v2 pages: its command (named by this project, spec 22 §3.3)
 // and the page's function its value is pushed to.
@@ -212,6 +234,38 @@ constexpr std::array kRows{
                &streaming_texture_heap_mb},
     SettingRow{Section::Graphics, "StreamingModelHeapMB", "Graphics.StreamingModelHeapMB",
                &streaming_model_heap_mb},
+    // 24 §8: read at attach; a toggle's site is installed only for a key
+    // that is false then.
+    SettingRow{Section::Graphics, "LensFlares", "Graphics.LensFlares", &lens_flares},
+    SettingRow{Section::Graphics, "ChromaticAberration", "Graphics.ChromaticAberration",
+               &chromatic_aberration},
+    SettingRow{Section::Graphics, "FilmGrain", "Graphics.FilmGrain", &film_grain},
+    // v2 (spec 23 §8): the Interaction and HUD pages. FastAnimations is
+    // reserved (23 §4.6): file only, no page item.
+    page_row(Section::Interaction, "PhysicalLevers", "Interaction.PhysicalLevers", &physical_levers,
+             "mvr_physicallevers", "setMotherPhysicalLevers"),
+    page_row(Section::Interaction, "CameraTakeovers", "Interaction.CameraTakeovers", &camera_takeovers,
+             "mvr_cameratakeovers", "setMotherCameraTakeovers", CommandRule::Choice),
+    SettingRow{Section::Interaction, "FastAnimations", "Interaction.FastAnimations", &fast_animations},
+    page_row(Section::Interaction, "TerminalDistance", "Interaction.TerminalDistance", &terminal_distance,
+             "mvr_terminaldistance", "setMotherTerminalDistance", CommandRule::Number, kActivationDistance),
+    page_row(Section::Interaction, "RewireDistance", "Interaction.RewireDistance", &rewire_distance,
+             "mvr_rewiredistance", "setMotherRewireDistance", CommandRule::Number, kActivationDistance),
+    page_row(Section::Interaction, "TerminalTextScale", "Interaction.TerminalTextScale", &terminal_text_scale,
+             "mvr_terminaltextscale", "setMotherTerminalTextScale", CommandRule::Number, kTerminalTextScale),
+    page_row(Section::Hud, "Crosshair", "Hud.Crosshair", &crosshair, "mvr_crosshair", "setMotherCrosshair",
+             CommandRule::Choice),
+    page_row(Section::Hud, "Hidden", "Hud.Hidden", &hud_hidden, "mvr_hidehud", "setMotherHudHidden"),
+    page_row(Section::Hud, "ItemHighlight", "Hud.ItemHighlight", &item_highlight, "mvr_itemhighlight",
+             "setMotherItemHighlight"),
+    page_row(Section::Hud, "Placement", "Hud.Placement", &hud_placement, "mvr_hudplacement",
+             "setMotherHudPlacement", CommandRule::Choice),
+    page_row(Section::Hud, "Distance", "Hud.Distance", &hud_distance, "mvr_huddistance",
+             "setMotherHudDistance", CommandRule::Number, kHudDistance),
+    page_row(Section::Hud, "Width", "Hud.Width", &hud_width, "mvr_hudwidth", "setMotherHudWidth",
+             CommandRule::Number, kHudWidth),
+    page_row(Section::Hud, "Pitch", "Hud.Pitch", &hud_pitch, "mvr_hudpitch", "setMotherHudPitch",
+             CommandRule::Number, kHudPitch),
 };
 
 } // namespace
@@ -294,6 +348,43 @@ std::optional<FlashlightAim> parse_flashlight_aim(std::string_view s) noexcept {
     return std::nullopt;
 }
 
+std::string_view to_string(CameraTakeovers c) noexcept {
+    return c == CameraTakeovers::Reduced ? "Reduced" : "Game";
+}
+
+std::string_view to_string(CrosshairMode c) noexcept {
+    switch (c) {
+        case CrosshairMode::On: return "On";
+        case CrosshairMode::Off: return "Off";
+        case CrosshairMode::Auto: return "Auto";
+    }
+    return "On";
+}
+
+std::string_view to_string(HudPlacement p) noexcept {
+    return p == HudPlacement::Follow ? "Follow" : "HeadLocked";
+}
+
+// Case-sensitive, as spec 23 §8 states.
+std::optional<CameraTakeovers> parse_camera_takeovers(std::string_view s) noexcept {
+    if (s == "Game") return CameraTakeovers::Game;
+    if (s == "Reduced") return CameraTakeovers::Reduced;
+    return std::nullopt;
+}
+
+std::optional<CrosshairMode> parse_crosshair_mode(std::string_view s) noexcept {
+    if (s == "On") return CrosshairMode::On;
+    if (s == "Off") return CrosshairMode::Off;
+    if (s == "Auto") return CrosshairMode::Auto;
+    return std::nullopt;
+}
+
+std::optional<HudPlacement> parse_hud_placement(std::string_view s) noexcept {
+    if (s == "HeadLocked") return HudPlacement::HeadLocked;
+    if (s == "Follow") return HudPlacement::Follow;
+    return std::nullopt;
+}
+
 std::optional<BodyVisible> parse_body_visible(std::string_view s) noexcept {
     if (s == "Full") return BodyVisible::Full;
     if (s == "ArmsAndHands") return BodyVisible::ArmsAndHands;
@@ -315,6 +406,15 @@ std::optional<MirrorViewType> parse_mirror_view_type(std::string_view s) noexcep
     if (s == "RightEye") return MirrorViewType::RightEye;
     if (s == "LeftEye") return MirrorViewType::LeftEye;
     return std::nullopt;
+}
+
+float terminal_text_step(float scale) noexcept {
+    if (std::isnan(scale)) return kTerminalTextScaleDefault;
+    float best = kTerminalTextScales.front();
+    for (const float step : kTerminalTextScales) {
+        if (std::abs(scale - step) < std::abs(scale - best)) best = step;
+    }
+    return best;
 }
 
 int snap_segments(int segments) noexcept {
@@ -376,6 +476,23 @@ void sanitize(Settings& cfg) noexcept {
     const auto heap = [](int& mb, int lo, int hi) { mb = mb <= 0 ? 0 : std::clamp(mb, lo, hi); };
     heap(cfg.graphics.streaming_texture_heap_mb, kTextureHeapMbMin, kTextureHeapMbMax);
     heap(cfg.graphics.streaming_model_heap_mb, kModelHeapMbMin, kModelHeapMbMax);
+
+    // Spec 23 §8: the activation distances are 0 or [min, max] (a value in
+    // (0, min) becomes min); the text scale is the nearest step; the HUD
+    // panel's values are clamped. NaN takes the default.
+    const auto distance = [](float& d) {
+        d = !(d > 0.0f) ? 0.0f : std::clamp(d, kActivationDistanceMin, kActivationDistanceMax);
+    };
+    distance(cfg.interaction.terminal_distance);
+    distance(cfg.interaction.rewire_distance);
+    cfg.interaction.terminal_text_scale = terminal_text_step(cfg.interaction.terminal_text_scale);
+
+    const auto clamp_or = [](float& v, float lo, float hi, float fallback) {
+        v = std::isnan(v) ? fallback : std::clamp(v, lo, hi);
+    };
+    clamp_or(cfg.hud.distance, kHudDistanceMin, kHudDistanceMax, kHudDistanceDefault);
+    clamp_or(cfg.hud.width, kHudWidthMin, kHudWidthMax, kHudWidthDefault);
+    clamp_or(cfg.hud.pitch, kHudPitchMin, kHudPitchMax, 0.0f);
 }
 
 } // namespace omvr::core::config

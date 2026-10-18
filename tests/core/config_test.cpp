@@ -308,7 +308,8 @@ TEST_CASE("describe names each setting by its key path") {
 }
 
 TEST_CASE("the settings table: commands and their rules") {
-    CHECK(settings_table().size() == 58); // 15 of v1 and Discord, 38 of the v2 pages, 5 Graphics
+    // 15 of v1 and Discord, 38 of the v2 pages, 8 Graphics, 13 Interaction and Hud
+    CHECK(settings_table().size() == 74);
     const SettingRow* row = find_command("mvr_pixelscale");
     REQUIRE(row != nullptr);
     CHECK(row->rule == CommandRule::PixelScale);
@@ -331,9 +332,12 @@ TEST_CASE("the settings table: every v2 key has its own command and push") {
     std::set<std::string_view> pushes;
     int v2_rows = 0;
     for (const SettingRow& row : settings_table()) {
+        // Interaction.FastAnimations is reserved: file only (spec 23 §4.6).
         const bool v2 = row.section == Section::Comfort || row.section == Section::Controls ||
                         row.section == Section::Hands || row.section == Section::HandsHaptics ||
-                        row.section == Section::Body;
+                        row.section == Section::Body ||
+                        ((row.section == Section::Interaction || row.section == Section::Hud) &&
+                         row.key != "FastAnimations");
         if (!row.command.empty()) CHECK(commands.insert(row.command).second);
         if (!v2) {
             CHECK(row.push.empty());
@@ -346,7 +350,7 @@ TEST_CASE("the settings table: every v2 key has its own command and push") {
         CHECK(row.push.starts_with("setMother"));
         CHECK(pushes.insert(row.push).second);
     }
-    CHECK(v2_rows == 38);
+    CHECK(v2_rows == 50);
     CHECK(find_command("mvr_smoothturnspeed")->rule == CommandRule::Number);
     CHECK(find_command("mvr_snapturnrepeat")->rule == CommandRule::Integer);
     CHECK(find_command("mvr_playmode")->rule == CommandRule::Choice);

@@ -31,6 +31,10 @@ constexpr const char* kHapticsKey   = "Haptics";
 constexpr const char* kBodyKey      = "Body";
 constexpr const char* kGraphicsKey  = "Graphics";
 
+// The v2 interaction and HUD pages (spec 23 §8).
+constexpr const char* kInteractionKey = "Interaction";
+constexpr const char* kHudKey         = "Hud";
+
 // The layout earlier builds of this project wrote: a top-level object
 // "DebugOptions" holding "SkipStartupIntro" and "DevDebugOptions".
 constexpr const char* kLegacyDebugKey     = "DebugOptions";
@@ -47,6 +51,8 @@ const char* section_key(Section s) noexcept {
         case Section::HandsHaptics: return kHapticsKey;
         case Section::Body: return kBodyKey;
         case Section::Graphics: return kGraphicsKey;
+        case Section::Interaction: return kInteractionKey;
+        case Section::Hud: return kHudKey;
         case Section::Settings: break;
     }
     return nullptr;

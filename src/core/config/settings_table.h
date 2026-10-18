@@ -15,7 +15,19 @@ namespace omvr::core::config {
 
 // The JSON object a key is in: "Settings" itself, or one of its objects.
 // HandsHaptics is "Haptics" inside "Hands".
-enum class Section { Settings, Rendering, Input, Comfort, Controls, Hands, HandsHaptics, Body, Graphics };
+enum class Section {
+    Settings,
+    Rendering,
+    Input,
+    Comfort,
+    Controls,
+    Hands,
+    HandsHaptics,
+    Body,
+    Graphics,
+    Interaction,
+    Hud,
+};
 
 // A setting's place in Settings.
 template <class T>
@@ -23,7 +35,8 @@ using Accessor = T& (*)(Settings&) noexcept;
 
 using Field = std::variant<Accessor<bool>, Accessor<int>, Accessor<float>, Accessor<VRRuntime>,
                            Accessor<MirrorViewType>, Accessor<StereoAA>, Accessor<PlayMode>,
-                           Accessor<FlashlightAim>, Accessor<BodyVisible>>;
+                           Accessor<FlashlightAim>, Accessor<BodyVisible>, Accessor<CameraTakeovers>,
+                           Accessor<CrosshairMode>, Accessor<HudPlacement>>;
 
 // How the setting's console command reads its value (spec 06 §4.2): a value
 // outside the rule changes nothing.
@@ -91,6 +104,10 @@ const SettingRow* find_command(std::string_view name) noexcept;
 // (the segment cascade).
 void sanitize(Settings& cfg) noexcept;
 
+// `scale` as the nearest of kTerminalTextScales; NaN is the default (spec
+// 23 §8).
+float terminal_text_step(float scale) noexcept;
+
 // `segments` rounded down to one of kSnapSegmentSteps, or the default.
 int snap_segments(int segments) noexcept;
 
@@ -102,12 +119,18 @@ std::string_view to_string(StereoAA a) noexcept;
 std::string_view to_string(PlayMode m) noexcept;
 std::string_view to_string(FlashlightAim a) noexcept;
 std::string_view to_string(BodyVisible v) noexcept;
+std::string_view to_string(CameraTakeovers c) noexcept;
+std::string_view to_string(CrosshairMode c) noexcept;
+std::string_view to_string(HudPlacement p) noexcept;
 std::optional<VRRuntime> parse_vr_runtime(std::string_view s) noexcept;
 std::optional<MirrorViewType> parse_mirror_view_type(std::string_view s) noexcept;
 std::optional<StereoAA> parse_stereo_aa(std::string_view s) noexcept;
 std::optional<PlayMode> parse_play_mode(std::string_view s) noexcept;
 std::optional<FlashlightAim> parse_flashlight_aim(std::string_view s) noexcept;
 std::optional<BodyVisible> parse_body_visible(std::string_view s) noexcept;
+std::optional<CameraTakeovers> parse_camera_takeovers(std::string_view s) noexcept;
+std::optional<CrosshairMode> parse_crosshair_mode(std::string_view s) noexcept;
+std::optional<HudPlacement> parse_hud_placement(std::string_view s) noexcept;
 
 // The string parser and the last value of each enum the file stores.
 template <class E>
@@ -144,6 +167,23 @@ template <>
 struct EnumTraits<BodyVisible> {
     static constexpr BodyVisible kLast = BodyVisible::None;
     static std::optional<BodyVisible> parse(std::string_view s) noexcept { return parse_body_visible(s); }
+};
+template <>
+struct EnumTraits<CameraTakeovers> {
+    static constexpr CameraTakeovers kLast = CameraTakeovers::Reduced;
+    static std::optional<CameraTakeovers> parse(std::string_view s) noexcept {
+        return parse_camera_takeovers(s);
+    }
+};
+template <>
+struct EnumTraits<CrosshairMode> {
+    static constexpr CrosshairMode kLast = CrosshairMode::Auto;
+    static std::optional<CrosshairMode> parse(std::string_view s) noexcept { return parse_crosshair_mode(s); }
+};
+template <>
+struct EnumTraits<HudPlacement> {
+    static constexpr HudPlacement kLast = HudPlacement::Follow;
+    static std::optional<HudPlacement> parse(std::string_view s) noexcept { return parse_hud_placement(s); }
 };
 
 } // namespace omvr::core::config

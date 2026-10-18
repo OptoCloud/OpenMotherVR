@@ -468,9 +468,10 @@ TEST_CASE("the settings push sets every variable, then the controls help") {
                       "setMotherToggleGrips=false",
                       "setMotherToggleCrouch=false",
                   });
-    // Then the v2 pages: 38 settings and 3 page states (pushed before the
-    // help rows, which the page shows on its own sub-page).
-    constexpr std::size_t kPagePushes = 38 + 3;
+    // Then the v2 pages: 38 settings, 3 page states and the 12 settings of
+    // the Interaction and HUD pages (pushed before the help rows, which the
+    // page shows on its own sub-page).
+    constexpr std::size_t kPagePushes = 38 + 3 + 12;
     CHECK(vars.calls[14] == "setMotherSmoothTurnSpeed=0.000000");
     CHECK(vars.calls[14 + kPagePushes] == "addMotherViewControl=Move|L Touchpad");
     CHECK(vars.calls.size() == 14 + kPagePushes + schemes.control_help().size());
