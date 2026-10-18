@@ -58,7 +58,7 @@ bool code_expected(const GameImage& g, const BodyRvas& r) noexcept {
 } // namespace
 
 bool install_body_sites(const GameImage& g, Patcher& p, const void* hook, BodyTargets& out) noexcept {
-    const BodyRvas& r = body_rvas(g.version);
+    const BodyRvas& r = kBodyRvas[g.version];
     if (r.final_pose_step == 0) {
         p.log().line(kLogNoAddress);
         return false;

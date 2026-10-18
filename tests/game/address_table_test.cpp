@@ -163,4 +163,14 @@ TEST_CASE("the inline sites are the values before the restructure") {
     CHECK(s20.ui_mouse_height_disp_lo == 0x90);
 }
 
+TEST_CASE("a per-build table picks the running build's rows") {
+    using omvr::game::GameBuild;
+    CHECK(&omvr::game::kReconRvas[GameBuild::Original2015] == &omvr::game::kReconRvas.original_2015);
+    CHECK(&omvr::game::kReconRvas[GameBuild::Patched2020] == &omvr::game::kReconRvas.patched_2020);
+    CHECK(omvr::game::kReconRvas[GameBuild::Original2015].reflection_render_call == 0x005B5D91u);
+    CHECK(omvr::game::kReconRvas[GameBuild::Patched2020].reflection_render_call == 0u);
+    CHECK(omvr::game::kInlineSites[GameBuild::Patched2020].left_stick_prompt_call_2 == 0x0043E2DCu);
+    CHECK(omvr::game::kInlineSites[GameBuild::Original2015].left_stick_prompt_call_2 == 0x0042D18Cu);
+}
+
 } // namespace

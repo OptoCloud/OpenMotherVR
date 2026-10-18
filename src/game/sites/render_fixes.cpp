@@ -238,7 +238,7 @@ void area_off(ports::Log& log, std::string_view area, std::string_view why) noex
 }
 
 void find_mode_stack_append(const GameImage& g, ports::Log& log, stereo::ModeStackTargets& out) noexcept {
-    const ReconRvas& r = recon_rvas(g.version);
+    const ReconRvas& r = kReconRvas[g.version];
     if (r.mode_stack_append == 0) {
         log.line(kNoAppendLog);
         return;
@@ -254,7 +254,7 @@ void find_mode_stack_append(const GameImage& g, ports::Log& log, stereo::ModeSta
 }
 
 void install_render_fixes(const GameImage& g, Patcher& p, const RenderFixHooks& hooks) noexcept {
-    const ReconRvas& r = recon_rvas(g.version);
+    const ReconRvas& r = kReconRvas[g.version];
     fix_if_known(r.reflection_render_call, kReflections, &fix_reflections, g, p, r, hooks);
     fix_if_known(r.stereo_output_draw_call, kStereoAa, &fix_anti_aliasing, g, p, r, hooks);
     fix_if_known(r.cull_distance_call, kCulling, &fix_culling, g, p, r, hooks);

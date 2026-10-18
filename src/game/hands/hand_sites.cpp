@@ -90,7 +90,7 @@ bool install_aim(const GameImage& g, Patcher& p, const HandRvas& r, const HandHo
 
 // 21 §6, §14: the tracker scan's call.
 bool install_tracker_call(const GameImage& g, Patcher& p, const void* hook, HandTargets& out) noexcept {
-    const HandRvas& r = hand_rvas(g.version);
+    const HandRvas& r = kHandRvas[g.version];
     if (r.tracker_scan_call == 0) return false;
     // Already pointed at the hook by the other feature that needs it.
     if (out.tracker_scan && calls(g.at_rva(r.tracker_scan_call), static_cast<const std::uint8_t*>(hook)))
@@ -107,7 +107,7 @@ bool install_tracker_call(const GameImage& g, Patcher& p, const void* hook, Hand
 }
 
 bool find_player(const GameImage& g, core::diag::ports::Log& log, HandTargets& out) noexcept {
-    const HandRvas& r = hand_rvas(g.version);
+    const HandRvas& r = kHandRvas[g.version];
     if (r.character_registry == 0) return false;
     if (!registry_confirmed(g, r)) {
         ports::logf(log, kLogRegistry, r.player_getter, r.character_registry);
@@ -118,7 +118,7 @@ bool find_player(const GameImage& g, core::diag::ports::Log& log, HandTargets& o
 }
 
 bool find_current_item(const GameImage& g, HandTargets& out) noexcept {
-    const HandRvas& r = hand_rvas(g.version);
+    const HandRvas& r = kHandRvas[g.version];
     if (r.current_item == 0 || !x86::matches(g.at_rva(r.current_item), kCurrentItemStart)) return false;
     out.current_item = g.at_rva(r.current_item);
     return true;
@@ -126,7 +126,7 @@ bool find_current_item(const GameImage& g, HandTargets& out) noexcept {
 
 HandSitesOutcome install_hand_sites(const GameImage& g, Patcher& p, const HandHooks& hooks,
                                     HandTargets& out) noexcept {
-    const HandRvas& r = hand_rvas(g.version);
+    const HandRvas& r = kHandRvas[g.version];
     if (r.character_registry == 0) {
         p.log().line(kLogNoAddress);
         return {};

@@ -39,7 +39,7 @@ constexpr std::size_t kMaxPath = 260;
 } // namespace
 
 std::string_view engine_settings_path(const GameImage& g, ports::Log& log) noexcept {
-    const EngineSettingsRvas& r = engine_settings_rvas(g.version);
+    const EngineSettingsRvas& r = kEngineSettingsRvas[g.version];
     if (r.load_site == 0) {
         area_off(log, kEngineSettingsArea, kNoAddressWhy);
         return {};

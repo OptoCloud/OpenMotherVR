@@ -112,6 +112,27 @@ enum class AiAddr : std::uint8_t {
 inline constexpr AiAddr kLastNamedSlot = AiAddr::CmdDispatchSlot;
 static_assert(std::to_underlying(kLastNamedSlot) < kAddressTableRows);
 
+// One value per build, picked by the running build (01 §4).
+template <class T>
+struct PerBuild {
+    T original_2015;
+    T patched_2020;
+
+    constexpr const T& operator[](GameBuild version) const noexcept {
+        return version == GameBuild::Patched2020 ? patched_2020 : original_2015;
+    }
+};
+
+// Every row of an RVA table (a struct of 32-bit RVAs) is known: a zero in
+// the 2015 table would switch a feature off on the build it was written for.
+template <class T>
+consteval bool all_rows_known(const T& rvas) {
+    static_assert(sizeof(T) % sizeof(std::uint32_t) == 0, "an RVA table holds 32-bit rows only");
+    constexpr std::size_t kRows = sizeof(T) / sizeof(std::uint32_t);
+    const auto rows             = std::bit_cast<std::array<std::uint32_t, kRows>>(rvas);
+    return std::ranges::none_of(rows, [](std::uint32_t rva) { return rva == 0; });
+}
+
 // AI.exe addresses the reconstruction uses that the original's table does
 // not have: ReconRvas for fixes the original never made (RVAs per build; 0
 // means not located for that build, and the fix depending on it stays off),
@@ -199,18 +220,8 @@ inline constexpr ReconRvas kReconRvas2015 = {
 
 inline constexpr ReconRvas kReconRvas2020 = {};
 
-// Every recon row has its 2015 RVA: a zero there would switch a fix off on
-// the build it was written for.
-consteval bool every_recon_row_known(const ReconRvas& rvas) {
-    constexpr std::size_t kRows = sizeof(ReconRvas) / sizeof(std::uint32_t);
-    const auto rows             = std::bit_cast<std::array<std::uint32_t, kRows>>(rvas);
-    return std::ranges::none_of(rows, [](std::uint32_t rva) { return rva == 0; });
-}
-static_assert(every_recon_row_known(kReconRvas2015));
-
-inline const ReconRvas& recon_rvas(GameBuild version) noexcept {
-    return version == GameBuild::Patched2020 ? kReconRvas2020 : kReconRvas2015;
-}
+inline constexpr PerBuild<ReconRvas> kReconRvas{kReconRvas2015, kReconRvas2020};
+static_assert(all_rows_known(kReconRvas2015), "every recon row has its 2015 RVA");
 
 // v2 hands (spec 21 §20). 2015 RVAs, checked in the 2015 AI.exe (timestamp
 // 0x54E3199D) against the bytes the spec gives; the 2020 ones are unknown
@@ -252,17 +263,8 @@ inline constexpr HandRvas kHandRvas2015 = {
 
 inline constexpr HandRvas kHandRvas2020 = {};
 
-static_assert(
-    [] {
-        constexpr std::size_t kRows = sizeof(HandRvas) / sizeof(std::uint32_t);
-        const auto rows             = std::bit_cast<std::array<std::uint32_t, kRows>>(kHandRvas2015);
-        return std::ranges::none_of(rows, [](std::uint32_t rva) { return rva == 0; });
-    }(),
-    "every hand row has its 2015 RVA");
-
-inline const HandRvas& hand_rvas(GameBuild version) noexcept {
-    return version == GameBuild::Patched2020 ? kHandRvas2020 : kHandRvas2015;
-}
+inline constexpr PerBuild<HandRvas> kHandRvas{kHandRvas2015, kHandRvas2020};
+static_assert(all_rows_known(kHandRvas2015), "every hand row has its 2015 RVA");
 
 // The haptics' own game sites (spec 21 §14, §20); they also use the
 // player, CurrentItem and the tracker scan call of HandRvas.
@@ -281,9 +283,8 @@ inline constexpr HapticRvas kHapticRvas2015 = {
 
 inline constexpr HapticRvas kHapticRvas2020 = {};
 
-inline const HapticRvas& haptic_rvas(GameBuild version) noexcept {
-    return version == GameBuild::Patched2020 ? kHapticRvas2020 : kHapticRvas2015;
-}
+inline constexpr PerBuild<HapticRvas> kHapticRvas{kHapticRvas2015, kHapticRvas2020};
+static_assert(all_rows_known(kHapticRvas2015), "every haptic row has its 2015 RVA");
 
 // Body visibility's game sites (spec 21 §2.3, §10, §20); it also uses the
 // player of HandRvas. 2015 RVAs, checked in the 2015 AI.exe by the spec
@@ -315,9 +316,8 @@ inline constexpr BodyRvas kBodyRvas2015 = {
 
 inline constexpr BodyRvas kBodyRvas2020 = {};
 
-inline const BodyRvas& body_rvas(GameBuild version) noexcept {
-    return version == GameBuild::Patched2020 ? kBodyRvas2020 : kBodyRvas2015;
-}
+inline constexpr PerBuild<BodyRvas> kBodyRvas{kBodyRvas2015, kBodyRvas2020};
+static_assert(all_rows_known(kBodyRvas2015), "every body row has its 2015 RVA");
 
 // The engine settings load (spec 24 §1.9, §6.1). Nothing is written there:
 // the game opens the file through the C runtime's fopen, which reaches
@@ -344,9 +344,9 @@ inline constexpr EngineSettingsRvas kEngineSettingsRvas2015 = {
 
 inline constexpr EngineSettingsRvas kEngineSettingsRvas2020 = {};
 
-inline const EngineSettingsRvas& engine_settings_rvas(GameBuild version) noexcept {
-    return version == GameBuild::Patched2020 ? kEngineSettingsRvas2020 : kEngineSettingsRvas2015;
-}
+inline constexpr PerBuild<EngineSettingsRvas> kEngineSettingsRvas{kEngineSettingsRvas2015,
+                                                                  kEngineSettingsRvas2020};
+static_assert(all_rows_known(kEngineSettingsRvas2015), "every engine settings row has its 2015 RVA");
 
 // The 2D-only effects in stereo (spec 24 §1.6, §1.8, §8): the calls of the
 // lens flare draw and of the post-processing readers of chromatic
@@ -385,9 +385,8 @@ inline constexpr PostFxEffectRvas kPostFxEffectRvas2015 = {
 
 inline constexpr PostFxEffectRvas kPostFxEffectRvas2020 = {};
 
-inline const PostFxEffectRvas& post_fx_effect_rvas(GameBuild version) noexcept {
-    return version == GameBuild::Patched2020 ? kPostFxEffectRvas2020 : kPostFxEffectRvas2015;
-}
+inline constexpr PerBuild<PostFxEffectRvas> kPostFxEffectRvas{kPostFxEffectRvas2015, kPostFxEffectRvas2020};
+static_assert(all_rows_known(kPostFxEffectRvas2015), "every post-processing effect row has its 2015 RVA");
 
 // Sites and bytes the original writes but codes inline in FUN_1001d6f0
 // instead of keeping them in its address table.
@@ -423,9 +422,7 @@ inline constexpr InlineSites kInlineSites2020 = {
     .ui_mouse_height_disp_lo  = 0x90,
 };
 
-inline const InlineSites& inline_sites(GameBuild version) noexcept {
-    return version == GameBuild::Patched2020 ? kInlineSites2020 : kInlineSites2015;
-}
+inline constexpr PerBuild<InlineSites> kInlineSites{kInlineSites2015, kInlineSites2020};
 
 // The HUD options (spec 23 §7, 22 §2.4, §8.3). 2015 RVAs, checked in the
 // 2015 AI.exe (timestamp 0x54E3199D) against the bytes the spec gives; the
@@ -500,17 +497,8 @@ inline constexpr HudRvas kHudRvas2015 = {
 
 inline constexpr HudRvas kHudRvas2020 = {};
 
-static_assert(
-    [] {
-        constexpr std::size_t kRows = sizeof(HudRvas) / sizeof(std::uint32_t);
-        const auto rows             = std::bit_cast<std::array<std::uint32_t, kRows>>(kHudRvas2015);
-        return std::ranges::none_of(rows, [](std::uint32_t rva) { return rva == 0; });
-    }(),
-    "every HUD row has its 2015 RVA");
-
-inline const HudRvas& hud_rvas(GameBuild version) noexcept {
-    return version == GameBuild::Patched2020 ? kHudRvas2020 : kHudRvas2015;
-}
+inline constexpr PerBuild<HudRvas> kHudRvas{kHudRvas2015, kHudRvas2020};
+static_assert(all_rows_known(kHudRvas2015), "every HUD row has its 2015 RVA");
 
 // The selected per-build table, rebased onto the running AI.exe.
 class AddressMap {

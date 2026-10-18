@@ -58,7 +58,7 @@ bool install_rumble(const GameImage& g, Patcher& p, const HapticRvas& r, const H
 }
 
 bool install_firing(const GameImage& g, Patcher& p, HandTargets& hand_out) noexcept {
-    const HandRvas& r = hand_rvas(g.version);
+    const HandRvas& r = kHandRvas[g.version];
     if (!find_current_item(g, hand_out)) {
         ports::logf(p.log(), kLogFiringCode, r.current_item);
         return false;
@@ -71,8 +71,8 @@ bool install_firing(const GameImage& g, Patcher& p, HandTargets& hand_out) noexc
 
 HapticSitesOutcome install_haptic_sites(const GameImage& g, Patcher& p, const HapticHooks& hooks,
                                         HandTargets& hand_out, HapticTargets& out) noexcept {
-    const HapticRvas& r = haptic_rvas(g.version);
-    if (r.rumble_set_motors == 0 || hand_rvas(g.version).character_registry == 0) {
+    const HapticRvas& r = kHapticRvas[g.version];
+    if (r.rumble_set_motors == 0 || kHandRvas[g.version].character_registry == 0) {
         p.log().line(kLogNoAddress);
         return {};
     }

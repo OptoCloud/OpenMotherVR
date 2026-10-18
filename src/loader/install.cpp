@@ -246,7 +246,7 @@ bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept {
     const auto version = game::select_address_table(ai_base, ctx.addresses, ctx.log);
     if (!version) return false;
     const GameImage g{ai_base, platform::win32::image_size_of(ai_base), *version,
-                      game::inline_sites(*version), ctx.addresses};
+                      game::kInlineSites[*version], ctx.addresses};
     ports::logf(ctx.log, kPatchSetLog, full_set ? "full" : "UI only", config::to_string(runtime),
                 forced ? "command line" : "config");
     if (!game::preflight(g, full_set, ctx.log)) return false;

@@ -84,7 +84,7 @@ struct Check {
 };
 
 bool known(const GameImage& g, Patcher& p, std::string_view area) noexcept {
-    if (hud_rvas(g.version).ui_find_object != 0) return true;
+    if (kHudRvas[g.version].ui_find_object != 0) return true;
     ports::logf(p.log(), kLogNoAddress, area);
     return false;
 }
@@ -154,7 +154,7 @@ bool visibility_expected(const Check& c, const HudRvas& r) noexcept {
 bool install_hud_visibility_sites(const GameImage& g, Patcher& p, const HudHooks& hooks,
                                   HudTargets& out) noexcept {
     if (!known(g, p, kVisibilityArea)) return false;
-    const HudRvas& r = hud_rvas(g.version);
+    const HudRvas& r = kHudRvas[g.version];
     const Check c{g, p, kVisibilityArea};
     if (!visibility_expected(c, r)) return false;
     set_lookup(g, r, out);
@@ -181,7 +181,7 @@ bool install_hud_visibility_sites(const GameImage& g, Patcher& p, const HudHooks
 bool install_crosshair_sites(const GameImage& g, Patcher& p, const HudHooks& hooks,
                              HudTargets& out) noexcept {
     if (!known(g, p, kCrosshairArea)) return false;
-    const HudRvas& r = hud_rvas(g.version);
+    const HudRvas& r = kHudRvas[g.version];
     const Check c{g, p, kCrosshairArea};
     const bool expected =
         lookup_expected(c, r) && c.code(r.crosshair_update, "CrosshairUpdate", kCrosshairUpdateStart) &&
@@ -216,7 +216,7 @@ bool install_crosshair_sites(const GameImage& g, Patcher& p, const HudHooks& hoo
 bool install_highlight_sites(const GameImage& g, Patcher& p, const HudHooks& hooks,
                              HudTargets& out) noexcept {
     if (!known(g, p, kHighlightArea)) return false;
-    const HudRvas& r = hud_rvas(g.version);
+    const HudRvas& r = kHudRvas[g.version];
     const Check c{g, p, kHighlightArea};
     const bool expected = c.code(r.icon_highlight, "the icon highlight update", kIconHighlightStart) &&
                           c.call(r.icon_highlight_call_a, r.icon_highlight, "its first call") &&

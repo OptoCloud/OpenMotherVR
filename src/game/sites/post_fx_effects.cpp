@@ -171,7 +171,7 @@ void toggle_if(bool key, std::string_view key_name, std::uint32_t rva, std::stri
 
 void install_post_fx_effects(const GameImage& g, Patcher& p, const PostFxEffectHooks& hooks,
                              const core::render::PostFxKeys& keys) noexcept {
-    const PostFxEffectRvas& r = post_fx_effect_rvas(g.version);
+    const PostFxEffectRvas& r = kPostFxEffectRvas[g.version];
     toggle_if(keys.lens_flares, "LensFlares", r.lens_flare_site, kLensFlareToggleArea, &toggle_lens_flares, g,
               p, r, hooks);
     toggle_if(keys.chromatic_aberration, "ChromaticAberration", r.chromatic_aberration_call,
