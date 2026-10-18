@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). r6 (project decision: with the aim poses made only at runtime start, turning tracked hands on in the menu left aiming on the head until the next start): the aim pose actions are declared and bound whatever `Hands.Enabled` is, so the key applies at once as §15.1 says; a binding that lacks them is logged. Revision: r6 -->
+<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). r6 (project decision: with the aim poses made only at runtime start, turning tracked hands on in the menu left aiming on the head until the next start): the aim pose actions are declared and bound whatever `Hands.Enabled` is, so the key applies at once as §15.1 says; a binding that lacks them is logged. r7 (static analysis of the 2015 `AI.exe` and the game's data by the spec side, without a lead): `FinalPoseStep`'s single return corrected (0x2A5553 belongs to the next function); the pose's hand-over to the model's render objects (`SkinSetPose` 0x28E9A0, its two calls in `FinalPoseStep`, which render objects receive which pose, and that it reads the pose without keeping it); the skeleton's name field and the model-space array's size; the crouch methods' condition byte `+0x3E2E` (corrects §2.2); the game's first-person camera offsets in `DATA\GLOBALCONSTANTS.TXT` (§22 item 14, the crouch drop); body visibility's method made exact (collapse at the nearest drawn joint, in a copy handed to the render objects; the held item's bone always drawn); real crouch's press through the v1 crouch control; room-scale kept off until the frame of the game's movement input and the body's yaw are established (new §22 items 25, 26); new open items 27 (parts posed from another skeleton) and 28 (the requested crouch byte in play). Revision: r7 -->
 
 # 21. Hands and body
 
@@ -109,7 +109,7 @@ the same frame (an order the game has, which §4.2 must account for).
 | Control object | character `+0x31C` | pointer; byte `+0x48` of it is set for the player-controlled character (tested by the crouch methods and by the weapon component's caller of `AimRayUpdate`, §2.5) |
 | Animation component | character `+0x3F0` | the final-pose step runs on it (§2.3) |
 | Equipment component | character `+0x1100` | see §2.5 |
-| `CharacterRequestCrouch` | 0x3CAE20 (`56 8b f1 80`) | `thiscall` on the character, no arguments, plain `ret`. For the player (control object byte `+0x48` set) it only sets the requested-crouch byte `+0x3E3A` (to 1, or to the value of byte `+0x3E34` when that is not 0); for other characters it also sets byte `+0x2AF` and raises the game's `CROUCHED` event |
+| `CharacterRequestCrouch` | 0x3CAE20 (`56 8b f1 80`) | `thiscall` on the character, no arguments, plain `ret`. It sets the requested-crouch byte `+0x3E3A` to 1 when byte `+0x3E2E` is set and to 0 when it is not (r7: `+0x3E2E` is tested first, `80 be 2e 3e 00 00 00`), then to the value of byte `+0x3E34` when that is not 0. For the player (control object byte `+0x48` set) that is all; for other characters it also sets byte `+0x2AF` and raises the game's `CROUCHED` event. Callers: 0x0987E2, 0x287BE6, 0x3CFECF; 0x287B60 handles an event of type 7 whose value 1 stands (unless byte `+0x2B4`) and 2 crouches [sure for the code; the meaning of `+0x3E2E`, most likely "crouching allowed", is a guess] |
 | `CharacterRequestStand` | 0x3CAE90 (`56 8b f1 8a`) | the same shape; sets `+0x3E3A` to 0 (or `+0x3E34`) |
 
 The player's requested crouch state is therefore byte `+0x3E3A` of the
@@ -124,7 +124,8 @@ identified, so nothing here depends on it].
 
 **Final-pose step [sure].** `FinalPoseStep` 0x2A5040 is a `thiscall` on the
 character's animation component (character `+0x3F0`), no stack arguments,
-plain `ret` (returns at 0x2A5467 and 0x2A5553), first bytes
+plain `ret` (one return, at 0x2A5467; r7: 0x2A5553 is in the next
+function, which starts at 0x2A5470), first bytes
 `64 a1 00 00 00 00 6a ff`. It is reached only through a `cdecl` thunk
 (`FinalPoseThunk`) at 0x2A55E0 (`8b 4c 24 04 81 c1 f0 03 00 00 e9 51 fa ff ff`: takes the
 character, adds 0x3F0, jumps to 0x2A5040). The final-pose pass 0x2A55F0
@@ -149,7 +150,36 @@ argument: the bone index) makes a bone's model-space transform current by
 walking its parents, which shows these fields. The skeleton's bone names
 are in the bone array that follows the parent indices in the public layout
 (skeleton `+0x18`, 8 bytes per bone, a name pointer first) [likely];
-acceptance item 2 logs the names the mod finds.
+acceptance item 2 logs the names the mod finds. r7: the bone array's count
+is the dword at skeleton `+0x1C`, the model-space array's count at pose
+`+0x14`, and the skeleton's own name pointer is at skeleton `+0x08`
+[likely, the public layout]; a name pointer's lowest bit is a flag of the
+string and is cleared before use [likely]. A model-space transform is read
+with aligned 16-byte loads, so any array of them handed to the game is
+16-byte aligned [sure].
+
+**The pose's hand-over to the renderer [sure, r7].** After making the
+model-space array current (0x7BA260 on the pose), `FinalPoseStep` hands it
+to the character model's render objects through `SkinSetPose` 0x28E9A0
+(`55 8b ec 83 e4 f0 81 ec 54 01 00 00`), `thiscall` on a render object,
+two stack arguments (a pointer to the model-space bone transforms, the bone
+count), `ret 8`. `SkinSetPose` only reads the array: it converts each bone
+to a 4x4 matrix (through 0x68EBE0, which reads only) into the render
+object's own storage, computes the object's bounding box from them and
+places the object's bone attachments; it keeps no pointer to the array.
+Its two calls in `FinalPoseStep`:
+
+| Call | Bytes | When | Render objects and pose |
+|---|---|---|---|
+| 0x2A51D8 | `e8 c3 97 fe ff` | byte `+0x3CD` of the animation component clear and the pointer at `+0x3D4` not null | the one render object at component `+0x3D8`, with the character's own model-space array |
+| 0x2A536A | `e8 31 96 fe ff` | byte `+0x3CD` set | each of up to six part objects at component `+0x3E4 + 12 k` (k = 0..5); part 3 receives the character's own array, the others an array mapped from another skeleton when 0xA2C100 on the pointer at `+0x328` gives one, else the character's own |
+
+Its other callers (0x28EE02, 0x293799, 0x2A8CD6, 0x2AC794, 0x2ACE45) are
+outside the frame's pose step [likely: model set-up]. So everything drawn
+of a character (the main view, its reflections and its shadow, which use
+the render object's matrices [likely; acceptance item 10]) is posed from
+the array passed here, while the game's own pose, collision, animation and
+camera never see that argument.
 
 **The game's own limb IK [sure for the shape].** A function at 0x29ED80
 (`stdcall`, four arguments, `ret 0x10`, first bytes `55 8b ec 83 e4 f0`)
@@ -781,7 +811,51 @@ groups. A permitted method [proposal: needs no table of the game's meshes]
 is to collapse the hidden bones' model-space transforms to zero scale at
 their parent's position after the final-pose step, which leaves the other
 bones untouched; another is to skip the hidden parts' draws using the part
-names of §2.8. Whichever is used, it must work for `FEMALEFP` and
+names of §2.8.
+
+r7 makes the first method exact [proposal for each rule; reasons given]:
+
+- **Where.** The collapse is made in a copy of the model-space array that
+  is handed to `SkinSetPose` in place of the game's at its two calls in
+  `FinalPoseStep` (§2.3), and only when the array is the player
+  character's own (the same array and skeleton as the player's pose). The
+  game's pose is never written [reason: animation, collision, the camera
+  and the next frame's blending read the game's pose; the render objects
+  are the only readers of the copy]. A part posed from another skeleton's
+  array (§2.3, the mapped pose) is left as the game poses it and that is
+  logged once (§22 item 27).
+- **Groups.** Each bone takes the group listed for its name in §2.3, after
+  removing a namespace prefix up to the last `:` (the game's skeletons name
+  bones `FemaleFP:LeftHand` [likely, from the mirror files]); a bone not
+  listed takes the group of its nearest listed ancestor, and a bone with
+  none is body. The fingers take their hand's group. `LeftWeaponBone` and
+  `RightWeaponBone` form a group of their own that is always drawn
+  [reason: the held item is placed on it in every value of the table].
+  Drawn per value: `Full` everything; `ArmsAndHands` shoulders, arms,
+  hands, weapon bones; `HandsOnly` hands and weapon bones; `None` the
+  weapon bones.
+- **Collapse point.** A hidden bone is collapsed to the joint of its
+  nearest drawn bone by the number of parent links between them (several at
+  the same distance: the mean of up to four of them); the joint is the
+  drawn bone's own position when the drawn bone is below the hidden one,
+  and the position of the hidden bone that hangs from it when the drawn
+  bone is above [reason: a vertex weighted between a drawn and a hidden
+  bone then stays at the edge of the drawn part instead of being pulled
+  across the body, so the cut is at the shoulder or the wrist]. With no
+  drawn bone the whole skeleton collapses at its first root.
+- **Transform.** A collapsed bone has the collapse point as translation,
+  the identity rotation and a scale of 0.001 on each axis [reason: exactly
+  zero gives the renderer singular normal matrices; a millimetre is not
+  visible].
+- **Required bones.** The skeleton must have, by name, `Spine`,
+  `LeftShoulder`, `RightShoulder`, `LeftArm`, `RightArm`, `LeftHand` and
+  `RightHand`; a skeleton without one of them, with more bones than the
+  implementation can hold (at least 256), or whose parent indices are not
+  a tree is drawn whole and that is logged once per skeleton.
+- **When.** Only while the stereo device runs (20 §1.2); the plan is made
+  on the game thread when the skeleton or the value changes (§17).
+
+Whichever method is used, it must work for `FEMALEFP` and
 `SPACESUITFP` (and each DLC skeleton that has the bones by name), must not
 change collision, animation or the game's own visibility tests, and must
 not hide other characters.
@@ -876,6 +950,15 @@ control hand-back (§12).
 
 **Off**: no follow, no shift; v1.
 
+**Until two facts are established (r7).** The follow writes the move action
+in the body's frame and the shift rotates by the body's yaw; neither the
+frame in which the game reads the move action (camera, body or world;
+§22 item 25) nor where the body's yaw in tracking space can be read (§22
+item 26) is established. Until both are, `Body.RoomScale` on changes
+nothing and the log says once that room-scale is off in this build and
+why [reason: a follow in the wrong frame walks the body away from the
+head, which is worse than no follow].
+
 ### 11.4 Seated and standing height
 
 The mode (`Comfort.PlayMode`), the calibrated standing eye height `h`
@@ -922,6 +1005,33 @@ standing up makes it stand, where the game allows.
 - when the game refuses to stand (in a vent), the character stays crouched
   and the view is limited by the game as usual; the mod retries at most
   every 0.5 s while the player stands.
+
+r7 details [proposal for each; reasons given]:
+
+- **The press** is the v1 crouch control (04's left trigger, mapped to map
+  0 action 0x09) held for the 100 ms, added to what the player presses
+  (merged by OR) [reason: the game's crouch then behaves exactly as for the
+  player's own press].
+- **One press per crossing.** A crouch press is made once for each crossing
+  of `0.78 h`; a stand press is retried every 0.5 s only after a press of
+  the session was followed by the requested crouch byte [reason: a byte
+  that does not follow the game's crouch must never make the mod toggle the
+  crouch again and again]. A press the byte does not follow within 1 s is
+  logged once (§22 item 28). A crouch the player makes with the control
+  while standing for real is not undone until the next crossing.
+- **The drop.** The game's data gives the first-person camera's vertical
+  offset as `first_person_camera_offset_y` 0.01 standing and
+  `first_person_camera_crouch_offset_y` -0.62 crouched (`#Camera` section
+  of `DATA\GLOBALCONSTANTS.TXT`; the names are entry 0x14 onwards of the
+  constants table at 0x123F7C0, 0x58 bytes per entry), so the game's crouch
+  lowers the eye by 0.63 game metres [likely: the reader of the values was
+  not located; acceptance item 13 measures it]. While the game's crouch was
+  engaged by a press of real crouch, the head height the game receives is
+  raised by 0.63 game metres (so 0.63 / `s` in runtime metres before the
+  world scale of §11.1), eased in and out over 0.3 s [reason: the game
+  moves its camera over a short time too; a step would jump].
+- **No head height**, no presses: without a floor reference, without a
+  valid head pose or while the headset is not in use (§19).
 
 The v1 crouch control keeps working; a press of it while real crouch is on
 toggles the game as before, and real crouch re-syncs at the next threshold
@@ -981,6 +1091,13 @@ body again:
 The goal: after any episode, the view is at the real head's position over
 the body, the hands are in the controllers, and the character's crouch
 matches the player's, within one second.
+
+r7: an episode is any frame in which §4.4's activity (computed as if
+`Hands.Enabled` were on) is not active for a reason other than the device
+not running or a setting; it ends at the first active frame, and the end is
+logged (DBG) with the reason it started with [reason: one definition of an
+episode for every feature of this section]. Items 1 to 5 apply then; item 1
+waits for room-scale (§11.3).
 
 ## 13. Health on the wrist
 
@@ -1212,6 +1329,7 @@ game actions v1 writes, merged by OR.
 | read controllers and hand poses, publish them with the head pose; all haptic runtime calls | render thread (04 §5.9; §14.3 of this document) |
 | take the frame's hand set (with the head pose of that frame), the camera pose (§2.4), the player pointer; compute world targets (§3.1); aim ray (§5), tracker heading (§6), room-scale, height, crouch presses (§11), control hand-back (§12), health value, haptic event detection | game thread |
 | edit the player's pose (§4.2), body visibility (§10) | the job thread running the player's final-pose step (§2.3), reading only the game thread's copy for this frame |
+| body visibility's plan (which bones collapse where, per skeleton and value) | game thread, before the `CHARACTER_IK_AND_RAGDOLL` stage; published with the pose and skeleton it is for; the job uses it only for that pose |
 | game rumble levels (§2.9) | whichever thread calls `RumbleSetMotors` [likely the audio thread]; stored as two atomic floats |
 
 The game thread's copy for the job threads is written before the
@@ -1239,6 +1357,11 @@ locking or logging on the render thread or in the job (12 §6).
 | room-scale follow blocked | DBG | the remaining offset |
 | real crouch press | DBG | crouch or stand; the head height and thresholds |
 | control hand-back at an episode end | DBG | the episode kind; what was restored |
+| body visibility: a value other than `Full` takes effect, or `Full` again | INF | the value; how many bones of which skeleton collapse |
+| body visibility: the first frame drawn from the collapsed copy | INF | that the player's model is drawn from it |
+| body visibility: a part posed from another skeleton (§10.2) | WRN, once | that it stays drawn |
+| real crouch: a press the byte did not follow (§11.5) | WRN, once | the time waited |
+| `Body.RoomScale` on while §11.3's facts are open | INF, once | that room-scale is off in this build and why |
 
 The calibration and the play mode are logged by 22 (22 §16).
 | haptic actions created, or bound/unbound | INF / WRN | per hand; that a saved binding lacks them |
@@ -1276,6 +1399,10 @@ every row. Names are spec labels.
 | equipment update call | 0x3CA02E | ? | call site | `e8 dd 86 fb ff` (to 0x382710) | 2.1 |
 | final-pose pass call | 0x3CA04B | ? | call site | `e8 a0 b5 ed ff` (to 0x2A55F0) | 2.1 |
 | `FinalPoseStep` | 0x2A5040 | ? | function | `64 a1 00 00 00 00 6a ff` | 2.3 |
+| `SkinSetPose` | 0x28E9A0 | ? | function | `55 8b ec 83 e4 f0 81 ec 54 01 00 00`; `thiscall`, (bones*, count), `ret 8` | 2.3, 10.2 |
+| model render object call | 0x2A51D8 | ? | call site | `e8 c3 97 fe ff` (to 0x28E9A0) | 2.3, 10.2 |
+| part render objects call | 0x2A536A | ? | call site | `e8 31 96 fe ff` (to 0x28E9A0) | 2.3, 10.2 |
+| constants table | 0x123F7C0 | ? | data | 0x58 bytes per entry; entry 0x14 `first_person_camera_offset_y` | 11.5 |
 | `FinalPoseThunk` | 0x2A55E0 | ? | function | `8b 4c 24 04 81 c1 f0 03 00 00 e9 51 fa ff ff`; its address is pushed at 0x2A5655 (`68 e0 55 6a 00`) | 2.3 |
 | game limb IK | 0x29ED80 | ? | function | `55 8b ec 83 e4 f0`; `stdcall`, `ret 0x10` | 2.3 |
 | pose model-space getter | 0x7B9E80 | ? | function | shows the pose layout | 2.3 |
@@ -1323,7 +1450,12 @@ where a VRB line is needed.
    gently: they fly with the hand's motion; opening the grip without moving
    keeps the item in hand.
 10. Each `Body.Visible` value: the hidden parts are gone in both eyes, in a
-    mirror (07) and in the shadow; other characters are unaffected.
+    mirror (07) and in the shadow; other characters are unaffected. The
+    log names the skeleton, its bone count and the indices of the required
+    bones, then how many bones collapse and that the model is drawn from
+    the collapsed copy; no warning that a part is posed from another
+    skeleton. In `None`, the held weapon and a held flare are still drawn
+    in the hand's place. Repeat in a space suit.
 11. `Body.EyeForward` +0.15: the view moves forward of the body; the
     head-in-wall fade does not trigger standing in the open.
 12. Room-scale: walk 1 m forward in the play area: the character walks 1 m
@@ -1332,7 +1464,9 @@ where a VRB line is needed.
 13. Standing mode, calibrated (22 §6), `Body.RealCrouch` on: standing
     upright gives the game's normal eye height; crouching to 70 % of the standing height crouches the character
     (log: the press, the heights) and enters a vent; standing inside the
-    vent stays crouched; leaving the vent and standing stands.
+    vent stays crouched; leaving the vent and standing stands. While
+    crouched by real crouch the view stays at the real head (within 5 cm;
+    no second drop); this measures §11.5's 0.63.
 14. The requested crouch byte (`+0x3E3A`) follows the game's crouch in
     the log when crouching by the control.
 15. After a cutscene, a ladder, a hiding place, a death and reload: within
@@ -1394,7 +1528,9 @@ where a VRB line is needed.
     the game's melee hit test follows the arm's animation (then the arm
     must play it during a swing by motion, §8.2) or the camera or body.
 14. **Crouch eye height**: the game's standing and crouched eye heights
-    (or the camera's height change on crouch), for §11.5.
+    (or the camera's height change on crouch), for §11.5. r7: 0.63 m from
+    the game's camera constants [likely] (§11.5); the code that reads them
+    is not located; acceptance item 13 confirms.
 15. **Scripted player animations** outside the signals of §12.1: how to
     observe that an animation drives the player's body and view
     (`CMD_PlayAnimation` and its `PlayerAnimDrivenView`, the
@@ -1423,6 +1559,28 @@ where a VRB line is needed.
     kinds of 11 §5.3 show a screen the game composes for the body's own
     eye point. To resolve: with `Body.EyeForward` at +0.2, use each kind
     and note the screens that are cropped or misaligned.
+25. **Frame of the move action** (§11.3): whether the game reads map 0
+    analog 0 and 1 relative to the camera's yaw, the body's or the world's.
+    To find: the player locomotion's reader of the move action; or in game,
+    with the head turned 90 degrees from the body, a forward stick and the
+    direction walked.
+26. **The body's yaw** (§11.3): a field of the player character or of its
+    camera's `FollowBehavior` that gives the body's heading each frame, so
+    the body's movement can be rotated into tracking space.
+27. **Parts posed from another skeleton** (§2.3, §10.2): which first-person
+    models take `FinalPoseStep`'s part path with a mapped array, and from
+    which skeleton. To find: acceptance item 10's warning; then the mapping
+    0xA2C100 and the pointer at component `+0x328`.
+28. **The requested crouch byte in play** (§2.2, §11.5): that `+0x3E3A`
+    follows the game's crouch for the player, including crouches the game
+    makes itself (vents, scripted). Acceptance item 14.
+
+Answered by r7 from the open points the earlier revisions left inside §2:
+the final-pose step's return and the pose's way to the renderer (§2.3,
+§22 item 1 keeps only the in-game order check); the bone groups' bones
+and how bones are matched by name (§2.3, §10.2); the first-person model
+parts are not needed by the method of §10.2 (§2.8 stays for the skipping
+method).
 
 ## 23. Changes to v1 and v2 documents
 
