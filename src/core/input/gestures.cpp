@@ -85,9 +85,10 @@ Holster holster_zone(std::size_t hand, const Vec3& p) noexcept {
     const bool right = hand == kRightHand;
     if (p.y > -kShoulderBelowHead && p.z > kShoulderBehind)
         return right ? Holster::RightShoulder : Holster::LeftShoulder;
-    if (!right && p.y < -kHipBelowHead && p.x < -kHipLeftOf) return Holster::LeftHip;
+    if (!right && p.y < -kHipBelowHead && p.x < -kHipLeftOf && p.z > -kHipFrontMost) return Holster::LeftHip;
+    // Close to the chest only: the hold in front of the body is not in it.
     if (p.y <= -kChestBelowTop && p.y >= -kChestBelowBottom && std::fabs(p.x) <= kChestHalfWidth &&
-        p.z < -kChestInFront)
+        p.z >= -kChestFrontMost && p.z <= kShoulderBehind)
         return Holster::Chest;
     return Holster::None;
 }

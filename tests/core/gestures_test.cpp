@@ -16,7 +16,9 @@
 
 #include <doctest/doctest.h>
 
+#include <array>
 #include <chrono>
+#include <cmath>
 #include <numbers>
 
 namespace {
@@ -158,14 +160,76 @@ TEST_CASE("holster zones") {
     CHECK(holster_zone(kLeftHand, {-0.15f, -0.1f, 0.15f}) == Holster::LeftShoulder);
     CHECK(holster_zone(kRightHand, {0.15f, -0.3f, 0.15f}) == Holster::None); // below the shoulder
     CHECK(holster_zone(kRightHand, {0.15f, -0.1f, 0.03f}) == Holster::None); // not behind the head
-    CHECK(holster_zone(kLeftHand, {-0.2f, -0.6f, 0.0f}) == Holster::LeftHip);
-    CHECK(holster_zone(kRightHand, {-0.2f, -0.6f, 0.0f}) == Holster::None); // the left hand's
-    CHECK(holster_zone(kLeftHand, {-0.05f, -0.6f, 0.0f}) == Holster::None); // not left of centre
-    CHECK(holster_zone(kLeftHand, {0.0f, -0.4f, -0.2f}) == Holster::Chest);
-    CHECK(holster_zone(kRightHand, {0.1f, -0.4f, -0.2f}) == Holster::Chest);
-    CHECK(holster_zone(kRightHand, {0.0f, -0.4f, -0.05f}) == Holster::None); // not in front
-    CHECK(holster_zone(kRightHand, {0.2f, -0.4f, -0.2f}) == Holster::None);  // off centre
-    CHECK(holster_zone(kRightHand, {0.0f, -0.2f, -0.2f}) == Holster::None);  // above the chest
+    CHECK(holster_zone(kLeftHand, {-0.25f, -0.65f, 0.0f}) == Holster::LeftHip);
+    CHECK(holster_zone(kLeftHand, {-0.25f, -0.65f, -0.05f}) == Holster::LeftHip);
+    CHECK(holster_zone(kRightHand, {-0.25f, -0.65f, 0.0f}) == Holster::None);  // the left hand's
+    CHECK(holster_zone(kLeftHand, {-0.15f, -0.65f, 0.0f}) == Holster::None);   // not left enough
+    CHECK(holster_zone(kLeftHand, {-0.25f, -0.58f, 0.0f}) == Holster::None);   // not low enough
+    CHECK(holster_zone(kLeftHand, {-0.25f, -0.65f, -0.15f}) == Holster::None); // in front of the body
+    // The chest: a hand against it, also with the head bent down to it.
+    CHECK(holster_zone(kLeftHand, {0.0f, -0.30f, -0.08f}) == Holster::Chest);
+    CHECK(holster_zone(kRightHand, {0.1f, -0.40f, -0.15f}) == Holster::Chest);
+    CHECK(holster_zone(kRightHand, {0.0f, -0.24f, 0.02f}) == Holster::Chest);
+    CHECK(holster_zone(kRightHand, {0.0f, -0.35f, -0.25f}) == Holster::None); // in front of the chest
+    CHECK(holster_zone(kRightHand, {0.0f, -0.35f, 0.08f}) == Holster::None);  // behind it
+    CHECK(holster_zone(kRightHand, {0.2f, -0.35f, -0.1f}) == Holster::None);  // off centre
+    CHECK(holster_zone(kRightHand, {0.0f, -0.15f, -0.1f}) == Holster::None);  // above the chest
+    CHECK(holster_zone(kRightHand, {0.0f, -0.50f, -0.1f}) == Holster::None);  // below it
+}
+
+// The hands' ordinary hold in play, as a tester's log gave it (head-local,
+// Index controllers through OpenXR, `openxr: hands` lines): a grip there
+// must aim or raise the tracker, never select from a holster. The log's
+// frame turns with the head's pitch too; the head frame of 22 §8.1 does
+// not, so each position is also checked as it is with the head bent down.
+TEST_CASE("holster zones: the ordinary hold in front of the body is in none") {
+    struct Hands {
+        Vec3 left, right;
+    };
+    constexpr std::array kLogged = {
+        Hands{{-0.05f, -0.51f, -0.34f}, {0.14f, -0.51f, -0.32f}}, // the reported hold
+        Hands{{-0.06f, -0.48f, -0.35f}, {0.07f, -0.50f, -0.34f}},
+        Hands{{-0.07f, -0.51f, -0.35f}, {0.06f, -0.51f, -0.34f}},
+        Hands{{-0.00f, -0.35f, -0.37f}, {0.23f, -0.30f, -0.33f}},
+        Hands{{-0.09f, -0.19f, -0.43f}, {0.08f, -0.20f, -0.43f}},
+        Hands{{0.09f, -0.51f, -0.32f}, {0.22f, -0.51f, -0.26f}},
+        Hands{{-0.02f, -0.52f, -0.31f}, {0.14f, -0.52f, -0.28f}},
+        Hands{{-0.01f, -0.49f, -0.35f}, {0.17f, -0.48f, -0.32f}},
+        Hands{{-0.04f, -0.51f, -0.35f}, {0.14f, -0.50f, -0.32f}},
+        Hands{{-0.00f, -0.57f, -0.27f}, {0.19f, -0.55f, -0.23f}},
+        Hands{{-0.09f, -0.47f, -0.37f}, {0.11f, -0.46f, -0.37f}},
+        Hands{{-0.08f, -0.54f, -0.32f}, {0.12f, -0.52f, -0.31f}},
+        Hands{{-0.05f, -0.53f, -0.33f}, {0.15f, -0.52f, -0.31f}},
+        Hands{{-0.04f, -0.49f, -0.37f}, {0.16f, -0.48f, -0.35f}},
+        Hands{{-0.11f, -0.52f, -0.33f}, {0.09f, -0.51f, -0.34f}},
+        Hands{{-0.17f, -0.37f, -0.23f}, {0.00f, -0.47f, -0.26f}},
+        Hands{{-0.13f, -0.26f, -0.39f}, {0.14f, -0.23f, -0.37f}},
+        Hands{{-0.13f, -0.45f, -0.29f}, {0.01f, -0.49f, -0.33f}},
+        Hands{{-0.06f, -0.52f, -0.31f}, {0.08f, -0.52f, -0.31f}},
+        Hands{{-0.08f, -0.52f, -0.31f}, {0.07f, -0.53f, -0.32f}},
+        // The head turned to the right of the body, and hands in the lap.
+        Hands{{-0.25f, -0.58f, -0.12f}, {-0.10f, -0.60f, -0.18f}},
+        Hands{{-0.34f, -0.56f, -0.05f}, {-0.20f, -0.58f, -0.17f}},
+        Hands{{-0.25f, -0.56f, -0.19f}, {-0.09f, -0.56f, -0.27f}},
+        Hands{{0.05f, -0.63f, -0.13f}, {0.23f, -0.60f, -0.09f}},
+        Hands{{-0.15f, -0.63f, -0.09f}, {-0.02f, -0.63f, -0.10f}},
+    };
+    // A head-local offset (y, z) in the yaw-only head frame when the head is
+    // pitched down by `degrees`.
+    const auto level = [](Vec3 p, float degrees) {
+        const float t = degrees * std::numbers::pi_v<float> / 180.0f;
+        return Vec3{p.x, p.y * std::cos(t) + p.z * std::sin(t), -p.y * std::sin(t) + p.z * std::cos(t)};
+    };
+    for (const Hands& h : kLogged) {
+        for (const float pitch : {0.0f, 10.0f, 20.0f, 30.0f}) {
+            CAPTURE(pitch);
+            CAPTURE(h.left.x);
+            CAPTURE(h.left.y);
+            CAPTURE(h.left.z);
+            CHECK(holster_zone(kLeftHand, level(h.left, pitch)) == Holster::None);
+            CHECK(holster_zone(kRightHand, level(h.right, pitch)) == Holster::None);
+        }
+    }
 }
 
 TEST_CASE("holsters: a grip press that begins in a zone holds the action until released") {
@@ -200,7 +264,7 @@ TEST_CASE("holsters: a grip press that begins in a zone holds the action until r
 TEST_CASE("holsters: off during interactions and menus") {
     Holsters h;
     Holsters::Input in{.blocked = true, .open = true};
-    in.hands[kLeftHand] = {.grip = true, .position = Vec3{-0.2f, -0.6f, 0.0f}};
+    in.hands[kLeftHand] = {.grip = true, .position = Vec3{-0.25f, -0.65f, 0.0f}};
     auto r              = h.update(true, in);
     REQUIRE(r.event.has_value());
     CHECK_FALSE(r.event->fired);
@@ -210,7 +274,7 @@ TEST_CASE("holsters: off during interactions and menus") {
     // stays the holster's until released.
     Holsters k;
     Holsters::Input play{.open = true};
-    play.hands[kLeftHand] = {.grip = true, .position = Vec3{-0.2f, -0.6f, 0.0f}};
+    play.hands[kLeftHand] = {.grip = true, .position = Vec3{-0.25f, -0.65f, 0.0f}};
     CHECK(k.update(true, play).held[kLeftHand] == Holster::LeftHip);
     play.blocked = true;
     r            = k.update(true, play);
@@ -388,13 +452,13 @@ TEST_CASE("control mapper: a holster press drives its action, not Aim") {
 
     // The left hip is the flashlight, the chest the tracker.
     rig.input.toggle_grips = false;
-    place(c.poses, kLeftHand, {-0.2f, -0.6f, 0.0f});
+    place(c.poses, kLeftHand, {-0.25f, -0.65f, 0.0f});
     c.grip_l = true;
     rig.mapper.write(c, false);
     CHECK(rig.player().digital[pa::kFlashlight] == 1);
     c.grip_l = false;
     rig.mapper.write(c, false);
-    place(c.poses, kLeftHand, {0.0f, -0.4f, -0.2f});
+    place(c.poses, kLeftHand, {0.0f, -0.30f, -0.08f});
     c.grip_l = true;
     rig.mapper.write(c, false);
     CHECK(rig.player().digital[pa::kTracker] == 1);

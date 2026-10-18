@@ -305,10 +305,15 @@ Controls keys in `mothervr.json`, Dev. Debug Options on.
       Log: `[input] gesture: recenter (both hands at the head, grips held)`
       once, then the runtime's recenter line.
 - [ ] **Holsters.** `"HolsterGestures": true`. Squeeze over the right
-      shoulder: next weapon; in front of the body: aims as before. At a
-      keypad the same squeeze does nothing. Log: `[input] gesture: holster
-      right shoulder (right hand): next_main_weapon`; at the keypad
-      `... suppressed: interaction`.
+      shoulder: next weapon; with a hand against the chest: the tracker;
+      low at the left hip: the flashlight. Squeezes with the hands held in
+      front of the body as in play (about 0.3 to 0.4 m forward, 0.5 m
+      down), resting in the lap or raised to aim: aim and raise the
+      tracker as before, and log no `holster` line. At a keypad the
+      shoulder squeeze does nothing. Log: `[input] gesture: holster right
+      shoulder (right hand): next_main_weapon`, `[input] gesture: holster
+      chest (left hand): select_motion_tracker` only for the chest
+      squeeze; at the keypad `... suppressed: interaction`.
 - [ ] **Lean while hiding.** `"HidingLean": true`. In a locker lean your
       head about 15 cm sideways, then back: the character peeks, then leans
       back. Log: `[input] gesture: hiding lean reference taken`, `[input]

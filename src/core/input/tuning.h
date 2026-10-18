@@ -67,20 +67,25 @@ inline constexpr std::chrono::milliseconds kGestureFocusSettle{500};
 inline constexpr float kRecenterHandDistance = 0.30f;
 inline constexpr std::chrono::milliseconds kRecenterHold{750};
 
-// 22 §8.4: the holster zones, starting values to tune in play. The
+// 22 §8.4 (r11): the holster zones, starting values to tune in play. The
 // shoulders: above the head's height minus kShoulderBelowHead and behind
 // the head by more than kShoulderBehind. The left hip: below the head's
-// height minus kHipBelowHead and left of centre by more than kHipLeftOf.
-// The chest: between kChestBelowTop and kChestBelowBottom below the head,
-// within kChestHalfWidth of centre and in front by more than kChestInFront.
+// height minus kHipBelowHead, left of centre by more than kHipLeftOf and
+// in front of the head by at most kHipFrontMost. The chest: between
+// kChestBelowTop and kChestBelowBottom below the head, within
+// kChestHalfWidth of centre, and from kChestFrontMost in front of the head
+// to kShoulderBehind behind it. The hands' ordinary hold, about 0.3 to 0.4 m
+// in front of and 0.5 m below the head, and hands resting in the lap are
+// outside every zone, so a grip there aims or raises the tracker as in v1.
 inline constexpr float kShoulderBelowHead = 0.25f;
 inline constexpr float kShoulderBehind    = 0.05f;
-inline constexpr float kHipBelowHead      = 0.55f;
-inline constexpr float kHipLeftOf         = 0.10f;
-inline constexpr float kChestBelowTop     = 0.30f;
-inline constexpr float kChestBelowBottom  = 0.55f;
+inline constexpr float kHipBelowHead      = 0.60f;
+inline constexpr float kHipLeftOf         = 0.18f;
+inline constexpr float kHipFrontMost      = 0.10f;
+inline constexpr float kChestBelowTop     = 0.20f;
+inline constexpr float kChestBelowBottom  = 0.45f;
 inline constexpr float kChestHalfWidth    = 0.15f;
-inline constexpr float kChestInFront      = 0.10f;
+inline constexpr float kChestFrontMost    = 0.20f;
 
 // 22 §9.2: a deliberate lean is well beyond kLeanStart, a breath or a nod
 // stays within kLeanStop (the hysteresis avoids chatter); the lean grows
