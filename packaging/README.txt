@@ -31,7 +31,8 @@ Uninstall
   openvr_api.dll, mothervr.json, mothervr.log and mothervr.log.1 (the
   older log, if present), the mothervr_input folder, any
   mothervr_reflection_*.dds files (developer debug dumps, only made with
-  Dev. Debug Options on), and DATA\MOTHER.PAK with DATA\MOTHER.PAK.src.
+  Dev. Debug Options on), openmothervr_engine_settings.xml, and
+  DATA\MOTHER.PAK with DATA\MOTHER.PAK.src.
   A game that was closed while saving can leave mothervr.json.tmp or
   DATA\MOTHER.PAK.tmp behind; delete those too.
   Never delete DATA\UI.PAK: it is the game's own file.
@@ -48,12 +49,17 @@ Playing
   your body, after half a second. Only in normal play: cutscenes,
   interactions (hacking, levers, ladders...) and hiding never black out,
   however you move your head.
-- VR controllers (Index, Quest/Touch, WMR, Vive wands) have default
-  layouts. Index/Touch: left stick move (click: sprint), right stick
-  turn (up/down: weapons, click: radial menu), A interact (hand near
+- VR controllers (Index, Quest/Touch, WMR, Vive wands, Steam Frame) have
+  default layouts. Index/Touch: left stick move (click: sprint), right
+  stick turn (up/down: weapons, click: radial menu), A interact (hand near
   your head: flashlight), B reload/back, X map, Y flashlight, left
   trigger crouch, right trigger fire, left grip motion tracker, right
   grip aim. Pause: menu button (Index: press the left trackpad).
+  Steam Frame: as Touch, except the left d-pad works like a gamepad's
+  d-pad (moves through menus; in play left/right pick the previous/next
+  weapon), the View button opens the map, the left bumper toggles the
+  flashlight, and the right Menu button pauses. If an older custom binding
+  for the game puts the flashlight on the d-pad, reset it to the default.
   Rebind anything in SteamVR > Settings > Controllers > Manage
   controller bindings > Alien: Isolation.
 - An Xbox controller works too.
@@ -112,10 +118,11 @@ Playing
 - Hands (preview; Options > MotherVR > Hands), in a "Hands" object
   under "Settings":
   - "Enabled": true uses your tracked controllers in the game (default
-    false). Set it before starting the game: aiming needs a pointing pose
-    that is asked of SteamVR or OpenXR at start (a custom SteamVR binding
-    for the game made before needs a reset to the default to get it). The
-    in-game arms still play the game's own animation for now.
+    false). It applies at once, also when turned on in the menu (a custom
+    SteamVR binding for the game made with an older version may lack the
+    pointing pose: the log then says so, and a reset to the default binding
+    fixes it). The in-game arms still play the game's own animation for
+    now.
   - "AimFromHand": with Enabled, the revolver, shotgun, bolt gun and
     flamethrower aim where your right controller points, not where you
     look; the drawn weapon does not follow your hand yet. Melee weapons
@@ -142,6 +149,12 @@ Playing
     while you use a keypad, terminal, lever or other interaction, during
     the breathing game while hiding, and in cutscenes; mouse look still
     works. Default false.
+  - "DpadEmulation": true makes the left stick a d-pad in menus, during
+    interactions and the breathing game while hiding, and in play while
+    you hold the left stick click (sprint) for a moment; on Vive wands,
+    click the left touchpad on an edge. Walking stops while a d-pad
+    direction is pressed. A controller with its own d-pad (Steam Frame)
+    uses it whatever this says. Default false.
   - "VrOffHotkey": true lets you turn VR off for the rest of the session
     by holding right Ctrl + right Shift + F10 for one second; the game
     goes on flat on the monitor. VR comes back at the next launch.
@@ -149,6 +162,19 @@ Playing
   - "CrashSafeLog": true writes mothervr.log to disk as it goes, and adds
     the mod's state to a crash record, so the log survives even a PC
     crash. Applies from the next launch. Default false.
+- Graphics (preview; mothervr.json only), in a "Graphics" object under
+  "Settings", all applied at the next launch:
+  - "EngineSettingsOverride": true adds the options below to the game's
+    Video options. The game's own DATA\ENGINE_SETTINGS.XML is never
+    changed: each launch the mod writes openmothervr_engine_settings.xml
+    in the game folder from it, and the game reads that instead.
+    Default false.
+  - "ShadowMap4096": true makes Video > Shadow Map Resolution offer 4096
+    (sharper shadows, at a GPU cost).
+  - "SharpReflections": true makes Video > Planar Reflections offer
+    Alternative: sharp, mirror-like reflections without blur.
+  - "StreamingTextureHeapMB": 0 keeps the game's size, or 300 to 1024.
+  - "StreamingModelHeapMB": 0 keeps the game's size, or 128 to 512.
 
 If something goes wrong
 - The headset shows the game as a flat screen (Theatre), or the game

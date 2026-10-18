@@ -44,6 +44,45 @@ headset; move it to the roadmap in `README.md` as verified.
       ahead; both eyes match. Log: `[hook] particle lighting: in place on 1
       sites` and one `[diag] particle lighting: eye N ...` line per eye.
 
+- [ ] **Sharper reflections and 4096 shadows.** `"Graphics":
+      {"EngineSettingsOverride": true, "ShadowMap4096": true,
+      "SharpReflections": true}`, then Options > Video: Shadow Map
+      Resolution lists 512, 1024, 1536, 2048, 4096; Planar Reflections
+      lists Off, On, Alternative. `DATA\ENGINE_SETTINGS.XML` is unchanged.
+      Log: `[hook] engine settings: on; ... 2 addition(s)`, two `[render]
+      engine settings: added ...` lines and `[render] engine settings: the
+      game reads ...openmothervr_engine_settings.xml`.
+- [ ] **Alternative renders sharp.** Choose it on a level with a reflective
+      floor (Torrens start): the reflection is sharp, present in both eyes
+      and does not smear at the eye seam. Log: the `reflection POV` line
+      shows `quality 6`. 4096 shadows: sharper edges; note the GPU frame
+      time.
+- [ ] **Defaults and fallbacks.** Without a saved engine settings file the
+      defaults are still the stock choices. Choose 4096 and Alternative,
+      quit, set `EngineSettingsOverride` false: the game still starts (note
+      what Video shows for the two). A broken XML in a test copy: the game
+      starts stock, log `is not well-formed XML ... nothing added`.
+
+## Virtual screen at start-up (OpenVR)
+
+- [ ] **Start-up videos in front.** Headset worn, Skip Startup Intro off:
+      every logo video, the legal screen, the title video and the main
+      menu on one level screen 1.5 m ahead at head height. Log: `openvr:
+      recenter: ...`, then `openvr: frames now on the screen` before the
+      first video and `openvr: frames now tracked` at the first gameplay
+      frame. Tester logs (Quest): if the screen is misplaced, check
+      whether an event line below coincides with it; if none, the runtime
+      re-anchors without telling SteamVR apps.
+- [ ] **Tracking space reset.** On the title screen, reset the seated or
+      standing zero pose in SteamVR (Quest: hold the Oculus button): a
+      moment of black, then the screen in front of where you face. Log:
+      `openvr: ... zero pose reset: the tracking space moved; ...` (or
+      `chaperone universe changed`) and one `openvr: recenter:` line. With
+      the headset on the desk during the reset, the screen stays black
+      until it is worn. In play the same reset re-centres forward.
+- [ ] **Headset on and off.** Log `openvr: headset in use (event 103)` /
+      `openvr: headset idle (event 104)`, and no recenter from that alone.
+
 ## Turning and comfort
 
 - [ ] **Smooth turn.** Snap Rotation off, `"Comfort": {"SmoothTurnSpeed":
@@ -68,6 +107,50 @@ headset; move it to the roadmap in `README.md` as verified.
 - [ ] **Breathing game.** Hide in a locker until the breath prompt: the
       log shows `Start_Breathing_Game` / `End_Breathing_Game` with
       `breathing true` / `false`, and turning is blocked while it runs.
+
+## D-pad and the Steam Frame
+
+With Dev. Debug Options on, every change of the d-pad press is logged:
+`[input] d-pad up true down false left false right false (emulated false)`.
+
+- [ ] **Frame d-pad navigates menus.** Steam Frame, OpenVR: the log has
+      `openvr input: SteamVR Input with 18 actions + 4 hand poses`. In the
+      main menu and the pause menu the left d-pad moves the selection up,
+      down, left and right (the `[input] d-pad` lines with `emulated
+      false`); it never toggles the flashlight. In play left / right pick
+      the previous / next main weapon. If the d-pad still toggles the
+      flashlight, the binding in use is an old custom one: reset it in
+      SteamVR to the default and check again.
+- [ ] **Frame d-pad on OpenXR.** Same on OpenXR: the log has `openxr input:
+      Steam Frame controller bindings suggested` and `openxr input:
+      controller profile /interaction_profiles/valve/frame_controller_valve`
+      (if the runtime does not offer `XR_VALVE_frame_controller_interaction`
+      the first line is missing and the Frame runs on a converted binding:
+      report it).
+- [ ] **Map and Flashlight on the Frame.** The left View button opens the
+      map, the left bumper toggles the flashlight, A near the head still
+      toggles it, the right Menu button pauses, right A / B interact and
+      reload. Options > MotherVR > Input > View Controls shows `Map Menu`
+      `View Button`, `Flashlight` `Left Bumper` and `Menu Navigation`
+      `Left D-Pad`.
+- [ ] **Frame hand poses (OpenVR).** The Frame binding uses the pose
+      components `grip` and `tip`, which are not confirmed for the Frame:
+      with Dev. Debug Options the hands lines every 900 frames show both
+      hands tracked (not `untracked`), and with Tracked Hands on there is no
+      `hand pose actions unbound` or `aim pose actions unbound` line.
+- [ ] **Other controllers unchanged.** Index, Touch, WMR and wands play as
+      before; their controls help is unchanged.
+- [ ] **D-pad emulation in menus.** `"Controls": {"DpadEmulation": true}`:
+      in a menu the left stick moves the selection one step per push, as a
+      pad's d-pad does (`[input] d-pad ... (emulated true)`), without
+      skipping items at the 0.6 threshold.
+- [ ] **D-pad emulation in play.** Hold the left stick click about 0.3 s,
+      then push left / right: previous / next weapon, and you stop walking
+      while the direction is held. A short click still sprints. At a
+      keypad or terminal, or in the breathing game, the left stick is the
+      d-pad without the click. On wands: click the left pad on an edge.
+- [ ] **D-pad emulation off.** With the key off the left stick only walks
+      and moves menus as before; no `emulated true` lines.
 
 ## Seated and standing
 
@@ -113,11 +196,11 @@ built yet: those keys do nothing.
 
 ## Hands
 
-Set `"Hands": {"Enabled": true}` before starting the game (the aim poses
-are registered when the runtime starts). Try on OpenVR and OpenXR.
+Set `"Hands": {"Enabled": true}`, before starting or in the menu (the aim
+poses are always declared). Try on OpenVR and OpenXR.
 
 - [ ] **Defaults.** With hands off: no `[hook] hands` lines; on OpenVR the
-      log reads `+ 2 hand poses`.
+      log reads `+ 4 hand poses` (the aim poses are always declared).
 - [ ] **Installed.** With hands on: `+ 4 hand poses` (OpenVR), `[hook]
       hands, aim from hand: in place`, `[hook] hands, motion tracker in
       hand: in place`, the line that the arms stay animated, then `tracked
@@ -137,8 +220,15 @@ are registered when the runtime starts). Try on OpenVR and OpenXR.
       returns. With the dashboard open, aim follows the head.
 - [ ] **Scenes.** Cutscene, ladder, locker, death: aim goes back to the
       head.
-- [ ] **Turned on mid-session.** The sites install and `no aim pose` is
-      logged (the aim poses need a restart).
+- [ ] **Turned on mid-session.** Start with hands off, turn Tracked Hands
+      on in the menu during play: the sites install, aiming follows the
+      right controller at once, and the log has no `the runtime gives no
+      aim pose for the right hand`. On both runtimes.
+- [ ] **Old binding without aim poses.** With a custom SteamVR binding for
+      the game saved by an older version: `openvr input: hand aim pose
+      actions unbound; ... (reset it to the default binding)` once; under
+      OpenXR a profile without an aim pose logs `openxr input: right hand
+      aim pose not bound by the current profile` once.
 - [ ] **Smoothing.** `"Smoothing": 1`: steadier hands.
 - [ ] **Threads.** No crash or stutter when the weapon update runs (it is
       assumed to run on the game thread).
