@@ -2,7 +2,7 @@
 #include "game/stereo/post_fx_effects.h"
 
 #include "game/code_address.h"
-#include "game/stereo/field.h"
+#include "game/field.h"
 
 namespace omvr::game::stereo {
 

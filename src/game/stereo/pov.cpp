@@ -6,7 +6,7 @@
 
 #include "game/clear_gate.h"
 #include "game/code_address.h"
-#include "game/stereo/field.h"
+#include "game/field.h"
 #include "util/math/matrix.h"
 
 #include <array>

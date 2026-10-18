@@ -5,7 +5,6 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/alpha_light.h
     ${CMAKE_CURRENT_LIST_DIR}/cull.cpp
     ${CMAKE_CURRENT_LIST_DIR}/cull.h
-    ${CMAKE_CURRENT_LIST_DIR}/field.h
     ${CMAKE_CURRENT_LIST_DIR}/follow_camera.cpp
     ${CMAKE_CURRENT_LIST_DIR}/follow_camera.h
     ${CMAKE_CURRENT_LIST_DIR}/graphics_settings.cpp

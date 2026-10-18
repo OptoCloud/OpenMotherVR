@@ -5,7 +5,7 @@
 
 #include "core/stereo/tuning.h"
 #include "game/constants.h"
-#include "game/stereo/field.h"
+#include "game/field.h"
 
 #include <cmath>
 #include <string_view>

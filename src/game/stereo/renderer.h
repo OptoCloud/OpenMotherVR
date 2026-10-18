@@ -3,7 +3,7 @@
 
 #include "game/addresses.h"
 #include "game/code_address.h"
-#include "game/stereo/field.h"
+#include "game/field.h"
 
 #include <cstddef>
 #include <cstdint>

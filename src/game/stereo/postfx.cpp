@@ -2,7 +2,7 @@
 #include "game/stereo/postfx.h"
 
 #include "game/code_address.h"
-#include "game/stereo/field.h"
+#include "game/field.h"
 
 #include <utility>
 
