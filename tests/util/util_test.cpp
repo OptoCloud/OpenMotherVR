@@ -9,6 +9,7 @@
 #include "util/binary/writer.h"
 #include "util/hash/crc32.h"
 #include "util/hash/md5_block.h"
+#include "util/math/finite.h"
 #include "util/math/matrix.h"
 #include "util/math/pose.h"
 #include "util/math/vec.h"
@@ -25,6 +26,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <numbers>
 #include <string_view>
 #include <vector>
@@ -219,6 +221,16 @@ TEST_CASE("4x4 identity and the camera position of a rigid view matrix") {
     CHECK(cam.x == -2.0f);
     CHECK(cam.y == 3.0f);
     CHECK(cam.z == -4.0f);
+}
+
+TEST_CASE("all_finite: any infinity or NaN fails") {
+    util::Matrix44 m = util::identity44();
+    CHECK(util::all_finite(m));
+    m[7] = std::numeric_limits<float>::quiet_NaN();
+    CHECK_FALSE(util::all_finite(m));
+    const float v[] = {0.0f, std::numeric_limits<float>::infinity()};
+    CHECK_FALSE(util::all_finite(v));
+    CHECK(util::all_finite({}));
 }
 
 TEST_CASE("4x4 rows and columns, 3x4 translation") {

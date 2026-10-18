@@ -4,6 +4,7 @@
 #include "core/stereo/tuning.h"
 #include "core/stereo/ui_placement.h"
 #include "core/ui/hud_tuning.h"
+#include "util/math/finite.h"
 #include "util/math/matrix.h"
 #include "util/math/vec.h"
 
@@ -47,10 +48,6 @@ Matrix44 panel(const Vec3& cam, const Vec3& forward, const Vec3& up, float inv_a
     return out;
 }
 
-bool finite(const Matrix44& m) noexcept {
-    return std::ranges::all_of(m, [](float v) { return std::isfinite(v); });
-}
-
 // `a` brought into (-pi, pi].
 float wrapped(float a) noexcept {
     a = std::remainder(a, kTwoPi);
@@ -77,7 +74,7 @@ Matrix44 head_locked_quad(const std::optional<Matrix44>& view, float inv_aspect,
     if (p.is_v1()) return stereo::hud_panel_quad(view, inv_aspect);
     const Matrix44 out = panel(util::camera_position(view->data()), column3(*view, kForwardAxis),
                                column3(*view, kUpAxis), inv_aspect, p);
-    return finite(out) ? out : identity44();
+    return util::all_finite(out) ? out : identity44();
 }
 
 Matrix44 level_quad(const std::optional<Matrix44>& view, float heading, float inv_aspect,
@@ -85,7 +82,7 @@ Matrix44 level_quad(const std::optional<Matrix44>& view, float heading, float in
     if (!view) return identity44();
     const Vec3 forward{std::sin(heading), 0.0f, std::cos(heading)};
     const Matrix44 out = panel(util::camera_position(view->data()), forward, kWorldUp, inv_aspect, p);
-    return finite(out) ? out : identity44();
+    return util::all_finite(out) ? out : identity44();
 }
 
 std::optional<float> view_heading(const Matrix44& view) noexcept {
