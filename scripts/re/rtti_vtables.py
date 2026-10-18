@@ -1,4 +1,12 @@
 # OpenMotherVR-Provenance: clean
+"""List the MSVC RTTI vtables of a 32-bit PE.
+
+    python -I scripts/re/rtti_vtables.py <pe>
+
+For each complete object locator in .rdata, prints the vtable's VA, the
+class's decorated name, the slot count, the locator's offset and the first
+40 slots.
+"""
 import sys, pefile, struct
 pe = pefile.PE(sys.argv[1]); B = pe.OPTIONAL_HEADER.ImageBase
 img = pe.get_memory_mapped_image()

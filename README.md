@@ -29,7 +29,9 @@ The project has two parts:
 
 - Ghidra 12.0.4 (headless) with the scripts in `scripts/`. The Ghidra project
   is not tracked; recreate it by importing MotherVR 0.8.1's `dxgi.dll`, running
-  auto-analysis, then `FillGaps.java` and `BulkDecompile.java`.
+  auto-analysis, then `FillGaps.java` and `BulkDecompile.java`. One-off
+  reverse-engineering tools (Ghidra dump scripts, an RTTI vtable lister) are
+  in `scripts/re/`.
 - JPEXS FFDec for the Scaleform `.GFX` movies.
 - Python 3 with `pefile` (and `capstone` for `scripts/disasm.py`).
 - Visual Studio 2022/2026 (C++ workload), CMake and vcpkg for the DLL; see
