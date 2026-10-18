@@ -32,7 +32,16 @@ public:
 
     // The game keeps the pointer it is handed, so `name` must be a string
     // literal (or otherwise live for the whole process). Render thread.
-    void set_glyph(int pad_code, const char* name) noexcept;
+    // True when the name changed.
+    bool set_glyph(int pad_code, const char* name) noexcept;
+
+    // The names changed while prompts may be on screen: the pad's activity
+    // hook makes the game redraw them (04 §4.2, 22 §10.1). Render thread
+    // requests, game thread takes.
+    void request_redraw() noexcept { redraw_.store(true, std::memory_order_relaxed); }
+    [[nodiscard]] bool take_redraw() const noexcept {
+        return redraw_.exchange(false, std::memory_order_relaxed);
+    }
 
     // The glyph for pad code `code`, which must be in range. Game thread.
     [[nodiscard]] const char* name(std::size_t code) const noexcept {
@@ -42,6 +51,8 @@ public:
 
 private:
     std::array<std::atomic<const char*>, game::kPadCodeCount> names_;
+    // Mutable: taking the request is not a change of the names.
+    mutable std::atomic<bool> redraw_{false};
 };
 
 } // namespace omvr::core::input

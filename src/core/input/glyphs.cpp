@@ -10,10 +10,9 @@ Glyphs::Glyphs() noexcept {
         names_[i].store(kStockPadNames[i], std::memory_order_relaxed);
 }
 
-void Glyphs::set_glyph(int pad_code, const char* name) noexcept {
-    if (name && pad_code >= 0 && static_cast<std::size_t>(pad_code) < names_.size()) {
-        names_[static_cast<std::size_t>(pad_code)].store(name, std::memory_order_relaxed);
-    }
+bool Glyphs::set_glyph(int pad_code, const char* name) noexcept {
+    if (!name || pad_code < 0 || static_cast<std::size_t>(pad_code) >= names_.size()) return false;
+    return names_[static_cast<std::size_t>(pad_code)].exchange(name, std::memory_order_relaxed) != name;
 }
 
 } // namespace omvr::core::input

@@ -196,14 +196,22 @@ for the scripts in `scripts/`). The v2 pages (Comfort, Controls, Hands, Body)
 are added to MotherVR's archive first: `scripts/ui_pages.py` splices
 `scripts/ui_pages/v2_pages.as` into `frontend.GameMenu` of the three menu
 movies and recompiles that class with JPEXS FFDec 26.3.0 (Java on `PATH`;
-`--ffdec <ffdec.jar>` if it is not at `C:\Tools\ffdec_26.3.0`). The output is
-the same bytes on every run; keep it and its work directory under `build-*/`
-(ignored), never in the repository:
+`--ffdec <ffdec.jar>` if it is not at `C:\Tools\ffdec_26.3.0`). Then
+`scripts/ui_glyphs.py` adds the VR button glyphs: one image per id in
+`src/core/input/glyph_ids.h`, drawn by `scripts/glyph_art.py` from simple
+shapes (no font or image is read; `python -I scripts/glyph_art.py <dir> --png`
+writes previews), registered in the 19 movies with `ImageSubstitution` by the
+same FFDec splice; every other VR glyph image of the input is replaced by the
+project's `none` glyph. A new glyph id in `glyph_ids.h` therefore needs a
+design in `glyph_art.py` and a new patch. The output is the same bytes on
+every run; keep it and its work directory under `build-*/` (ignored), never in
+the repository:
 
 ```powershell
 python -I scripts/ui_pages.py <MotherVR 0.8.1 MOTHER.PAK> build\ui\MOTHER_v2.PAK build\ui\work
-python -I scripts/ui_patch.py make  "<game>\DATA\UI.PAK" build\ui\MOTHER_v2.PAK res/ui_patch.bin
-python -I scripts/ui_patch.py check "<game>\DATA\UI.PAK" build\ui\MOTHER_v2.PAK res/ui_patch.bin
+python -I scripts/ui_glyphs.py build\ui\MOTHER_v2.PAK build\ui\MOTHER_v2g.PAK build\ui\work-glyphs
+python -I scripts/ui_patch.py make  "<game>\DATA\UI.PAK" build\ui\MOTHER_v2g.PAK res/ui_patch.bin
+python -I scripts/ui_patch.py check "<game>\DATA\UI.PAK" build\ui\MOTHER_v2g.PAK res/ui_patch.bin
 ```
 
 A new `res/ui_patch.bin` reaches players with the next DLL: `MOTHER.PAK` is
