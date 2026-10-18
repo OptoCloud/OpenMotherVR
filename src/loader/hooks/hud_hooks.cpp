@@ -89,33 +89,24 @@ const char* action_name(HudAction a) noexcept {
 
 // ---- The scripted HUD entity (22 §2.4): the game's own intent ----------------
 
-int __fastcall entity_hide(void* self, void* edx, void* a, void* b) noexcept {
+// The entity's hide and show methods (two stack arguments, ret 8): the
+// game's intent is noted, then its method runs. `kOriginal` is the
+// HudTargets slot of the method each instance replaces.
+template <bool kShow, gui::HudEntityMethodFn gui::HudTargets::* kOriginal>
+int __fastcall entity_method(void* self, void* edx, void* a, void* b) noexcept {
     auto& ctx = context();
-    ctx.hud_visibility.on_game_hide();
-    if (ctx.log.debug_enabled()) logf(ctx.log, kLogGameHud, "hides");
-    return ctx.hud_targets.entity_hide(self, edx, a, b);
+    if constexpr (kShow)
+        ctx.hud_visibility.on_game_show();
+    else
+        ctx.hud_visibility.on_game_hide();
+    if (ctx.log.debug_enabled()) logf(ctx.log, kLogGameHud, kShow ? "shows" : "hides");
+    return (ctx.hud_targets.*kOriginal)(self, edx, a, b);
 }
 
-int __fastcall entity_hide_alt(void* self, void* edx, void* a, void* b) noexcept {
-    auto& ctx = context();
-    ctx.hud_visibility.on_game_hide();
-    if (ctx.log.debug_enabled()) logf(ctx.log, kLogGameHud, "hides");
-    return ctx.hud_targets.entity_hide_alt(self, edx, a, b);
-}
-
-int __fastcall entity_show(void* self, void* edx, void* a, void* b) noexcept {
-    auto& ctx = context();
-    ctx.hud_visibility.on_game_show();
-    if (ctx.log.debug_enabled()) logf(ctx.log, kLogGameHud, "shows");
-    return ctx.hud_targets.entity_show(self, edx, a, b);
-}
-
-int __fastcall entity_show_alt(void* self, void* edx, void* a, void* b) noexcept {
-    auto& ctx = context();
-    ctx.hud_visibility.on_game_show();
-    if (ctx.log.debug_enabled()) logf(ctx.log, kLogGameHud, "shows");
-    return ctx.hud_targets.entity_show_alt(self, edx, a, b);
-}
+constexpr auto* entity_hide     = &entity_method<false, &gui::HudTargets::entity_hide>;
+constexpr auto* entity_hide_alt = &entity_method<false, &gui::HudTargets::entity_hide_alt>;
+constexpr auto* entity_show     = &entity_method<true, &gui::HudTargets::entity_show>;
+constexpr auto* entity_show_alt = &entity_method<true, &gui::HudTargets::entity_show_alt>;
 
 // ---- The crosshair (23 §7.1) -----------------------------------------------------
 
@@ -175,16 +166,16 @@ void __fastcall icon_highlight(void* manager, void* edx, void* record) noexcept 
     gui::restore_highlight_disabled(record, was_set);
 }
 
-static_assert(std::is_convertible_v<decltype(&entity_hide), gui::HudEntityMethodFn>);
-static_assert(std::is_convertible_v<decltype(&entity_hide_alt), gui::HudEntityMethodFn>);
-static_assert(std::is_convertible_v<decltype(&entity_show), gui::HudEntityMethodFn>);
-static_assert(std::is_convertible_v<decltype(&entity_show_alt), gui::HudEntityMethodFn>);
+static_assert(std::is_convertible_v<decltype(entity_hide), gui::HudEntityMethodFn>);
+static_assert(std::is_convertible_v<decltype(entity_hide_alt), gui::HudEntityMethodFn>);
+static_assert(std::is_convertible_v<decltype(entity_show), gui::HudEntityMethodFn>);
+static_assert(std::is_convertible_v<decltype(entity_show_alt), gui::HudEntityMethodFn>);
 static_assert(std::is_convertible_v<decltype(&crosshair_update), gui::CrosshairUpdateFn>);
 static_assert(std::is_convertible_v<decltype(&show_crosshairs), gui::UiInvokeFn>);
 static_assert(std::is_convertible_v<decltype(&hide_crosshairs), gui::UiInvokeFn>);
 static_assert(std::is_convertible_v<decltype(&icon_highlight), gui::IconHighlightFn>);
 
-constexpr gui::HudHooks kHooks{&entity_hide,      &entity_hide_alt, &entity_show,     &entity_show_alt,
+constexpr gui::HudHooks kHooks{entity_hide,       entity_hide_alt,  entity_show,      entity_show_alt,
                                &crosshair_update, &show_crosshairs, &hide_crosshairs, &icon_highlight};
 
 // ---- Installing, as the keys ask -----------------------------------------------
