@@ -11,7 +11,8 @@
 namespace omvr::core::input {
 
 struct ControlSchemes::HelpSet {
-    std::span<const char* const> lines;
+    // The rows, in parts appended in order (an empty part adds nothing).
+    std::array<std::span<const char* const>, 4> parts;
     // The HUD toggle's row: its control is the set's Map Menu control
     // (22 §10.3).
     const char* hud_row;
@@ -22,7 +23,8 @@ struct ControlSchemes::HelpSet {
 namespace {
 
 // The controls help rows, function and control separated by a tab (04 §5.7,
-// exact text).
+// exact text). The thumbstick sets share their first and weapon rows, so
+// each set is its parts in order.
 constexpr const char* kTouchpadHelp[] = {
     "Move\tL Touchpad",
     "Sprint\tL Touchpad Click",
@@ -38,61 +40,39 @@ constexpr const char* kTouchpadHelp[] = {
     "Map Menu\tL Menu",
     "Pause Menu\tR Menu",
 };
-constexpr const char* kThumbstickHelp[] = {
-    "Move\tLeft Thumbstick",
-    "Sprint\tLeft Thumbstick Click",
-    "Crouch\tLeft Trigger",
-    "Turn\tRight Thumbstick L/R",
-    "Aim\tRight Grip",
-    "Fire / Throw / Melee\tRight Trigger",
+// Every thumbstick set's first rows.
+constexpr const char* kStickHelp[] = {
+    "Move\tLeft Thumbstick",   "Sprint\tLeft Thumbstick Click",
+    "Crouch\tLeft Trigger",      "Turn\tRight Thumbstick L/R",
+    "Aim\tRight Grip",        "Fire / Throw / Melee\tRight Trigger",
     "Motion Tracker\tLeft Grip",
-    "Interact\tA",
-    "Radial Menu\tRight Thumbstick Click",
-    "Reload / Activate\tB",
-    "Flashlight\tY",
-    "Flashlight [Press Interact near Head]\tA",
+};
+constexpr const char* kWeaponStickHelp[] = {
     "Next Weapon\tRight Thumbstick Up",
     "Previous Weapon\tRight Thumbstick Down",
+};
+// The face buttons of Touch and Index (A, B, X, Y).
+constexpr const char* kFaceHelp[] = {
+    "Interact\tA", "Radial Menu\tRight Thumbstick Click",    "Reload / Activate\tB",
+    "Flashlight\tY", "Flashlight [Press Interact near Head]\tA",
+};
+constexpr const char* kThumbstickEndHelp[] = {
     "Map Menu\tX",
     "Pause Menu\tMenu Button",
 };
 // Index has no menu button: the left trackpad press pauses.
-constexpr const char* kIndexHelp[] = {
-    "Move\tLeft Thumbstick",
-    "Sprint\tLeft Thumbstick Click",
-    "Crouch\tLeft Trigger",
-    "Turn\tRight Thumbstick L/R",
-    "Aim\tRight Grip",
-    "Fire / Throw / Melee\tRight Trigger",
-    "Motion Tracker\tLeft Grip",
-    "Interact\tA",
-    "Radial Menu\tRight Thumbstick Click",
-    "Reload / Activate\tB",
-    "Flashlight\tY",
-    "Flashlight [Press Interact near Head]\tA",
-    "Next Weapon\tRight Thumbstick Up",
-    "Previous Weapon\tRight Thumbstick Down",
+constexpr const char* kIndexEndHelp[] = {
     "Map Menu\tX",
     "Pause Menu\tLeft Trackpad Press",
 };
 
 // The Steam Frame (04 §5.7): Flashlight on the left bumper, Map on the
 // View button, Pause on the right Menu button, and a d-pad for menus.
-constexpr const char* kFrameHelp[] = {
-    "Move\tLeft Thumbstick",
-    "Sprint\tLeft Thumbstick Click",
-    "Crouch\tLeft Trigger",
-    "Turn\tRight Thumbstick L/R",
-    "Aim\tRight Grip",
-    "Fire / Throw / Melee\tRight Trigger",
-    "Motion Tracker\tLeft Grip",
-    "Interact\tA",
-    "Radial Menu\tRight Thumbstick Click",
-    "Reload / Activate\tB",
-    "Flashlight\tLeft Bumper",
-    "Flashlight [Press Interact near Head]\tA",
-    "Next Weapon\tRight Thumbstick Up",
-    "Previous Weapon\tRight Thumbstick Down",
+constexpr const char* kFrameFaceHelp[] = {
+    "Interact\tA",           "Radial Menu\tRight Thumbstick Click",    "Reload / Activate\tB",
+    "Flashlight\tLeft Bumper", "Flashlight [Press Interact near Head]\tA",
+};
+constexpr const char* kFrameEndHelp[] = {
     "Map Menu\tView Button",
     "Pause Menu\tMenu Button",
     "Menu Navigation\tLeft D-Pad",
@@ -100,57 +80,33 @@ constexpr const char* kFrameHelp[] = {
 
 // With Controls.ControllerGlyphs (22 §10.3): Index names the buttons its
 // controllers are marked with.
-constexpr const char* kIndexFamilyHelp[] = {
-    "Move\tLeft Thumbstick",
-    "Sprint\tLeft Thumbstick Click",
-    "Crouch\tLeft Trigger",
-    "Turn\tRight Thumbstick L/R",
-    "Aim\tRight Grip",
-    "Fire / Throw / Melee\tRight Trigger",
-    "Motion Tracker\tLeft Grip",
-    "Interact\tRight A",
-    "Radial Menu\tRight Thumbstick Click",
-    "Reload / Activate\tRight B",
-    "Flashlight\tLeft B",
-    "Flashlight [Press Interact near Head]\tRight A",
-    "Next Weapon\tRight Thumbstick Up",
-    "Previous Weapon\tRight Thumbstick Down",
+constexpr const char* kIndexFamilyFaceHelp[] = {
+    "Interact\tRight A", "Radial Menu\tRight Thumbstick Click",          "Reload / Activate\tRight B",
+    "Flashlight\tLeft B",  "Flashlight [Press Interact near Head]\tRight A",
+};
+constexpr const char* kIndexFamilyEndHelp[] = {
     "Map Menu\tLeft A",
     "Pause Menu\tLeft Trackpad Press",
 };
 // WMR under SteamVR Input: touchpad halves for the face-button roles.
-constexpr const char* kWmrSteamVrHelp[] = {
-    "Move\tLeft Thumbstick",
-    "Sprint\tLeft Thumbstick Click",
-    "Crouch\tLeft Trigger",
-    "Turn\tRight Thumbstick L/R",
-    "Aim\tRight Grip",
-    "Fire / Throw / Melee\tRight Trigger",
-    "Motion Tracker\tLeft Grip",
+constexpr const char* kWmrSteamVrFaceHelp[] = {
     "Interact\tRight Touchpad Down",
     "Radial Menu\tRight Thumbstick Click",
     "Reload / Activate\tRight Touchpad Up",
     "Flashlight\tLeft Touchpad Up",
     "Flashlight [Press Interact near Head]\tRight Touchpad Down",
-    "Next Weapon\tRight Thumbstick Up",
-    "Previous Weapon\tRight Thumbstick Down",
+};
+constexpr const char* kWmrSteamVrEndHelp[] = {
     "Map Menu\tLeft Touchpad Down",
     "Pause Menu\tMenu Button",
 };
 // WMR under OpenXR: one click per touchpad, no reload or flashlight control.
-constexpr const char* kWmrOpenXrHelp[] = {
-    "Move\tLeft Thumbstick",
-    "Sprint\tLeft Thumbstick Click",
-    "Crouch\tLeft Trigger",
-    "Turn\tRight Thumbstick L/R",
-    "Aim\tRight Grip",
-    "Fire / Throw / Melee\tRight Trigger",
-    "Motion Tracker\tLeft Grip",
+constexpr const char* kWmrOpenXrFaceHelp[] = {
     "Interact\tRight Touchpad Click",
     "Radial Menu\tRight Thumbstick Click",
     "Flashlight [Press Interact near Head]\tRight Touchpad Click",
-    "Next Weapon\tRight Thumbstick Up",
-    "Previous Weapon\tRight Thumbstick Down",
+};
+constexpr const char* kWmrOpenXrEndHelp[] = {
     "Map Menu\tLeft Touchpad Click",
     "Pause Menu\tMenu Button",
 };
@@ -164,13 +120,17 @@ constexpr const char* kHudRowWmrSteamVr  = "Hide/Show HUD [Left Hand near Head]\
 constexpr const char* kHudRowWmrOpenXr   = "Hide/Show HUD [Left Hand near Head]\tLeft Touchpad Click";
 
 using HelpSet = ControlSchemes::HelpSet;
-const HelpSet kTouchpadSet{kTouchpadHelp, kHudRowWand, true};
-const HelpSet kThumbstickSet{kThumbstickHelp, kHudRowThumbstick, false};
-const HelpSet kIndexSet{kIndexHelp, kHudRowThumbstick, false};
-const HelpSet kFrameSet{kFrameHelp, kHudRowFrame, false};
-const HelpSet kIndexFamilySet{kIndexFamilyHelp, kHudRowIndexFamily, false};
-const HelpSet kWmrSteamVrSet{kWmrSteamVrHelp, kHudRowWmrSteamVr, false};
-const HelpSet kWmrOpenXrSet{kWmrOpenXrHelp, kHudRowWmrOpenXr, false};
+const HelpSet kTouchpadSet{{kTouchpadHelp}, kHudRowWand, true};
+const HelpSet kThumbstickSet{
+    {kStickHelp, kFaceHelp, kWeaponStickHelp, kThumbstickEndHelp}, kHudRowThumbstick, false};
+const HelpSet kIndexSet{{kStickHelp, kFaceHelp, kWeaponStickHelp, kIndexEndHelp}, kHudRowThumbstick, false};
+const HelpSet kFrameSet{{kStickHelp, kFrameFaceHelp, kWeaponStickHelp, kFrameEndHelp}, kHudRowFrame, false};
+const HelpSet kIndexFamilySet{
+    {kStickHelp, kIndexFamilyFaceHelp, kWeaponStickHelp, kIndexFamilyEndHelp}, kHudRowIndexFamily, false};
+const HelpSet kWmrSteamVrSet{
+    {kStickHelp, kWmrSteamVrFaceHelp, kWeaponStickHelp, kWmrSteamVrEndHelp}, kHudRowWmrSteamVr, false};
+const HelpSet kWmrOpenXrSet{
+    {kStickHelp, kWmrOpenXrFaceHelp, kWeaponStickHelp, kWmrOpenXrEndHelp}, kHudRowWmrOpenXr, false};
 
 // The rows of v2 features (22 §10.3), each while its key is on, in this
 // order; thumbstick style, then the wand's.
@@ -294,7 +254,7 @@ void ControlSchemes::apply() noexcept {
 HelpRows ControlSchemes::control_help() const noexcept {
     const HelpSet& set = *help_.load(std::memory_order_acquire);
     HelpRows rows;
-    rows.append(set.lines);
+    for (const auto part : set.parts) rows.append(part);
     // The rows of v2 features, whatever Controls.ControllerGlyphs says.
     if (controls_.dpad_emulation) rows.push_back(set.wand_style ? kDpadRowWand : kDpadRow);
     if (controls_.recenter_gesture) rows.push_back(kRecenterRow);
