@@ -80,4 +80,28 @@ inline bool calls(const std::uint8_t* site, const std::uint8_t* target) noexcept
     return *site == x86::kCallRel32 && call_target(site) == address_of(target);
 }
 
+// True if `site` holds `jmp rel32` to `target`.
+inline bool jumps(const std::uint8_t* site, const std::uint8_t* target) noexcept {
+    return *site == x86::kJmpRel32 &&
+           address_of(site + x86::kJmpRel32Size) + read_u32(site + x86::kCallOperandOffset) ==
+               address_of(target);
+}
+
+// True if the 4 bytes at `p` (an operand, a vtable slot, a global pointer)
+// hold the address of `target`.
+inline bool holds_address(const std::uint8_t* p, const volatile void* target) noexcept {
+    return read_u32(p) == address_of(target);
+}
+
+// True if `site` holds `push imm32` of the address of `target`.
+inline bool pushes(const std::uint8_t* site, const volatile void* target) noexcept {
+    return *site == x86::kPushImm32 && holds_address(site + x86::kImm32Offset, target);
+}
+
+// The rel32 operand that reaches `target` from an instruction ending at
+// `insn_end` (rel32 counts from the end of its instruction).
+inline std::uint32_t rel32(const volatile void* insn_end, const volatile void* target) noexcept {
+    return address_of(target) - address_of(insn_end);
+}
+
 } // namespace omvr::game

@@ -73,10 +73,7 @@ struct Check {
     }
     // `push imm32` at `rva` naming the string at `string_rva`.
     bool push_of(std::uint32_t rva, std::uint32_t string_rva, std::string_view what) const noexcept {
-        const auto* site = g.at_rva(rva);
-        return (*site == x86::kPushImm32 &&
-                read_u32(site + x86::kImm32Offset) == address_of(g.at_rva(string_rva))) ||
-               fail(what, rva);
+        return pushes(g.at_rva(rva), g.at_rva(string_rva)) || fail(what, rva);
     }
     bool call(std::uint32_t site, std::uint32_t target, std::string_view what) const noexcept {
         return calls(g.at_rva(site), g.at_rva(target)) || fail(what, site);
@@ -143,7 +140,7 @@ bool visibility_expected(const Check& c, const HudRvas& r) noexcept {
     if (*c.g.at_rva(r.pickup_hud_show) != x86::kPushEsi) return c.fail("PickupHudShow", r.pickup_hud_show);
     for (std::size_t i = 0; i < kEntitySlots.size(); ++i) {
         const std::uint32_t slot = r.hud_entity_methods + slot_offset(static_cast<std::uint32_t>(i));
-        if (read_u32(c.g.at_rva(slot)) != address_of(c.g.at_rva(entity_rva(r, kEntitySlots[i]))))
+        if (!holds_address(c.g.at_rva(slot), c.g.at_rva(entity_rva(r, kEntitySlots[i]))))
             return c.fail("the HUD entity's method table", slot);
     }
     return true;

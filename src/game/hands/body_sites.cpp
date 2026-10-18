@@ -37,20 +37,12 @@ static_assert(kCharacterAnimation == 0x3F0, "the thunk's add is the animation co
 constexpr std::array<std::uint8_t, 12> kSkinSetPoseStart = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0,
                                                             0x81, 0xEC, 0x54, 0x01, 0x00, 0x00};
 
-// `jmp rel32` at `site` to `target`.
-bool jumps(const std::uint8_t* site, const std::uint8_t* target) noexcept {
-    return *site == x86::kJmpRel32 &&
-           address_of(site + x86::kJmpRel32Size) + read_u32(site + x86::kCallOperandOffset) ==
-               address_of(target);
-}
-
 bool code_expected(const GameImage& g, const BodyRvas& r) noexcept {
     const std::uint8_t* thunk = g.at_rva(r.final_pose_thunk);
     const std::uint8_t* push  = g.at_rva(r.final_pose_job_push);
     return x86::matches(g.at_rva(r.final_pose_step), kFinalPoseStepStart) &&
            x86::matches(thunk, kThunkStart) && jumps(thunk + kThunkJumpOffset, g.at_rva(r.final_pose_step)) &&
-           *push == x86::kPushImm32 && read_u32(push + x86::kImm32Offset) == address_of(thunk) &&
-           x86::matches(g.at_rva(r.skin_set_pose), kSkinSetPoseStart) &&
+           pushes(push, thunk) && x86::matches(g.at_rva(r.skin_set_pose), kSkinSetPoseStart) &&
            calls(g.at_rva(r.skin_call_single), g.at_rva(r.skin_set_pose)) &&
            calls(g.at_rva(r.skin_call_parts), g.at_rva(r.skin_set_pose));
 }

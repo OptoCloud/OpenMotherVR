@@ -37,7 +37,7 @@ constexpr std::array<std::uint8_t, 6> kRumbleSetMotorsStart = {0xF3, 0x0F, 0x10,
 // 21 §2.9: the rumble object's vtable holds RumbleSetMotors in slot 0, so
 // the function is the one the game calls for every pad rumble.
 bool rumble_expected(const GameImage& g, const HapticRvas& r) noexcept {
-    return read_u32(g.at_rva(r.rumble_vtable)) == address_of(g.at_rva(r.rumble_set_motors)) &&
+    return holds_address(g.at_rva(r.rumble_vtable), g.at_rva(r.rumble_set_motors)) &&
            x86::matches(g.at_rva(r.rumble_set_motors), kRumbleSetMotorsStart);
 }
 

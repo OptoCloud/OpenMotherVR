@@ -45,8 +45,7 @@ std::string_view engine_settings_path(const GameImage& g, ports::Log& log) noexc
         return {};
     }
     const std::uint8_t* site = g.at_rva(r.load_site);
-    if (site[0] != x86::kMovEaxMoffs ||
-        read_u32(site + x86::kImm32Offset) != address_of(g.at_rva(r.path_pointer)) ||
+    if (site[0] != x86::kMovEaxMoffs || !holds_address(site + x86::kImm32Offset, g.at_rva(r.path_pointer)) ||
         !x86::matches(site + kMovEaxMoffsSize, kLoadArgs) ||
         !calls(site + kCallOffset, g.at_rva(r.xml_load))) {
         ports::logf(log, kCodeLog, r.load_site);

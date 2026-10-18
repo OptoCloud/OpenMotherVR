@@ -72,8 +72,7 @@ void write_gate(std::uint8_t* stub, std::uint8_t* clear) noexcept {
     w.put(kSkipRel);
     w.put(kClearPrologue);
     w.put(x86::kJmpRel32);
-    // rel32 counts from the end of the jump.
-    w.put_u32(address_of(clear + kClearPrologue.size()) - address_of(w.cursor() + x86::kRel32Size));
+    w.put_u32(rel32(w.cursor() + x86::kRel32Size, clear + kClearPrologue.size()));
     w.put(x86::kRet);
 }
 
@@ -92,7 +91,7 @@ bool install_clear_gate(std::uint8_t* clear, core::diag::ports::Log& log) noexce
     // jmp stub; nop (the sixth byte of the prologue it replaces)
     std::array<std::uint8_t, kClearPrologue.size()> entry = x86::nops<kClearPrologue.size()>();
     entry[0]                                              = x86::kJmpRel32;
-    const auto rel = x86::le32(address_of(stub) - address_of(clear + x86::kJmpRel32Size));
+    const auto rel = x86::le32(rel32(clear + x86::kJmpRel32Size, stub));
     std::copy(rel.begin(), rel.end(), entry.begin() + x86::kCallOperandOffset);
     Patcher patcher{log};
     return patcher.write(clear, entry).has_value();

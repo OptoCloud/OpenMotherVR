@@ -51,14 +51,14 @@ constexpr std::array<std::uint8_t, 6> kTrackerScanPrologue = {0x55, 0x8B, 0xEC, 
 bool registry_confirmed(const GameImage& g, const HandRvas& r) noexcept {
     const std::uint8_t* getter = g.at_rva(r.player_getter);
     return getter[0] == x86::kMovEaxMoffs &&
-           read_u32(getter + x86::kImm32Offset) == address_of(g.at_rva(r.character_registry)) &&
+           holds_address(getter + x86::kImm32Offset, g.at_rva(r.character_registry)) &&
            x86::matches(getter + kGetterListOffset, kLoadCharacterList);
 }
 
 bool fire_gate_expected(const GameImage& g, const HandRvas& r) noexcept {
     const std::uint8_t* site = g.at_rva(r.fire_gate_compare);
     return x86::matches(site, kComissXmm0Abs) &&
-           read_u32(site + x86::kComissDispOffset) == address_of(g.at_rva(r.fire_gate_threshold)) &&
+           holds_address(site + x86::kComissDispOffset, g.at_rva(r.fire_gate_threshold)) &&
            x86::matches(site + kGateJbeOffset, kJbeShort11);
 }
 

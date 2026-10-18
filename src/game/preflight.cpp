@@ -101,7 +101,7 @@ public:
 
     // The vtable slot (or code pointer) at `slot` holds `expected`.
     void expect_slot(const std::uint8_t* slot, const std::uint8_t* expected, std::string_view what) noexcept {
-        expect_slot_value(slot, read_u32(slot) == address_of(expected), what);
+        expect_slot_value(slot, holds_address(slot, expected), what);
     }
 
     // The vtable slot at `slot` holds a code address inside the image: for

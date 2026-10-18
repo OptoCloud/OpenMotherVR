@@ -37,8 +37,7 @@ util::Result<void> Patcher::redirect_call(std::uint8_t* site, const void* fn,
         core::diag::ports::logf(log_, kNoCallLog, what, static_cast<void*>(site));
         return std::unexpected(util::Error{.code = 0, .context = "no call at the site"});
     }
-    // rel32 counts from the end of the call instruction.
-    const std::uint32_t rel = address_of(fn) - address_of(site + x86::kCallRel32Size);
+    const std::uint32_t rel = rel32(site + x86::kCallRel32Size, fn);
     if (auto written = write_u32(site + x86::kCallOperandOffset, rel); !written) {
         core::diag::ports::logf(log_, kNotRedirected, what, static_cast<void*>(site));
         return written;
