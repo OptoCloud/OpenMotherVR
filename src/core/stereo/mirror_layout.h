@@ -22,7 +22,7 @@ struct MirrorView {
 // mirror settings. Head-tracked frames (`screen` false) show the eye
 // image(s), filling the window width at their own aspect (a near-square eye
 // in a 16:9 window is cropped top and bottom). Screen frames show the region
-// the headset's virtual screen shows, kScreenMirrorSource, fitted whole.
+// the headset's virtual screen shows, vr::kScreenRegion, fitted whole.
 // Outside the draw area the shader paints black. Pure.
 MirrorConstants mirror_constants(const MirrorView& view, bool screen) noexcept;
 

@@ -1,6 +1,8 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
+#include "core/vr/types.h"
+
 #include <chrono>
 #include <cstdint>
 
@@ -41,15 +43,26 @@ inline constexpr float kDefaultEyeX = 0.032f;
 inline constexpr float kDefaultScreenDistance = 2.0f;
 inline constexpr float kDefaultScreenWidth    = 2.6f;
 
+// The virtual screen for menus, videos and loading: the left eye's image
+// this far in front of where the head faced at the last recenter, and this
+// wide (both metres; 03 §7).
+inline constexpr float kCinemaDistance = 1.5f;
+inline constexpr float kCinemaWidth    = 32.0f / 9.0f;
+
 // A screen frame shows eye 0's half of the stereo texture, its middle half
-// vertically (03 §7, 09 §5.2): in normalised coordinates, and as quarters
-// of the height in pixels (integer division).
-inline constexpr float kScreenLeftHalfU              = 0.5f;
-inline constexpr float kScreenTopV                   = 0.25f;
-inline constexpr float kScreenBottomV                = 0.75f;
+// vertically (03 §7, 09 §5.2), on the virtual screen and in the desktop
+// mirror: in normalised coordinates, and as quarters of the height in
+// pixels (integer division).
+inline constexpr TextureBounds kScreenRegion{0.0f, 0.25f, 0.5f, 0.75f};
 inline constexpr std::uint32_t kScreenHeightQuarters = 4;
 inline constexpr std::uint32_t kScreenTopQuarters    = 1;
 inline constexpr std::uint32_t kScreenBottomQuarters = 3;
+static_assert(kScreenRegion.v_min == static_cast<float>(kScreenTopQuarters) / kScreenHeightQuarters);
+static_assert(kScreenRegion.v_max == static_cast<float>(kScreenBottomQuarters) / kScreenHeightQuarters);
+// Its edges by the names the OpenVR runtime uses.
+inline constexpr float kScreenLeftHalfU = kScreenRegion.u_max;
+inline constexpr float kScreenTopV      = kScreenRegion.v_min;
+inline constexpr float kScreenBottomV   = kScreenRegion.v_max;
 
 // A running session that the runtime never makes visible is reported this
 // long after the session started (09 §3.1).

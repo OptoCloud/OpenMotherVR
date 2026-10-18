@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/vr/tuning.h"
+
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -10,11 +12,10 @@ namespace omvr::core::stereo {
 
 // ---- The runtimes' virtual screen (03 §7) ----------------------------------
 
-// The virtual screen for menus, videos and loading: the left eye's image
-// this far in front of where the head faced at the last recenter, and this
-// wide (both metres).
-inline constexpr float kCinemaDistance = 1.5f;
-inline constexpr float kCinemaWidth    = 32.0f / 9.0f;
+// Defined in core/vr/tuning.h; named here for the platform runtimes that
+// still read them from core::stereo.
+using vr::kCinemaDistance;
+using vr::kCinemaWidth;
 
 // ---- The game's UI quads (05 §4) -------------------------------------------
 
@@ -101,10 +102,6 @@ inline constexpr float kMaxTextureSize = 16384.0f;
 // that fails shows as red, and to black when the mirror is off.
 inline constexpr std::array<float, 4> kMirrorClearColour = {0.6f, 0.0f, 0.0f, 1.0f};
 inline constexpr std::array<float, 4> kMirrorOffColour   = {0.0f, 0.0f, 0.0f, 1.0f};
-// In screen frames the mirror shows what the virtual screen shows: eye 0's
-// half of the stereo texture, its middle half vertically (UV left, top,
-// right, bottom).
-inline constexpr std::array<float, 4> kScreenMirrorSource = {0.0f, 0.25f, 0.5f, 0.75f};
 
 // ---- Per-eye reflections, diagnostics (07 §6) ------------------------------
 

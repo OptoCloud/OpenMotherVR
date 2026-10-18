@@ -5,6 +5,7 @@
 #include "core/stereo/mirror_layout.h"
 
 #include "core/stereo/tuning.h"
+#include "core/vr/tuning.h"
 
 #include <algorithm>
 #include <iterator>
@@ -24,8 +25,8 @@ struct UvRect {
 constexpr UvRect kLeftHalf{0.0f, 0.0f, 0.5f, 1.0f};
 constexpr UvRect kRightHalf{0.5f, 0.0f, 1.0f, 1.0f};
 constexpr UvRect kWhole{0.0f, 0.0f, 1.0f, 1.0f};
-constexpr UvRect kScreenSource{kScreenMirrorSource[0], kScreenMirrorSource[1], kScreenMirrorSource[2],
-                               kScreenMirrorSource[3]};
+constexpr UvRect kScreenSource{vr::kScreenRegion.u_min, vr::kScreenRegion.v_min, vr::kScreenRegion.u_max,
+                               vr::kScreenRegion.v_max};
 
 void set_panel(MirrorConstants& c, int panel, const UvRect& draw, const UvRect& source) noexcept {
     const float d[4] = {draw.l, draw.t, draw.r, draw.b};
