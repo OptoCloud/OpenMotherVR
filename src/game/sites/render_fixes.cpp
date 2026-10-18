@@ -184,7 +184,9 @@ void fix_alpha_light(const GameImage& g, Patcher& p, const ReconRvas& r,
         ports::logf(p.log(), kAlphaLightCallLog, kAlphaLightArea, r.alpha_light_ndc_call);
         return;
     }
-    hooks.targets->alpha_light = {.eye_ndc = g.at_rva(r.eye_ndc)};
+    hooks.targets->alpha_light = {.eye_ndc          = g.at_rva(r.eye_ndc),
+                                  .light_object     = g.at_rva(r.light_object),
+                                  .camera_constants = g.at_rva(r.camera_constants)};
     if (p.redirect_call(g.at_rva(r.alpha_light_ndc_call), hooks.alpha_light_eye_ndc, "EyeNdc")) {
         area_on(p.log(), kAlphaLightArea, kAlphaLightSites);
     }

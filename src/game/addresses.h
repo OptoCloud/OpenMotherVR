@@ -181,6 +181,12 @@ struct ReconRvas {
     // the 2015 AI.exe (timestamp 0x54E3199D): `e8 c6 9a 03 00` at 0x57EC15.
     std::uint32_t alpha_light_ndc_call;
     std::uint32_t eye_ndc;
+    // The particle lighting diagnostic (08 §8.5): the atlas camera
+    // (`LightObject`, 24 §1.1; 08 §8.1: axes at +0xF0..+0x110, position at
+    // +0x120) and the drawn POV's camera constants (`CameraConstants`, 24
+    // §1.1; view at +0x280, 24 §14.2). Objects, read only.
+    std::uint32_t light_object;
+    std::uint32_t camera_constants;
 
     // Mode stack (cleanroom 05 section 3.2f, 01 StereoModeStackAppend): the
     // game's int-array append and its call in StereoPushMode, after
@@ -214,6 +220,8 @@ inline constexpr ReconRvas kReconRvas2015 = {
     .event_tap               = 0x00A1BCC0,
     .alpha_light_ndc_call    = 0x0057EC15,
     .eye_ndc                 = 0x005B86E0,
+    .light_object            = 0x01365C90,
+    .camera_constants        = 0x01357E40,
     .mode_stack_append_call  = 0x005D9C53,
     .mode_stack_append       = 0x00294540,
 };
