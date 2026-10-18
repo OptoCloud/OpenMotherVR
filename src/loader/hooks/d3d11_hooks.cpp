@@ -139,10 +139,9 @@ HRESULT __stdcall hook_create_pixel_shader(void* self, const void* code, SIZE_T 
     const auto create  = system_method<CreatePixelShaderFn>(ctx.targets.create_pixel_shader);
     auto& stats        = ctx.shader_fixes;
     const int total    = stats.count_created();
-    int sites          = 0;
-    const auto patched = core::render::patch_position_dither(code, size, sites);
-    if (!patched.empty()) {
-        const HRESULT hr = create(self, patched.data(), patched.size(), linkage, out);
+    const auto patched = core::render::patch_position_dither(code, size);
+    if (!patched.blob.empty()) {
+        const HRESULT hr = create(self, patched.blob.data(), patched.blob.size(), linkage, out);
         if (SUCCEEDED(hr)) {
             stats.count_fixed(total);
             return hr;

@@ -47,6 +47,8 @@ inline constexpr std::uint32_t kVertexShaderProgram = 1;
 // Opcode token: opcode, length in tokens, extended flag.
 inline constexpr std::uint32_t kOpMad = 0x32, kOpMul = 0x38, kOpNop = 0x3A, kOpCustomData = 0x35,
                                kOpDclConstantBuffer = 0x59;
+// The fraction the dither fix takes of a wrapped position (08 §1.4 r7).
+inline constexpr std::uint32_t kOpFrc = 0x1A;
 // The arithmetic the upright-sprite fix inserts, and the declarations it
 // reads or changes.
 inline constexpr std::uint32_t kOpAdd = 0x00, kOpDp2 = 0x0F, kOpDp4 = 0x11, kOpLt = 0x31, kOpMax = 0x34,

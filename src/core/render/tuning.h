@@ -12,6 +12,12 @@ namespace omvr::core::render {
 inline constexpr std::uint32_t kResolutionBuffer = 2;
 inline constexpr std::uint32_t kSourceResolution = 39;
 
+// A shader that declares no cb2 wraps the dither's position to this period
+// in pixels instead (08 §1.4 r7, project decision: a pattern repeating
+// every 1024 pixels still breaks up banding, and frc(p / 1024) has the
+// range of p / size).
+inline constexpr float kDitherWrapPixels = 1024.0f;
+
 // The pixel-shader statistics are logged on the first fixed shader and then
 // every this many (11).
 inline constexpr int kShaderStatsLogPeriod = 200;
