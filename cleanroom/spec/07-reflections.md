@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build, re-checked against the binary for r2: reflection render and its single call, POV::SetEye including its FOV formula, renderer clear prologue, screen-constants upload); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; analysis of the game's level pixel shaders (LEVEL_SHADERS_DX11_BIN.PAK of the Torrens level); geometric derivation of the per-eye mapping by the spec side; observation in game by the spec side (an earlier mod showed reflections sliding against head motion; the per-eye render required here has not yet been seen running, because in every scene tested the reflection view never had both its active and render flags set). r4: some game facts (the side effects of POV::SetEye, mip generation by quality and the mip count at target creation, the values the graphics settings offer for setting 0x10) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and the game's `ENGINE_SETTINGS.XML` by the spec side; the viewport rebuild of §8 item 1 re-read in the 2015 `AI.exe`; requirements of §4.3, §4.6, §6 and §7 restated as results (clean-room review round 2); capture gating aligned with 11 and 13. Section numbers are unchanged from r3. r5 (with 24 r6): the reflection quality's values include the option the v2 engine settings override adds (§1); the reflection events of §6 also convey the reflection quality, project decision with its reason in §6. Revision: r5 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build, re-checked against the binary for r2: reflection render and its single call, POV::SetEye including its FOV formula, renderer clear prologue, screen-constants upload); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; analysis of the game's level pixel shaders (LEVEL_SHADERS_DX11_BIN.PAK of the Torrens level); geometric derivation of the per-eye mapping by the spec side; observation in game by the spec side (an earlier mod showed reflections sliding against head motion; the per-eye render required here has not yet been seen running, because in every scene tested the reflection view never had both its active and render flags set). r4: some game facts (the side effects of POV::SetEye, mip generation by quality and the mip count at target creation, the values the graphics settings offer for setting 0x10) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and the game's `ENGINE_SETTINGS.XML` by the spec side; the viewport rebuild of §8 item 1 re-read in the 2015 `AI.exe`; requirements of §4.3, §4.6, §6 and §7 restated as results (clean-room review round 2); capture gating aligned with 11 and 13. Section numbers are unchanged from r3. r5 (with 24 r6): the reflection quality's values include the option the v2 engine settings override adds (§1); the reflection events of §6 also convey the reflection quality, project decision with its reason in §6. r6: static analysis by the spec side of the level shader packs of six levels and of the global deferred shader pack (every reflection sampler forms its lookup from the pixel position and register 60; the deferred-light vertex shaders' use of buffer 1 register 21 and the upload's formulas, re-read in the 2015 `AI.exe` at 0x574F50); a tester's report (metal and glass looking different across the view) attributed to 08 §1.5. Section numbers are unchanged from r5. Revision: r6 -->
 
 # 07: Planar reflections in stereo
 
@@ -194,6 +194,32 @@ position:
 
 No reflection matrix is involved. `1 - x` undoes the left-right mirroring of
 the reflection view.
+
+r6 [sure, counted by the spec side]: every pixel shader that binds
+`reflectionSamplerReg` in the level packs of the Torrens, `TECH_HUB`,
+`SCI_HOSPITALUPPER`, `HAB_AIRPORT`, `SOLACE` and `TECH_RND` levels (25
+shaders) forms its lookup this way, from `SV_Position` and register 60.
+Some (the transparent reflective materials) first add a normal-map
+offset in pixels to the position, scaled by a material constant; near the
+middle of the target such an offset can cross into the other eye's half
+by a few pixels, which is accepted. None uses the vertex constant of
+`ScreenConstantsUpload` (buffer 1 register 21); that constant is read by
+the game's deferred-light vertex shaders (`DATA\SHADERS\UBERSHADER\DEFERREDSHADERS_DX11_BIN.PAK`),
+which map the light volume's clip position to a G-buffer coordinate with
+it, `uv = (0.5 + 0.5 · x, 0.5 - 0.5 · y) · c21.xy + c21.zw`, with
+`c21 = (vpW / W, vpH / H, left / W, top / H)` from the renderer's
+rectangle `+0xA88..+0xA94` (0x574F50; pixel register 61 is the same
+rectangle with `1/W` and `1/H` subtracted from its first two components).
+
+**Surfaces that are not planar reflections (r6) [likely; 08 §1.6 confirms
+it].** Metal (grills,
+staircases) and glass get their reflective look from the environment
+map (a cube map addressed by direction, not by screen position) scaled
+by a reflectance factor; a reflective look that differs across the view
+or between the eyes on such a surface comes from that factor's dither,
+08 §1.5, not from this document. In a tester's session where these
+differed, the reflection view never rendered (§6's event showed its
+flags 0 throughout).
 
 ## 3. Why it breaks in stereo [likely]
 

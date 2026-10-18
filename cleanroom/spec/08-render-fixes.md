@@ -1,12 +1,13 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build; every site and byte below re-read from the binary for r2; for r4 the spec side re-read the cull function 0x61FD20 and its distance test, the register 39 upload and the head-in-wall fade 0x346DE0) and of the game's pixel shaders (DXBC from the level and global shader packs; for r4 the spec side counted the pixel shaders holding the dither's immediates in three level packs); the public DXBC container layout and checksum; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and shader packs by the spec side (the dither sequence and how it fails, register 39, the cull function's tests); that analysis served only as a lead to which problems exist, and the required results of sections 1, 2 and 4 are stated as this project's own properties; in-game observation by the spec side in a headset (section 1 and section 5 confirmed working); measurements in game by the spec side (draw-submission cost with the distance, occlusion and view-volume tests all bypassed; AA cost; shader-creation cost over the first 3500 shaders of a session); user requirements (anti-aliasing choice with an automatic mode, no MD5 of every shader, shaders changed by other tools pass through); project decisions, each with its reason inline (the head-in-wall delay D, chosen afresh for r4; the bound on the dither's input). r4: clean-room review round 2 applied (section 1 as properties, section 2.1 restated from the spec side's own reading, the head-in-wall delay and its "clear" test re-derived from the game, measurement conditions stated). Section numbers are unchanged from r3. For r5: cross-document alignment after the second fix pass (the acceptance of 07 is 07 §7; the setting's full key `Rendering.StereoAntiAliasing`; the AA log event as 11 §2.4 defines it; the head-in-wall measurement no longer points at a log event 11 does not define). Section numbers are unchanged from r4. For r6, under the clean-room process r3 (what a player sees may be stated exactly): the options-page label of `ClippingBlinders` (`Clip Blinding`, the label players of the earlier mod knew) in §4.1 and §4.2, and that `Rendering.StereoAntiAliasing` has no options-page control (§3.2). No game fact was added. Section numbers are unchanged from r5. Revision: r6 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build; every site and byte below re-read from the binary for r2; for r4 the spec side re-read the cull function 0x61FD20 and its distance test, the register 39 upload and the head-in-wall fade 0x346DE0) and of the game's pixel shaders (DXBC from the level and global shader packs; for r4 the spec side counted the pixel shaders holding the dither's immediates in three level packs); the public DXBC container layout and checksum; game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and shader packs by the spec side (the dither sequence and how it fails, register 39, the cull function's tests); that analysis served only as a lead to which problems exist, and the required results of sections 1, 2 and 4 are stated as this project's own properties; in-game observation by the spec side in a headset (section 1 and section 5 confirmed working); measurements in game by the spec side (draw-submission cost with the distance, occlusion and view-volume tests all bypassed; AA cost; shader-creation cost over the first 3500 shaders of a session); user requirements (anti-aliasing choice with an automatic mode, no MD5 of every shader, shaders changed by other tools pass through); project decisions, each with its reason inline (the head-in-wall delay D, chosen afresh for r4; the bound on the dither's input). r4: clean-room review round 2 applied (section 1 as properties, section 2.1 restated from the spec side's own reading, the head-in-wall delay and its "clear" test re-derived from the game, measurement conditions stated). Section numbers are unchanged from r3. For r5: cross-document alignment after the second fix pass (the acceptance of 07 is 07 §7; the setting's full key `Rendering.StereoAntiAliasing`; the AA log event as 11 §2.4 defines it; the head-in-wall measurement no longer points at a log event 11 does not define). Section numbers are unchanged from r4. For r6, under the clean-room process r3 (what a player sees may be stated exactly): the options-page label of `ClippingBlinders` (`Clip Blinding`, the label players of the earlier mod knew) in §4.1 and §4.2, and that `Rendering.StereoAntiAliasing` has no options-page control (§3.2). No game fact was added. Section numbers are unchanged from r5. For r7: a tester's report on OpenXR with a Valve Index at pixel scale 2.0 (glass not transparent in the corner of the view; a ceiling grill and staircases with a metallic look only in the right part of the right eye); static analysis by the spec side of the level shader packs of six levels (Torrens, `TECH_HUB`, `SCI_HOSPITALUPPER`, `HAB_AIRPORT`, `SOLACE`, `TECH_RND`) with the public D3D shader disassembler: the dither occurs in eleven register layouts, of which r6 matched one; counts per layout, per pack and per render-target count, and which shaders declare constant buffer 2 (§1.1); the overflow region evaluated by the spec side from the formula (§1.5); project decision with its reason (§1.4: shaders without constant buffer 2 are patched with a wrapped position); new §1.5 and §1.6; other section numbers are unchanged from r6. A new §8 (r7): the particle lighting lookup in stereo, from static analysis of the 2015 `AI.exe` by the spec side (the lookup's tile offset and scale, the stereo manager's NDC wrapper and its single call, device slot 14 for eye -1, the per-frame alpha-light camera) and of the particle shaders in the level packs (how the vertex shaders form the lookup and the pixel shaders read it); a tester's report (smoke near the floor unlit when looked at directly) with the diagnostic that settles it. Revision: r7 -->
 
 # 08: Rendering fixes
 
-Five problems in how the game renders in stereo, beyond the reflections of
+Six problems in how the game renders in stereo, beyond the reflections of
 07: lighting that differs between the eyes, objects popping in and out,
 anti-aliasing switched off, an abrupt head-in-wall blackout, and the size of
-the desktop mirror. For each: what the game does, why it fails in VR, and
-what the mod must do.
+the desktop mirror, and (§8, r7) particle lighting looked up at the wrong
+place. For each: what the game does, why it fails in VR, and what the mod
+must do.
 
 Addresses are RVAs of the 2015 build (image base 0x400000), read from the
 2015 `AI.exe`. The 2020 addresses of sections 2 to 4 are not known (2020: ?);
@@ -24,6 +25,7 @@ confirmed in game.
 | 3 | Anti-aliasing off in stereo | required; specified; **not yet confirmed in game** |
 | 4 | Head-in-wall blackout too abrupt | required; specified; **not yet confirmed in game** |
 | 5 | Desktop mirror smaller than the window | required; **confirmed in game** |
+| 8 | Particle lighting misplaced in stereo (r7) | required; specified; **not yet confirmed in game**; 8.5 open |
 | (07) | Planar reflections per eye | required; specified in 07; **not yet confirmed in game** (no planar reflection surface in the tested scene) |
 
 ## 0. Applying the fixes
@@ -71,11 +73,36 @@ shaders (shader model 5.0) it is always this sequence, where `vP` is the
 | 7 | `min rD.w, rD.w, l(1.0)` | factor clamped to 1 |
 
 Register numbers, write masks and input numbers vary between shaders;
-instructions 1 and 2 are always adjacent and in this order. Instruction 1's
-immediate is exactly `(0.001, 0.001, 0, 0)` and instruction 2's exactly
-`(0, 0, 0.001, 0.001)`, with 0.001 having the bit pattern 0x3A83126F; the
+instructions 1 and 2 are always adjacent and in this order, and
+instruction 3 follows instruction 2 directly; instructions 4 to 7 follow in
+that order, with unrelated instructions between them in some shaders. The
 second source of instruction 2 is an input with a negate modifier. The
-factor then scales an output colour (emissive or environment light).
+factor then scales an output colour (emissive or environment light,
+including the environment-map reflection of metal and the reflectance and
+transmission of glass).
+
+**Register layouts (r7) [sure, counted by the spec side].** The table
+shows the most common layout, not the only one. In every site the spec
+side found, each of instructions 1 and 2 writes exactly two components of
+a temporary; its `vP` source swizzle puts `vP.x` in the first written
+component and `vP.y` in the second; its immediate holds 0.001 (bit pattern
+0x3A83126F) in exactly the written components and 0 in the other two;
+instruction 2's third source is `-vT` with one component replicated in the
+written components; and instruction 3 is a `dp2` whose two sources read
+the two written pairs (in written order). The two instructions write
+either two different temporaries or two disjoint component pairs of the
+same one. Counted over the level packs of the Torrens, `TECH_HUB`,
+`SCI_HOSPITALUPPER`, `HAB_AIRPORT`, `SOLACE` and `TECH_RND` levels: 4121
+sites, of which 2467 have the layout of the table (written components `xy`
+then `zw`, one temporary) and 1654 another one, in ten further layouts (for
+example `mul rA.yz, vP.xxyx, l(0, 0.001, 0.001, 0)` followed by
+`mad rB.xy, vP.xyxx, l(0.001, 0.001, 0, 0), -vT.xxxx` and
+`dp2 rC.y, rB.xyxx, rA.yzyy`, 980 sites). Per pack, 248 to 319 sites are in
+another layout, about 40 % of each. Of the shaders with a single render
+target (forward-rendered materials such as glass), 144 of 181 use another
+layout. 296 of the shaders holding the dither do not declare constant
+buffer 2 (281 of them in another layout). Every one of the 4121 sites
+holds two consecutive dwords 0x3A83126F in one of its two immediates.
 
 ### 1.2 Why it fails on a side-by-side target [likely]
 
@@ -142,11 +169,16 @@ game's pair (the target size is not an immediate), so the patched program
 may be longer than the original. The rewrite is subject to these required
 results:
 
-- **Exact match only.** A site is patched only if instructions 1 and 2 have
-  exactly the form of §1.1: the operand kinds, the `vP` components read, the
-  two immediates, and a negated input as the second source of instruction
-  2. Any other form is left unchanged. How the match is decided is the
-  implementation's choice.
+- **Every layout of the dither, and nothing else (r7).** A site is patched
+  when instructions 1 and 2 have the form of §1.1 in any of its register
+  layouts (§1.1, "Register layouts"): the operand kinds, `vP.x` and `vP.y`
+  in the two written components, 0.001 in exactly those components of the
+  immediate and 0 elsewhere, a negated input with one replicated component
+  as the third source of instruction 2, and a `dp2` as instruction 3 that
+  reads the two written pairs. Any other form is left unchanged. Matching
+  only the layout of the table is not enough: it leaves about 40 % of the
+  sites unpatched, which shows as §1.5 describes. How the match is decided
+  is the implementation's choice.
 - **No live value overwritten.** The patched program must not change any
   value the rest of the shader reads, other than the two results above.
   Whether to reuse registers or declare an extra temporary is the
@@ -155,8 +187,16 @@ results:
 - **Register 39 declared.** Register 39 must be inside the shader's declared
   size of constant buffer 2 (at least 40 registers); a smaller declaration
   is raised to 40. A shader that does not declare constant buffer 2 at all
-  is left unchanged: the game is only known to bind buffer 2 for shaders
-  that declare it [likely].
+  gets no new constant buffer, since the game is only known to bind
+  buffer 2 for shaders that declare it [likely]. r7: such a shader (296
+  of the shaders holding the dither, §1.1) is still patched, with an
+  input that needs no constant: the position wrapped to a period of 1024
+  pixels and scaled to `[0, 1)`, `frc(p / 1024)` per component, in place
+  of `p · (1/W, 1/H)` (project decision: the dither's purpose is breaking
+  up banding, which a pattern repeating every 1024 pixels still does, and
+  the value has the same range as `p · (1/W, 1/H)`, so the bound below
+  holds as it does for the other shaders). Every other property of this
+  section holds for it.
 - **Containers understood or untouched.** A DXBC container the
   implementation does not fully understand, by the public DXBC layout, is
   left unchanged; so is one whose stored checksum (bytes 4..19, the standard
@@ -203,6 +243,58 @@ visible there beyond the dither pattern), but not with runtime None.
 
 **Observed [sure]:** in the headset, surfaces that lit up in the right eye
 only are lit the same in both eyes after the change.
+
+### 1.5 The unpatched layouts at pixel scale 2.0 (r7)
+
+**Reports.** A tester (OpenXR, Valve Index, 2688x2688 per eye, pixel scale
+2.0, so a side-by-side target of 10752x5376) reported: glass windows stop
+being transparent in the very corner of the view but stay visible; a
+grill in a ceiling and parts of some staircases have their metallic,
+reflective look only in the right part of the right eye, and not in the
+left eye or the rest of the right eye. In that session the reflection
+view never rendered (07 §6's event showed its flags 0 throughout), so the
+planar reflection of 07 was not involved.
+
+**Cause [likely; the arithmetic is sure, the link to the reports is to be
+confirmed by §1.6].** These materials hold the dither in a layout the
+fix of r6 did not match (§1.1: the forward-rendered ones mostly do), so
+their hash still runs on the absolute position. With `p' = 0.001·p`,
+`d = p'.x (p'.x - t) + p'.y (p'.y - t)`. `2^d` overflows to infinity for
+`d >= 128`; the factor then becomes 1 (§1.2): full environment reflection
+on metal, full reflectance and no transmission on glass. On a 10752x5376
+target, `d >= 128` with `t = 0` is reached only in the lower right corner
+of the right eye (`|p'| >= 11.3`), and with a negative texture coordinate
+it moves to the left (for `t = -2`, the right-most 7 % of the right eye
+at its top edge and about 40 % at its bottom edge; for `t = -5`, about the
+right third of the right eye from a quarter of its height down). The left
+eye stays below 128 unless `t` is about -6.5 or less. On 5376x2688 (pixel
+scale 1.0) `d` stays below 128 for `t` above about -11, which is why the
+effect appears with pixel scale 2.0. (Spec side's evaluation of the
+formula; `t` is the material's texture coordinate, which differs per
+surface.) Where `10.7 < d < 128` the hash is 0 (§1.2) and the
+factor is the material's own, which is what flat play shows: so the
+look the tester saw only in the right part of the right eye is the factor
+forced to 1, and the rest of the view is the game's own result. The
+required result of §1.4, applied to every layout, removes the overflow:
+the whole view then looks as the left eye does now, and as flat play
+does.
+
+### 1.6 Acceptance and diagnostic (r7)
+
+1. Same spot (the ceiling grill, the staircase, a window), pixel scale
+   2.0, before the r7 change: close each eye in turn. Expected from §1.5:
+   the different look is in the right eye only, on its right side (glass:
+   its lower right corner). At pixel scale 1.0 it is gone or confined to
+   the very edge.
+2. Runtime None, same spot, looking at the surface with the mouse so that
+   it sits in the lower right of the screen and then in the centre: the
+   flat look is the look of the left eye in 1.
+3. After the r7 change, at pixel scale 2.0: the grill, the staircase and
+   the window look the same in both eyes and across the whole view, and as
+   in 2; glass is transparent up to the edge of the view.
+4. The log's dither event (11 §2.2) counts the shaders holding the dither
+   that were left unchanged; after a level load it reports 0 of them, or a
+   count to be reported with the log.
 
 ## 2. Object pop-in
 
@@ -463,11 +555,12 @@ itself: the game leaves whatever viewport it last used bound.
 
 | § | Check | Status |
 |---|---|---|
-| 1 | Floors and walls lit the same in both eyes at pixel scale 2.0; the log reports several hundred patched shaders per level and no rejections | confirmed |
+| 1 | Floors and walls lit the same in both eyes at pixel scale 2.0; the log reports several hundred patched shaders per level and no rejections | confirmed (layout of the table); r7: every layout, §1.6, to do |
 | 2 | 2.3 acceptance | to do |
 | 3 | 3.2 acceptance | to do |
 | 4 | 4.2 acceptance | to do |
 | 5 | Mirror fills the window for each mirror type, symmetric on and off | confirmed |
+| 8 | 8.4 acceptance; 8.5 diagnostic | to do |
 | (07) | 07 §7 | to do |
 
 ## 7. Open questions
@@ -491,3 +584,158 @@ itself: the game leaves whatever viewport it last used bound.
 - **Per-eye T2x.** True temporal SMAA in stereo (a velocity pass for eye 1
   and per-eye history) is not required in v1.
 - **2020 build.** Every address of sections 2 to 4.
+
+## 8. Particle lighting lookup in stereo (r7)
+
+Smoke, steam, fog and other lit particles read their lighting from a
+screen-space atlas the game builds once per frame. In stereo the game
+addresses that atlas with the wrong scale. This fix applies whenever
+stereo runs, like §1, and has no key (a defect of the game's stereo path).
+
+### 8.1 Game facts [sure for the code and shaders]
+
+- **The atlas camera.** Once per frame, on the game thread, the camera
+  step calls 0x5C5F50 (the call at 0x3B4160, `b9 90 5c 76 01 e8 eb 1d 21
+  00`, ECX = `LightObject`, RVA 0x1365C90) after the stereo update. It
+  takes the main POV's view and projection; while the stereo device is in
+  state 2 the projection is replaced through device slot 12 with eye -1
+  (at 0x5C5FEB) and the FOV through slot 13 with eye -1. It stores the
+  view times projection at `LightObject` `+0x70`, its inverse at `+0xB0`,
+  the camera's axes at `+0xF0` to `+0x110` and its position at `+0x120`.
+- **Tiles.** For each lit sprite emitter the game projects its bounding
+  box through `+0x70`, divides by w, clamps to `[-1, 1]` and keeps the
+  rectangle (centre and half extents in that camera's NDC, at entry
+  `+0x1C` to `+0x2C`; 0x589A20). Each rectangle gets a tile of the
+  512x512 alpha-light atlas; the light passes of 24 §1.7 fill the tiles,
+  and the atlas is bound to pixel-shader slot t9
+  (`alphalightIntensitiesReg`).
+- **The particle shaders.** In the level packs the vertex shaders that
+  read `AlphaLight_OffsetScale` (vertex constant buffer 0 register 29;
+  366 in the Torrens pack) mostly (297) form
+  `o.xy = clip.xy · OS.zw + clip.w · OS.xy`, `o.z = clip.w`, from the
+  vertex's final clip position in the drawn view's `ViewProj` (after a
+  sprite's corner offset, 24 §14.2); the others take the tile coordinate
+  from a vertex attribute. The pixel shaders divide `o.xy` by `o.z` and
+  sample t9 there. So each pixel reads the atlas at
+  `uv = ndc · OS.zw + OS.xy`, with `ndc` the pixel's own position in the
+  drawn eye's view. No particle pixel shader addresses t9 from
+  `SV_Position` (72 pixel shaders bind t9 in the Torrens pack; all read
+  it at the interpolated coordinate), so the side-by-side layout of the
+  target does not enter: `ndc` is per eye and the atlas is a texture of
+  its own.
+- **The offset and scale.** `AlphaLight_OffsetScale` is computed by
+  0x57EB30 (cdecl `(float out[4], renderer, const u16* index)`) from the
+  emitter's tile and rectangle and from the renderer's current eye
+  (`+0x2C`): it calls the stereo manager's NDC wrapper 0x5B86E0 (thiscall
+  on the manager `[0x1366A2C]`, `(float out[4], int eye)`, `ret 8`,
+  returns `out`) at **0x57EC15** (`e8 c6 9a 03 00`), the wrapper's only
+  call. The wrapper writes `(0, 0, 1, 1)`, or device slot 14's
+  `(offset.x, offset.y, scale.x, scale.y)` for that eye while the device
+  is in state 2 (02 §5). The tile is then addressed with
+  `q = ndc / scale - offset`, and `q` must be a coordinate in the atlas
+  camera's NDC (the rectangle's space).
+- **Slot 14 for eye -1.** The game's slot 14 (0x5B8F10) returns offset
+  `(0, 0)` and **eye 0's scale** for eye -1 (the branch at 0x5B8F56), and
+  slot 12 builds an eye's projection with slot 14's scale and offset for
+  the same eye. So the atlas camera's NDC is `s_c · tan` with `s_c` eye
+  0's scale, and an eye's is `s_e · tan + o_e`, `tan` being the
+  view-space tangent.
+
+### 8.2 Problem [likely for the effect; the arithmetic is sure]
+
+The game's `q = ndc_e / s_e - o_e` is a view tangent, not the atlas
+camera's NDC, unless the scale is 1 (a 90-degree field of view, which no
+headset has). With the shared symmetric FOV of 03 §3.2 (`o_e = 0`,
+`s_e = s_c = s`), every particle reads the atlas at `ndc / s`: magnified
+by `1/s` about the centre of the view (on an Index at render tangents
+1.154 and 1.214, `s` is 0.867 x 0.824). The lit part of smoke then slides
+with every head turn, right only where the player looks straight, and
+particles of an emitter away from the centre read outside its tile. Flat
+play is unaffected (the wrapper gives `(0, 0, 1, 1)`).
+
+### 8.3 Required result
+
+While stereo runs, the lookup at 0x57EC15 receives, per axis, the eye's
+scale and offset relative to the atlas camera's:
+
+    S = s_e / s_c        O = s_c · o_e / s_e - o_c
+
+with `(o_e, s_e)` the wrapper's answer for the eye and `(o_c, s_c)` its
+answer for eye -1, so that `ndc_e / S - O = s_c · (ndc_e - o_e) / s_e + o_c`
+is the atlas camera's NDC of the same view direction (derived by the spec
+side from 8.1). With the FOV of 03 §3.2 this is `(0, 0, 1, 1)` for both
+eyes, the flat-play value: the eye-0 scale the game passes is the wrong
+value, scale 1 the right one.
+
+- A scale that is 0 or not finite keeps the game's value for that call.
+- Flat play, no device, or a device not in state 2: the game's call,
+  unchanged.
+- The site is checked (a call to 0x5B86E0 at 0x57EC15) before it is
+  changed; if it differs, nothing is changed and the log says so. 2020:
+  the addresses are unknown; the fix stays off.
+- Render thread; no allocation, file I/O or logging per call except the
+  debug events of 8.4 and 8.5.
+- The upright sprites of 24 §14 do not change where the lighting is
+  looked up: they turn the corner offset before the clip position is
+  formed, and the lookup reads the final clip position, the pixel's own
+  position [sure from the shaders].
+
+What the game does and this fix leaves as it is: the tiles are built from
+the atlas camera (the centre between the two eyes), so each eye's
+lighting is placed with an error of half the eye distance at the
+emitter's distance; and a tile's light is evaluated on the plane through
+its rectangle's centre at the centre's depth (0x57EDB0 unprojects the
+rectangle's corners there through `+0xB0`) [likely], an approximation of
+the volume.
+
+### 8.4 Acceptance
+
+1. Steam or smoke lit by a nearby lamp: look at the lit part, then turn
+   the head left, right, up and down with the smoke in view: the lit part
+   stays on the smoke, as in flat play, and does not drift with the head.
+2. Both eyes alike (close each in turn); runtime None unchanged.
+3. The log shows the fix in place on 1 site; with `DebugOptions`, one line
+   per eye and change with the game's values and the ones used (scale
+   1.000 x 1.000, offset 0 0 with 03 §3.2's FOV).
+
+### 8.5 Open report: floor smoke unlit when looked at directly (r7)
+
+A tester (OpenXR, Index, pixel scale 2.0, the fix of 8.3 in place with
+the values of 8.4 item 3 logged) reported that smoke near floor level
+that is partly in light becomes unlit when looked at directly and stays
+lit when it is in the corner of the eye. The lookup of 8.3 does not
+explain it: the game's uncorrected value would be right at the centre of
+the view and wrong towards the edge, the opposite of the report. Not
+established statically; candidates [guess]:
+
+1. The atlas camera (game thread) and the drawn eye (render thread)
+   belong to different frames or views, so a pixel's `ndc` falls outside
+   its emitter's rectangle and reads another tile or the cleared atlas.
+2. The game's own approximation (the plane through the emitter's centre,
+   8.3): for a large low volume near the player, looking at it directly
+   puts the box's centre near the camera, or corners behind it, which
+   0x589A20 moves in front, so the light is evaluated at points near the
+   eye, outside the lamp's light.
+3. The same happens in flat play (a game behaviour).
+
+Diagnostic for one session (Dev. Debug Options):
+
+- Every 900 frames while stereo runs, at the lookup on the render thread:
+  the angle between the atlas camera's forward axis (`LightObject`
+  `+0x110`) and the drawn eye's forward axis (from `ViewMatrix` as written
+  for that eye, 24 §14.2), and the distance between the atlas camera's
+  position (`+0x120`) and the drawn eye's `CameraPosition` (vertex
+  constant buffer 0 register 22). Template:
+  `Particle lighting: atlas camera vs eye {Eye}: {Angle} deg, {Distance} m apart`.
+  With the head still, about 0 degrees and half the eye distance exclude
+  candidate 1; several degrees with the head still, or a difference that
+  grows with head speed, confirm it.
+- The tester also compares the same spot in flat play (runtime None),
+  turning the camera with the mouse so that the smoke is in the centre and
+  then at the edge of the screen (candidate 3), and steps back from the
+  smoke while looking at it directly: lit from further away and unlit
+  when standing over it points to candidate 2.
+
+A lighting of smoke that does not follow the scene's lights (a constant
+brightness) would hide all three, but is not this project's choice
+(24 §4.2: particles still respond to lights).

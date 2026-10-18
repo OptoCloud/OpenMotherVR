@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). r6 (project decision: with the aim poses made only at runtime start, turning tracked hands on in the menu left aiming on the head until the next start): the aim pose actions are declared and bound whatever `Hands.Enabled` is, so the key applies at once as §15.1 says; a binding that lacks them is logged. r7 (static analysis of the 2015 `AI.exe` and the game's data by the spec side, without a lead): `FinalPoseStep`'s single return corrected (0x2A5553 belongs to the next function); the pose's hand-over to the model's render objects (`SkinSetPose` 0x28E9A0, its two calls in `FinalPoseStep`, which render objects receive which pose, and that it reads the pose without keeping it); the skeleton's name field and the model-space array's size; the crouch methods' condition byte `+0x3E2E` (corrects §2.2); the game's first-person camera offsets in `DATA\GLOBALCONSTANTS.TXT` (§22 item 14, the crouch drop); body visibility's method made exact (collapse at the nearest drawn joint, in a copy handed to the render objects; the held item's bone always drawn); real crouch's press through the v1 crouch control; room-scale kept off until the frame of the game's movement input and the body's yaw are established (new §22 items 25, 26); new open items 27 (parts posed from another skeleton) and 28 (the requested crouch byte in play). r8 (a tester's log: a value set in a menu was never applied): a skeleton that cannot be read is read again once a second until it can be (§10.2, project decision with its reason), and that is logged once per change with its reason (§18). r9 (game analysis of the 2015 `AI.exe` by the spec side, facts located with the help of an analysis of another mod and verified in the code): the character's model-to-world transform on the animation component and the bone world query `BoneWorldTransform` 0x2A2FB0 with its pose selector (§2.3); the final pose is entry 7 of the component's pose array; the held item's attachment query at 0x3B4E06 and what makes the item follow the edited hand (§4.2 item 6, §22 item 3); the game's limb IK is not run for the player's first-person skeleton while tracked hands are active (§4.2 item 7, §22 item 4); the game's CCD and two-joint IK solvers (§22 item 23); the grip to hand-bone mapping derived from each skeleton's own finger bones at run time (new §3.5, §22 item 2). Revision: r9 -->
+<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). r6 (project decision: with the aim poses made only at runtime start, turning tracked hands on in the menu left aiming on the head until the next start): the aim pose actions are declared and bound whatever `Hands.Enabled` is, so the key applies at once as §15.1 says; a binding that lacks them is logged. r7 (static analysis of the 2015 `AI.exe` and the game's data by the spec side, without a lead): `FinalPoseStep`'s single return corrected (0x2A5553 belongs to the next function); the pose's hand-over to the model's render objects (`SkinSetPose` 0x28E9A0, its two calls in `FinalPoseStep`, which render objects receive which pose, and that it reads the pose without keeping it); the skeleton's name field and the model-space array's size; the crouch methods' condition byte `+0x3E2E` (corrects §2.2); the game's first-person camera offsets in `DATA\GLOBALCONSTANTS.TXT` (§22 item 14, the crouch drop); body visibility's method made exact (collapse at the nearest drawn joint, in a copy handed to the render objects; the held item's bone always drawn); real crouch's press through the v1 crouch control; room-scale kept off until the frame of the game's movement input and the body's yaw are established (new §22 items 25, 26); new open items 27 (parts posed from another skeleton) and 28 (the requested crouch byte in play). r8 (a tester's log: a value set in a menu was never applied): a skeleton that cannot be read is read again once a second until it can be (§10.2, project decision with its reason), and that is logged once per change with its reason (§18). r9 (game analysis of the 2015 `AI.exe` by the spec side, facts located with the help of an analysis of another mod and verified in the code): the character's model-to-world transform on the animation component and the bone world query `BoneWorldTransform` 0x2A2FB0 with its pose selector (§2.3); the final pose is entry 7 of the component's pose array; the held item's attachment query at 0x3B4E06 and what makes the item follow the edited hand (§4.2 item 6, §22 item 3); the game's limb IK is not run for the player's first-person skeleton while tracked hands are active (§4.2 item 7, §22 item 4); the game's CCD and two-joint IK solvers (§22 item 23); the grip to hand-bone mapping derived from each skeleton's own finger bones at run time (new §3.5, §22 item 2). r10 (a tester's log on OpenXR with a Valve Index: the player's skeleton `FEMALEFP` had no bone names, so body visibility drew the body whole): game data read by the spec side in the Steam 2015 `DATA\GLOBAL\ANIMATION.PAK` (the compiled first-person skeletons, their name-hash tables and parent indices, resolved with the game's reference skeleton files) and static analysis of the 2015 `AI.exe` (the bone-group and mirror reader's upper-casing and FNV-1a hash); the bone table, the matching rule with its parent check and its logging (§2.3, §10.2, §18, §21 item 2). Fixed bone indices for these rigs had been seen in an analysis of another mod; they served only as a lead, and the table rests on the game's data. Other section numbers are unchanged from r9. Revision: r10 -->
 
 # 21. Hands and body
 
@@ -245,6 +245,70 @@ The hand groups also list hand-pose blend values (`pose_LeftHand_Open`,
 the player's skeleton at run time, never by a fixed index, because the two
 skeletons (and any further first-person skeleton) need not number them the
 same way.
+
+**Bone names of the first-person skeletons (r10) [sure for the file
+contents; likely that the game looks bones up through this table].** The
+skeletons the game loads carry no bone names: a tester's log showed the
+player's `FEMALEFP` skeleton with 69 bones and no name on bone 0, and the
+game's compiled skeleton files hold none. These files are the entries
+`DATA\ANIM_SYS\SKELE\SK\2971063975` (`FEMALEFP`) and
+`DATA\ANIM_SYS\SKELE\SK\550335910` (`SPACESUITFP`) of
+`DATA\GLOBAL\ANIMATION.PAK`; each entry is named by the FNV-1a 32-bit hash
+of the upper-cased skeleton name. Each is a Havok 2012.2 packfile whose
+only strings are class names and the skeleton's name; its parent-index
+array (69 signed 16-bit values) follows the skeleton's name. After the
+packfile data the entry holds the game's name table: 69 pairs of dwords
+(hash, slot), sorted by descending hash, then 69 dwords, the bone index of
+each slot. A hash is the FNV-1a 32-bit hash (offset basis 0x811C9DC5,
+prime 0x01000193) of the upper-cased `<SKELETON>:<Bone>`, for example
+`FEMALEFP:LEFTHAND`; the game's reader of the bone-group and mirror files
+(0x6442C0) upper-cases each name it reads (0x63D0B0) and hashes it the
+same way. The spec side resolved both tables with the names of the
+reference files (`*_BONE_GROUPS.TXT`, `*_MIRROR.TXT`) and `Spine3` (absent
+from those files; its hash matches): 67 of the 69 bones resolve, and the
+two others (the root, 0, and bone 68) have no name in the game's files.
+The two skeletons have the same bones in the same order with the same
+parents (index; name; parent):
+
+| Indices | Bones, in index order | Their parents, in the same order |
+|---|---|---|
+| 0 | (none) | -1 |
+| 1 to 2 | `Head`, `Head1` | 0, 1 |
+| 3 to 9 | `LeftShoulder`, `LeftArm`, `LeftArmRoll`, `LeftForeArm`, `LeftForeArmRoll`, `LeftForeArmRoll1`, `LeftHand` | 1, 3, 4, 4, 6, 6, 6 |
+| 10 to 25 | `LeftHandIndex1`, `LeftHandIndex2`, `LeftHandIndex3`, `LeftHandMiddle1`, `LeftHandMiddle2`, `LeftHandMiddle3`, `LeftHandPinky1`, `LeftHandPinky2`, `LeftHandPinky3`, `LeftHandRing1`, `LeftHandRing2`, `LeftHandRing3`, `LeftHandThumb1`, `LeftHandThumb2`, `LeftHandThumb3`, `LeftWeaponBone` | 9, 10, 11, 9, 13, 14, 9, 16, 17, 9, 19, 20, 9, 22, 23, 9 |
+| 26 to 32 | `RightShoulder`, `RightArm`, `RightArmRoll`, `RightForeArm`, `RightForeArmRoll`, `RightForeArmRoll1`, `RightHand` | 1, 26, 27, 27, 29, 29, 29 |
+| 33 to 48 | `RightHandIndex1`, `RightHandIndex2`, `RightHandIndex3`, `RightHandMiddle1`, `RightHandMiddle2`, `RightHandMiddle3`, `RightHandPinky1`, `RightHandPinky2`, `RightHandPinky3`, `RightHandRing1`, `RightHandRing2`, `RightHandRing3`, `RightHandThumb1`, `RightHandThumb2`, `RightHandThumb3`, `RightWeaponBone` | 32, 33, 34, 32, 36, 37, 32, 39, 40, 32, 42, 43, 32, 45, 46, 32 |
+| 49 to 58 | `Hips`, `Pelvis`, `LeftUpLeg`, `LeftLeg`, `LeftFoot`, `LeftToeBase`, `RightUpLeg`, `RightLeg`, `RightFoot`, `RightToeBase` | 0, 49, 50, 51, 52, 53, 50, 55, 56, 57 |
+| 59 to 63 | `Spine`, `Spine1`, `Spine2`, `Spine3`, `Neck` | 49, 59, 60, 61, 62 |
+| 64 to 68 | `L_Foot`, `L_Hand`, `R_Foot`, `R_Hand`, (none) | 0, 0, 0, 0, 0 |
+
+The arms hang from `Head` (bone 1, a child of the root), not from the
+spine; `Neck` ends the spine chain. The hand bones are 9 and 32.
+
+**Matching the player's skeleton to that table [required, r10].** Bones
+are still matched by name, through this table, and only on a skeleton
+shown to be the one the table describes:
+
+1. The skeleton's own name (skeleton `+0x08`) is `FEMALEFP` or
+   `SPACESUITFP` exactly.
+2. Its bone count (skeleton `+0x1C`) is 69, and its parent-index array
+   (skeleton `+0x0C`) equals the table's parent column at every index.
+3. Then bone `k` has the table's name for `k`; the two bones without a
+   name have none and are not needed (their groups follow §10.2's rule
+   for a bone not listed).
+
+If 1 holds and 2 does not, the skeleton is rejected: the body is drawn
+whole, tracked hands are not active, and the log says so once with the
+skeleton's name, its bone count and the first index whose parent differs
+[reason: a different skeleton under a known name must not be posed with
+another skeleton's bone meanings]. A skeleton whose bones do carry names
+(1 not holding, for example a DLC character) is matched by its own names
+as before. An implementation may instead build the same table at run time
+from the player's own `ANIMATION.PAK` (the entry named by the hash of the
+skeleton's name, its hash table and slot map, and the names above), with
+the same checks; the result must be identical. The table is a game fact
+of the Steam 2015 data; the 2020 build's data is not checked [guess: the
+same].
 
 ### 2.4 The active camera [sure]
 
@@ -938,7 +1002,9 @@ r7 makes the first method exact [proposal for each rule; reasons given]:
 - **A skeleton not readable yet** [r8, project decision from a tester's
   log]. When the player's skeleton cannot be read (no bones, no bone or
   parent array, more bones than the implementation holds, or a bone
-  without a name), the body is drawn whole and the skeleton is read again
+  without a name; r10: a bone without a name is not a reason on a
+  skeleton matched through the table of §2.3, whose bones have their
+  names from it), the body is drawn whole and the skeleton is read again
   once a second until it can be read, then the plan is made as above.
   Required: a value set while the game has no readable player skeleton
   (the pause or main menu, a level load) or present in `mothervr.json` at
@@ -1442,7 +1508,7 @@ locking or logging on the render thread or in the job (12 §6).
 |---|---|---|
 | each v2 key of this document that is on, at session start | INF | the key and value |
 | each game site of §20 checked for an enabled feature | INF / WRN | the site, the outcome; on a mismatch that the feature stays off |
-| the player's skeleton seen for the first time | INF | the skeleton's name; whether all bones of §2.3 were found by name; their indices |
+| the player's skeleton seen for the first time | INF | the skeleton's name; whether all bones of §2.3 were found by name; their indices; r10: whether the names came from the skeleton or from the table of §2.3, and for the table whether the bone count and parent check passed (on a failure, the count and the first differing index) |
 | tracked hands become active or inactive | INF (DBG when it is an episode of §12) | which; the reason (episode kind, hand lost, setting) |
 | a hand lost or regained (§3.3) | INF | the hand; the reason |
 | hand aiming: the class in use changes | DBG | the weapon type |
@@ -1527,7 +1593,9 @@ where a VRB line is needed.
    step runs on job threads.
 2. Load a level with `Hands.Enabled`: the log names the player's skeleton
    (`FEMALEFP`), finds every bone of §2.3 by name, and gives their indices.
-   Repeat in a space-suit section (`SPACESUITFP`).
+   Repeat in a space-suit section (`SPACESUITFP`). r10: the names come from
+   the table of §2.3, the parent check passes, and the hands are 9 and 32,
+   `Spine` 59, the shoulders 3 and 26, the arms 4 and 27.
 3. Hands on, looking straight ahead with both hands held out: the VRB line
    shows each hand's world target within 5 mm of the hand bone's reached
    position (§4.2 item 1). r9: once per skeleton the log gives the grip
