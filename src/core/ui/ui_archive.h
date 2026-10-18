@@ -11,6 +11,8 @@
 
 namespace omvr::core::ui {
 
+struct ArchivePaths; // the files of a deploy (ui_archive.cpp)
+
 // The mod's UI archive, DATA\MOTHER.PAK. Game thread, at attach.
 class UiArchiveDeployer {
 public:
@@ -41,8 +43,7 @@ public:
 private:
     // Reuses MOTHER.PAK if it is current, else builds it (unless `may_build`
     // is false: another process holds the build lock).
-    bool reuse_or_build(const std::filesystem::path& stock, const std::filesystem::path& target,
-                        const std::filesystem::path& sidecar, const ports::FileIdentity& source,
+    bool reuse_or_build(const ArchivePaths& paths, const ports::FileIdentity& source,
                         std::int64_t build_stamp, bool may_build, std::string_view variant) noexcept;
 
     ports::ArchiveFiles& files_;

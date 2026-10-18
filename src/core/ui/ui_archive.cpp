@@ -13,17 +13,17 @@
 
 namespace omvr::core::ui {
 
-namespace {
-
-using diag::path_text;
-using diag::ports::logf;
-
 // The three files of a deploy.
 struct ArchivePaths {
     std::filesystem::path stock;   // DATA\UI.PAK, the player's own
     std::filesystem::path target;  // DATA\MOTHER.PAK
     std::filesystem::path sidecar; // DATA\MOTHER.PAK.src
 };
+
+namespace {
+
+using diag::path_text;
+using diag::ports::logf;
 
 ArchivePaths archive_paths(const std::filesystem::path& game_dir) {
     const auto data = game_dir / kDataDirectory;
@@ -35,11 +35,10 @@ ArchivePaths archive_paths(const std::filesystem::path& game_dir) {
 
 } // namespace
 
-bool UiArchiveDeployer::reuse_or_build(const std::filesystem::path& stock,
-                                       const std::filesystem::path& target,
-                                       const std::filesystem::path& sidecar,
-                                       const ports::FileIdentity& source, std::int64_t build_stamp,
-                                       bool may_build, std::string_view variant) noexcept {
+bool UiArchiveDeployer::reuse_or_build(const ArchivePaths& paths, const ports::FileIdentity& source,
+                                       std::int64_t build_stamp, bool may_build,
+                                       std::string_view variant) noexcept {
+    const auto& [stock, target, sidecar] = paths;
     if (files_.stamped(target, build_stamp) && files_.read_sidecar(sidecar) == source) {
         logf(log_, "payload: {} is current", path_text(target));
         return true;
@@ -84,8 +83,7 @@ bool UiArchiveDeployer::deploy(const std::filesystem::path& game_dir, std::int64
     const ports::LockState lock = files_.lock(kArchiveLockName, kArchiveLockWait);
     // Without a mutex at all (cannot be created) build as before.
     const bool may_build = lock.held || !lock.exists;
-    const bool ok = reuse_or_build(paths.stock, paths.target, paths.sidecar, *source, build_stamp, may_build,
-                                   variant.tag);
+    const bool ok        = reuse_or_build(paths, *source, build_stamp, may_build, variant.tag);
     files_.unlock();
     return ok;
 }
