@@ -41,11 +41,17 @@ constexpr std::string_view kLogElevated =
     "openxr: the game runs elevated (as administrator); the loader ignores the environment, "
     "only its initialisation property points it at the runtime";
 constexpr std::string_view kLogPlayerChoice = "openxr: available: {} (XR_RUNTIME_JSON set by the player)";
-constexpr std::string_view kLogActive       = "openxr: active runtime 64-bit {}, 32-bit {}";
-constexpr std::string_view kLogNoneActive   = "openxr: not available: no active runtime registered";
-constexpr std::string_view kLogNo32Bit      = "openxr: not available: no active runtime has a 32-bit build";
-constexpr std::string_view kLogAvailable    = "openxr: available: {} ({})";
-constexpr std::string_view kLogProbeFailed  = "openxr: probe failed: {}";
+constexpr std::string_view kLogPlayerSibling =
+    "openxr: available: {} (the 32-bit sibling of {}, which XR_RUNTIME_JSON names but this 32-bit game "
+    "cannot load)";
+constexpr std::string_view kLogPlayerUnusable =
+    "openxr: not available: XR_RUNTIME_JSON names {}, which this 32-bit game cannot load, and it has no "
+    "32-bit sibling";
+constexpr std::string_view kLogActive      = "openxr: active runtime 64-bit {}, 32-bit {}";
+constexpr std::string_view kLogNoneActive  = "openxr: not available: no active runtime registered";
+constexpr std::string_view kLogNo32Bit     = "openxr: not available: no active runtime has a 32-bit build";
+constexpr std::string_view kLogAvailable   = "openxr: available: {} ({})";
+constexpr std::string_view kLogProbeFailed = "openxr: probe failed: {}";
 
 // The manifest's runtime library, relative to the manifest or absolute.
 constexpr const char* kManifestRuntime     = "runtime";
@@ -164,10 +170,26 @@ std::filesystem::path Session::Impl::probe() noexcept {
     try {
         // An explicit override wins, as with the loader itself.
         if (auto set = runtime_json_override()) {
-            // The player chose: left as it is, nothing else passed (09 §1).
+            // The player chose: left as it is, nothing else passed (09 §1),
+            // unless it names a 64-bit build; then that runtime's x86 build
+            // is handed to the loader in its place, as for the registry.
+            if (usable_from_x86(log, *set)) {
+                manifest.clear();
+                logf(log, kLogPlayerChoice, utf8(*set));
+                return *set;
+            }
+            for (const auto& m : x86_siblings(*set)) {
+                if (usable_from_x86(log, m)) {
+                    logf(log, kLogPlayerSibling, utf8(m), utf8(*set));
+                    manifest = m;
+                    return m;
+                }
+            }
+            // The loader would follow the variable, so the registry does
+            // not count.
             manifest.clear();
-            logf(log, kLogPlayerChoice, utf8(*set));
-            return *set;
+            logf(log, kLogPlayerUnusable, utf8(*set));
+            return {};
         }
         const auto m64 = active_runtime(win32::RegistryView::Bits64);
         const auto m32 = active_runtime(win32::RegistryView::Bits32);
