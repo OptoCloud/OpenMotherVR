@@ -7,19 +7,10 @@
 #include <algorithm>
 #include <cmath>
 
-// Vector and quaternion helpers beyond vec.h: products, the quaternion of a
-// rotation matrix, interpolation. Plain maths, any axis convention: the
+// Quaternion helpers beyond vec.h: products, the quaternion of a rotation
+// matrix, interpolation. Plain maths, any axis convention: the
 // caller's matrices and quaternions only have to share one.
 namespace omvr::util {
-
-inline Vec3 add(const Vec3& a, const Vec3& b) noexcept { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
-
-inline float dot(const Vec3& a, const Vec3& b) noexcept { return a.x * b.x + a.y * b.y + a.z * b.z; }
-
-// a + (b - a) * t.
-inline Vec3 lerp(const Vec3& a, const Vec3& b, float t) noexcept {
-    return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t};
-}
 
 // The Hamilton product a * b: rotating by the result rotates by b, then a.
 inline Quat multiply(const Quat& a, const Quat& b) noexcept {
@@ -72,27 +63,6 @@ inline Quat nlerp(const Quat& a, const Quat& b, float t) noexcept {
 inline float angle_between(const Quat& a, const Quat& b) noexcept {
     const float c = std::min(1.0f, std::fabs(dot(a, b)));
     return 2 * std::acos(c);
-}
-
-// The translation column of a 3x4 pose.
-inline Vec3 translation_of(const Matrix34& p) noexcept { return {p.m[0][3], p.m[1][3], p.m[2][3]}; }
-
-// R^T v for the 3x3 part of `r`: a world vector in the pose's own axes.
-inline Vec3 rotate_inverse(const Matrix34& r, const Vec3& v) noexcept {
-    const auto& m = r.m;
-    return {m[0][0] * v.x + m[1][0] * v.y + m[2][0] * v.z, m[0][1] * v.x + m[1][1] * v.y + m[2][1] * v.z,
-            m[0][2] * v.x + m[1][2] * v.y + m[2][2] * v.z};
-}
-
-// The 3x3 product A^T B of two poses' rotations, as a 3x4 with no
-// translation: B's rotation in A's axes.
-inline Matrix34 relative_rotation(const Matrix34& a, const Matrix34& b) noexcept {
-    Matrix34 out{};
-    for (int r = 0; r < 3; ++r) {
-        for (int c = 0; c < 3; ++c)
-            out.m[r][c] = a.m[0][r] * b.m[0][c] + a.m[1][r] * b.m[1][c] + a.m[2][r] * b.m[2][c];
-    }
-    return out;
 }
 
 } // namespace omvr::util

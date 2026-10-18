@@ -20,17 +20,9 @@ constexpr std::string_view kLogStandingUncalibrated =
 constexpr std::string_view kLogNoFloor =
     "[stereo] WARNING standing play unavailable on {}: no floor reference; play is seated";
 
-util::Vec3 translation(const util::Matrix34& m) noexcept { return {m.m[0][3], m.m[1][3], m.m[2][3]}; }
-
-util::Vec3 add(const util::Vec3& a, const util::Vec3& b) noexcept {
-    return {a.x + b.x, a.y + b.y, a.z + b.z};
-}
-
-void set_translation(util::Matrix34& m, const util::Vec3& t) noexcept {
-    m.m[0][3] = t.x;
-    m.m[1][3] = t.y;
-    m.m[2][3] = t.z;
-}
+using util::add;
+using util::set_translation;
+using util::translation_of;
 
 // The reference's forward in the horizontal plane: the game looks along +Z
 // (21 §2.4), the reference's column 2, which the conversion leaves as the
@@ -74,7 +66,7 @@ bool PlaySpace::begin_frame(const PlaySpaceSettings& settings) noexcept {
 
 util::Matrix34 PlaySpace::on_reference(const util::Matrix34& reference, std::optional<float> floor_y,
                                        std::string_view runtime) noexcept {
-    reference_       = translation(reference);
+    reference_       = translation_of(reference);
     forward_         = horizontal_forward(reference);
     reference_scale_ = scale_;
     // The convention negates the translation: the height is -y.
@@ -132,7 +124,7 @@ PlaySpace::Offsets PlaySpace::offsets(std::optional<float> floor_y) const noexce
 HeadPoses PlaySpace::on_head_pose(const util::Matrix34& head, std::optional<float> floor_y) const noexcept {
     const float s            = scale_;
     const Offsets o          = offsets(floor_y);
-    const util::Vec3 real    = util::scaled(translation(head), s);
+    const util::Vec3 real    = util::scaled(translation_of(head), s);
     const util::Vec3 rescale = util::scaled(reference_, reference_scale_ - s);
     // Exactly the runtime's pose at s when every term is 0 (v1).
     const util::Vec3 player = add(add(real, util::scaled(o.standing, s)), rescale);

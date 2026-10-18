@@ -29,13 +29,19 @@ inline Vec3 rotate(const Quat& q, const Vec3& v) noexcept {
 // The inverse rotation of the unit quaternion `q`.
 inline Quat conjugate(const Quat& q) noexcept { return {-q.x, -q.y, -q.z, q.w}; }
 
+// a + b.
+inline Vec3 add(const Vec3& a, const Vec3& b) noexcept { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
+
 // a - b.
 inline Vec3 sub(const Vec3& a, const Vec3& b) noexcept { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
+
+inline float dot(const Vec3& a, const Vec3& b) noexcept { return a.x * b.x + a.y * b.y + a.z * b.z; }
 
 // Euclidean length.
 inline float length(const Vec3& v) noexcept { return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z); }
 
-inline float length(float x, float y, float z) noexcept { return std::sqrt(x * x + y * y + z * z); }
+// The Euclidean distance between `a` and `b`: length(sub(a, b)).
+inline float distance(const Vec3& a, const Vec3& b) noexcept { return length(sub(a, b)); }
 
 // a x b, component by component as written (the handedness is the caller's
 // coordinate system's).
@@ -45,5 +51,10 @@ inline Vec3 cross(const Vec3& a, const Vec3& b) noexcept {
 
 // v scaled by s.
 inline Vec3 scaled(const Vec3& v, float s) noexcept { return {s * v.x, s * v.y, s * v.z}; }
+
+// a + (b - a) * t.
+inline Vec3 lerp(const Vec3& a, const Vec3& b, float t) noexcept {
+    return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t};
+}
 
 } // namespace omvr::util

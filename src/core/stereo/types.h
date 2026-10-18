@@ -2,6 +2,7 @@
 #pragma once
 
 #include "game/constants.h"
+#include "util/math/matrix.h"
 
 #include <array>
 #include <cstdint>
@@ -17,7 +18,7 @@ enum class SwapchainHandle : std::uintptr_t {};
 
 // A 4x4 matrix as the game stores it: 16 floats, row-major, row vectors
 // (the translation is row 3).
-using Matrix44 = std::array<float, 16>;
+using util::Matrix44;
 
 // A size in pixels.
 struct PixelSize {

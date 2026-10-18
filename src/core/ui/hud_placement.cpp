@@ -10,48 +10,24 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <cstddef>
 #include <numbers>
 
 namespace omvr::core::ui {
 
 namespace {
 
+using util::add;
+using util::column3;
+using util::identity44;
+using util::kForwardAxis;
+using util::kRightAxis;
+using util::kTranslationRow;
+using util::kUpAxis;
+using util::set_row3;
 using util::Vec3;
-
-// Rows of a quad matrix, as 05 §4 builds them: its right and up axes
-// (scaled to the quad's size), its forward axis and its position.
-constexpr std::size_t kRightRow    = 0;
-constexpr std::size_t kUpRow       = 1;
-constexpr std::size_t kForwardRow  = 2;
-constexpr std::size_t kPositionRow = 3;
-
-// Columns of the view matrix: the camera's up and forward axes in world
-// space (rows 0 to 2).
-constexpr std::size_t kViewUpColumn      = 1;
-constexpr std::size_t kViewForwardColumn = 2;
 
 constexpr Vec3 kWorldUp{0.0f, 1.0f, 0.0f};
 constexpr float kTwoPi = 2.0f * std::numbers::pi_v<float>;
-
-Matrix44 identity_quad() noexcept {
-    Matrix44 m{};
-    util::identity(m.data());
-    return m;
-}
-
-void set_row(Matrix44& m, std::size_t row, const Vec3& v) noexcept {
-    m[row * util::kMatrix4Rows + 0] = v.x;
-    m[row * util::kMatrix4Rows + 1] = v.y;
-    m[row * util::kMatrix4Rows + 2] = v.z;
-}
-
-Vec3 view_axis(const Matrix44& v, std::size_t column) noexcept {
-    return {util::element4(v.data(), 0, column), util::element4(v.data(), 1, column),
-            util::element4(v.data(), 2, column)};
-}
-
-Vec3 add(const Vec3& a, const Vec3& b) noexcept { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
 
 // The panel facing the eyes from `cam`, centred along `forward` turned by
 // `pitch` towards `up` (both unit and orthogonal).
@@ -61,13 +37,13 @@ Matrix44 panel(const Vec3& cam, const Vec3& forward, const Vec3& up, float inv_a
     const float s  = std::sin(p.pitch);
     const Vec3 dir = add(util::scaled(forward, c), util::scaled(up, s));
     const Vec3 pup = add(util::scaled(up, c), util::scaled(forward, -s));
-    Matrix44 out   = identity_quad();
+    Matrix44 out   = identity44();
     // Right = up x forward (left-handed), as v1's panel; the pitch turns
     // both about it, so it stays.
-    set_row(out, kRightRow, util::scaled(util::cross(pup, dir), p.width));
-    set_row(out, kUpRow, util::scaled(pup, p.width * inv_aspect));
-    set_row(out, kForwardRow, dir);
-    set_row(out, kPositionRow, add(cam, util::scaled(dir, p.distance)));
+    set_row3(out, kRightAxis, util::scaled(util::cross(pup, dir), p.width));
+    set_row3(out, kUpAxis, util::scaled(pup, p.width * inv_aspect));
+    set_row3(out, kForwardAxis, dir);
+    set_row3(out, kTranslationRow, add(cam, util::scaled(dir, p.distance)));
     return out;
 }
 
@@ -96,24 +72,24 @@ HudPanel hud_panel(const config::HudSettings& hud) noexcept {
 }
 
 Matrix44 head_locked_quad(const std::optional<Matrix44>& view, float inv_aspect, const HudPanel& p) noexcept {
-    if (!view) return identity_quad();
+    if (!view) return identity44();
     // Defaults: v1's own builder, so v1 is reproduced to the bit.
     if (p.is_v1()) return stereo::hud_panel_quad(view, inv_aspect);
-    const Matrix44 out = panel(util::camera_position(view->data()), view_axis(*view, kViewForwardColumn),
-                               view_axis(*view, kViewUpColumn), inv_aspect, p);
-    return finite(out) ? out : identity_quad();
+    const Matrix44 out = panel(util::camera_position(view->data()), column3(*view, kForwardAxis),
+                               column3(*view, kUpAxis), inv_aspect, p);
+    return finite(out) ? out : identity44();
 }
 
 Matrix44 level_quad(const std::optional<Matrix44>& view, float heading, float inv_aspect,
                     const HudPanel& p) noexcept {
-    if (!view) return identity_quad();
+    if (!view) return identity44();
     const Vec3 forward{std::sin(heading), 0.0f, std::cos(heading)};
     const Matrix44 out = panel(util::camera_position(view->data()), forward, kWorldUp, inv_aspect, p);
-    return finite(out) ? out : identity_quad();
+    return finite(out) ? out : identity44();
 }
 
 std::optional<float> view_heading(const Matrix44& view) noexcept {
-    const Vec3 f    = view_axis(view, kViewForwardColumn);
+    const Vec3 f    = column3(view, kForwardAxis);
     const float len = std::sqrt(f.x * f.x + f.z * f.z);
     if (!(len > stereo::kMinForwardLength)) return std::nullopt;
     return std::atan2(f.x, f.z);

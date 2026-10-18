@@ -176,7 +176,8 @@ TEST_CASE("vector maths") {
 
     const util::Vec3 d = util::sub({3, 4, 12}, {0, 0, 0});
     CHECK(util::length(d) == doctest::Approx(13.0f));
-    CHECK(util::length(3, 4, 0) == doctest::Approx(5.0f));
+    CHECK(util::length({3, 4, 0}) == doctest::Approx(5.0f));
+    CHECK(util::distance({4, 6, 12}, {1, 2, 0}) == doctest::Approx(13.0f));
 
     const util::Vec3 c = util::cross({0, 1, 0}, {0, 0, 1});
     CHECK(c.x == 1.0f);
@@ -218,6 +219,26 @@ TEST_CASE("4x4 identity and the camera position of a rigid view matrix") {
     CHECK(cam.x == -2.0f);
     CHECK(cam.y == 3.0f);
     CHECK(cam.z == -4.0f);
+}
+
+TEST_CASE("4x4 rows and columns, 3x4 translation") {
+    util::Matrix44 m = util::identity44();
+    CHECK(m[0] == 1.0f);
+    CHECK(m[15] == 1.0f);
+    util::set_row3(m, util::kTranslationRow, {2, 3, 4});
+    CHECK(m[12] == 2.0f);
+    CHECK(m[14] == 4.0f);
+    CHECK(m[15] == 1.0f); // the fourth column is kept
+    const util::Vec3 c = util::column3(m, util::kForwardAxis);
+    CHECK(c.x == 0.0f);
+    CHECK(c.z == 1.0f);
+
+    util::Matrix34 p{};
+    util::set_translation(p, {1, 2, 3});
+    const util::Vec3 t = util::translation_of(p);
+    CHECK(t.x == 1.0f);
+    CHECK(t.y == 2.0f);
+    CHECK(t.z == 3.0f);
 }
 
 } // namespace
