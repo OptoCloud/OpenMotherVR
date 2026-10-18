@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (device methods 3 to 16, relative head pose, render-target size query, render-target rebuild flag, renderer accessors, order of renderer initialisation); OpenVR, DXGI, Win32 and LibOVR 0.4 public API semantics (fullscreen transitions, window placement, window subclassing, interface versions, the LibOVR descriptor fields); observation in game by the spec side on SteamVR with a Valve Index (full resolution from the start, eye layout tied to the created texture, windowed swapchain, mirror back buffer at window size, recenter when worn and when gameplay starts, running start with pose age 0 over 600 frames, render-target sizes up to 13440x6720 and the 16384 texture limit, pixel-scale changes applied in the same run through the rebuild flag, head motion moving the camera correctly, the game's threads per device slot); observation of the SteamVR install by the spec side (where the x86 `vrclient.dll` and its libraries are); performance measurements in game by the spec side (mirror and back-buffer cost, controller latency); answers to implementation questions Q1, Q3, Q4 (ANSWERS.md); user requirements and project decisions (SteamVR need not be running, invalid poses, bounded start-up waits). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. For spec r6: AI.exe 2015 analysis by the spec side (the game's window procedure, RVA 0x612850, and its focus, activation and size handling); OpenVR public API (IVRApplications, the scene application's process id); observation in game by the spec side (a mirror window shrunk to fit its monitor, as the spec r4 decision required, put the menus and the cursor off centre); project decisions of spec r6, prompted by a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus; the game not shown in the headset with Desktop Game Theatre on), each with its reason inline (a mirror window that does not fit becomes borderless over its monitor, replacing the spec r4 shrink-and-centre decision; focus loss is kept from the game while a headset is attached; the scene-application check after about 3 s). For this document's r6 (after spec r6): clean-room review round 2 applied (results instead of mechanisms in §6.7, §9.3 and §9.6; the window-size behaviour traced in the game; the screen-frame mirror question restated from the game; descriptor header values left free); coverage review (late detach on the render thread, one interception failing, mirror resources failing, mirror shaders built at build time, the `vrclient.dll` location, failure text without a runtime error, acceptance checks for invalid poses, cropped mirror modes and the pose handover). Section numbers are unchanged from r5. For r7: cross-document alignment after the second fix pass (CreateDevice labelled with its RVA, and its single call site re-verified by the spec side in the 2015 `AI.exe`; required and optional OpenVR interfaces and the loader release as in 13 §3.2; the reason the mirror's shaders must not contain the dither pattern; the back-buffer view the mirror binds is not created per frame; references to 06 §4.6 and 05 §10 for the rebuild flag; the pose-handover check no longer points at an event 11 does not define). Section numbers are unchanged from r6. For r8, under the clean-room process r3 (what a player sees may be stated exactly): the SteamVR failure box of §6.4 given exactly (caption, icon, button, text: the earlier mod's text, whose behaviour is unchanged, with this project's caption `MotherVR` without a version, the `unknown error` fallback and this project's descriptions for failures the earlier mod did not report) and the headset-not-showing-the-game warning of §6.7 (this project's text, a check the earlier mod did not have); the options-page labels of the mirror and pixel-scale settings (§8.1, §10, parameters table); what the player sees of the virtual screen (§7); acceptance checks 3, 13, 14 and 16 naming the boxes and labels. No game fact was added. Section numbers are unchanged from r7. Revision: r8 -->
+<!-- Provenance: game analysis of AI.exe 2015 (device methods 3 to 16, relative head pose, render-target size query, render-target rebuild flag, renderer accessors, order of renderer initialisation); OpenVR, DXGI, Win32 and LibOVR 0.4 public API semantics (fullscreen transitions, window placement, window subclassing, interface versions, the LibOVR descriptor fields); observation in game by the spec side on SteamVR with a Valve Index (full resolution from the start, eye layout tied to the created texture, windowed swapchain, mirror back buffer at window size, recenter when worn and when gameplay starts, running start with pose age 0 over 600 frames, render-target sizes up to 13440x6720 and the 16384 texture limit, pixel-scale changes applied in the same run through the rebuild flag, head motion moving the camera correctly, the game's threads per device slot); observation of the SteamVR install by the spec side (where the x86 `vrclient.dll` and its libraries are); performance measurements in game by the spec side (mirror and back-buffer cost, controller latency); answers to implementation questions Q1, Q3, Q4 (ANSWERS.md); user requirements and project decisions (SteamVR need not be running, invalid poses, bounded start-up waits). 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`. For spec r6: AI.exe 2015 analysis by the spec side (the game's window procedure, RVA 0x612850, and its focus, activation and size handling); OpenVR public API (IVRApplications, the scene application's process id); observation in game by the spec side (a mirror window shrunk to fit its monitor, as the spec r4 decision required, put the menus and the cursor off centre); project decisions of spec r6, prompted by a tester's report on SteamVR with a Steam Frame headset (the game paused or held at a loading screen when another window took the focus; the game not shown in the headset with Desktop Game Theatre on), each with its reason inline (a mirror window that does not fit becomes borderless over its monitor, replacing the spec r4 shrink-and-centre decision; focus loss is kept from the game while a headset is attached; the scene-application check after about 3 s). For this document's r6 (after spec r6): clean-room review round 2 applied (results instead of mechanisms in §6.7, §9.3 and §9.6; the window-size behaviour traced in the game; the screen-frame mirror question restated from the game; descriptor header values left free); coverage review (late detach on the render thread, one interception failing, mirror resources failing, mirror shaders built at build time, the `vrclient.dll` location, failure text without a runtime error, acceptance checks for invalid poses, cropped mirror modes and the pose handover). Section numbers are unchanged from r5. For r7: cross-document alignment after the second fix pass (CreateDevice labelled with its RVA, and its single call site re-verified by the spec side in the 2015 `AI.exe`; required and optional OpenVR interfaces and the loader release as in 13 §3.2; the reason the mirror's shaders must not contain the dither pattern; the back-buffer view the mirror binds is not created per frame; references to 06 §4.6 and 05 §10 for the rebuild flag; the pose-handover check no longer points at an event 11 does not define). Section numbers are unchanged from r6. For r8, under the clean-room process r3 (what a player sees may be stated exactly): the SteamVR failure box of §6.4 given exactly (caption, icon, button, text: the earlier mod's text, whose behaviour is unchanged, with this project's caption `MotherVR` without a version, the `unknown error` fallback and this project's descriptions for failures the earlier mod did not report) and the headset-not-showing-the-game warning of §6.7 (this project's text, a check the earlier mod did not have); the options-page labels of the mirror and pixel-scale settings (§8.1, §10, parameters table); what the player sees of the virtual screen (§7); acceptance checks 3, 13, 14 and 16 naming the boxes and labels. No game fact was added. Section numbers are unchanged from r7. For r9: project decisions prompted by a tester's report on SteamVR with a Quest 2 headset (on the first launch the first start-up video appeared low and behind the player, the next one in front but far too high, the main menu then in place; one recenter at CreateDevice with the headset in use, none after it until a level loaded), each with its reason inline: the runtime moving its tracking space under the mod (a new chaperone universe, a seated or standing zero-pose reset; OpenVR public API events) queues a retake and hides the virtual screen until it (new §6.8, a row in §2.2, §6.2, §11); the virtual screen is placed in the universe the poses are in, as `IVRCompositor::GetTrackingSpace` reports it, not a fixed one (§1, §7); no virtual screen is shown before the first valid reference (§7, replacing "before any recenter `Y` is identity"); the frame kind of the first frames logged whatever `DebugOptions` says (§6.2, 11 §4.5). Game analysis by the spec side in the 2015 `AI.exe` (the start-up sequence is started by a front-end method of its own at 0x441AA0, not by the front-end menu's Open at 0x441950, which ends at 0x441A90) and the existing fact of 02 §6.3 (slot 11's only per-frame caller is the VR camera behaviour of a head-tracked camera) put the start-up videos and the legal screen in screen frames [likely] (§7). New section §6.8 and acceptance checks 19 to 21; other section numbers are unchanged from r8. Revision: r9 -->
 
 # 03 - Head tracking, projection, render targets, frames, virtual screen, mirror
 
@@ -44,7 +44,11 @@ Take the headset pose from `IVRCompositor::GetLastPoses` (all tracked
 devices, or at least `k_unTrackedDeviceIndex_Hmd`), element
 `k_unTrackedDeviceIndex_Hmd`, field `mDeviceToAbsoluteTracking`, in the
 tracking universe the application runs in (the compositor default,
-`TrackingUniverseStanding`; the mod does not change it). This is the pose
+`TrackingUniverseStanding`; the mod does not change it), as
+`IVRCompositor::GetTrackingSpace` reports it once the runtime is up
+(§6.4). Everything the mod places absolutely, the virtual screen of §7,
+is placed in that same universe: a pose and a placement in different
+universes put the screen at the right coordinates of the wrong origin. This is the pose
 the last `WaitGetPoses` (§6) predicted for the frame the game is about to
 render. Call its rotation part `R` (3x3) and its translation `t` (metres).
 OpenVR space is right-handed, +Y up, -Z forward.
@@ -130,6 +134,7 @@ was taken from, the resulting heading, and whether the headset was in use
 | a loading screen closes (05 §5) | queue a retake, so gameplay starts facing the way the player faces |
 | manual recenter: pad LB+RB, keyboard left Ctrl + left Alt (04 §8) | take it at once (once per press) |
 | the game's reset-orientation path (02 §6.4, RVA 0x5B8680) | take it at once |
+| the runtime moved its tracking space (§6.8) | queue a retake |
 
 A queued retake is a single flag: queuing it again before it runs changes
 nothing. A repeated CreateDevice (not expected, §6.5) does not take or
@@ -385,10 +390,16 @@ true, so the game's present step leaves presenting to slot 6 (02 §6.8).
 |---|---|
 | slot 11 (game thread) | `IVRCompositor::GetLastPoses`, convert (§1; the last valid pose when this one is invalid), set the "head pose requested" flag, keep the pose as this frame's render pose |
 | slot 5 (render thread) | if no controller state was handed to the game since the last slot 5 (before the first frame, or a frame that submitted nothing), read the controllers now (04 §5.9); refresh eye offsets (§5); this frame is **head-tracked** if the "head pose requested" flag is set, otherwise it is a **screen frame** |
-| slot 6 (render thread) | if no stereo texture is known yet, skip to the mirror. Head-tracked: hide the virtual-screen overlay if it is visible, then `IVRCompositor::Submit(Eye_Left, ...)` and `Submit(Eye_Right, ...)`. Screen frame: §7. Then `IVRCompositor::WaitGetPoses(nullptr, 0, nullptr, 0)`; then read the controllers and hand them to the game (04 §5.9); then draw the mirror (§8); then `IDXGISwapChain::Present(0, 0)` on the game's swapchain (accessor, 02 §8); then clear the "head pose requested" flag |
+| slot 6 (render thread) | if no stereo texture is known yet, skip to the mirror. Head-tracked: hide the virtual-screen overlay if it is visible, then `IVRCompositor::Submit(Eye_Left, ...)` and `Submit(Eye_Right, ...)`. Screen frame: §7. Then read the runtime's events (§6.8); then `IVRCompositor::WaitGetPoses(nullptr, 0, nullptr, 0)`; then hand a tracking space change read before it to the game thread (§6.8); then read the controllers and hand them to the game (04 §5.9); then draw the mirror (§8); then `IDXGISwapChain::Present(0, 0)` on the game's swapchain (accessor, 02 §8); then clear the "head pose requested" flag |
 
-With `DebugOptions` on, each change between screen frames and head-tracked
-frames is logged once per change, on either runtime (11 §4.5).
+Each change between screen frames and head-tracked frames is logged once
+per change, on either runtime (11 §4.5): the first frame's kind and each
+change up to and including the first head-tracked frame whatever
+`DebugOptions` says, later changes only with `DebugOptions` on. Reason
+(project decision, r9): whether the start-up videos, the legal screen and
+the front end are screen frames is the first question about a report of
+a misplaced screen at start-up, and testers' logs rarely have
+`DebugOptions` on; the always-on lines are a handful per launch.
 
 The order inside slot 6 is required where the API or the game needs it:
 both submits before `WaitGetPoses` (the compositor takes the frame, then
@@ -590,10 +601,44 @@ The warning must block neither the render thread nor the game thread
 appears in the headset as soon as the player fixes the cause. The check is
 made once per process; it is not repeated after a display reset.
 
+### 6.8 The runtime moves its tracking space (OpenVR)
+
+SteamVR can move the origin of the universe the poses are in while the
+game runs: a room setup committed with a different universe
+(`VREvent_ChaperoneUniverseHasChanged`), the seated or standing zero pose
+reset (`VREvent_SeatedZeroPoseReset`, `VREvent_StandingZeroPoseReset`),
+for example by a headset's own recenter or by a streaming client
+establishing its play area after start-up. The reference pose (§2) and the
+virtual screen (§7) were taken in the old space: in the new one, forward
+points elsewhere and the screen stands at the old coordinates of a moved
+origin, which a player sees as a screen behind, below or far above them.
+
+Required:
+
+| Item | Required result |
+|---|---|
+| reading events | the mod reads `IVRSystem::PollNextEvent` on the render thread once per submitted frame, before that frame's `WaitGetPoses` (§6.2), at most 64 events per frame (a project decision: far more than SteamVR sends in a frame, so the queue never falls behind, while a runtime that floods it cannot hold the frame). It is the process's only reader of that queue: every reader in a process shares one read position, so a second reader would take events from it. Not before the SteamVR Input action manifest is set (04 §5.8), which the API requires to come first |
+| a change | any of the three events above, whichever universe the poses are in (reason: some runtimes move both universes together, and a retake the space did not need only faces forward again): logged once per event (11 §2.4); the virtual screen is not shown from then until the retake; a retake is queued (§2.2) |
+| order | the change reaches the game thread only after the `WaitGetPoses` that follows the read, so the pose the retake is taken from was predicted after the runtime reported the change |
+| the retake | as any queued retake (§2.2): on the first frame where the headset is in use and its pose valid. The virtual screen then shows again, placed from the new reference, and the game's own menu quad is placed again (05 §4.2) |
+| the headset | the headset's `VREvent_TrackedDeviceUserInteractionStarted` and `...Ended` are logged (11 §2.4) but do not queue a retake by themselves (§2.2: putting the headset on again does not) |
+| other events | left unhandled |
+
+OpenXR reports the same situation as a pending reference space change and
+re-anchors its own spaces (09 §6).
+
 ## 7. The virtual screen for screen frames
 
 Screen frames are those where the game did not ask for a head-tracked pose:
-menus, the title video, loading screens, cutscenes. Their camera ignores the
+menus, the title video, loading screens, cutscenes, and the start-up
+sequence (the logo videos and the legal screen) [likely: slot 11's only
+per-frame caller is the VR camera behaviour of a head-tracked camera
+(02 §6.3), and no level, so no such camera, exists before the title
+screen; the start-up sequence is started by a front-end method of its
+own (RVA 0x441AA0, which pushes `ShowBootup`, 05 §11), not by the
+front-end menu's Open (0x441950), so whether the game is in stereo mode 1
+during it is not settled by 05 §5. The always-on frame-kind lines of §6.2
+settle it from a tester's log]. Their camera ignores the
 head, so they are shown on a flat, world-locked screen instead of as stereo
 3D. What the player sees: the game's flat picture (the left eye's image,
 middle half vertically) on a level panel about 3.56 m wide, 1.5 m ahead
@@ -607,8 +652,8 @@ Required in every screen frame:
 | mechanism | an `IVROverlay` overlay (public OpenVR API), created with the runtime render resources (§4.4) and destroyed in slot 4; its key and name are the implementation's choice. If creation fails, log the error once and continue: screen frames then show black in the headset, the mirror still works |
 | content | the stereo target texture (`TextureType_DirectX`, `ColorSpace_Gamma`), region `u 0.0..0.5`, `v 0.25..0.75`: eye 0's half, middle half vertically |
 | width | 32/9 m (3.5556 m); height follows the region's pixel aspect (`H / W` of the target times the width, 1.778 m for square eyes) |
-| placement | absolute, in `TrackingUniverseStanding`: the unconverted yaw-only matrix `Y` of the latest recenter (§2.1), with its translation moved 1.5 m along `Y`'s forward axis (minus its third column) in X and Z only. The screen centre is 1.5 m in front of where the head was at the recenter, at that head height, facing it, level. Before any recenter `Y` is identity |
-| visibility | shown in screen frames; hidden on the first head-tracked frame |
+| placement | absolute, in the universe the poses are in (§1): the unconverted yaw-only matrix `Y` of the latest recenter (§2.1), with its translation moved 1.5 m along `Y`'s forward axis (minus its third column) in X and Z only. The screen centre is 1.5 m in front of where the head was at the recenter, at that head height, facing it, level |
+| visibility | shown in screen frames once a reference was taken from a valid pose in the current tracking space; hidden on the first head-tracked frame. Not shown (the view is all black) before the first such reference, nor from a tracking space change (§6.8) until the retake. Reason (project decision, r9): without a reference the screen would stand at the universe's origin, on the floor or behind the player, and a reference from before a space change places it wherever the old coordinates now fall; a few frames of black until the headset is worn and tracked are better than a screen the player has to look for |
 | around the screen | the headset shows black around the screen. The compositor keeps receiving eye frames in screen frames too (it expects them every frame), by any means that shows black |
 
 A recenter, or a new stereo texture after a rebuild, must show on the next
@@ -948,6 +993,8 @@ Requirements, whatever the mechanism:
 | "head pose requested" flag | game thread (slot 11) | render thread (slots 5 and 6, which clears it) | a set made before the frame's slot 5 is seen there |
 | the render pose (the headset pose slot 11 returned) | game thread | render thread (submit pose) | the submit uses exactly the pose the frame was rendered with; never a torn matrix |
 | unconverted yaw-only reference `Y` | game thread (recenter) | render thread (virtual screen placement) | never torn; a recenter shows on the next screen frame |
+| whether `Y` belongs to the current tracking space (§7) | game thread (a valid recenter sets it), render thread (a space change clears it) | render thread | a set made with `Y` is seen with that `Y` or a newer one |
+| a tracking space change (§6.8) | render thread, after the `WaitGetPoses` that follows the event | game thread (stereo update, queues the retake) | seen once; several changes before the game thread looks count as one |
 | controller poses and states | render thread (after `WaitGetPoses`) | game thread | handed over whole (no mix of two frames' data in one read), 04 |
 | device pointer at manager +0x04 and device state (+0x04 of the device) | game thread; the render thread when slot 3 detaches the device after a failed OpenXR session (§4.4, 09 §7) | render thread, game thread and job threads | aligned 32-bit atomic stores and loads that are never torn; a value one frame stale is harmless. A call into the runtime that began before a detach is never left using a released runtime (02 §7.4, 12 §3.2) |
 | recorded window size | render-target size query | swapchain hooks, slot 3 | read after it is written in the same rebuild |
@@ -1087,6 +1134,26 @@ wording are those of 11; message boxes are those of §6.4 and §6.7.
     per frame, for example a comparison in a test build; 11 §4.1 leaves
     this check to this item and defines no event for it); no frame is
     submitted with a torn or newer pose.
+19. Start-up placement: start the game with the headset worn and SteamVR
+    already running, `SkipStartupIntro` off. From the first logo video on,
+    every start-up video, the legal screen, the title video and the main
+    menu appear on the same level screen 1.5 m ahead at the head height of
+    the start-up recenter; the log shows the start-up recenter and
+    `frames now on the screen` before the first video, without
+    `DebugOptions`.
+20. Tracking space change: on the title screen or the main menu, reset the
+    standing (or seated) zero pose from SteamVR, or let the headset
+    recenter the play area (on a Quest, hold the Oculus button), while the
+    headset is worn: the log names the event, the screen goes black for a
+    moment and comes back 1.5 m in front of where the head faces now, with
+    one recenter logged after the event. With the headset lying on a desk
+    during the event, the screen stays black until the headset is worn,
+    then appears in front of it. In gameplay the same event re-centres
+    forward to where the player faces.
+21. Universe: with the application's tracking space reported as seated
+    (any runtime or tool that starts it so), the virtual screen still
+    appears in front at head height, not offset by the difference between
+    the seated and standing origins.
 
 ## 14. Open questions
 
