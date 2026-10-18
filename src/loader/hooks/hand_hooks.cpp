@@ -4,7 +4,7 @@
 
 #include "loader/hooks/hand_hooks.h"
 
-#include "core/hands/aim.h"
+#include "core/hands/hand_aim.h"
 #include "core/hands/types.h"
 #include "core/stereo/types.h"
 #include "core/ui/play_state.h"

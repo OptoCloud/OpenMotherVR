@@ -1,8 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #include "core/hands/hands.h"
 
-#include "core/hands/aim.h"
-#include "core/hands/hand_mapping.h"
+#include "core/hands/hand_aim.h"
 #include "core/hands/tuning.h"
 
 #include <algorithm>

@@ -6,12 +6,10 @@
 
 #include "core/config/settings.h"
 #include "core/hands/activity.h"
-#include "core/hands/aim.h"
-#include "core/hands/hand_mapping.h"
+#include "core/hands/hand_aim.h"
 #include "core/hands/hand_track.h"
 #include "core/hands/hands.h"
 #include "core/hands/pose_filter.h"
-#include "core/hands/tracker_facing.h"
 #include "core/hands/tuning.h"
 #include "core/vr/pose_convert.h"
 #include "fakes/fakes.h"

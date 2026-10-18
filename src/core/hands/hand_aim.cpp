@@ -1,11 +1,26 @@
 // OpenMotherVR-Provenance: clean
-#include "core/hands/aim.h"
+#include "core/hands/hand_aim.h"
 
-#include "core/hands/hand_mapping.h"
 #include "core/hands/tuning.h"
 #include "util/math/quat.h"
 
+#include <cmath>
+
 namespace omvr::core::hands {
+
+HeadLocalPose head_local(const util::Matrix34& head, const util::Matrix34& hand) noexcept {
+    const util::Vec3 d = util::sub(util::translation_of(hand), util::translation_of(head));
+    return {util::rotate_inverse(head, d), util::quat_from_rotation(util::relative_rotation(head, hand))};
+}
+
+WorldPose to_world(const CameraPose& camera, const HeadLocalPose& local) noexcept {
+    return {util::add(camera.position, util::rotate(camera.orientation, local.offset)),
+            util::normalized(util::multiply(camera.orientation, local.rotation))};
+}
+
+util::Vec3 pointing(const WorldPose& pose) noexcept {
+    return util::rotate(pose.orientation, {0.0f, 0.0f, 1.0f});
+}
 
 WeaponClass weapon_class(std::optional<game::WeaponType> type) noexcept {
     if (!type) return WeaponClass::NoWeapon;
@@ -54,6 +69,12 @@ AimRay hand_aim_ray(const AimRay& game, const WorldPose& aim, float weight, floa
 
 float fire_gate_threshold(bool hand_aiming, float game_threshold) noexcept {
     return hand_aiming ? kFireGateAlwaysPass : game_threshold;
+}
+
+std::optional<util::Vec2> TrackerFacing::update(const util::Vec3& dir) noexcept {
+    const float horizontal = std::sqrt(dir.x * dir.x + dir.z * dir.z);
+    if (horizontal >= kTrackerMinHorizontal) last_ = util::Vec2{dir.x / horizontal, dir.z / horizontal};
+    return last_;
 }
 
 } // namespace omvr::core::hands

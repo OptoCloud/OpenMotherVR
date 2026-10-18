@@ -7,7 +7,7 @@
 #include "core/hands/activity.h"
 #include "core/hands/hand_track.h"
 #include "core/hands/pose_filter.h"
-#include "core/hands/tracker_facing.h"
+#include "core/hands/hand_aim.h"
 #include "core/hands/types.h"
 #include "game/constants.h"
 #include "util/sync/change_latch.h"
