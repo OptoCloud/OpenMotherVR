@@ -145,8 +145,9 @@ bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noex
         // Spec 22 §15: the comfort pass's resources follow the target.
         ctx.vignette.configure(platform::d3d11::gpu_device(device),
                                platform::d3d11::gpu_texture(si.eye_texture[0].texture));
-        return ctx.stereo.configure_rendering(si, size, platform::d3d11::gpu_device(device),
-                                              platform::d3d11::gpu_context(dc), ctx.mirror);
+        ctx.stereo.configure_rendering(si, size, platform::d3d11::gpu_device(device),
+                                       platform::d3d11::gpu_context(dc), ctx.mirror);
+        return true;
     });
 }
 

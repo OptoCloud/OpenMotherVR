@@ -98,7 +98,7 @@ public:
     // If the runtime cannot drive the headset with the game's device (no
     // OpenXR session), the device detaches here; the mirror resources are
     // still made for any call already on its way. Render thread.
-    bool configure_rendering(game::StereoInterface& si, std::optional<PixelSize> texture_size,
+    void configure_rendering(game::StereoInterface& si, std::optional<PixelSize> texture_size,
                              vr::GpuDevice device, vr::GpuContext context, ports::DesktopMirror& mirror);
 
     // [5] BeginFrame (03 §5, §6.2): poll the controllers, take the eye
@@ -128,6 +128,7 @@ public:
     bool turn_off_if_requested(game::StereoInterface& si) noexcept;
 
 private:
+    void detach(game::StereoInterface& si) noexcept;
     void fail_runtime(game::StereoInterface& si, vr::DetectResult::Chosen chosen, bool late) noexcept;
     void init_device(game::StereoInterface& si) noexcept;
 

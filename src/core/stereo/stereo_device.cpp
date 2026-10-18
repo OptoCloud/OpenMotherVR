@@ -155,6 +155,15 @@ std::optional<PixelSize> StereoDevice::attached_window_size() const noexcept {
     return PixelSize{dev->mirror_width, dev->mirror_height};
 }
 
+// Takes the device off the manager and the runtime off the device, in the
+// order of 02 §7.4: state and pointer first, so no new call starts using it.
+void StereoDevice::detach(StereoInterface& si) noexcept {
+    store_state(si, DeviceState::None);
+    if (load_device(manager_) == &si) store_device(manager_, nullptr);
+    vr_session_active_ = false;
+    store_backend(si, nullptr);
+}
+
 // The runtime cannot drive the headset after all: detach the device, as a
 // failed init leaves it, and tell the player. State and pointer are cleared
 // before the runtime, so no new call starts using it.
@@ -166,10 +175,7 @@ std::optional<PixelSize> StereoDevice::attached_window_size() const noexcept {
 // runtime is then only taken off the device and kept, unused, until the
 // process ends, so that call finishes on a live runtime.
 void StereoDevice::fail_runtime(StereoInterface& si, Chosen chosen, bool late) noexcept {
-    store_state(si, DeviceState::None);
-    if (load_device(manager_) == &si) store_device(manager_, nullptr);
-    vr_session_active_ = false;
-    store_backend(si, nullptr);
+    detach(si);
     if (!late) runtime_.reset();
     runtime_failed_ = true;
     ui::report_init_failure(dialogs_, chosen, failure_.last());
@@ -183,10 +189,7 @@ bool StereoDevice::turn_off_if_requested(StereoInterface& si) noexcept {
     if (!vr_off_requested_.exchange(false, std::memory_order_acq_rel)) return false;
     if (load_state(si) == DeviceState::None) return false;
     vr::ports::VrRuntime* runtime = load_backend(si);
-    store_state(si, DeviceState::None);
-    if (load_device(manager_) == &si) store_device(manager_, nullptr);
-    vr_session_active_ = false;
-    store_backend(si, nullptr);
+    detach(si);
     runtime_failed_ = true; // the options page shows VR not running (06 §5.2)
     turned_off_.store(true, std::memory_order_release);
     log_.line(kVrOffLog);
@@ -231,13 +234,9 @@ void StereoDevice::init_device(StereoInterface& si) noexcept {
     store_state(si, DeviceState::Ready);
 }
 
-bool StereoDevice::configure_rendering(StereoInterface& si, std::optional<PixelSize> texture_size,
+void StereoDevice::configure_rendering(StereoInterface& si, std::optional<PixelSize> texture_size,
                                        vr::GpuDevice device, vr::GpuContext context,
                                        ports::DesktopMirror& mirror) {
-    auto& t0    = si.eye_texture[0];
-    t0.api      = game::kEyeTextureApiD3d11;
-    t0.size     = {si.rt_width, si.rt_height};
-    t0.viewport = si.viewport[0];
     // 03 §4.3: the eye halves must match the texture the game actually
     // created. The original trusts its last size computation, which runs at
     // half scale before stereo starts and at full scale after, so the two
@@ -246,9 +245,11 @@ bool StereoDevice::configure_rendering(StereoInterface& si, std::optional<PixelS
         set_target_size(si, *texture_size);
         si.configured_width  = si.rt_width;
         si.configured_height = si.rt_height;
-        t0.size              = {si.rt_width, si.rt_height};
-        t0.viewport          = si.viewport[0];
     }
+    auto& t0                   = si.eye_texture[0];
+    t0.api                     = game::kEyeTextureApiD3d11;
+    t0.size                    = {si.rt_width, si.rt_height};
+    t0.viewport                = si.viewport[0];
     si.eye_texture[1]          = t0;
     si.eye_texture[1].viewport = si.viewport[1];
 
@@ -261,7 +262,6 @@ bool StereoDevice::configure_rendering(StereoInterface& si, std::optional<PixelS
     mirror.create(device, mirror_constants(view, false), mirror_constants(view, true));
 
     diag::ports::logf(log_, kConfiguredLog, si.rt_width, si.rt_height, static_cast<void*>(t0.texture));
-    return true;
 }
 
 void StereoDevice::begin_frame(StereoInterface& si) {
