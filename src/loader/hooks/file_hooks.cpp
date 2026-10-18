@@ -91,14 +91,21 @@ HANDLE open_copy(const wchar_t* copy, DWORD access, DWORD share, LPSECURITY_ATTR
     return h;
 }
 
+// What the hooks do with the game's open of `name`: note a level load, and
+// open the engine settings copy in place of the game's file. The copy's
+// handle, or INVALID_HANDLE_VALUE when the game's own open goes ahead.
+HANDLE try_game_open(std::string_view name, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES security,
+                     DWORD disposition, DWORD flags, HANDLE templ) noexcept {
+    if (g_watch_levels.load(std::memory_order_relaxed)) context().play.on_file_open(name);
+    const wchar_t* copy = engine_settings_copy_for(name, access, disposition);
+    return copy ? open_copy(copy, access, share, security, disposition, flags, templ) : INVALID_HANDLE_VALUE;
+}
+
 HANDLE WINAPI create_file_a(LPCSTR name, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES security,
                             DWORD disposition, DWORD flags, HANDLE templ) noexcept {
     if (name) {
-        if (g_watch_levels.load(std::memory_order_relaxed)) context().play.on_file_open(name);
-        if (const wchar_t* copy = engine_settings_copy_for(name, access, disposition)) {
-            HANDLE h = open_copy(copy, access, share, security, disposition, flags, templ);
-            if (h != INVALID_HANDLE_VALUE) return h;
-        }
+        HANDLE h = try_game_open(name, access, share, security, disposition, flags, templ);
+        if (h != INVALID_HANDLE_VALUE) return h;
     }
     return g_create_file_a.load(std::memory_order_relaxed)(name, access, share, security, disposition, flags,
                                                            templ);
@@ -112,12 +119,8 @@ HANDLE WINAPI create_file_w(LPCWSTR name, DWORD access, DWORD share, LPSECURITY_
         for (; n < kPathChars && name[n] != L'\0'; ++n)
             path[n] = name[n] < 0x80 ? static_cast<char>(name[n]) : '?';
         if (n < kPathChars) {
-            const std::string_view ascii{path, n};
-            if (g_watch_levels.load(std::memory_order_relaxed)) context().play.on_file_open(ascii);
-            if (const wchar_t* copy = engine_settings_copy_for(ascii, access, disposition)) {
-                HANDLE h = open_copy(copy, access, share, security, disposition, flags, templ);
-                if (h != INVALID_HANDLE_VALUE) return h;
-            }
+            HANDLE h = try_game_open({path, n}, access, share, security, disposition, flags, templ);
+            if (h != INVALID_HANDLE_VALUE) return h;
         }
     }
     return g_create_file_w.load(std::memory_order_relaxed)(name, access, share, security, disposition, flags,
