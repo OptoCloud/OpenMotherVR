@@ -23,8 +23,6 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/interaction_state.cpp
     ${CMAKE_CURRENT_LIST_DIR}/interaction_state.h
     ${CMAKE_CURRENT_LIST_DIR}/remap.h
-    ${CMAKE_CURRENT_LIST_DIR}/touchpad.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/touchpad.h
     ${CMAKE_CURRENT_LIST_DIR}/tuning.h
     ${CMAKE_CURRENT_LIST_DIR}/types.h
     ${CMAKE_CURRENT_LIST_DIR}/virtual_pad.cpp

@@ -1,7 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #include "core/input/dpad_emulation.h"
 
-#include "core/input/touchpad.h"
+#include "core/input/controller_mapping.h"
 #include "core/input/tuning.h"
 
 #include <cmath>

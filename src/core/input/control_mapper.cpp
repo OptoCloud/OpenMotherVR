@@ -7,7 +7,7 @@
 #include "core/input/control_mapper.h"
 
 #include "game/constants.h"
-#include "core/input/touchpad.h"
+#include "core/input/controller_mapping.h"
 #include "core/input/tuning.h"
 #include "core/input/virtual_pad.h"
 

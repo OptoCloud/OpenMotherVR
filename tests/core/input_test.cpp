@@ -11,7 +11,6 @@
 #include "core/input/glyphs.h"
 #include "core/input/interaction_state.h"
 #include "core/input/remap.h"
-#include "core/input/touchpad.h"
 #include "core/input/virtual_pad.h"
 #include "fakes/fakes.h"
 #include "game/constants.h"
@@ -485,7 +484,8 @@ TEST_CASE("interaction state logs a string the first time and on a change") {
     REQUIRE(log.lines.size() == 2);
     CHECK(log.lines[0] ==
           "[events] \"start_interaction\" (new): interaction false kind 0 hiding false breathing false");
-    CHECK(log.lines[1] == "[events] \"start_interaction\": interaction false kind 0 hiding false breathing false");
+    CHECK(log.lines[1] ==
+          "[events] \"start_interaction\": interaction false kind 0 hiding false breathing false");
 }
 
 } // namespace
