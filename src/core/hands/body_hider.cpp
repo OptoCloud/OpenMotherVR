@@ -58,31 +58,27 @@ int index_of(const SkeletonBones& b, std::string_view name) noexcept {
 
 bool BodyHider::wants_bones(BodyVisible v, const PlayerSkeleton& s, TimePoint now) const noexcept {
     if (v == BodyVisible::Full || s.pose == 0) return false;
-    if (!built_any_ || v != built_value_ || s.skeleton != built_skeleton_ || s.pose != built_pose_)
-        return true;
+    if (changed(v, s)) return true;
     return retry_at_ && now >= *retry_at_;
 }
 
 void BodyHider::update(BodyVisible v, bool running, const PlayerSkeleton& s, const SkeletonBones* bones,
                        TimePoint now, const SkeletonReadFault& fault) noexcept {
     log_job_reports();
-    if (v == BodyVisible::Full && built_any_ && built_value_ != BodyVisible::Full) {
+    // Said once as the value goes back to Full; a later value other than
+    // Full then counts as a change and builds again.
+    if (v == BodyVisible::Full && built_ && built_->value != BodyVisible::Full) {
         log_.line(kLogWhole);
-        built_value_ = BodyVisible::Full;
+        built_->value = BodyVisible::Full;
     }
     if (!running || v == BodyVisible::Full || s.pose == 0) {
         current_.store(nullptr, std::memory_order_release);
         return;
     }
     if (wants_bones(v, s, now)) {
-        const bool changed =
-            !built_any_ || v != built_value_ || s.skeleton != built_skeleton_ || s.pose != built_pose_;
-        if (changed) unreadable_logged_.reset();
-        built_any_      = true;
-        built_value_    = v;
-        built_skeleton_ = s.skeleton;
-        built_pose_     = s.pose;
-        built_ok_       = false;
+        if (changed(v, s)) unreadable_logged_.reset();
+        built_    = BuildKey{v, s.skeleton, s.pose};
+        built_ok_ = false;
         retry_at_.reset();
         if (bones) {
             build(v, s, *bones);

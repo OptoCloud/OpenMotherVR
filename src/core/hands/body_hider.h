@@ -90,12 +90,21 @@ private:
     std::size_t next_ = 0; // the buffer the next build writes
     std::atomic<const HiddenPose*> current_{nullptr};
 
-    // The last build: its value, skeleton and pose, and whether it gave a plan.
-    config::BodyVisible built_value_ = config::BodyVisible::Full;
-    std::uintptr_t built_skeleton_   = 0;
-    std::uintptr_t built_pose_       = 0;
-    bool built_ok_                   = false;
-    bool built_any_                  = false;
+    // What a build was for: the value, skeleton and pose.
+    struct BuildKey {
+        config::BodyVisible value                                = config::BodyVisible::Full;
+        std::uintptr_t skeleton                                  = 0;
+        std::uintptr_t pose                                      = 0;
+        friend bool operator==(const BuildKey&, const BuildKey&) = default;
+    };
+    // `v` and `s` differ from the last build, or there was none.
+    bool changed(config::BodyVisible v, const PlayerSkeleton& s) const noexcept {
+        return built_ != BuildKey{v, s.skeleton, s.pose};
+    }
+
+    // The last build (none: not yet), and whether it gave a plan.
+    std::optional<BuildKey> built_;
+    bool built_ok_ = false;
     // The last build could not read the skeleton: when to read it again, and
     // the fault last logged for this skeleton, pose and value (none: not yet).
     std::optional<TimePoint> retry_at_;
