@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were verified by the spec side in the game's data; the existence of a terminal font change and of lever input emulation was known from the analysis of another mod. The camera takeover sites of 2.4 were located with the help of that analysis and verified. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). r2: second clean-room review: terminal text steps derived from this project's own legibility criterion; the reduced animation set defined by a criterion; facts with no use removed; item highlight stated as a result; the HUD game facts cited from 22 §2.4 (one description); the tap's thread left open as 11 §8 does; lever interactions own turning and the move action (22 §4.1, §7); the master switch of 20 §1.3. r3 (spec r7 cross-check): the controls help cited from 04 §5.7 (it is not in 06); the interaction names passed to `ScriptEventTap` (11 §5.1). r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Interaction` and `HUD` pages of the options page given exactly (item order, labels, control kinds, value names, ranges, steps and display formats, description lines, greying), and the controls help rows of the lever mapping, as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the activation distances' suggested values move from a first offered value to the item's description. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Interaction` and `HUD` pages are reached from the `MotherVR` page (22 §12.1). Revision: r5 -->
+<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were verified by the spec side in the game's data; the existence of a terminal font change and of lever input emulation was known from the analysis of another mod. The camera takeover sites of 2.4 were located with the help of that analysis and verified. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). r2: second clean-room review: terminal text steps derived from this project's own legibility criterion; the reduced animation set defined by a criterion; facts with no use removed; item highlight stated as a result; the HUD game facts cited from 22 §2.4 (one description); the tap's thread left open as 11 §8 does; lever interactions own turning and the move action (22 §4.1, §7); the master switch of 20 §1.3. r3 (spec r7 cross-check): the controls help cited from 04 §5.7 (it is not in 06); the interaction names passed to `ScriptEventTap` (11 §5.1). r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Interaction` and `HUD` pages of the options page given exactly (item order, labels, control kinds, value names, ranges, steps and display formats, description lines, greying), and the controls help rows of the lever mapping, as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the activation distances' suggested values move from a first offered value to the item's description. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Interaction` and `HUD` pages are reached from the `MotherVR` page (22 §12.1). r6 (spec-side game analysis of the 2015 `AI.exe`, static, while implementing 5 to 7): the icon highlight update and its "highlight disabled" bit (2.6; §12 item 7 resolved for the update, the receiver of its messages left open); the crosshair update's two invoke sites and the movie invoke's missing null check (2.7); the scripted HUD entity's four methods and the six table slots they fill, and the UI-ready byte the game tests before each lookup (2.7, §12 item 10 in part); the terminal text steps built as tagged variant entries of the UI patch (6.2). Revision: r6 -->
 
 # 23. Interactions and HUD
 
@@ -197,9 +197,27 @@ messages include `highlight` and `unhighlight`.
 | `push_hold_time` | 0x4F0590 | 0.0 | the record's `+0x90` |
 | `interaction_distance_threshold` | none: its hash global is written by its initialiser and read by no instruction | | not used by `AI.exe` |
 
-The code that reads `+0x8C` was not located [open, section 12]. [likely,
-from the name and the default: within 3.15 m of the camera, the item the
-icon belongs to is drawn highlighted.]
+**Highlight update** [sure, r6]. `IconHighlightUpdate` at **0x3A3420**
+(thiscall on the icon manager, one stack argument, the icon record;
+`ret 4`; prologue `55 8b ec 83 e4 f0 6a ff`) reads `+0x8C`. Its two
+callers are in the icon update 0x3C51E0, at **0x3C586C** and **0x3C594C**;
+neither uses its return value. It decides "highlighted" only when the
+record's byte `+0x96` has bits 1 and 2 set, its byte `+0x97` has bit 4 set
+and **bit 3 clear**, its geometry list (`+0x74`) is not empty and the
+manager's byte `+0x27065` is not 0 (set to 1 in the manager's constructor
+only); then either the squared distance from the camera to the record's
+position (`+0x4C` to `+0x54`) is at most `+0x8C` squared, or the player's
+flag at `+0x2BA` is set, the record is within a view cone (0.2513, float
+at 0x12F4B58) and at most 85.38 squared metres away (0x12F4B54). It
+compares the result with the record's cached state (`+0x97` bit 5) and,
+only on a change, sends message 0x200036 (highlight) or 0x200037
+(unhighlight) for the record's entity (`+0x58`) to the object at
+0x174EF40 and updates bit 5; it writes nothing else of the record. The
+game itself sets `+0x97` bit 3 at 0x16B3C3 (in `UI_Icon`'s code) to
+disable an icon's highlight. So an icon whose bit 3 is set when the
+update runs is found not highlighted, and an icon that was highlighted is
+unhighlighted by the game's own message. [The receiver of the two
+messages and what it draws are left open, §12 item 7.]
 
 ### 2.7 HUD movies [sure]
 
@@ -231,6 +249,25 @@ decision in `+0xE4`. Its one caller is the HUD update at 0x437340 (call at
 0x437345), called from 0x44D3C9. In the movie, `ShowCrosshairs` plays the
 crosshair's `in` label and `HideCrosshairs` its `out` label; `HideUI` is
 empty. 14 §3.6.4 describes the crosshair symbol.
+
+The two invokes [sure, r6]: `ShowCrosshairs` is `push` of the string at
+**0xEFEA94** at 0x4372BF and the call of 0x4081E0 at **0x4372C4**;
+`HideCrosshairs` is `push` of the string at **0xEFEA84** at 0x437313 and
+the call at **0x437318**. The movie invoke dereferences the movie
+(`+0x68`) without testing it, so the movie must be loaded before it is
+called on this object.
+
+**Scripted HUD entity** [sure, r6]. The slots 0xDFD014 to 0xDFD028 of its
+method table hold four methods: 0x1094A0 (in two slots) and 0x109680 hide
+the HUD, 0x1095A0 and 0x109770 (in two slots) show it. All four are
+thiscall with two stack arguments (`ret 8`), are referred to only from
+those slots, and are the only callers of `WeaponHudHide`,
+`WeaponHudShow`, `PickupHudHide` and `PickupHudShow` (the calls at
+0x109514, 0x109527, 0x10965F, 0x109671, 0x109723, 0x109735, 0x1097F4 and
+0x109807). Before each `UiFindObject` of these objects the game tests the
+byte at **0x1240F27** (1 at start). So the game's own intent to hide or
+show the HUD is the calls of these four methods, while `+0x40` reads the
+same whether the game or the mod hid the movie.
 
 ### 2.8 Terminal text [sure]
 
@@ -507,6 +544,15 @@ change of the VR set (14 §1.3, §3.6):
 
 Takes effect on the next launch: the options archive is built at launch
 (14 §5), and `t` becomes part of its staleness key (section 13).
+
+How the build carries the steps [r6, project decision]: the embedded UI
+patch (14 §5) holds, after the entry it replaces, one entry per step
+other than 1.0, named as that entry with `|text125`, `|text150` or
+`|text175` appended. The build takes the entry whose tag matches `t` in
+place of the earlier one and drops the others; with `t` 1.0, or with a
+patch that has no entry for the tag (logged), the movie is the VR set's
+as before. The step's index (0 to 3) is added to the staleness key. Reason:
+one patch file serves every step and the archive stays one file.
 
 ### 6.3 Off, edge cases
 
@@ -795,15 +841,17 @@ OpenXR unless stated.
    can be matched; and where `PlaySpeed` is stored (4.6).
 6. **Orientation convergence.** Whether `OrientationConvergence` turns the
    follow camera's yaw (4.2, last row).
-7. **Highlight reader.** The code that reads the icon record's `+0x8C`,
-   what it highlights, and the receiver of `force_disable_highlight`.
+7. **Highlight reader.** (Resolved in r6 for the reader: 2.6's
+   `IconHighlightUpdate`.) Still open: the receiver of its messages
+   0x200036 and 0x200037, what it draws, and the receiver of
+   `force_disable_highlight`.
 8. **Terminal screen placement.** Whether the terminal UI is drawn on the
    in-world display (2.8), where that display is, and whether a touch or
    pointer input to it is feasible (3.2).
 9. **Body text format.** Whether the game's terminal HTML carries font
    sizes of its own that would override 6.2's default format.
-10. **The scripted HUD entity.** The class owning the method table at
-    0xDFD014 (2.7), and whether other HUD movies (objectives, subtitles)
+10. **The scripted HUD entity.** (Its four methods: 2.7, r6.) The class
+    owning the method table at 0xDFD014 (2.7), and whether other HUD movies (objectives, subtitles)
     are hidden by other means in scripted scenes.
 11. (Resolved in r2: during the lever mapping this document owns the
     grips and the move and look actions; 22 §4.1 blocks turning and 22 §7
