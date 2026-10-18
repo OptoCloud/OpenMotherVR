@@ -50,11 +50,6 @@ public:
     bool add_row(core::ui::ports::UiHandle ui, const char* name, const char* a,
                  const char* b) noexcept override;
 
-    // The setters, for the installer's log line.
-    FireBoolFn fire_bool() const noexcept { return fire_bool_; }
-    FireIntFn fire_int() const noexcept { return fire_int_; }
-    FireFloatFn fire_float() const noexcept { return fire_float_; }
-
 private:
     FireStr2Fn fire_str2_   = nullptr;
     FireBoolFn fire_bool_   = nullptr;

@@ -8,17 +8,11 @@
 
 namespace omvr::game::sites {
 
-// The eight "Stereo Mode == Rift" tests in AI.exe's stereo/render path
-// (RVAs in InlineSites::stereo_mode_tests, addresses.h). The hook
-// installer's preflight checks each holds the game's `cmp reg, eax`.
-//
-// Rewrite each test as `cmp eax, eax` so it always passes and the game takes
-// its LibOVR stereo path, which our stereo manager stands in for (05 §2).
-// Returns false if a write failed.
-// From: FUN_1001d6f0 lines 72..100 (payload g_payload_1005dc34).
-bool force_stereo_mode_tests(const GameImage& g, Patcher& patcher) noexcept;
-
-// 6
+// 6: the eight "Stereo Mode == Rift" tests in AI.exe's stereo/render path
+// (RVAs in InlineSites::stereo_mode_tests, addresses.h), which the
+// preflight checked hold the game's `cmp reg, eax`, become `cmp eax, eax`,
+// so the game takes its LibOVR stereo path, which our stereo manager
+// stands in for (05 §2). Returns false if a write failed.
 bool force_stereo_mode(const GameImage& g, Patcher& patcher) noexcept;
 
 // The replacements step 7 installs, and the vtables of the objects it hands

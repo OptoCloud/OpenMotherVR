@@ -1,6 +1,7 @@
 #include "loader/hooks/ui_hooks.h"
 
 #include "core/ui/commands.h"
+#include "game/code_address.h"
 #include "game/ui/console.h"
 #include "loader/context.h"
 #include "loader/hooks/crash_hook.h"
@@ -14,7 +15,7 @@ namespace omvr::loader::hooks {
 
 void push_settings(void* ui) noexcept {
     reassert_crash_hook();
-    context().settings_push.push(core::ui::ports::UiHandle{reinterpret_cast<std::uintptr_t>(ui)});
+    context().settings_push.push(core::ui::ports::UiHandle{game::address_of(ui)});
 }
 
 void __fastcall on_menu_open(void* self, void* /*edx*/) noexcept {
@@ -44,8 +45,8 @@ void __fastcall handle_mvr_command(void* self, void* /*edx*/, int ctx, char* cmd
 
 void __fastcall pause_open_settings_only(void* self, void* /*edx*/) noexcept {
     // The stock method this replaces, as the installer recorded it.
-    if (auto open = reinterpret_cast<game::ui::MenuMethodFn>(context().targets.pause_open_settings_only))
-        open(self, nullptr);
+    const game::ui::MenuMethodFn open = game::CodeAddress{context().targets.pause_open_settings_only};
+    if (open) open(self, nullptr);
     push_settings(self);
 }
 

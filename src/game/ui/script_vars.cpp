@@ -1,12 +1,17 @@
 #include "game/ui/script_vars.h"
 
+#include "game/code_address.h"
+
+#include <cstdint>
+#include <utility>
+
 namespace omvr::game::ui {
 
 namespace {
 
 // The game's menu object behind a handle (its `this`).
 void* game_ui(core::ui::ports::UiHandle ui) noexcept {
-    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(ui));
+    return CodeAddress{static_cast<std::uint32_t>(std::to_underlying(ui))};
 }
 
 // The script setter's boolean is an int.

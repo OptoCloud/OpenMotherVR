@@ -62,14 +62,16 @@ bool redirect_manager_calls(const GameImage& g, Patcher& p, const StereoDeviceHo
     return redirect_all(p, calls);
 }
 
-} // namespace
-
+// Rewrites each "Stereo Mode == Rift" test so it always passes.
+// From: FUN_1001d6f0 lines 72..100 (payload g_payload_1005dc34).
 bool force_stereo_mode_tests(const GameImage& g, Patcher& p) noexcept {
     for (std::uint32_t rva : g.sites.stereo_mode_tests) {
         if (!p.write(g.at_rva(rva), kCmpEaxEax)) return false;
     }
     return true;
 }
+
+} // namespace
 
 bool force_stereo_mode(const GameImage& g, Patcher& p) noexcept {
     if (!force_stereo_mode_tests(g, p)) return false;
