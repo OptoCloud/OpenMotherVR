@@ -175,9 +175,9 @@ Playing
     trigger). Default false.
   - "HolsterGestures": true: squeeze a grip over your right shoulder for
     the next weapon, over your left shoulder for the previous one, at
-    your left hip for the flashlight, and in front of your chest for the
-    motion tracker. A squeeze anywhere else aims or raises the tracker as
-    usual. Off in menus and interactions. Default false.
+    your left hip for the flashlight, and with a hand against your chest
+    for the motion tracker. A squeeze anywhere else, such as with your
+    hands held out in front of you, aims or raises the tracker as usual. Off in menus and interactions. Default false.
   - "HidingLean": true: in a locker or other hiding place, lean your head
     sideways or back to peek and lean. Small movements do nothing.
     Default false.
