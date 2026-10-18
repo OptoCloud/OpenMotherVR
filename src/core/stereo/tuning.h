@@ -1,7 +1,5 @@
 #pragma once
 
-#include "core/vr/tuning.h"
-
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -9,13 +7,6 @@
 // Behaviour parameters of the stereo device, the stereo update and the
 // render fixes: the project's choices, each defined once here.
 namespace omvr::core::stereo {
-
-// ---- The runtimes' virtual screen (03 §7) ----------------------------------
-
-// Defined in core/vr/tuning.h; named here for the platform runtimes that
-// still read them from core::stereo.
-using vr::kCinemaDistance;
-using vr::kCinemaWidth;
 
 // ---- The game's UI quads (05 §4) -------------------------------------------
 

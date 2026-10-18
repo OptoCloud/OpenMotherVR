@@ -16,7 +16,6 @@
 #include "core/diag/tuning.h"
 #include "core/hands/tuning.h"
 #include "core/input/controller_mapping.h"
-#include "core/stereo/tuning.h"
 #include "core/ui/notices.h"
 #include "core/vr/fov.h"
 #include "core/vr/hand_offsets.h"
@@ -60,11 +59,11 @@ namespace {
 
 namespace input = core::input;
 using core::diag::ports::logf;
-using core::stereo::kCinemaDistance;
-using core::stereo::kCinemaWidth;
 using core::vr::FovTangents;
 using core::vr::HeadsetDesc;
 using core::vr::HeadTracking;
+using core::vr::kCinemaDistance;
+using core::vr::kCinemaWidth;
 using core::vr::kHandCount;
 using core::vr::RawProjection;
 using core::vr::RenderTangents;
@@ -674,8 +673,8 @@ void OpenVrRuntime::place_screen(void* side_by_side) {
     overlay_->SetOverlayTransformAbsolute(overlay_handle_,
                                           static_cast<vr::ETrackingUniverseOrigin>(tracking_origin_), &m);
     overlay_->SetOverlayWidthInMeters(overlay_handle_, kCinemaWidth);
-    const vr::VRTextureBounds_t screen{0.0f, core::vr::kScreenTopV, core::vr::kScreenLeftHalfU,
-                                       core::vr::kScreenBottomV};
+    const vr::VRTextureBounds_t screen{core::vr::kScreenRegion.u_min, core::vr::kScreenRegion.v_min,
+                                       core::vr::kScreenRegion.u_max, core::vr::kScreenRegion.v_max};
     overlay_->SetOverlayTextureBounds(overlay_handle_, &screen);
     overlay_->ShowOverlay(overlay_handle_);
 }

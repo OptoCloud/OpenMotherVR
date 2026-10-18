@@ -59,10 +59,6 @@ inline constexpr std::uint32_t kScreenTopQuarters    = 1;
 inline constexpr std::uint32_t kScreenBottomQuarters = 3;
 static_assert(kScreenRegion.v_min == static_cast<float>(kScreenTopQuarters) / kScreenHeightQuarters);
 static_assert(kScreenRegion.v_max == static_cast<float>(kScreenBottomQuarters) / kScreenHeightQuarters);
-// Its edges by the names the OpenVR runtime uses.
-inline constexpr float kScreenLeftHalfU = kScreenRegion.u_max;
-inline constexpr float kScreenTopV      = kScreenRegion.v_min;
-inline constexpr float kScreenBottomV   = kScreenRegion.v_max;
 
 // A running session that the runtime never makes visible is reported this
 // long after the session started (09 §3.1).

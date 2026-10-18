@@ -10,7 +10,6 @@
 
 #include "core/diag/tuning.h"
 #include "core/input/controller_mapping.h"
-#include "core/stereo/tuning.h"
 #include "core/vr/fov.h"
 #include "core/vr/hand_offsets.h"
 #include "core/vr/heading.h"
@@ -38,11 +37,11 @@ namespace {
 
 namespace input = core::input;
 using core::diag::ports::logf;
-using core::stereo::kCinemaDistance;
-using core::stereo::kCinemaWidth;
 using core::vr::FovAngles;
 using core::vr::FovTangents;
 using core::vr::HeadsetDesc;
+using core::vr::kCinemaDistance;
+using core::vr::kCinemaWidth;
 using core::vr::kDefaultEyeX;
 using core::vr::kDefaultTangent;
 using core::vr::kEyeCount;
