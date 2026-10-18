@@ -2,9 +2,14 @@
 
 #include "core/config/settings.h"
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
 #include <optional>
 #include <span>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 #include <variant>
 
 // The settings of mothervr.json, one row each: where the value lives in the
@@ -112,79 +117,100 @@ float terminal_text_step(float scale) noexcept;
 // `segments` rounded down to one of kSnapSegmentSteps, or the default.
 int snap_segments(int segments) noexcept;
 
-// String forms used in the JSON. Parsing also takes the legacy spelling
-// "Disabled" for VRRuntime::None.
-std::string_view to_string(VRRuntime r) noexcept;
-std::string_view to_string(MirrorViewType m) noexcept;
-std::string_view to_string(StereoAA a) noexcept;
-std::string_view to_string(PlayMode m) noexcept;
-std::string_view to_string(FlashlightAim a) noexcept;
-std::string_view to_string(BodyVisible v) noexcept;
-std::string_view to_string(CameraTakeovers c) noexcept;
-std::string_view to_string(CrosshairMode c) noexcept;
-std::string_view to_string(HudPlacement p) noexcept;
-std::optional<VRRuntime> parse_vr_runtime(std::string_view s) noexcept;
-std::optional<MirrorViewType> parse_mirror_view_type(std::string_view s) noexcept;
-std::optional<StereoAA> parse_stereo_aa(std::string_view s) noexcept;
-std::optional<PlayMode> parse_play_mode(std::string_view s) noexcept;
-std::optional<FlashlightAim> parse_flashlight_aim(std::string_view s) noexcept;
-std::optional<BodyVisible> parse_body_visible(std::string_view s) noexcept;
-std::optional<CameraTakeovers> parse_camera_takeovers(std::string_view s) noexcept;
-std::optional<CrosshairMode> parse_crosshair_mode(std::string_view s) noexcept;
-std::optional<HudPlacement> parse_hud_placement(std::string_view s) noexcept;
-
-// The string parser and the last value of each enum the file stores.
+// The names an enum has in mothervr.json, by value: every enum the file
+// stores runs from 0 without gaps. `fallback` is what to_string gives a
+// value outside them. Parsing is case-sensitive (spec 22 §3.1, 21 §15,
+// 23 §8) and also takes the legacy spelling "Disabled" for VRRuntime::None.
 template <class E>
-struct EnumTraits;
-template <>
-struct EnumTraits<VRRuntime> {
-    static constexpr VRRuntime kLast = VRRuntime::OpenXR;
-    static std::optional<VRRuntime> parse(std::string_view s) noexcept { return parse_vr_runtime(s); }
-};
-template <>
-struct EnumTraits<MirrorViewType> {
-    static constexpr MirrorViewType kLast = MirrorViewType::LeftEye;
-    static std::optional<MirrorViewType> parse(std::string_view s) noexcept {
-        return parse_mirror_view_type(s);
+struct EnumNames {
+    static constexpr std::size_t kCapacity = 4;
+    std::array<std::string_view, kCapacity> names{};
+    E fallback{};
+
+    constexpr std::size_t size() const noexcept {
+        return static_cast<std::size_t>(
+            std::ranges::count_if(names, [](std::string_view n) { return !n.empty(); }));
     }
-};
-template <>
-struct EnumTraits<StereoAA> {
-    static constexpr StereoAA kLast = StereoAA::Off;
-    static std::optional<StereoAA> parse(std::string_view s) noexcept { return parse_stereo_aa(s); }
 };
 
+template <class E>
+inline constexpr EnumNames<E> kNames{};
 template <>
-struct EnumTraits<PlayMode> {
-    static constexpr PlayMode kLast = PlayMode::Standing;
-    static std::optional<PlayMode> parse(std::string_view s) noexcept { return parse_play_mode(s); }
-};
+inline constexpr EnumNames<VRRuntime> kNames<VRRuntime>{{"None", "Oculus", "OpenVR", "OpenXR"},
+                                                        VRRuntime::OpenVR};
 template <>
-struct EnumTraits<FlashlightAim> {
-    static constexpr FlashlightAim kLast = FlashlightAim::RightHand;
-    static std::optional<FlashlightAim> parse(std::string_view s) noexcept { return parse_flashlight_aim(s); }
-};
+inline constexpr EnumNames<MirrorViewType> kNames<MirrorViewType>{{"BothEyes", "RightEye", "LeftEye"},
+                                                                  MirrorViewType::RightEye};
 template <>
-struct EnumTraits<BodyVisible> {
-    static constexpr BodyVisible kLast = BodyVisible::None;
-    static std::optional<BodyVisible> parse(std::string_view s) noexcept { return parse_body_visible(s); }
-};
+inline constexpr EnumNames<StereoAA> kNames<StereoAA>{{"Auto", "On", "Off"}};
 template <>
-struct EnumTraits<CameraTakeovers> {
-    static constexpr CameraTakeovers kLast = CameraTakeovers::Reduced;
-    static std::optional<CameraTakeovers> parse(std::string_view s) noexcept {
-        return parse_camera_takeovers(s);
+inline constexpr EnumNames<PlayMode> kNames<PlayMode>{{"Seated", "Standing"}};
+template <>
+inline constexpr EnumNames<FlashlightAim> kNames<FlashlightAim>{{"Head", "LeftHand", "RightHand"}};
+template <>
+inline constexpr EnumNames<BodyVisible> kNames<BodyVisible>{{"Full", "ArmsAndHands", "HandsOnly", "None"}};
+template <>
+inline constexpr EnumNames<CameraTakeovers> kNames<CameraTakeovers>{{"Game", "Reduced"}};
+template <>
+inline constexpr EnumNames<CrosshairMode> kNames<CrosshairMode>{{"On", "Off", "Auto"}};
+template <>
+inline constexpr EnumNames<HudPlacement> kNames<HudPlacement>{{"HeadLocked", "Follow"}};
+
+// An enum the file stores by name.
+template <class E>
+concept NamedEnum = std::is_enum_v<E> && (kNames<E>.size() > 0);
+
+// The last value of an enum the file stores.
+template <NamedEnum E>
+inline constexpr E kLast = static_cast<E>(kNames<E>.size() - 1);
+
+// `e`'s name in the file.
+template <NamedEnum E>
+constexpr std::string_view to_string(E e) noexcept {
+    const auto i = static_cast<std::size_t>(std::to_underlying(e));
+    return kNames<E>.names[i < kNames<E>.size()
+                               ? i
+                               : static_cast<std::size_t>(std::to_underlying(kNames<E>.fallback))];
+}
+
+// The value named `s`, or none.
+template <NamedEnum E>
+constexpr std::optional<E> parse_enum(std::string_view s) noexcept {
+    if constexpr (std::is_same_v<E, VRRuntime>) {
+        if (s == "Disabled") return VRRuntime::None;
     }
-};
-template <>
-struct EnumTraits<CrosshairMode> {
-    static constexpr CrosshairMode kLast = CrosshairMode::Auto;
-    static std::optional<CrosshairMode> parse(std::string_view s) noexcept { return parse_crosshair_mode(s); }
-};
-template <>
-struct EnumTraits<HudPlacement> {
-    static constexpr HudPlacement kLast = HudPlacement::Follow;
-    static std::optional<HudPlacement> parse(std::string_view s) noexcept { return parse_hud_placement(s); }
-};
+    for (std::size_t i = 0; i < kNames<E>.size(); ++i) {
+        if (kNames<E>.names[i] == s) return static_cast<E>(i);
+    }
+    return std::nullopt;
+}
+
+inline std::optional<VRRuntime> parse_vr_runtime(std::string_view s) noexcept {
+    return parse_enum<VRRuntime>(s);
+}
+inline std::optional<MirrorViewType> parse_mirror_view_type(std::string_view s) noexcept {
+    return parse_enum<MirrorViewType>(s);
+}
+inline std::optional<StereoAA> parse_stereo_aa(std::string_view s) noexcept {
+    return parse_enum<StereoAA>(s);
+}
+inline std::optional<PlayMode> parse_play_mode(std::string_view s) noexcept {
+    return parse_enum<PlayMode>(s);
+}
+inline std::optional<FlashlightAim> parse_flashlight_aim(std::string_view s) noexcept {
+    return parse_enum<FlashlightAim>(s);
+}
+inline std::optional<BodyVisible> parse_body_visible(std::string_view s) noexcept {
+    return parse_enum<BodyVisible>(s);
+}
+inline std::optional<CameraTakeovers> parse_camera_takeovers(std::string_view s) noexcept {
+    return parse_enum<CameraTakeovers>(s);
+}
+inline std::optional<CrosshairMode> parse_crosshair_mode(std::string_view s) noexcept {
+    return parse_enum<CrosshairMode>(s);
+}
+inline std::optional<HudPlacement> parse_hud_placement(std::string_view s) noexcept {
+    return parse_enum<HudPlacement>(s);
+}
 
 } // namespace omvr::core::config

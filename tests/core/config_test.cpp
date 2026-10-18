@@ -374,6 +374,20 @@ TEST_CASE("enum names round trip") {
     CHECK_FALSE(parse_vr_runtime("openvr").has_value());
     CHECK(parse_mirror_view_type("BothEyes") == MirrorViewType::BothEyes);
     CHECK(parse_stereo_aa("Auto") == StereoAA::Auto);
+    CHECK(parse_vr_runtime("Disabled") == VRRuntime::None);
+    CHECK(parse_body_visible("None") == BodyVisible::None);
+    CHECK(parse_hud_placement("Follow") == HudPlacement::Follow);
+    CHECK_FALSE(parse_crosshair_mode("").has_value());
+    CHECK(to_string(BodyVisible::HandsOnly) == "HandsOnly");
+    CHECK(to_string(CameraTakeovers::Reduced) == "Reduced");
+    // A value outside the enum (an integer cast from the game) has a name.
+    CHECK(to_string(static_cast<VRRuntime>(7)) == "OpenVR");
+    CHECK(to_string(static_cast<MirrorViewType>(-1)) == "RightEye");
+    CHECK(to_string(static_cast<PlayMode>(2)) == "Seated");
+    CHECK(to_string(static_cast<HudPlacement>(5)) == "HeadLocked");
+    CHECK(kLast<VRRuntime> == VRRuntime::OpenXR);
+    CHECK(kLast<BodyVisible> == BodyVisible::None);
+    CHECK(kLast<CrosshairMode> == CrosshairMode::Auto);
 }
 
 const std::filesystem::path kDir  = L"C:\\game";

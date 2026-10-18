@@ -82,10 +82,10 @@ template <class E>
 E get_enum_or(const json& j, std::string_view key, E fallback) {
     auto it = j.find(key);
     if (it == j.end()) return fallback;
-    if (it->is_string()) return EnumTraits<E>::parse(it->get_ref<const std::string&>()).value_or(fallback);
+    if (it->is_string()) return parse_enum<E>(it->get_ref<const std::string&>()).value_or(fallback);
     if (it->is_number_integer()) {
         const auto n = it->get<long long>();
-        if (n >= 0 && n <= static_cast<long long>(EnumTraits<E>::kLast)) return static_cast<E>(n);
+        if (n >= 0 && n <= static_cast<long long>(kLast<E>)) return static_cast<E>(n);
     }
     return fallback;
 }

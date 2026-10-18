@@ -58,7 +58,7 @@ CommandOutcome apply_choice(config::Settings& cfg, const SettingRow& row, const 
             using T = std::remove_reference_t<decltype(field(cfg))>;
             if constexpr (std::is_enum_v<T>) {
                 const auto n = util::parse_int(value);
-                if (!n || *n < 0 || *n > std::to_underlying(config::EnumTraits<T>::kLast)) return refused();
+                if (!n || *n < 0 || *n > std::to_underlying(config::kLast<T>)) return refused();
                 const auto e = static_cast<T>(*n);
                 return applied(cfg, row, e, std::string(config::to_string(e)));
             } else {
