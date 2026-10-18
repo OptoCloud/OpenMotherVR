@@ -77,7 +77,8 @@ struct UpdateOutput {
 // From: FUN_1001f8a0.
 class StereoUpdate final {
 public:
-    // `settings` is the live settings object: turning is read each update.
+    // `settings` is the live settings object: turning is read once at the
+    // start of each update.
     StereoUpdate(const config::Settings& settings, SceneTracker& scene) noexcept
         : settings_(settings), scene_(scene) {}
 
@@ -97,11 +98,19 @@ public:
     bool loading_blackout() const noexcept { return loading_blackout_; }
 
 private:
+    // The settings one update reads, latched at its start.
+    struct RunSettings {
+        config::ComfortSettings comfort{};
+        bool snap_rotation             = false;
+        int snap_rotation_segments     = 0;
+        bool interaction_aware_turning = false;
+    };
+
     // Which turning applies (spec 22 §4.1); exactly one, chosen each update.
-    Turning turning(const config::ComfortSettings& comfort) const noexcept;
+    static Turning turning(const RunSettings& latched) noexcept;
     // Spec 22 §4.4: why turning is blocked now, None with the setting off;
     // a change is reported in `out`.
-    TurnBlock block(const UpdateInput& in, UpdateOutput& out) noexcept;
+    TurnBlock block(const UpdateInput& in, const RunSettings& latched, UpdateOutput& out) noexcept;
     // While blocked: a held snap deflection neither steps nor repeats, and
     // must come back inside the threshold first once the block ends.
     void hold_snap(const UpdateInput& in) noexcept;
@@ -110,7 +119,7 @@ private:
     static bool vignette_motion(const UpdateInput& in, Turning turn, TurnBlock blocked,
                                 const UpdateOutput& out) noexcept;
 
-    void snap_turn(const UpdateInput& in, UpdateOutput& out, const config::ComfortSettings& comfort) noexcept;
+    void snap_turn(const UpdateInput& in, UpdateOutput& out, const RunSettings& latched) noexcept;
     // True when smooth turn applied this update.
     bool smooth_turn(const UpdateInput& in, UpdateOutput& out, float speed) noexcept;
     void recenter(const UpdateInput& in, UpdateOutput& out) noexcept;

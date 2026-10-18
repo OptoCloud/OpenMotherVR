@@ -13,16 +13,20 @@ namespace omvr::core::stereo {
 
 UpdateOutput StereoUpdate::run(const UpdateInput& in) noexcept {
     UpdateOutput out;
-    const config::ComfortSettings comfort = settings_.comfort;
-    const Turning turn                    = turning(comfort);
-    const TurnBlock blocked               = block(in, out);
+    const RunSettings latched{.comfort                   = settings_.comfort,
+                              .snap_rotation             = settings_.input.snap_rotation,
+                              .snap_rotation_segments    = settings_.input.snap_rotation_segments,
+                              .interaction_aware_turning = settings_.controls.interaction_aware_turning};
+    const config::ComfortSettings& comfort = latched.comfort;
+    const Turning turn                     = turning(latched);
+    const TurnBlock blocked                = block(in, latched, out);
     report_turning(turn, comfort, out);
     bool smoothed = false;
     if (in.pad) {
         // 05 §3.2b: the pad in use switches game look off again.
         if (in.pad_activity) keyboard_mouse_ = false;
         if (turn == Turning::Snap && blocked != TurnBlock::None) hold_snap(in);
-        if (turn == Turning::Snap && blocked == TurnBlock::None) snap_turn(in, out, comfort);
+        if (turn == Turning::Snap && blocked == TurnBlock::None) snap_turn(in, out, latched);
         if (turn == Turning::Smooth && blocked == TurnBlock::None)
             smoothed = smooth_turn(in, out, comfort.smooth_turn_speed);
     }
@@ -50,14 +54,14 @@ UpdateOutput StereoUpdate::run(const UpdateInput& in) noexcept {
     return out;
 }
 
-Turning StereoUpdate::turning(const config::ComfortSettings& comfort) const noexcept {
-    if (settings_.input.snap_rotation) return Turning::Snap;
-    return comfort.smooth_turn_speed > 0.0f ? Turning::Smooth : Turning::GameLook;
+Turning StereoUpdate::turning(const RunSettings& latched) noexcept {
+    if (latched.snap_rotation) return Turning::Snap;
+    return latched.comfort.smooth_turn_speed > 0.0f ? Turning::Smooth : Turning::GameLook;
 }
 
-TurnBlock StereoUpdate::block(const UpdateInput& in, UpdateOutput& out) noexcept {
+TurnBlock StereoUpdate::block(const UpdateInput& in, const RunSettings& latched, UpdateOutput& out) noexcept {
     TurnBlockChange now{};
-    if (settings_.controls.interaction_aware_turning) {
+    if (latched.interaction_aware_turning) {
         now.block = turn_block({.in_interaction   = in.in_interaction,
                                 .interaction_kind = in.interaction_kind,
                                 .breathing_game   = in.breathing_game,
@@ -102,17 +106,16 @@ bool StereoUpdate::vignette_motion(const UpdateInput& in, Turning turn, TurnBloc
 // 05 §3.2c: one step per push of the stick; a held stick repeats after the
 // comfort repeat interval (spec 22 §4.3; 0 never repeats). Not in the menu
 // screen's mode, where the game has no camera to turn.
-void StereoUpdate::snap_turn(const UpdateInput& in, UpdateOutput& out,
-                             const config::ComfortSettings& comfort) noexcept {
-    const auto& input           = settings_.input;
-    const bool out_of_dead_zone = turn_out(in.turn);
-    const auto repeat           = std::chrono::milliseconds(comfort.snap_turn_repeat_ms);
-    const bool repeats          = comfort.snap_turn_repeat_ms > 0;
+void StereoUpdate::snap_turn(const UpdateInput& in, UpdateOutput& out, const RunSettings& latched) noexcept {
+    const config::ComfortSettings& comfort = latched.comfort;
+    const bool out_of_dead_zone            = turn_out(in.turn);
+    const auto repeat                      = std::chrono::milliseconds(comfort.snap_turn_repeat_ms);
+    const bool repeats                     = comfort.snap_turn_repeat_ms > 0;
     if (!out_of_dead_zone) snap_hold_ = false;
-    if (in.follow_active && input.snap_rotation && out_of_dead_zone && in.mode != StereoMode::Screen &&
-        !snap_latch_) {
+    // Only called with snap turning in use (latched.snap_rotation).
+    if (in.follow_active && out_of_dead_zone && in.mode != StereoMode::Screen && !snap_latch_) {
         snap_time_ = last_snap_ = in.now;
-        out.yaw                 = snapped_yaw(in.follow_yaw, in.turn, input.snap_rotation_segments);
+        out.yaw                 = snapped_yaw(in.follow_yaw, in.turn, latched.snap_rotation_segments);
         snap_latch_             = true;
     } else if ((!out_of_dead_zone && snap_latch_) ||
                (repeats && !snap_hold_ && in.follow_active && out_of_dead_zone && snap_latch_ &&
