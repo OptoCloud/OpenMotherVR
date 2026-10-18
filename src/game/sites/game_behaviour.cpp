@@ -9,7 +9,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 #include <string_view>
 
 namespace omvr::game::sites {
@@ -72,58 +71,26 @@ std::array<std::uint8_t, 1> ui_reference_disp(std::uint8_t back_buffer_disp_lo) 
     return {static_cast<std::uint8_t>(back_buffer_disp_lo + kUiReferenceSizeOffset)};
 }
 
-// ---- 8: vtable slots -----------------------------------------------------------
-
-std::uint8_t* slot_at(const GameImage& g, AiAddr vtable, std::uint32_t index) noexcept {
-    return g.at(vtable) + slot_offset(index);
-}
-
-// The method in slot `index` of the vtable at `vtable`.
-void* method_at(const GameImage& g, AiAddr vtable, std::uint32_t index) noexcept {
-    return pointer_at(slot_at(g, vtable, index));
-}
+// ---- 8: vtable slots and calls -------------------------------------------------
 
 GameSideOriginals save_originals(const GameImage& g) noexcept {
-    return {
-        .follow_on_activate   = method_at(g, AiAddr::FollowVtable, kFollowOnActivateSlot),
-        .follow_on_deactivate = method_at(g, AiAddr::FollowVtable, kFollowOnDeactivateSlot),
-        .ui_on_message        = pointer_at(g.at(AiAddr::UiEntityMessageSlot)),
-        .menu_close           = method_at(g, AiAddr::MenuVtable, kScreenCloseSlot),
-        .pause_open           = method_at(g, AiAddr::PauseMenuVtable, kScreenOpenSlot),
-        .pause_close          = method_at(g, AiAddr::PauseMenuVtable, kScreenCloseSlot),
-        .loading_open         = method_at(g, AiAddr::LoadingScreenVtable, kScreenOpenSlot),
-        .loading_close        = method_at(g, AiAddr::LoadingScreenVtable, kScreenCloseSlot),
-        .attract_open         = method_at(g, AiAddr::AttractScreenVtable, kScreenOpenSlot),
-    };
+    GameSideOriginals saved;
+    for (const GameSideSlot& s : kGameSideSlots) {
+        if (s.original) saved.*s.original = pointer_at(s.site.at(g));
+    }
+    return saved;
 }
 
 bool replace_slots(const GameImage& g, Patcher& p, const GameSideReplacements& r) noexcept {
-    return
-        // Track the first-person camera; watch cutscenes and level fades.
-        p.write_pointer(slot_at(g, AiAddr::FollowVtable, kFollowOnActivateSlot), r.follow_on_activate) &&
-        p.write_pointer(slot_at(g, AiAddr::FollowVtable, kFollowOnDeactivateSlot), r.follow_on_deactivate) &&
-        p.write_pointer(g.at(AiAddr::UiEntityMessageSlot), r.ui_on_message) &&
-        // Menus, loading and the title video show on the virtual screen.
-        p.write_pointer(slot_at(g, AiAddr::MenuVtable, kScreenCloseSlot), r.menu_close) &&
-        p.write_pointer(slot_at(g, AiAddr::PauseMenuVtable, kScreenOpenSlot), r.pause_open) &&
-        p.write_pointer(slot_at(g, AiAddr::PauseMenuVtable, kScreenCloseSlot), r.pause_close) &&
-        p.write_pointer(slot_at(g, AiAddr::LoadingScreenVtable, kScreenOpenSlot), r.loading_open) &&
-        p.write_pointer(slot_at(g, AiAddr::LoadingScreenVtable, kScreenCloseSlot), r.loading_close) &&
-        p.write_pointer(slot_at(g, AiAddr::AttractScreenVtable, kScreenOpenSlot), r.attract_open) &&
-        p.write_pointer(slot_at(g, AiAddr::AttractScreenVtable, kScreenCloseSlot), r.attract_close);
+    for (const GameSideSlot& s : kGameSideSlots) {
+        if (!p.write_pointer(s.site.at(g), r.*s.replacement)) return false;
+    }
+    return true;
 }
 
 bool redirect_calls(const GameImage& g, Patcher& p, const GameSideReplacements& r) noexcept {
-    if (!p.redirect_call(g.at(AiAddr::StereoUpdateCall), r.stereo_update, "Stereo::Update") ||
-        !p.redirect_call(g.at(AiAddr::VirtualScreenCall), r.place_virtual_screen, "virtual screen") ||
-        !p.redirect_call(g.at(AiAddr::HudPanelCall), r.place_hud_panel, "HUD panel")) {
-        return false;
-    }
-    for (AiAddr a : {AiAddr::PushModeCallA, AiAddr::PushModeCallB, AiAddr::PushModeCallC}) {
-        if (!p.redirect_call(g.at(a), r.push_mode, "PushMode")) return false;
-    }
-    for (AiAddr a : {AiAddr::PopModeCallA, AiAddr::PopModeCallB, AiAddr::PopModeCallC}) {
-        if (!p.redirect_call(g.at(a), r.pop_mode, "PopMode")) return false;
+    for (const GameSideCall& c : kGameSideCalls) {
+        if (!p.redirect_call(g.at(c.site), r.*c.replacement, c.redirected_as)) return false;
     }
     return true;
 }

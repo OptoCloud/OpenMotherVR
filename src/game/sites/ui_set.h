@@ -38,6 +38,14 @@ bool hook_script_bridge(const GameImage& g, Patcher& patcher, ui::ScriptVars& sc
 bool hook_pause_settings_push(const GameImage& g, Patcher& patcher, const void* replacement,
                               void*& stock) noexcept;
 
+// The menus' open slots (05 §5): the front-end menu's gets the settings
+// push, the pause menu's is written with the game-side hooks or on its own
+// for runtime None.
+inline constexpr SlotSite kMenuOpenSite{AiAddr::MenuVtable, kScreenOpenSlot, AiAddr::MenuOpen,
+                                        "the front-end menu's open (slot 0)"};
+inline constexpr SlotSite kPauseMenuOpenSite{AiAddr::PauseMenuVtable, kScreenOpenSlot, AiAddr::PauseMenuOpen,
+                                             "the pause menu's open (slot 0)"};
+
 // Sites of the UI set: the external-call slot and the menu's open slot,
 // the archive path when the mod's archive is in use, and the pause menu's
 // open slot, written with the game-side hooks or on its own for runtime

@@ -26,13 +26,7 @@ constexpr std::string_view kLeftStickPrompt = "left stick prompt";
 // connected, since VR controllers come through it.
 constexpr std::array<std::uint8_t, 3> kPadAlwaysConnected = {x86::kMovClImm8, 0x01, x86::kNop};
 
-// Byte offset of a pad slot from the table's vtable address.
-constexpr std::uint32_t pad_slot_offset(std::uint32_t slot) noexcept {
-    return slot_offset(slot - kPadFirstTableSlot);
-}
-
-// The five replaced pad methods.
-constexpr std::size_t kPadSlotCount = 5;
+constexpr std::size_t kPadSlotCount = kPadSlots.size();
 
 struct Slot {
     std::uint32_t offset;
@@ -64,21 +58,14 @@ bool install_pad_slots(Patcher& p, std::uint8_t* pad_vtable, const PadReplacemen
     // The game calls the replacements as soon as a slot is written, so the
     // stock methods are in place first. These are the same addresses the
     // table names (PadIsDown..PadHasActivity), which the preflight checked.
-    stock.is_down  = pointer_at(pad_vtable + pad_slot_offset(kPadIsDownSlot));
-    stock.value    = pointer_at(pad_vtable + pad_slot_offset(kPadGetValueSlot));
-    stock.axis     = pointer_at(pad_vtable + pad_slot_offset(kPadGetAxisSlot));
-    stock.name     = pointer_at(pad_vtable + pad_slot_offset(kPadControlNameSlot));
-    stock.activity = pointer_at(pad_vtable + pad_slot_offset(kPadHasActivitySlot));
-
-    const std::array<Slot, kPadSlotCount> slots = {{
-        {pad_slot_offset(kPadIsDownSlot), replacements.is_down},
-        {pad_slot_offset(kPadGetValueSlot), replacements.value},
-        {pad_slot_offset(kPadGetAxisSlot), replacements.axis},
-        {pad_slot_offset(kPadControlNameSlot), replacements.control_name},
-        {pad_slot_offset(kPadHasActivitySlot), replacements.has_activity},
-    }};
+    std::array<Slot, kPadSlotCount> slots{};
     std::array<std::uint32_t, kPadSlotCount> saved{};
-    for (std::size_t i = 0; i < kPadSlotCount; ++i) saved[i] = read_u32(pad_vtable + slots[i].offset);
+    for (std::size_t i = 0; i < kPadSlotCount; ++i) {
+        const PadSlot& s = kPadSlots[i];
+        slots[i]         = {slot_offset(s.site.slot), replacements.*s.replacement};
+        s.keep_stock(stock, pointer_at(pad_vtable + slots[i].offset));
+        saved[i] = read_u32(pad_vtable + slots[i].offset);
+    }
 
     // All or nothing (04 §3.3).
     bool restored             = true;

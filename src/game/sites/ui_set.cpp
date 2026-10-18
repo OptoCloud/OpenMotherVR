@@ -68,13 +68,12 @@ bool hook_script_bridge(const GameImage& g, Patcher& p, ui::ScriptVars& script_v
 
     // The Fire* methods need the game's menu object, so settings are pushed
     // from a hook on it rather than from DLL code with no object at hand.
-    return p.write_pointer(g.at(AiAddr::MenuVtable) + slot_offset(kScreenOpenSlot), r.on_menu_open)
-        .has_value();
+    return p.write_pointer(kMenuOpenSite.at(g), r.on_menu_open).has_value();
 }
 
 bool hook_pause_settings_push(const GameImage& g, Patcher& p, const void* replacement,
                               void*& stock) noexcept {
-    std::uint8_t* slot = g.at(AiAddr::PauseMenuVtable) + slot_offset(kScreenOpenSlot);
+    std::uint8_t* slot = kPauseMenuOpenSite.at(g);
     stock              = pointer_at(slot);
     return p.write_pointer(slot, replacement).has_value();
 }

@@ -4,6 +4,7 @@
 #include "game/input/input_manager.h"
 #include "game/patcher.h"
 
+#include <array>
 #include <cstdint>
 
 namespace omvr::game::sites {
@@ -18,6 +19,39 @@ struct PadReplacements {
     const void* control_name;
     const void* has_activity;
     const void* move_on_left_stick;
+};
+
+// A pad slot the controls replace: the table's PadVtable is one slot past
+// the destructor, so slot n is entry n - kPadFirstTableSlot. `keep_stock`
+// stores the game's method into StockPad.
+struct PadSlot {
+    SlotSite site;
+    const void* PadReplacements::* replacement;
+    void (*keep_stock)(input::StockPad& stock, CodeAddress method) noexcept;
+};
+
+// The five slots, in the order they are written.
+inline constexpr std::array kPadSlots = {
+    PadSlot{{AiAddr::PadVtable, kPadIsDownSlot - kPadFirstTableSlot, AiAddr::PadIsDown,
+             "the pad's IsDown (slot 1)"},
+            &PadReplacements::is_down,
+            [](input::StockPad& s, CodeAddress m) noexcept { s.is_down = m; }},
+    PadSlot{{AiAddr::PadVtable, kPadGetValueSlot - kPadFirstTableSlot, AiAddr::PadGetValue,
+             "the pad's GetValue (slot 2)"},
+            &PadReplacements::value,
+            [](input::StockPad& s, CodeAddress m) noexcept { s.value = m; }},
+    PadSlot{{AiAddr::PadVtable, kPadGetAxisSlot - kPadFirstTableSlot, AiAddr::PadGetAxis,
+             "the pad's GetAxis (slot 3)"},
+            &PadReplacements::axis,
+            [](input::StockPad& s, CodeAddress m) noexcept { s.axis = m; }},
+    PadSlot{{AiAddr::PadVtable, kPadControlNameSlot - kPadFirstTableSlot, AiAddr::PadControlToName,
+             "the pad's ControlToName (slot 5)"},
+            &PadReplacements::control_name,
+            [](input::StockPad& s, CodeAddress m) noexcept { s.name = m; }},
+    PadSlot{{AiAddr::PadVtable, kPadHasActivitySlot - kPadFirstTableSlot, AiAddr::PadHasActivity,
+             "the pad's HasActivity (slot 11)"},
+            &PadReplacements::has_activity,
+            [](input::StockPad& s, CodeAddress m) noexcept { s.activity = m; }},
 };
 
 // Saves the game's five pad methods into `stock` and points the vtable slots
@@ -45,7 +79,9 @@ enum class ControlsOutcome {
 
 // Sites of the controls step: five pad slots, the connected flag and two
 // prompt calls.
-inline constexpr int kControlSites = 8;
+inline constexpr int kLeftStickPromptCalls = 2;
+inline constexpr int kControlSites         = static_cast<int>(kPadSlots.size()) + 1 + kLeftStickPromptCalls;
+static_assert(kControlSites == 8);
 
 // 9, controls: VR input goes through the game's gamepad, five of its vtable
 // slots replaced as one patch. Only with those in place does the pad count

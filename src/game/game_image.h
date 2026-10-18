@@ -6,6 +6,8 @@
 #include "game/constants.h"
 
 #include <cstdint>
+#include <optional>
+#include <string_view>
 
 namespace omvr::game {
 
@@ -29,6 +31,19 @@ struct GameImage {
 
     // `va` lies inside this image.
     bool contains(std::uint32_t va) const noexcept { return va - address_of(base) < image_size; }
+};
+
+// A vtable slot the patches check and write: slot `slot` of the vtable at
+// `table` (a slot the table names itself is slot 0 of it), the stock method
+// the preflight expects there (none: any code in AI.exe) and the name its
+// log line gives the slot.
+struct SlotSite {
+    AiAddr table;
+    std::uint32_t slot;
+    std::optional<AiAddr> stock;
+    std::string_view what;
+
+    std::uint8_t* at(const GameImage& g) const noexcept { return g.at(table) + slot_offset(slot); }
 };
 
 } // namespace omvr::game

@@ -7,7 +7,9 @@
 #include "game/preflight.h"
 
 #include "game/code_address.h"
+#include "game/sites/controls.h"
 #include "game/sites/game_behaviour.h"
+#include "game/sites/ui_set.h"
 #include "game/x86.h"
 
 #include <algorithm>
@@ -110,6 +112,16 @@ public:
         expect_slot_value(slot, g_.contains(read_u32(slot)), what);
     }
 
+    // `site` holds its stock method, or code in the image when the table
+    // does not name it.
+    void expect_slot(const SlotSite& site) noexcept {
+        if (site.stock) {
+            expect_slot(site.at(g_), g_.at(*site.stock), site.what);
+        } else {
+            expect_slot_in_image(site.at(g_), site.what);
+        }
+    }
+
     // An address the checks would read lies outside the image: itself a
     // failed check, and nothing is read there.
     void expect_rva_in_image(std::uint32_t site_rva, std::string_view what) noexcept {
@@ -179,10 +191,8 @@ void check_ui_set(Preflight& pf) noexcept {
               "push \"ShowBootup\" (ShowBootupPush)");
     pf.expect_slot(g.at(AiAddr::CmdDispatchSlot), g.at(AiAddr::OriginalCmdHandler),
                    "the UI's external-call handler (UiExternalCallSlot)");
-    pf.expect_slot(g.at(AiAddr::MenuVtable) + slot_offset(kScreenOpenSlot), g.at(AiAddr::MenuOpen),
-                   "the front-end menu's open (slot 0)");
-    pf.expect_slot(g.at(AiAddr::PauseMenuVtable) + slot_offset(kScreenOpenSlot), g.at(AiAddr::PauseMenuOpen),
-                   "the pause menu's open (slot 0)");
+    pf.expect_slot(sites::kMenuOpenSite);
+    pf.expect_slot(sites::kPauseMenuOpenSite);
 }
 
 // The inline sites lie inside the image; the checks below read them.
@@ -224,17 +234,9 @@ void check_stereo_hand_off(Preflight& pf) noexcept {
 // 8: the call sites the game-side hooks redirect (05 §3, §4).
 void check_game_side_calls(Preflight& pf) noexcept {
     const GameImage& g = pf.game();
-    pf.expect(*g.at(AiAddr::StereoUpdateCall) == x86::kCallRel32, g.at(AiAddr::StereoUpdateCall),
-              "call StereoUpdate");
-    pf.expect(calls(g.at(AiAddr::VirtualScreenCall), g.at(AiAddr::BuildUiQuad)),
-              g.at(AiAddr::VirtualScreenCall), "call BuildUiQuad (the virtual screen)");
-    pf.expect(calls(g.at(AiAddr::HudPanelCall), g.at(AiAddr::BuildUiQuad)), g.at(AiAddr::HudPanelCall),
-              "call BuildUiQuad (the HUD panel)");
-    for (AiAddr a : {AiAddr::PushModeCallA, AiAddr::PushModeCallB, AiAddr::PushModeCallC}) {
-        pf.expect(calls(g.at(a), g.at(AiAddr::GamePushMode)), g.at(a), "call StereoPushMode");
-    }
-    for (AiAddr a : {AiAddr::PopModeCallA, AiAddr::PopModeCallB, AiAddr::PopModeCallC}) {
-        pf.expect(calls(g.at(a), g.at(AiAddr::GamePopMode)), g.at(a), "call StereoPopMode");
+    for (const sites::GameSideCall& c : sites::kGameSideCalls) {
+        const std::uint8_t* site = g.at(c.site);
+        pf.expect(c.callee ? calls(site, g.at(*c.callee)) : *site == x86::kCallRel32, site, c.checked_as);
     }
     // The table does not name the callee: both calls reach the same
     // function inside AI.exe.
@@ -249,30 +251,9 @@ void check_game_side_calls(Preflight& pf) noexcept {
 
 // 8: the vtable slots the game-side hooks replace (05 §5, §6).
 void check_game_side_slots(Preflight& pf) noexcept {
-    const GameImage& g         = pf.game();
-    const std::uint8_t* follow = g.at(AiAddr::FollowVtable);
-    pf.expect_slot(follow + slot_offset(kFollowOnActivateSlot), g.at(AiAddr::FollowOnActivatePatch),
-                   "FollowBehavior::OnActivate (slot 0)");
-    pf.expect_slot(follow + slot_offset(kFollowOnDeactivateSlot), g.at(AiAddr::FollowOnDeactivate),
-                   "FollowBehavior::OnDeactivate (slot 1)");
-    pf.expect_slot(g.at(AiAddr::UiEntityMessageSlot), g.at(AiAddr::UiEntityOnMessage),
-                   "the UI entity's message handler");
-    auto expect_screen_slot = [&](AiAddr vtable, std::uint32_t slot, AiAddr method, std::string_view what) {
-        pf.expect_slot(g.at(vtable) + slot_offset(slot), g.at(method), what);
-    };
-    expect_screen_slot(AiAddr::MenuVtable, kScreenCloseSlot, AiAddr::MenuClose,
-                       "the front-end menu's close (slot 2)");
-    expect_screen_slot(AiAddr::PauseMenuVtable, kScreenCloseSlot, AiAddr::PauseMenuClose,
-                       "the pause menu's close (slot 2)");
-    expect_screen_slot(AiAddr::LoadingScreenVtable, kScreenOpenSlot, AiAddr::LoadingScreenOpen,
-                       "the loading screen's open (slot 0)");
-    expect_screen_slot(AiAddr::LoadingScreenVtable, kScreenCloseSlot, AiAddr::LoadingScreenClose,
-                       "the loading screen's close (slot 2)");
-    expect_screen_slot(AiAddr::AttractScreenVtable, kScreenOpenSlot, AiAddr::AttractOpen,
-                       "the attract screen's open (slot 0)");
-    // A shared empty method the table does not name.
-    pf.expect_slot_in_image(g.at(AiAddr::AttractScreenVtable) + slot_offset(kScreenCloseSlot),
-                            "code in AI.exe (attract screen slot 2)");
+    for (const sites::GameSideSlot& s : sites::kGameSideSlots) {
+        if (!s.checked_with_ui_set) pf.expect_slot(s.site);
+    }
 }
 
 // 9: the camera and look byte patches (05 §7.1 to §7.6).
@@ -328,16 +309,7 @@ void check_ui_patch_sites(Preflight& pf) noexcept {
 
 // 9: the pad slots the controls replace as one patch (04 §3.3).
 void check_pad_slots(Preflight& pf) noexcept {
-    const GameImage& g      = pf.game();
-    const std::uint8_t* pad = g.at(AiAddr::PadVtable);
-    auto expect_pad_slot    = [&](std::uint32_t slot, AiAddr method, std::string_view what) {
-        pf.expect_slot(pad + slot_offset(slot - kPadFirstTableSlot), g.at(method), what);
-    };
-    expect_pad_slot(kPadIsDownSlot, AiAddr::PadIsDown, "the pad's IsDown (slot 1)");
-    expect_pad_slot(kPadGetValueSlot, AiAddr::PadGetValue, "the pad's GetValue (slot 2)");
-    expect_pad_slot(kPadGetAxisSlot, AiAddr::PadGetAxis, "the pad's GetAxis (slot 3)");
-    expect_pad_slot(kPadControlNameSlot, AiAddr::PadControlToName, "the pad's ControlToName (slot 5)");
-    expect_pad_slot(kPadHasActivitySlot, AiAddr::PadHasActivity, "the pad's HasActivity (slot 11)");
+    for (const sites::PadSlot& s : sites::kPadSlots) pf.expect_slot(s.site);
 }
 
 } // namespace
