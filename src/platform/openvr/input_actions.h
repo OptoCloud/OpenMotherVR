@@ -39,8 +39,9 @@ struct HandPose {
 // Render thread, after init.
 class Actions final {
 public:
-    // `aim_poses`: declare and read the aim pose actions (Hands.Enabled at
-    // start, 21 §1). `haptics`: declare the vibration outputs (21 §14.3).
+    // The aim pose actions are always declared and bound (21 §15.1, §16);
+    // `aim_poses`: read them each frame. `haptics`: declare the vibration
+    // outputs (21 §14.3).
     Actions(core::diag::ports::Log& log, bool aim_poses, bool haptics) noexcept
         : log_(log), aim_poses_(aim_poses), haptics_(haptics) {}
 
@@ -70,6 +71,7 @@ private:
     bool write_files(const std::filesystem::path& dir, const std::filesystem::path& manifest_path);
     void register_actions(vr::IVRInput* input);
     void report_unbound_poses() noexcept;
+    void report_unbound_aim() noexcept;
     void report_haptic_binding() noexcept;
     void read_aim(std::size_t hand, int origin, HandPose& p) noexcept;
 
@@ -80,10 +82,11 @@ private:
     std::array<std::uint64_t, core::vr::kHandCount> pose_handles_{};               // hand_left, hand_right
     std::array<std::uint64_t, core::vr::kHandCount> aim_handles_{};                // aim_left, aim_right
     std::array<std::uint64_t, core::vr::kHandCount> haptic_handles_{}; // haptic_left, haptic_right
-    bool aim_poses_      = false;
-    bool haptics_        = false;
-    bool unbound_logged_ = false;
-    bool haptics_logged_ = false;
+    bool aim_poses_          = false;
+    bool haptics_            = false;
+    bool unbound_logged_     = false;
+    bool aim_unbound_logged_ = false;
+    bool haptics_logged_     = false;
 };
 
 } // namespace omvr::platform::openvr

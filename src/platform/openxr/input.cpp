@@ -30,6 +30,9 @@ constexpr std::string_view kLogHapticCreated =
     "openxr input: haptic output action created for both hands (21 §14.3)";
 constexpr std::string_view kLogHapticBound   = "openxr input: haptic output bound to {} source(s)";
 constexpr std::string_view kLogHapticUnbound = "openxr input: haptic output not bound by this profile ({})";
+constexpr std::string_view kLogAimUnbound =
+    "openxr input: {} hand aim pose not bound by the current profile; aiming stays on the head";
+constexpr std::string_view kLogFrameProfile = "openxr input: Steam Frame controller bindings suggested";
 
 constexpr float kNanosecondsPerSecond = 1e9f;
 
@@ -69,11 +72,15 @@ bool Input::make_actions() noexcept {
            make_action(a.primary, XR_ACTION_TYPE_BOOLEAN_INPUT, "primary", "A / X") &&
            make_action(a.secondary, XR_ACTION_TYPE_BOOLEAN_INPUT, "secondary", "B / Y") &&
            make_action(a.menu, XR_ACTION_TYPE_BOOLEAN_INPUT, "menu", "Menu") &&
-           (!aim_poses_ || make_action(a.aim_pose, XR_ACTION_TYPE_POSE_INPUT, "aim_pose", "Hand aim")) &&
+           make_action(a.dpad_up, XR_ACTION_TYPE_BOOLEAN_INPUT, "dpad_up", "D-pad up") &&
+           make_action(a.dpad_down, XR_ACTION_TYPE_BOOLEAN_INPUT, "dpad_down", "D-pad down") &&
+           make_action(a.dpad_left, XR_ACTION_TYPE_BOOLEAN_INPUT, "dpad_left", "D-pad left") &&
+           make_action(a.dpad_right, XR_ACTION_TYPE_BOOLEAN_INPUT, "dpad_right", "D-pad right") &&
+           make_action(a.aim_pose, XR_ACTION_TYPE_POSE_INPUT, "aim_pose", "Hand aim") &&
            (!haptics_ || make_action(a.haptic, XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic", "Vibration"));
 }
 
-void Input::suggest(const char* profile, const std::vector<Bind>& binds) noexcept {
+bool Input::suggest(const char* profile, const std::vector<Bind>& binds) noexcept {
     std::vector<XrActionSuggestedBinding> list;
     for (const auto& b : binds) {
         if (b.left) list.push_back({*b.action, path((std::string("/user/hand/left/") + b.left).c_str())});
@@ -85,17 +92,19 @@ void Input::suggest(const char* profile, const std::vector<Bind>& binds) noexcep
     s.suggestedBindings      = list.data();
     const XrResult r         = xrSuggestInteractionProfileBindings(instance_, &s);
     if (XR_FAILED(r)) logf(log_, kLogBindingsRejected, profile, static_cast<int>(r));
+    return XR_SUCCEEDED(r);
 }
 
 // The suggested bindings of 04 §5.8.4, one table per interaction profile.
 void Input::suggest_all() noexcept {
     Actions& a = actions_;
     // The grip pose is the same on every profile, and so is the aim pose
-    // (21 §16) when it is wanted.
+    // (21 §16), suggested whatever Hands.Enabled is so that it applies at
+    // once (21 §15.1).
     std::vector<Bind> common = {
         {&a.grip_pose, "input/grip/pose", "input/grip/pose"},
+        {&a.aim_pose, "input/aim/pose", "input/aim/pose"},
     };
-    if (aim_poses_) common.push_back({&a.aim_pose, "input/aim/pose", "input/aim/pose"});
     // 21 §14.3: every profile here has a haptic output on each hand.
     if (haptics_) common.push_back({&a.haptic, "output/haptic", "output/haptic"});
     auto with_common = [&](std::vector<Bind> v) {
@@ -152,6 +161,32 @@ void Input::suggest_all() noexcept {
                 {&a.trigger, "input/select/click", "input/select/click"},
                 {&a.menu, "input/menu/click", "input/menu/click"},
             }));
+
+    if (frame_profile_) suggest_frame(common);
+}
+
+// Steam Frame (Valve's public input documentation; only with its
+// extension): the Touch layout where the buttons exist (right A interact,
+// right B reload, the right Menu pauses), the left d-pad as the d-pad (22
+// §7), Map on the left View and Flashlight on the left bumper, where Touch
+// has its left X / Y.
+void Input::suggest_frame(const std::vector<Bind>& common) noexcept {
+    Actions& a             = actions_;
+    std::vector<Bind> list = {
+        {&a.trigger, "input/trigger/value", "input/trigger/value"},
+        {&a.squeeze, "input/squeeze/value", "input/squeeze/value"},
+        {&a.stick, "input/thumbstick", "input/thumbstick"},
+        {&a.stick_click, "input/thumbstick/click", "input/thumbstick/click"},
+        {&a.primary, "input/view/click", "input/a/click"},
+        {&a.secondary, "input/bumper/click", "input/b/click"},
+        {&a.menu, nullptr, "input/menu/click"},
+        {&a.dpad_up, "input/dpad_up/click", nullptr},
+        {&a.dpad_down, "input/dpad_down/click", nullptr},
+        {&a.dpad_left, "input/dpad_left/click", nullptr},
+        {&a.dpad_right, "input/dpad_right/click", nullptr},
+    };
+    list.insert(list.end(), common.begin(), common.end());
+    if (suggest(kFrameControllerProfile, list)) log_.line(kLogFrameProfile);
 }
 
 XrSpace Input::make_action_space(XrAction action, XrPath hand) noexcept {
@@ -232,15 +267,29 @@ void Input::locate_grip(int hand, XrSpace space, XrSpace base, XrTime t, HandSta
 }
 
 // The aim pose (21 §5.2), located like the grip; untracked leaves aim_valid
-// false, without a log line of its own (the grip's says why a hand is out).
-void Input::locate_aim(XrSpace space, XrSpace base, XrTime t, HandState& s) noexcept {
+// false, without a log line of its own (the grip's says why a hand is out),
+// except a profile that binds no aim pose while the grip is tracked.
+void Input::locate_aim(int hand, XrSpace space, XrSpace base, XrTime t, HandState& s) noexcept {
     XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
     if (space == XR_NULL_HANDLE || XR_FAILED(xrLocateSpace(space, base, t, &loc)) ||
         (loc.locationFlags & kOrientationAndPosition) != kOrientationAndPosition) {
+        if (s.grip_valid) log_unbound_aim(hand);
         return;
     }
     s.aim       = from_xr(loc.pose);
     s.aim_valid = true;
+}
+
+// 21 §16: the aim pose action reads inactive on a tracked hand: the bound
+// profile has no aim pose. Once per hand and process.
+void Input::log_unbound_aim(int hand) noexcept {
+    auto& logged = aim_unbound_logged_[static_cast<std::size_t>(hand)];
+    if (logged) return;
+    XrActionStatePose pose{XR_TYPE_ACTION_STATE_POSE};
+    const XrActionStateGetInfo gi = get_info(actions_.aim_pose, hand);
+    if (XR_FAILED(xrGetActionStatePose(session_, &gi, &pose)) || pose.isActive != XR_FALSE) return;
+    logged = true;
+    logf(log_, kLogAimUnbound, hand_name(hand));
 }
 
 bool Input::create(XrInstance instance, XrSession session) noexcept {
@@ -274,7 +323,7 @@ bool Input::create(XrInstance instance, XrSession session) noexcept {
 
     for (std::size_t h = 0; h < grip_space_.size(); ++h) {
         grip_space_[h].reset(make_action_space(actions_.grip_pose, hand_path_[h]));
-        if (aim_poses_) aim_space_[h].reset(make_action_space(actions_.aim_pose, hand_path_[h]));
+        aim_space_[h].reset(make_action_space(actions_.aim_pose, hand_path_[h]));
     }
     log_.line(kLogAttached);
     if (haptics_) log_.line(kLogHapticCreated);
@@ -301,8 +350,12 @@ HandState Input::read_hand(int hand, XrSpace base, XrTime t) noexcept {
     s.primary     = get_bool(a.primary, hand, any);
     s.secondary   = get_bool(a.secondary, hand, any);
     s.menu        = get_bool(a.menu, hand, any);
+    s.dpad        = {.up    = get_bool(a.dpad_up, hand, any),
+                     .down  = get_bool(a.dpad_down, hand, any),
+                     .left  = get_bool(a.dpad_left, hand, any),
+                     .right = get_bool(a.dpad_right, hand, any)};
     locate_grip(hand, grip_space_[static_cast<std::size_t>(hand)].get(), base, t, s);
-    if (aim_poses_) locate_aim(aim_space_[static_cast<std::size_t>(hand)].get(), base, t, s);
+    if (aim_poses_) locate_aim(hand, aim_space_[static_cast<std::size_t>(hand)].get(), base, t, s);
     s.active = any || s.grip_valid;
     return s;
 }
@@ -343,8 +396,9 @@ void Input::on_interaction_profile_changed() noexcept {
     char name[XR_MAX_PATH_LENGTH] = {};
     std::uint32_t n               = 0;
     xrPathToString(instance_, ps.interactionProfile, sizeof(name), &n, name);
-    state_.family =
-        std::strstr(name, kViveProfile) ? ControllerFamily::Touchpad : ControllerFamily::Thumbstick;
+    state_.family = std::strstr(name, kViveProfile)                   ? ControllerFamily::Touchpad
+                    : std::strcmp(name, kFrameControllerProfile) == 0 ? ControllerFamily::Frame
+                                                                      : ControllerFamily::Thumbstick;
     logf(log_, kLogProfile, name);
     log_haptic_binding();
 }

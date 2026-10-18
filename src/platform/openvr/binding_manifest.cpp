@@ -87,8 +87,8 @@ json stick_sources(const StickLayout& l) {
 // The aim poses (21 §5.2, §16) go to the controller's pointing pose: the
 // component SteamVR's OpenXR runtime pairs with /input/aim/pose,
 // /pose/openxr_aim, where the input profile lists it (Touch), else
-// /pose/tip, the controller's nose (Index, Vive wands, WMR). Null: the aim
-// poses are not bound (Hands.Enabled off at start).
+// /pose/tip, the controller's nose (Index, Vive wands, WMR, Steam Frame).
+// Bound whatever Hands.Enabled is, so the setting applies at once (21 §15.1).
 json hand_poses(const char* component, const char* aim_component) {
     json p   = json::array();
     auto add = [&p](const std::array<const char*, 2>& actions, const char* pose) {
@@ -99,7 +99,7 @@ json hand_poses(const char* component, const char* aim_component) {
         }
     };
     add(kPoseActions, component);
-    if (aim_component) add(kAimPoseActions, aim_component);
+    add(kAimPoseActions, aim_component);
     return p;
 }
 
@@ -168,6 +168,29 @@ json wand_sources() {
     return wand;
 }
 
+// Steam Frame (Valve's public input documentation): thumbsticks, A / B /
+// X / Y and Menu on the right, a d-pad and a View button on the left, and a
+// bumper above each trigger. The Touch layout where the buttons exist (right
+// A interact, right B reload, the menu pauses); the left d-pad is the d-pad
+// (menus, and the player's d-pad bindings in play, 22 §7); Map on the left
+// View and Flashlight on the left bumper, where Touch has its left X / Y.
+json frame_sources() {
+    json frame = stick_sources({.stick      = "thumbstick",
+                                .grip_mode  = "button",
+                                .grip_input = "click",
+                                .button_a   = "a",
+                                .button_b   = "b",
+                                .button_x   = "view",
+                                .button_y   = "bumper",
+                                .pause_path = hand("right", "menu"),
+                                .pause_mode = "button"});
+    frame.push_back(source(hand("left", "dpad_up"), "button", {{"click", out("dpad_up")}}));
+    frame.push_back(source(hand("left", "dpad_down"), "button", {{"click", out("dpad_down")}}));
+    frame.push_back(source(hand("left", "dpad_left"), "button", {{"click", out("dpad_left")}}));
+    frame.push_back(source(hand("left", "dpad_right"), "button", {{"click", out("dpad_right")}}));
+    return frame;
+}
+
 const char* type_name(Kind kind) noexcept {
     switch (kind) {
         case Kind::Boolean: return "boolean";
@@ -187,9 +210,9 @@ std::string binding_file_name(const std::string& controller) {
     return kBindingFilePrefix + controller + kBindingFileSuffix;
 }
 
-std::vector<std::pair<std::string, json>> default_bindings(bool aim_poses, bool haptics) {
-    const char* tip   = aim_poses ? "tip" : nullptr;
-    const char* touch = aim_poses ? "openxr_aim" : nullptr;
+std::vector<std::pair<std::string, json>> default_bindings(bool haptics) {
+    const char* tip   = "tip";
+    const char* touch = "openxr_aim";
     std::vector<std::pair<std::string, json>> files;
 
     // Index has no menu button: the left trackpad press pauses, and the left
@@ -224,10 +247,12 @@ std::vector<std::pair<std::string, json>> default_bindings(bool aim_poses, bool 
         binding_file("holographic_controller", "Windows Mixed Reality", wmr_sources(), "grip", tip, haptics));
     files.emplace_back("vive_controller",
                        binding_file("vive_controller", "Vive wands", wand_sources(), "grip", tip, haptics));
+    files.emplace_back("frame_controller", binding_file("frame_controller", "Steam Frame controllers",
+                                                        frame_sources(), "grip", tip, haptics));
     return files;
 }
 
-json manifest(const std::vector<std::pair<std::string, json>>& bindings, bool aim_poses, bool haptics) {
+json manifest(const std::vector<std::pair<std::string, json>>& bindings, bool haptics) {
     json actions      = json::array();
     json localization = {{"language_tag", "en_US"}, {kSet, "Alien: Isolation"}};
     for (const auto& a : kActions) {
@@ -238,7 +263,7 @@ json manifest(const std::vector<std::pair<std::string, json>>& bindings, bool ai
         actions.push_back({{"name", action_path(kPoseActions[h])}, {"type", "pose"}});
         localization[action_path(kPoseActions[h])] = kPoseLabels[h];
     }
-    for (std::size_t h = 0; aim_poses && h < kAimPoseActions.size(); ++h) {
+    for (std::size_t h = 0; h < kAimPoseActions.size(); ++h) {
         actions.push_back({{"name", action_path(kAimPoseActions[h])}, {"type", "pose"}});
         localization[action_path(kAimPoseActions[h])] = kAimPoseLabels[h];
     }

@@ -20,11 +20,12 @@ Context* the_context = nullptr;
 
 // The runtime the stereo device drives, made when the game creates its
 // stereo device.
-// Spec 21 §1, §16: the hands' aim pose actions only when Hands.Enabled is
-// on as the runtime starts; 21 §14.3: the haptic output only when
-// Hands.Haptics.Enabled was on at attach and its game sources went in.
+// Spec 21 §16: the hands' aim pose actions are always declared, bound and
+// read, so Hands.Enabled turned on in the menu has them at once (21 §15.1);
+// the hands use them only while it is on. 21 §14.3: the haptic output only
+// when Hands.Haptics.Enabled was on at attach and its game sources went in.
 std::unique_ptr<core::vr::ports::VrRuntime> make_runtime(Context& c, core::vr::DetectResult::Chosen chosen) {
-    const bool aim_poses = c.settings.current().hands.enabled;
+    constexpr bool aim_poses = true;
     core::vr::ports::HapticSource* haptics =
         c.settings.current().hands.haptics.enabled && hooks::haptics_installed() ? &c.haptics : nullptr;
     if (chosen == core::vr::DetectResult::Chosen::OpenVR) {

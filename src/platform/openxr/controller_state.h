@@ -6,6 +6,7 @@
 // reports the physical controls; mapping them to game actions happens
 // elsewhere.
 
+#include "core/input/types.h"
 #include "core/vr/types.h"
 #include "util/math/pose.h"
 
@@ -16,10 +17,10 @@ namespace omvr::platform::openxr {
 
 enum class Hand : int { Left = 0, Right = 1 };
 
-// Two control schemes: thumbstick controllers (Touch, Index, WMR) and
-// touchpad controllers (Vive wands), where touchpad regions stand in for
-// face buttons (04 §5.5).
-enum class ControllerFamily { Unknown, Thumbstick, Touchpad };
+// Two control schemes: thumbstick controllers (Touch, Index, WMR, and the
+// Steam Frame, which has its own controls help) and touchpad controllers
+// (Vive wands), where touchpad regions stand in for face buttons (04 §5.5).
+enum class ControllerFamily { Unknown, Thumbstick, Touchpad, Frame };
 
 struct HandState {
     bool active     = false; // controller present and bound
@@ -36,6 +37,7 @@ struct HandState {
     bool primary     = false; // A / X
     bool secondary   = false; // B / Y
     bool menu        = false;
+    core::input::Dpad dpad{}; // a d-pad (the Steam Frame's left hand, 22 §7)
 };
 
 struct ControllerState {

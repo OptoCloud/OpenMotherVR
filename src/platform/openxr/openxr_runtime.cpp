@@ -81,7 +81,8 @@ input::HandInput hand_input(const HandState& h) noexcept {
             .grip          = input::squeeze_pressed(h.squeeze),
             .primary       = h.primary,
             .secondary     = h.secondary,
-            .menu          = h.menu};
+            .menu          = h.menu,
+            .dpad          = h.dpad};
 }
 
 // The semantic inputs of the scheme the controllers use (04 §5.2, §5.3).
@@ -425,6 +426,7 @@ private:
         if (s.family != ControllerFamily::Unknown && !glyphs_chosen_) {
             glyphs_chosen_ = true;
             controls_.set_scheme(s.family == ControllerFamily::Touchpad ? input::ControlScheme::Touchpad
+                                 : s.family == ControllerFamily::Frame  ? input::ControlScheme::Frame
                                                                         : input::ControlScheme::Thumbstick);
         }
         const input::Controls c = map_controls(s);

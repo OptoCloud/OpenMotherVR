@@ -57,6 +57,8 @@ struct TouchpadRegions {
 // The controller layout in use: picks the button-prompt glyphs (the
 // touchpad set or the thumbstick set of 04 §4.1) and the controls help
 // shown on the options page (04 §5.7).
-enum class ControlScheme { Touchpad, Thumbstick, Index };
+// Frame: the Steam Frame controllers, thumbsticks with Map, Flashlight and
+// Pause on their own buttons and a d-pad (04 §5.7).
+enum class ControlScheme { Touchpad, Thumbstick, Index, Frame };
 
 } // namespace omvr::core::input

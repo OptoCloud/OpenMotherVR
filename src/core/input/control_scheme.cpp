@@ -70,10 +70,33 @@ constexpr const char* kIndexHelp[] = {
     "Pause Menu\tLeft Trackpad Press",
 };
 
+// The Steam Frame (04 §5.7): Flashlight on the left bumper, Map on the
+// View button, Pause on the right Menu button, and a d-pad for menus.
+constexpr const char* kFrameHelp[] = {
+    "Move\tLeft Thumbstick",
+    "Sprint\tLeft Thumbstick Click",
+    "Crouch\tLeft Trigger",
+    "Turn\tRight Thumbstick L/R",
+    "Aim\tRight Grip",
+    "Fire / Throw / Melee\tRight Trigger",
+    "Motion Tracker\tLeft Grip",
+    "Interact\tA",
+    "Radial Menu\tRight Thumbstick Click",
+    "Reload / Activate\tB",
+    "Flashlight\tLeft Bumper",
+    "Flashlight [Press Interact near Head]\tA",
+    "Next Weapon\tRight Thumbstick Up",
+    "Previous Weapon\tRight Thumbstick Down",
+    "Map Menu\tView Button",
+    "Pause Menu\tMenu Button",
+    "Menu Navigation\tLeft D-Pad",
+};
+
 using HelpSet = ControlSchemes::HelpSet;
 const HelpSet kTouchpadSet{kTouchpadHelp};
 const HelpSet kThumbstickSet{kThumbstickHelp};
 const HelpSet kIndexSet{kIndexHelp};
+const HelpSet kFrameSet{kFrameHelp};
 
 // The glyph sets of 04 §4.1, keyed by the stock pad control each game
 // function is bound to (04 §2.4: A interact, B radial, X reload, Y
@@ -109,6 +132,7 @@ const HelpSet& help_set(ControlScheme scheme) noexcept {
     switch (scheme) {
         case ControlScheme::Touchpad: return kTouchpadSet;
         case ControlScheme::Index: return kIndexSet;
+        case ControlScheme::Frame: return kFrameSet;
         case ControlScheme::Thumbstick: break;
     }
     return kThumbstickSet;

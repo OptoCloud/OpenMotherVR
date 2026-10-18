@@ -141,8 +141,9 @@ public:
     // init() runs it first if it has not run.
     bool init_system() noexcept;
 
-    // Whether init() also creates the hands' aim pose action (spec 21 §16:
-    // Hands.Enabled at start). Before init().
+    // Whether the frames locate the hands' aim poses; the action exists
+    // either way, so turning tracked hands on applies at once (spec 21
+    // §15.1, §16). Before init().
     void set_aim_poses(bool on) noexcept;
     // Whether init() also creates the vibration output action (spec 21
     // §14.3: Hands.Haptics.Enabled at start). Before init().

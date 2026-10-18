@@ -32,6 +32,10 @@ enum class Action : std::size_t {
     Flashlight,
     Map,
     Pause,
+    DpadUp,
+    DpadDown,
+    DpadLeft,
+    DpadRight,
     Count
 };
 
@@ -62,6 +66,12 @@ inline constexpr std::array kActions = {
     ActionDef{Action::Flashlight, "flashlight", Kind::Boolean, "Flashlight"},
     ActionDef{Action::Map, "map", Kind::Boolean, "Map"},
     ActionDef{Action::Pause, "pause", Kind::Boolean, "Pause"},
+    // 22 §7: a controller's own d-pad drives what the game puts on a pad's
+    // d-pad: menu navigation, and in play the player's d-pad bindings.
+    ActionDef{Action::DpadUp, "dpad_up", Kind::Boolean, "D-pad up (menu up)"},
+    ActionDef{Action::DpadDown, "dpad_down", Kind::Boolean, "D-pad down (menu down)"},
+    ActionDef{Action::DpadLeft, "dpad_left", Kind::Boolean, "D-pad left (menu left / previous weapon)"},
+    ActionDef{Action::DpadRight, "dpad_right", Kind::Boolean, "D-pad right (menu right / next weapon)"},
 };
 static_assert(kActions.size() == static_cast<std::size_t>(Action::Count));
 static_assert(
@@ -78,7 +88,8 @@ inline constexpr std::array<const char*, 2> kPoseActions = {"hand_left", "hand_r
 inline constexpr std::array<const char*, 2> kPoseLabels  = {"Left hand", "Right hand"};
 
 // The hands' aim (pointing) poses (spec 21 §5.2, §16), likewise one per
-// hand. Only in the manifest while Hands.Enabled is on at start (21 §1).
+// hand. Always in the manifest and the bindings, so turning Hands.Enabled on
+// in the menu has them at once (21 §15.1).
 inline constexpr std::array<const char*, 2> kAimPoseActions = {"aim_left", "aim_right"};
 inline constexpr std::array<const char*, 2> kAimPoseLabels  = {"Left hand aim", "Right hand aim"};
 
@@ -97,14 +108,13 @@ std::string output_path(const char* name);
 // The file name of a controller type's default binding file.
 std::string binding_file_name(const std::string& controller);
 
-// The default binding file of each controller type, by controller name;
-// with `aim_poses`, the aim pose actions are bound too, with `haptics` the
-// vibration outputs.
-std::vector<std::pair<std::string, nlohmann::json>> default_bindings(bool aim_poses, bool haptics = false);
+// The default binding file of each controller type, by controller name,
+// binding the grip and aim poses; with `haptics` the vibration outputs too.
+std::vector<std::pair<std::string, nlohmann::json>> default_bindings(bool haptics = false);
 
-// The action manifest naming `bindings` as the defaults; with `aim_poses`
-// it declares the aim pose actions, with `haptics` the vibration outputs.
-nlohmann::json manifest(const std::vector<std::pair<std::string, nlohmann::json>>& bindings, bool aim_poses,
+// The action manifest naming `bindings` as the defaults, declaring the
+// actions, the grip and aim poses and, with `haptics`, the vibration outputs.
+nlohmann::json manifest(const std::vector<std::pair<std::string, nlohmann::json>>& bindings,
                         bool haptics = false);
 
 // False, logged with the Windows error, when the file cannot be written: the

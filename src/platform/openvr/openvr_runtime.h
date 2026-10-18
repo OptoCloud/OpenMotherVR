@@ -28,7 +28,7 @@ struct OpenVrRuntimeDeps {
     core::input::ports::ControlsSink& controls;
     core::ui::ports::Dialogs& dialogs;
     std::filesystem::path runtime_root; // as the runtime probe found it
-    bool aim_poses = false;             // add the hands' aim pose actions (spec 21 §16)
+    bool aim_poses = false;             // read the hands' aim poses; they are always declared (spec 21 §16)
     // The haptic output (spec 21 §14), asked each frame; null: no vibration
     // actions are declared and nothing vibrates.
     core::vr::ports::HapticSource* haptics = nullptr;

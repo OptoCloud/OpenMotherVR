@@ -20,7 +20,7 @@ struct OpenXrRuntimeDeps {
     core::input::ports::ControlsSink& controls;
     core::vr::ports::HeadsetAudio& audio;
     core::ui::ports::GameSignals& signals; // the runtime's quit request
-    bool aim_poses = false;                // add the hands' aim pose action (spec 21 §16)
+    bool aim_poses = false; // locate the hands' aim poses; the action always exists (spec 21 §16)
     // The haptic output (spec 21 §14), asked each frame; null: no vibration
     // action is made and nothing vibrates.
     core::vr::ports::HapticSource* haptics = nullptr;

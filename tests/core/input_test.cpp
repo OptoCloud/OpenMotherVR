@@ -432,6 +432,16 @@ TEST_CASE("glyph table and the schemes' glyphs and help") {
 
     schemes.set(ControlScheme::Index);
     CHECK(std::string_view{schemes.control_help().back()} == "Pause Menu\tLeft Trackpad Press");
+
+    // Steam Frame (04 §5.7): the thumbstick glyphs, its own buttons in the help.
+    schemes.set(ControlScheme::Frame);
+    CHECK(std::string_view{glyphs.name(game::kPadA)} == kGlyphA);
+    const auto frame = schemes.control_help();
+    CHECK(frame.size() == 17u);
+    CHECK(std::string_view{frame[10]} == "Flashlight\tLeft Bumper");
+    CHECK(std::string_view{frame[14]} == "Map Menu\tView Button");
+    CHECK(std::string_view{frame[15]} == "Pause Menu\tMenu Button");
+    CHECK(std::string_view{frame[16]} == "Menu Navigation\tLeft D-Pad");
 }
 
 TEST_CASE("interaction state from the scripts' event strings") {

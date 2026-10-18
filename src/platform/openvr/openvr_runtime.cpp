@@ -109,6 +109,7 @@ constexpr std::string_view kNotShowingLabel = "headset not showing the game";
 // SteamVR's controller type names that pick a control scheme.
 constexpr std::string_view kViveController  = "vive_controller";
 constexpr std::string_view kIndexController = "knuckles";
+constexpr std::string_view kFrameController = "frame_controller";
 
 // The neutral pose: the reference before any recenter (03 §7) and the head
 // before any valid pose (03 §1).
@@ -151,6 +152,7 @@ const char* tracking_text(HeadTracking t) noexcept {
 input::ControlScheme scheme_for(std::string_view controller_type) noexcept {
     if (controller_type == kViveController) return input::ControlScheme::Touchpad;
     if (controller_type == kIndexController) return input::ControlScheme::Index;
+    if (controller_type == kFrameController) return input::ControlScheme::Frame;
     return input::ControlScheme::Thumbstick;
 }
 

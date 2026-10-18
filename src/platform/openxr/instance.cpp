@@ -117,14 +117,18 @@ bool Session::Impl::init_system() noexcept {
     const bool audio_ext = offered(props, XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
     // 22 §6.1: LOCAL_FLOOR is the floor reference when there is no STAGE.
     const bool floor_ext = offered(props, XR_EXT_LOCAL_FLOOR_EXTENSION_NAME);
+    // 04 §5.8.4: the Steam Frame's controller profile needs its extension.
+    const bool frame_ext = offered(props, kFrameControllerExtensionName);
     std::vector<const char*> extensions{XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
     if (fov_ext) extensions.push_back(XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
     if (audio_ext) extensions.push_back(XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
     if (floor_ext) extensions.push_back(XR_EXT_LOCAL_FLOOR_EXTENSION_NAME);
+    if (frame_ext) extensions.push_back(kFrameControllerExtensionName);
     if (!create_instance(extensions)) {
         teardown();
         return false;
     }
+    input.set_frame_profile(frame_ext);
     read_instance_properties(audio_ext);
     if (!read_system(fov_ext)) {
         teardown();

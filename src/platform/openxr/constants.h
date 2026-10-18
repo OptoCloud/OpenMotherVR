@@ -25,6 +25,12 @@ inline constexpr const wchar_t* kRuntimeJsonVariable = L"XR_RUNTIME_JSON";
 inline constexpr const char* kActionSetName          = "gameplay";
 inline constexpr const char* kActionSetLocalizedName = "Gameplay";
 
+// The Steam Frame controllers (Valve's public Steam Frame input
+// documentation): an extension the SDK headers in use do not define yet,
+// and its interaction profile (04 §5.8.4).
+inline constexpr const char* kFrameControllerExtensionName = "XR_VALVE_frame_controller_interaction";
+inline constexpr const char* kFrameControllerProfile = "/interaction_profiles/valve/frame_controller_valve";
+
 // XR_MAX_SYSTEM_NAME_SIZE and XR_MAX_RUNTIME_NAME_SIZE, for SystemInfo,
 // whose header does not include OpenXR (checked against the SDK in
 // instance.cpp).
