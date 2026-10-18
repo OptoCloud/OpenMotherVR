@@ -65,7 +65,7 @@ name. The same holds for the other compatibility names (`mothervr.log`,
 | `21-hands-and-body.md` | v2: tracked hands and arms, aiming per weapon class, tracker and flashlight by hand, melee, throwing, body visibility, eye forward offset, room-scale, seated eye raise and real crouch, control hand-back, wrist health, haptics |
 | `22-controls-and-comfort.md` | v2: smooth and snap turning, comfort vignette, seated and standing play and calibration (one owner), world scale, d-pad emulation, gestures and holsters, hiding, per-controller glyphs, OpenXR default, VR-off hotkey, crash-safe logging |
 | `23-interactions-and-hud.md` | v2: levers and valves by hand, camera takeovers, activation distances, terminal text size, crosshair, HUD and item highlight options, HUD placement |
-| `24-rendering-v2.md` | v2: per-eye temporal AA, steady particle lighting, world behind the pause menu, engine settings overrides, foveated rendering, 2D-only effects, D3D11 state cost |
+| `24-rendering-v2.md` | v2: per-eye temporal AA, steady particle lighting, world behind the pause menu, engine settings overrides, foveated rendering, 2D-only effects, D3D11 state cost; upright sprites in stereo (a fix) |
 | `ANSWERS.md` | Answers to the implementation side's questions (`spec/QUESTIONS.md` in its clone), with the sections changed |
 
 Every document starts with a provenance header:

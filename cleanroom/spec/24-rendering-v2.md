@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). r3 (spec r7 cross-check): 07 §8 item 1 no longer names the viewport setter or a viewport constant, so the viewport setter 0x621350 (it builds one viewport and calls `ID3D11DeviceContext::RSSetViewports`), the constant writers 0x621C20 and 0x621C90 and the pass set-up's type argument are given as this document's own facts, verified by the spec side in the 2015 `AI.exe`, and the velocity shader question no longer assumes a viewport constant; the settings setter labelled `SettingsSetOption` as in 01 §4, and whether it reaches the saved settings left open as 02 §11 item 5 does; the 2D-only effects keep the player's saved settings as 02 §6.5 now requires of v1. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Graphics` page of the options page given exactly (item order, labels, control kinds, value names, steps, description lines, greying and the rule for showing an item), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the game's English menu texts it names read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the anti-aliasing option names from `DATA\ENGINE_SETTINGS.XML`; the `Pixel Scale` item and the Video page's `Shadow Map Resolution` item named by their labels. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Graphics` page is reached from the `MotherVR` page (22 §12.1). r6 (user decision of 2026-10-18, a tester's request): the additions of §6.2 made exact: `ShadowMap4096` adds the option `4096` and `SharpReflections` the option `Alternative` with value 6 (replacing the proposed value 1), both ranked so that they never become the default, the heap additions' names, and an addition the player's file already offers is not made twice; how the Video page shows an option's name and that the C runtime's open of the engine settings file goes through `AI.exe`'s `CreateFileA` import (§1.9), the reflection quality compares in the reflection manager's code (§12 item 6) and the copy's file name (13 §2), read by the spec side in the 2015 `AI.exe`, `DATA\TEXT\ENGLISH\UI.TXT` and `DATA\ENGINE_SETTINGS.XML`. r7: static analysis of the 2015 `AI.exe` by the spec side (the chromatic aberration reader's flag read and the only readers of `+0x1B38`; the film grain reader 0x5F63D0, its only call, its read of the intensity and the only readers of `+0x608`; §1.6, §8); project decisions with their reasons (§8: a value written for a reader's call does not outlive it; a toggle's call is redirected at attach only for a key that is false then; §10: the three keys' "takes effect" column). Section numbers are unchanged from r6. r8 (user decision of 2026-10-18): the user confirmed the `Graphics` page's items of the features implemented (§10 items 5 to 9 and 11 to 13), which are now shown; the others stay hidden until their feature is implemented and confirmed; a change on the page reaches the 2D effects at once as §10's "takes effect" column says. Revision: r8 -->
+<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). r3 (spec r7 cross-check): 07 §8 item 1 no longer names the viewport setter or a viewport constant, so the viewport setter 0x621350 (it builds one viewport and calls `ID3D11DeviceContext::RSSetViewports`), the constant writers 0x621C20 and 0x621C90 and the pass set-up's type argument are given as this document's own facts, verified by the spec side in the 2015 `AI.exe`, and the velocity shader question no longer assumes a viewport constant; the settings setter labelled `SettingsSetOption` as in 01 §4, and whether it reaches the saved settings left open as 02 §11 item 5 does; the 2D-only effects keep the player's saved settings as 02 §6.5 now requires of v1. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Graphics` page of the options page given exactly (item order, labels, control kinds, value names, steps, description lines, greying and the rule for showing an item), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the game's English menu texts it names read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the anti-aliasing option names from `DATA\ENGINE_SETTINGS.XML`; the `Pixel Scale` item and the Video page's `Shadow Map Resolution` item named by their labels. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Graphics` page is reached from the `MotherVR` page (22 §12.1). r6 (user decision of 2026-10-18, a tester's request): the additions of §6.2 made exact: `ShadowMap4096` adds the option `4096` and `SharpReflections` the option `Alternative` with value 6 (replacing the proposed value 1), both ranked so that they never become the default, the heap additions' names, and an addition the player's file already offers is not made twice; how the Video page shows an option's name and that the C runtime's open of the engine settings file goes through `AI.exe`'s `CreateFileA` import (§1.9), the reflection quality compares in the reflection manager's code (§12 item 6) and the copy's file name (13 §2), read by the spec side in the 2015 `AI.exe`, `DATA\TEXT\ENGLISH\UI.TXT` and `DATA\ENGINE_SETTINGS.XML`. r7: static analysis of the 2015 `AI.exe` by the spec side (the chromatic aberration reader's flag read and the only readers of `+0x1B38`; the film grain reader 0x5F63D0, its only call, its read of the intensity and the only readers of `+0x608`; §1.6, §8); project decisions with their reasons (§8: a value written for a reader's call does not outlive it; a toggle's call is redirected at attach only for a key that is false then; §10: the three keys' "takes effect" column). Section numbers are unchanged from r6. r8 (user decision of 2026-10-18): the user confirmed the `Graphics` page's items of the features implemented (§10 items 5 to 9 and 11 to 13), which are now shown; the others stay hidden until their feature is implemented and confirmed; a change on the page reaches the 2D effects at once as §10's "takes effect" column says. r9 (a tester's report on OpenXR with a Valve Index: smoke turns with the roll of the head): new §14, upright sprites in stereo; static analysis of the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK` of the Torrens and `TECH_HUB` levels, and the global packs under `DATA\SHADERS`) and of the 2015 `AI.exe` by the spec side (the sprite vertex shaders' corner offset in the view plane and its form; the camera-constant upload 0x57A100 and its `ViewMatrix` registers; the vertex constant writer 0x621C20, given to the spec side as an observation and confirmed in the binary); the roll-removal arithmetic derived by the spec side from the requirement and the game's view convention (05 §1); project decisions with their reasons (§14.1: a fix with no key; §14.3: the ease near the vertical and its length; §14.5: axis-locked sprites left as they are). Sections 1 to 13 are unchanged. Revision: r9 -->
 
 # 24. Rendering in v2
 
@@ -15,11 +15,14 @@ specifies the v2 rendering features listed in 20 §3.4:
 | 7 | Foveated rendering and resolution scale | `FoveatedRendering` | `"Off"` |
 | 8 | 2D-only effects | `LensFlares`, `ChromaticAberration`, `FilmGrain` | true, true, true |
 | 9 | D3D11 state cost | `StateCache` | false |
+| 14 | Upright sprites in stereo | none: a fix of a stereo defect | (applies whenever a headset runtime is chosen) |
 
 Every key is in a new section `Graphics` inside `Settings` of
 `mothervr.json` (section 10). With every key at its v1 value the mod is
 exactly v1 (20 §1.1): no patch of this document is installed and no work of
-this document runs per frame.
+this document runs per frame. The exception is §14, a fix of a defect the
+game shows only in stereo, which has no key and applies with v1 like the
+shader fix of 08 §1.
 
 Addresses are RVAs of the 2015 build (image base 0x400000), read from the
 2015 `AI.exe`. The 2020 column is `?` throughout: every feature here stays
@@ -929,7 +932,8 @@ Each event must convey:
 - §7: whether foveated rendering is supported and on, and why not;
 - §8: each toggle's state when stereo starts and when it changes;
 - §9: the profile counts when profiling is on (a `DebugOptions` diagnostic);
-  that the cache is on.
+  that the cache is on;
+- §14: as §14.7.
 
 ## 12. Open questions
 
@@ -1012,3 +1016,188 @@ To be applied in the v1 revision that collects v2 changes (20 §10 item 11):
 - `13-distribution.md`: any file the engine settings override writes
   (24 §6.1).
 - `01-loading.md` §4.7: the v2 addresses of this document, 2015 only.
+- `08-render-fixes.md` §1: a second shader fix, for vertex shaders, is
+  24 §14; `11-diagnostics.md` §2.2: its events (24 §14.7) and
+  `CreateVertexShader` among the intercepted methods.
+
+## 14. Upright sprites in stereo (a fix, no key)
+
+### 14.1 Problem
+
+A tester reported (OpenXR, Valve Index): smoke and steam turn with the
+roll of the head. Tilting the head sideways turns every smoke sprite by
+the same angle, so the smoke looks fixed to the face rather than standing
+in the room. Flat play hardly shows it, because the game's own camera
+rarely rolls; a headset rolls whenever the player tilts the head.
+
+This is a defect of the game in stereo, not a matter of taste, so it is
+fixed whenever a headset runtime is chosen, like the dither fix of 08 §1,
+and has no key [proposal: project decision with the reason above]. With
+no roll the result is the game's own (§14.3), so a player who keeps the
+head upright sees no change.
+
+### 14.2 Game facts: how the game turns a sprite to the camera [sure]
+
+Found by the spec side in the levels' compiled shader packs
+(`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`; shader model 5.0 vertex
+shaders) and in the 2015 `AI.exe`:
+
+- **The sprite vertex shaders.** Many vertex shaders draw a camera-facing
+  sprite the same way (counted by the spec side: 396 of the 925 vertex
+  shaders of the Torrens level's pack, 469 of the 1106 of the `TECH_HUB`
+  level's; none in the global packs under `DATA\SHADERS`). They compute
+  the clip position of the sprite's centre, `c = p · ViewProj` (vertex
+  constant buffer 0, `cbDefaultXSC`, registers 0 to 3; in some shaders
+  `SecondaryViewProj`, registers 12 to 15), and then add the corner's
+  offset in the eye's view plane, scaled by the projection:
+  `c.x += a · P[0][0]`, `c.y += b · P[1][1]`, where `P` is `ProjMatrix`
+  (vertex constant buffer 1, `cbDefaultVSC`, register 0 component x and
+  register 1 component y) and `(a, b)` is the corner's offset in view
+  units after the sprite's own rotation (which comes from the particle's
+  data and the material). Lit sprites then also compute the particle
+  lighting lookup of `AlphaLight_OffsetScale` from `c` (§4).
+- **Their form.** Each of these shaders holds exactly two instructions
+  that read those projection entries: a `mad` whose destination is
+  component x of a temporary, whose first source is one component of a
+  temporary (`a`, possibly negated), whose second source is buffer 1
+  register 0 component x and whose third source is a temporary component
+  last written by a `dp4` with buffer 0 register 0 (or 12); and a `mad`
+  of the same shape for component y with `b`, buffer 1 register 1
+  component y and buffer 0 register 1 (or 13). Only `dp4` instructions lie
+  between the two; the x one comes first in most shaders, the y one first
+  in some. The spec side checked all 865 sites of the two packs against
+  this form.
+- **What that means.** The sprite's axes are the drawn eye's view x and y
+  axes. When the head rolls, the eye's view rolls, and so does every
+  sprite.
+- **The view is available to these shaders.** Buffer 0 registers 4 to 7
+  (`ViewMatrix`) hold the transposed view of the POV being drawn: the
+  camera-constant setter 0x57A8A0 (§1.3) stores its view argument at
+  `CameraConstants` `+0x280`, and the camera-constant upload 0x57A100
+  (thiscall `(CameraConstants, renderer, int)`, `ret 8`) uploads that
+  matrix's columns 0 to 3 as buffer 0 registers 4 to 7 through the vertex
+  constant writer 0x621C20 (cdecl `(renderer, buffer, first register,
+  data, register count)`; it copies the data into the renderer's copy of
+  that buffer and marks the buffer for upload). No other code writes
+  `+0x280`. Every POV's begin-render (0x5B11D0) calls 0x57A8A0 with the
+  POV's own view (`+0x00`), and the eye renders run it after `SetEye`
+  (07 §2.4), so in each eye's pass `ViewMatrix` is that eye's view.
+  The sprite shaders declare buffer 0 with at least 23 registers. Some of
+  the game's own particle shaders read `ViewMatrix` already
+  (camera-relative emitters).
+- **Up in the view.** With the game's view convention (05 §1: row
+  vectors, columns 0 and 1 of the view are the camera's right and up axes
+  in world space, the world's up is +Y), the world's up direction has the
+  view coordinates `ux = V[1][0]` and `uy = V[1][1]`, which are component y
+  of buffer 0 register 4 and component y of register 5.
+- **Other sprite kinds are already upright.** Shaders that build a sprite
+  in world space from its velocity and the direction to the camera
+  position (buffer 0 register 22), or around an emitter axis, do not use
+  the view's roll. A few shaders (the spec side found six in the Torrens
+  pack) build an axis-locked sprite from the view's right axis in world
+  space (register 4 alone) [likely]; they are not changed (§14.5).
+
+The spec side also confirmed an observation given to it: 0x621C20 is the
+renderer's writer of vertex constants, through which the camera matrices
+reach buffers 0 and 1.
+
+### 14.3 Required result
+
+In every vertex shader of the form of §14.2 that the game creates while a
+headset runtime is chosen, the corner offset `(a, b)` that the two
+instructions read is replaced by `(a', b')`, the same offset turned in
+the view plane so that the sprite's up axis is the world's up as the eye
+sees it. The arithmetic below was derived by the spec side from this
+requirement and the view convention of §14.2:
+
+1. `u = (ux, uy)` from `ViewMatrix` (§14.2), `len = |u|`.
+2. Near the vertical the direction of `u` is undefined, so it is eased
+   back to the game's own orientation: `w = u + (0, max(0, L - len))`
+   with `L = 0.1` (project decision: within about 6 degrees of looking
+   straight up or down the sprites turn smoothly back to the view's own
+   orientation instead of spinning with the smallest head turn; at
+   `len >= L`, `w = u` exactly).
+3. If `|w|^2 < 1e-12` (only reachable with the view upside down near the
+   vertical) `w = (0, 1)`.
+4. `n = w / |w|`, the sprite's up axis in view x and y; its right axis is
+   `(n.y, -n.x)`.
+5. `a' = a · n.y + b · n.x`, `b' = b · n.y - a · n.x`.
+
+Properties the result must have:
+
+- **No roll, no change.** With no roll `ux = 0` and `n = (0, 1)`, so
+  `(a', b') = (a, b)`: flat play and an upright head give the game's own
+  result (up to float rounding).
+- **Still facing the eye, still centred.** Only the in-plane direction of
+  the corner offset changes: the sprite stays in the eye's view plane, its
+  size and its centre `c` are unchanged, and each eye uses its own view,
+  so the two eyes agree.
+- **Upright in the world.** Away from the vertical, the sprite's right
+  axis has no world-up component and its up axis lies in the plane of the
+  view direction and the world's up.
+- **Defined everywhere.** Looking straight up or down gives the game's own
+  orientation; nothing is NaN or infinite.
+- **Only those values change.** The values the two instructions read as
+  `a` and `b` are the only change to what the rest of the shader sees; the
+  shader's inputs, outputs, signatures and other values stay as they are.
+- **Container rules of 08 §1.** A shader whose container this fix does not
+  understand (checksum, sizes, one program chunk), or whose instructions
+  differ in any way from §14.2, is created unchanged. If the device
+  refuses a changed shader the original is created.
+
+Runtime None: nothing (20 §1.2). The shader is changed when it is created,
+so the change applies to flat frames of a session with a headset runtime
+too; with no roll that is the game's own result.
+
+### 14.4 Edge cases
+
+| Situation | Rule |
+|---|---|
+| looking straight up or down | the game's own orientation, eased in within `L` (§14.3 item 2) |
+| planar reflections (07) | the reflection view's up may be mirrored, so sprites in a floor reflection may appear as the mirror image of upright sprites [guess]; acceptable, as a real reflection shows them so |
+| the light passes of the particle lighting (§1.7) | not sprite shaders of §14.2; unchanged |
+| a shader changed by another tool | its checksum or form no longer matches; created unchanged |
+| 2020 build | the form is a property of the shader packs, not of `AI.exe` addresses; it applies if the packs match [guess] |
+
+### 14.5 Not covered
+
+- The few axis-locked sprites built from the view's right axis in world
+  space (§14.2). Their vertical axis is the world's already; only their
+  width axis tilts with roll. Left as they are (project decision: few
+  shaders, a smaller effect, a different form).
+- Sprites drawn by shaders outside the level packs: none of the global
+  packs has the form of §14.2.
+
+### 14.6 Cost and threads
+
+About 16 instructions more per sprite vertex. The shader is examined when
+the game creates it, on whichever thread creates it: a cheap byte search
+for the second-source operand of the x instruction (buffer 1 register 0
+component x) skips most shaders before any checksum is computed (08 §1's
+concern for shader-creation cost). Nothing runs per frame.
+
+### 14.7 Logging
+
+- At install: that vertex shader creation is intercepted for this fix, or
+  that it could not be (11 §2.2's interception failure, method
+  `CreateVertexShader`).
+- When the fix changed a shader: at the first one, then at the bounded
+  rate of 08 §1's event: how many vertex shaders the game created so far,
+  how many were changed, how many changed ones the device refused.
+  Template:
+  `Upright sprites: {Patched} of {Created} vertex shaders changed so far; {Rejected} refused by the device`.
+- A refused shader: a few at most per process, as for 08 §1.
+
+### 14.8 Acceptance
+
+1. Near smoke or steam (Sevastopol vents, the Torrens), tilt the head to
+   either side: the sprites stay upright in the room, as they do with an
+   upright head; nod and turn: unchanged from before.
+2. Look straight down into steam and up into smoke: no spinning or
+   flicker; the sprites turn smoothly back to the game's own orientation
+   near the vertical.
+3. Both eyes alike (close each in turn); the lit parts of the smoke stay
+   where the particle lighting puts them.
+4. Runtime None: unchanged.
+5. The log shows the first `Upright sprites` event after a level loads,
+   with a nonzero changed count and none refused.
