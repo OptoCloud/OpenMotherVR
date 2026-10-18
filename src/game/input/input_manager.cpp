@@ -3,28 +3,21 @@
 
 #include "game/input/input_manager.h"
 
+#include "game/field.h"
+
 namespace omvr::game::input {
-
-namespace {
-
-// The pointer stored at `offset` in the game object `base`.
-void* pointer_at(std::uint8_t* base, std::ptrdiff_t offset) noexcept {
-    return *reinterpret_cast<void**>(base + offset);
-}
-
-} // namespace
 
 std::uint8_t* InputManager::manager() const noexcept {
     return manager_global_ ? static_cast<std::uint8_t*>(*manager_global_) : nullptr;
 }
 
 GameActionMap& action_map(std::uint8_t* mgr, std::size_t index) noexcept {
-    return *reinterpret_cast<GameActionMap*>(mgr + kInputManagerMapOffsets[index]);
+    return field<GameActionMap>(mgr, kInputManagerMapOffsets[index]);
 }
 
 void* InputManager::manager_field(std::ptrdiff_t offset) const noexcept {
     std::uint8_t* mgr = manager();
-    return mgr ? pointer_at(mgr, offset) : nullptr;
+    return mgr ? field_ptr(mgr, offset) : nullptr;
 }
 
 void* InputManager::pad_device() const noexcept { return manager_field(kInputManagerPad); }

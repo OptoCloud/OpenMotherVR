@@ -13,6 +13,7 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/detour.h
     ${CMAKE_CURRENT_LIST_DIR}/event_tap.cpp
     ${CMAKE_CURRENT_LIST_DIR}/event_tap.h
+    ${CMAKE_CURRENT_LIST_DIR}/field.h
     ${CMAKE_CURRENT_LIST_DIR}/game_image.h
     ${CMAKE_CURRENT_LIST_DIR}/layout.h
     ${CMAKE_CURRENT_LIST_DIR}/patcher.cpp

@@ -2,6 +2,7 @@
 #include "game/ui/hud_objects.h"
 
 #include "game/code_address.h"
+#include "game/field.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -23,13 +24,6 @@ constexpr std::ptrdiff_t kCrosshairCached = 0xE4;
 constexpr std::ptrdiff_t kIconFlags          = 0x97;
 constexpr std::uint8_t kHighlightDisabledBit = 0x08;
 
-const std::uint8_t* at(const void* object, std::ptrdiff_t offset) noexcept {
-    return static_cast<const std::uint8_t*>(object) + offset;
-}
-std::uint8_t* at(void* object, std::ptrdiff_t offset) noexcept {
-    return static_cast<std::uint8_t*>(object) + offset;
-}
-
 } // namespace
 
 void* find_hud_object(const HudTargets& t, HudMovie which) noexcept {
@@ -46,7 +40,7 @@ core::ui::HudMovieState hud_movie_state(HudMovie which, const void* object) noex
     // WeaponHudHide and Show test the movie themselves (they set a pending
     // byte without it); PickupHudHide and Show invoke it directly.
     if (which == HudMovie::Pickup && !movie_loaded(object)) return {};
-    return {true, *at(object, kForcedHidden) != 0};
+    return {true, *bytes_at(object, kForcedHidden) != 0};
 }
 
 void hide_hud(const HudTargets& t, HudMovie which, void* object) noexcept {
@@ -57,12 +51,14 @@ void show_hud(const HudTargets& t, HudMovie which, void* object) noexcept {
     (which == HudMovie::Weapon ? t.weapon_show : t.pickup_show)(object, nullptr);
 }
 
-bool movie_loaded(const void* object) noexcept { return read_u32(at(object, kMovie)) != 0; }
+bool movie_loaded(const void* object) noexcept { return read_u32(bytes_at(object, kMovie)) != 0; }
 
-bool crosshair_cached(const void* weaponstuff) noexcept { return *at(weaponstuff, kCrosshairCached) != 0; }
+bool crosshair_cached(const void* weaponstuff) noexcept {
+    return *bytes_at(weaponstuff, kCrosshairCached) != 0;
+}
 
 void set_crosshair_cached(void* weaponstuff, bool shown) noexcept {
-    *at(weaponstuff, kCrosshairCached) = shown ? 1 : 0;
+    *bytes_at(weaponstuff, kCrosshairCached) = shown ? 1 : 0;
 }
 
 void hide_crosshairs(const HudTargets& t, void* weaponstuff) noexcept {
@@ -70,7 +66,7 @@ void hide_crosshairs(const HudTargets& t, void* weaponstuff) noexcept {
 }
 
 bool set_highlight_disabled(void* record) noexcept {
-    std::uint8_t& flags = *at(record, kIconFlags);
+    std::uint8_t& flags = *bytes_at(record, kIconFlags);
     const bool was      = (flags & kHighlightDisabledBit) != 0;
     flags               = static_cast<std::uint8_t>(flags | kHighlightDisabledBit);
     return was;
@@ -78,7 +74,7 @@ bool set_highlight_disabled(void* record) noexcept {
 
 void restore_highlight_disabled(void* record, bool was_set) noexcept {
     if (was_set) return;
-    std::uint8_t& flags = *at(record, kIconFlags);
+    std::uint8_t& flags = *bytes_at(record, kIconFlags);
     flags               = static_cast<std::uint8_t>(flags & ~kHighlightDisabledBit);
 }
 
