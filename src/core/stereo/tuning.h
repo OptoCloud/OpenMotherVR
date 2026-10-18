@@ -26,9 +26,11 @@ inline constexpr float kMenuScreenInvAspect = 9.0f / 16.0f;
 // The head-locked HUD panel (mode 0) is this wide, in metres; it stands one
 // unit forward of the eyes (the view's forward axis has length 1).
 inline constexpr float kHudPanelWidth = 0.55f;
-// A forward axis shorter than this in the horizontal plane (looking
-// straight up or down) has no heading: the screen faces +Z instead.
-inline constexpr float kMinForwardLength = 1e-6f;
+// A view matrix's forward axis shorter than this in the horizontal plane
+// (looking straight up or down) has no heading: the menu screen faces +Z
+// instead, and the HUD's view_heading has none. (The head pose's threshold is
+// vr::kMinForwardLength.)
+inline constexpr float kMinViewForwardLength = 1e-6f;
 
 // ---- The stereo update (05 §3.2) -------------------------------------------
 

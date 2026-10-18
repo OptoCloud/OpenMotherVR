@@ -88,7 +88,7 @@ Matrix44 level_quad(const std::optional<Matrix44>& view, float heading, float in
 std::optional<float> view_heading(const Matrix44& view) noexcept {
     const Vec3 f    = column3(view, kForwardAxis);
     const float len = std::sqrt(f.x * f.x + f.z * f.z);
-    if (!(len > stereo::kMinForwardLength)) return std::nullopt;
+    if (!(len > stereo::kMinViewForwardLength)) return std::nullopt;
     return std::atan2(f.x, f.z);
 }
 

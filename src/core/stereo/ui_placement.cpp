@@ -29,7 +29,7 @@ Vec3 level_forward(const Matrix44& v) noexcept {
     float fx        = util::element4(v.data(), 0, kForwardAxis);
     float fz        = util::element4(v.data(), 2, kForwardAxis);
     const float len = std::sqrt(fx * fx + fz * fz);
-    if (len > kMinForwardLength) {
+    if (len > kMinViewForwardLength) {
         fx /= len;
         fz /= len;
     } else {
