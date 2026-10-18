@@ -174,6 +174,14 @@ void Commands::carry_out(const CommandOutcome& outcome) {
     // patched into its head-in-wall check.
     if (outcome.effect == CommandEffect::ApplyBlinders)
         stereo::set_clipping_blinders(cfg.rendering.clipping_blinders);
+    // The 2D effect hooks on the render thread read the keys through atomics.
+    // A hook is installed only for a key false at attach (spec 24 §8), so a
+    // key turned false that was true then applies at the next launch.
+    if (outcome.effect == CommandEffect::ApplyPostFx) {
+        post_fx_.set_keys({.lens_flares          = cfg.graphics.lens_flares,
+                           .chromatic_aberration = cfg.graphics.chromatic_aberration,
+                           .film_grain           = cfg.graphics.film_grain});
+    }
 
     config::sanitize(cfg);
     // Pixel scale and mirror changes need the game's targets rebuilt.

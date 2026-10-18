@@ -103,6 +103,11 @@ constexpr CommandRange kTerminalTextScale{kTerminalTextScales.front(), kTerminal
 constexpr CommandRange kHudDistance{kHudDistanceMin, kHudDistanceMax};
 constexpr CommandRange kHudWidth{kHudWidthMin, kHudWidthMax};
 constexpr CommandRange kHudPitch{kHudPitchMin, kHudPitchMax};
+// Spec 24 §10: 0 keeps the game's own size.
+constexpr CommandRange kTextureHeap{static_cast<float>(kTextureHeapMbMin),
+                                    static_cast<float>(kTextureHeapMbMax), true};
+constexpr CommandRange kModelHeap{static_cast<float>(kModelHeapMbMin), static_cast<float>(kModelHeapMbMax),
+                                  true};
 
 // A row of the v2 pages: its command (named by this project, spec 22 §3.3)
 // and the page's function its value is pushed to.
@@ -110,6 +115,14 @@ constexpr SettingRow page_row(Section section, std::string_view key, std::string
                               std::string_view command, std::string_view push,
                               CommandRule rule = CommandRule::Switch, CommandRange range = {}) {
     return SettingRow{section, key, path, field, command, rule, CommandEffect::None, range, push};
+}
+
+// A 2D effect switch of the Graphics page (spec 24 §8, §10).
+constexpr SettingRow post_fx_row(std::string_view key, std::string_view path, Field field,
+                                 std::string_view command, std::string_view push) {
+    SettingRow row = page_row(Section::Graphics, key, path, field, command, push);
+    row.effect     = CommandEffect::ApplyPostFx;
+    return row;
 }
 
 // Key names are the original's (spec 06 §3); "StereoAntiAliasing" and the
@@ -223,23 +236,26 @@ constexpr std::array kRows{
              "setMotherSeatedEyeRaise", CommandRule::Number, kSeatedEyeRaise),
     page_row(Section::Body, "RealCrouch", "Body.RealCrouch", &real_crouch, "mvr_realcrouch",
              "setMotherRealCrouch"),
-    // v2 (spec 24 §10), file only: the Graphics page's items are shown only
-    // once the user has confirmed them (24 §10), so these have no command
-    // or push yet. Read at attach.
-    SettingRow{Section::Graphics, "EngineSettingsOverride", "Graphics.EngineSettingsOverride",
-               &engine_settings_override},
-    SettingRow{Section::Graphics, "ShadowMap4096", "Graphics.ShadowMap4096", &shadow_map_4096},
-    SettingRow{Section::Graphics, "SharpReflections", "Graphics.SharpReflections", &sharp_reflections},
-    SettingRow{Section::Graphics, "StreamingTextureHeapMB", "Graphics.StreamingTextureHeapMB",
-               &streaming_texture_heap_mb},
-    SettingRow{Section::Graphics, "StreamingModelHeapMB", "Graphics.StreamingModelHeapMB",
-               &streaming_model_heap_mb},
-    // 24 §8: read at attach; a toggle's site is installed only for a key
-    // that is false then.
-    SettingRow{Section::Graphics, "LensFlares", "Graphics.LensFlares", &lens_flares},
-    SettingRow{Section::Graphics, "ChromaticAberration", "Graphics.ChromaticAberration",
-               &chromatic_aberration},
-    SettingRow{Section::Graphics, "FilmGrain", "Graphics.FilmGrain", &film_grain},
+    // v2 (spec 24 §10): the Graphics page (user decision of 2026-10-18). The
+    // engine settings are read at attach and apply at the next launch.
+    page_row(Section::Graphics, "EngineSettingsOverride", "Graphics.EngineSettingsOverride",
+             &engine_settings_override, "mvr_enginesettingsoverride", "setMotherEngineSettingsOverride"),
+    page_row(Section::Graphics, "ShadowMap4096", "Graphics.ShadowMap4096", &shadow_map_4096,
+             "mvr_shadowmap4096", "setMotherShadowMap4096"),
+    page_row(Section::Graphics, "SharpReflections", "Graphics.SharpReflections", &sharp_reflections,
+             "mvr_sharpreflections", "setMotherSharpReflections"),
+    page_row(Section::Graphics, "StreamingTextureHeapMB", "Graphics.StreamingTextureHeapMB",
+             &streaming_texture_heap_mb, "mvr_streamingtextureheap", "setMotherStreamingTextureHeapMB",
+             CommandRule::Integer, kTextureHeap),
+    page_row(Section::Graphics, "StreamingModelHeapMB", "Graphics.StreamingModelHeapMB",
+             &streaming_model_heap_mb, "mvr_streamingmodelheap", "setMotherStreamingModelHeapMB",
+             CommandRule::Integer, kModelHeap),
+    // 24 §8: a toggle's site is installed only for a key that is false at
+    // attach; a change reaches that site at once (ApplyPostFx).
+    post_fx_row("LensFlares", "Graphics.LensFlares", &lens_flares, "mvr_lensflares", "setMotherLensFlares"),
+    post_fx_row("ChromaticAberration", "Graphics.ChromaticAberration", &chromatic_aberration,
+                "mvr_chromaticaberration", "setMotherChromaticAberration"),
+    post_fx_row("FilmGrain", "Graphics.FilmGrain", &film_grain, "mvr_filmgrain", "setMotherFilmGrain"),
     // v2 (spec 23 §8): the Interaction and HUD pages. FastAnimations is
     // reserved (23 §4.6): file only, no page item.
     page_row(Section::Interaction, "PhysicalLevers", "Interaction.PhysicalLevers", &physical_levers,

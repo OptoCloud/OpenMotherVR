@@ -316,12 +316,17 @@ TEST_CASE("the settings table: commands and their rules") {
     CHECK(row->path == "Rendering.PixelScale");
     CHECK(find_command("mvr_vrruntime")->effect == CommandEffect::QuitGame);
     CHECK(find_command("mvr_clipblinding")->effect == CommandEffect::ApplyBlinders);
+    CHECK(find_command("mvr_lensflares")->effect == CommandEffect::ApplyPostFx);
+    CHECK(find_command("mvr_chromaticaberration")->effect == CommandEffect::ApplyPostFx);
+    CHECK(find_command("mvr_filmgrain")->effect == CommandEffect::ApplyPostFx);
+    CHECK(find_command("mvr_enginesettingsoverride")->effect == CommandEffect::None);
     CHECK(find_command("mvr_nothing") == nullptr);
     CHECK(find_command("") == nullptr); // the AA row has no command
 }
 
-// Spec 22 §3.3, 21 §15.3: every v2 key has a command beginning with mvr_ and
-// a push to the options page; no command is a v1 name or another's.
+// Spec 22 §3.3, 21 §15.3, 23 §8, 24 §10: every v2 key has a command
+// beginning with mvr_ and a push to the options page; no command is a v1
+// name or another's.
 TEST_CASE("the settings table: every v2 key has its own command and push") {
     const std::set<std::string_view> v1{
         "mvr_vrruntime",     "mvr_mirrorview",   "mvr_mirrorviewsym",        "mvr_pixelscale",
@@ -335,7 +340,7 @@ TEST_CASE("the settings table: every v2 key has its own command and push") {
         // Interaction.FastAnimations is reserved: file only (spec 23 §4.6).
         const bool v2 = row.section == Section::Comfort || row.section == Section::Controls ||
                         row.section == Section::Hands || row.section == Section::HandsHaptics ||
-                        row.section == Section::Body ||
+                        row.section == Section::Body || row.section == Section::Graphics ||
                         ((row.section == Section::Interaction || row.section == Section::Hud) &&
                          row.key != "FastAnimations");
         if (!row.command.empty()) CHECK(commands.insert(row.command).second);
@@ -350,7 +355,9 @@ TEST_CASE("the settings table: every v2 key has its own command and push") {
         CHECK(row.push.starts_with("setMother"));
         CHECK(pushes.insert(row.push).second);
     }
-    CHECK(v2_rows == 50);
+    CHECK(v2_rows == 58);
+    CHECK(find_command("mvr_streamingtextureheap")->rule == CommandRule::Integer);
+    CHECK(find_command("mvr_streamingmodelheap")->path == "Graphics.StreamingModelHeapMB");
     CHECK(find_command("mvr_smoothturnspeed")->rule == CommandRule::Number);
     CHECK(find_command("mvr_snapturnrepeat")->rule == CommandRule::Integer);
     CHECK(find_command("mvr_playmode")->rule == CommandRule::Choice);

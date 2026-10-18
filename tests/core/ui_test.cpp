@@ -199,6 +199,71 @@ TEST_CASE("v2 integer commands take whole numbers in range, and 0 where it means
     CHECK(s.comfort.snap_turn_repeat_ms == 1000);
 }
 
+// Spec 24 §10: the Graphics page's commands (user decision of 2026-10-18).
+TEST_CASE("Graphics commands: switches, heap sizes in range or 0, the 2D effects' effect") {
+    Settings s;
+    for (const char* name : {"mvr_enginesettingsoverride", "mvr_shadowmap4096", "mvr_sharpreflections"}) {
+        const CommandOutcome o = apply_command(s, name, "1");
+        CHECK(o.kind == Kind::Applied);
+        CHECK(o.effect == CommandEffect::None);
+        CHECK(apply_command(s, name, "2").kind == Kind::Refused);
+    }
+    CHECK(s.graphics.engine_settings_override);
+    CHECK(s.graphics.shadow_map_4096);
+    CHECK(s.graphics.sharp_reflections);
+
+    CommandOutcome o = apply_command(s, "mvr_streamingtextureheap", "300");
+    CHECK(o.change->path == "Graphics.StreamingTextureHeapMB");
+    CHECK(o.change->text == "300");
+    CHECK(apply_command(s, "mvr_streamingtextureheap", "1024").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_streamingtextureheap", "299").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_streamingtextureheap", "1025").kind == Kind::Refused);
+    CHECK(s.graphics.streaming_texture_heap_mb == 1024);
+    CHECK(apply_command(s, "mvr_streamingtextureheap", "0").kind == Kind::Applied);
+    CHECK(s.graphics.streaming_texture_heap_mb == 0);
+    CHECK(apply_command(s, "mvr_streamingmodelheap", "128").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_streamingmodelheap", "512").kind == Kind::Applied);
+    CHECK(apply_command(s, "mvr_streamingmodelheap", "127").kind == Kind::Refused);
+    CHECK(apply_command(s, "mvr_streamingmodelheap", "513").kind == Kind::Refused);
+    CHECK(s.graphics.streaming_model_heap_mb == 512);
+
+    for (const char* name : {"mvr_lensflares", "mvr_chromaticaberration", "mvr_filmgrain"}) {
+        const CommandOutcome off = apply_command(s, name, "0");
+        CHECK(off.kind == Kind::Applied);
+        CHECK(off.change->text == "false"); // these default on (24 §10)
+        CHECK(off.effect == CommandEffect::ApplyPostFx);
+        CHECK(apply_command(s, name, "2").kind == Kind::Refused);
+    }
+    CHECK_FALSE(s.graphics.lens_flares);
+    CHECK_FALSE(s.graphics.chromatic_aberration);
+    CHECK_FALSE(s.graphics.film_grain);
+}
+
+TEST_CASE("a 2D effect command reaches the effect hooks' keys at once") {
+    MemoryFileStore files;
+    RecordingLog log;
+    omvr::core::config::SettingsStore store(files, log);
+    store.initialize(L"C:\\game");
+    FakeGameSignals signals;
+    FakeRuntimeState state;
+    DisplayReset reset(signals, state, log);
+    FakePlaySpaceControl play_space;
+    omvr::core::render::PostFxEffects post_fx;
+    Commands commands(store, reset, signals, play_space, post_fx, log);
+    char grain[] = "mvr_filmgrain 0";
+    commands.run(grain);
+    CHECK_FALSE(post_fx.keys().film_grain);
+    CHECK(post_fx.keys().lens_flares);
+    CHECK(post_fx.keys().chromatic_aberration);
+    CHECK(files.writes == 1);
+    CHECK(log.contains("[script_bridge] Graphics.FilmGrain changed to false by command"));
+    // A command without the effect leaves the keys alone.
+    char shadows[] = "mvr_shadowmap4096 1";
+    commands.run(shadows);
+    CHECK_FALSE(post_fx.keys().film_grain);
+    CHECK(store.current().graphics.shadow_map_4096);
+}
+
 TEST_CASE("v2 list and switch commands") {
     Settings s;
     CommandOutcome o = apply_command(s, "mvr_playmode", "1");
@@ -253,7 +318,8 @@ TEST_CASE("mvr_calibrateheight asks for a calibration and saves nothing") {
     FakeRuntimeState state;
     DisplayReset reset(signals, state, log);
     FakePlaySpaceControl play_space;
-    Commands commands(store, reset, signals, play_space, log);
+    omvr::core::render::PostFxEffects post_fx;
+    Commands commands(store, reset, signals, play_space, post_fx, log);
     char cmd[] = "mvr_calibrateheight";
     commands.run(cmd);
     CHECK(play_space.requests == 1);
@@ -280,13 +346,15 @@ TEST_CASE("the push sends each v2 value with its type, the -vrscale switch and t
     play_space.scale_switch = 1.2f;
     play_space.calibration  = {ports::CalibrationPageState::Counting, 2};
     Settings s;
-    s.comfort.smooth_turn_speed   = 45.0f;
-    s.comfort.play_mode           = PlayMode::Standing;
-    s.comfort.standing_eye_height = 1.72f;
-    s.controls.dpad_emulation     = true;
-    s.hands.flashlight_aim        = FlashlightAim::LeftHand;
-    s.hands.haptics.strength      = 0.5f;
-    s.body.visible                = BodyVisible::HandsOnly;
+    s.comfort.smooth_turn_speed          = 45.0f;
+    s.comfort.play_mode                  = PlayMode::Standing;
+    s.comfort.standing_eye_height        = 1.72f;
+    s.controls.dpad_emulation            = true;
+    s.hands.flashlight_aim               = FlashlightAim::LeftHand;
+    s.hands.haptics.strength             = 0.5f;
+    s.body.visible                       = BodyVisible::HandsOnly;
+    s.graphics.streaming_texture_heap_mb = 512;
+    s.graphics.lens_flares               = false;
     SettingsPush push({vars, reset, schemes, s, state, play_space, log});
     push.push(ports::UiHandle{1});
 
@@ -313,6 +381,14 @@ TEST_CASE("the push sends each v2 value with its type, the -vrscale switch and t
     CHECK(has("setMotherBodyVisible=2"));
     CHECK(has("setMotherEyeForward=0.000000"));
     CHECK(has("setMotherRealCrouch=false"));
+    CHECK(has("setMotherEngineSettingsOverride=false"));
+    CHECK(has("setMotherShadowMap4096=false"));
+    CHECK(has("setMotherSharpReflections=false"));
+    CHECK(has("setMotherStreamingTextureHeapMB=512"));
+    CHECK(has("setMotherStreamingModelHeapMB=0"));
+    CHECK(has("setMotherLensFlares=false"));
+    CHECK(has("setMotherChromaticAberration=true"));
+    CHECK(has("setMotherFilmGrain=true"));
     CHECK(has("setMotherWorldScaleSwitch=1.200000"));
     CHECK(has("setMotherCalibrationState=1"));
     CHECK(has("setMotherCalibrationSeconds=2"));
@@ -410,7 +486,8 @@ TEST_CASE("the command runner saves, then quits, after mvr_vrruntime") {
     FakeRuntimeState state;
     DisplayReset reset(signals, state, log);
     FakePlaySpaceControl play_space;
-    Commands commands(store, reset, signals, play_space, log);
+    omvr::core::render::PostFxEffects post_fx;
+    Commands commands(store, reset, signals, play_space, post_fx, log);
 
     char cmd[] = "mvr_vrruntime 1 trailing";
     commands.run(cmd);
@@ -468,10 +545,10 @@ TEST_CASE("the settings push sets every variable, then the controls help") {
                       "setMotherToggleGrips=false",
                       "setMotherToggleCrouch=false",
                   });
-    // Then the v2 pages: 38 settings, 3 page states and the 12 settings of
-    // the Interaction and HUD pages (pushed before the help rows, which the
-    // page shows on its own sub-page).
-    constexpr std::size_t kPagePushes = 38 + 3 + 12;
+    // Then the v2 pages: 38 settings, 3 page states, the 8 settings of the
+    // Graphics page and the 12 of the Interaction and HUD pages (pushed
+    // before the help rows, which the page shows on its own sub-page).
+    constexpr std::size_t kPagePushes = 38 + 3 + 8 + 12;
     CHECK(vars.calls[14] == "setMotherSmoothTurnSpeed=0.000000");
     CHECK(vars.calls[14 + kPagePushes] == "addMotherViewControl=Move|L Touchpad");
     CHECK(vars.calls.size() == 14 + kPagePushes + schemes.control_help().size());

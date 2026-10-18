@@ -69,6 +69,7 @@ enum class CommandEffect {
     QuitGame,        // the runtime takes effect on the next launch, so the game quits
     ApplyBlinders,   // the game reads the head-clip threshold at once
     CalibrateHeight, // no setting: measure the standing eye height (spec 22 §3.3, §6.2)
+    ApplyPostFx,     // the 2D effect hooks read their keys at once (spec 24 §8)
 };
 
 struct SettingRow {

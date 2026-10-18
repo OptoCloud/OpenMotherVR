@@ -4,6 +4,7 @@
 #include "core/config/settings_store.h"
 #include "core/config/settings_table.h"
 #include "core/diag/ports/log.h"
+#include "core/render/post_fx.h"
 #include "core/ui/display_reset.h"
 #include "core/ui/ports/game_signals.h"
 #include "core/ui/ports/play_space_control.h"
@@ -52,11 +53,13 @@ CommandOutcome apply_command(config::Settings& cfg, std::string_view name, const
 class Commands {
 public:
     Commands(config::SettingsStore& store, DisplayReset& display_reset, ports::GameSignals& signals,
-             ports::PlaySpaceControl& play_space, diag::ports::Log& log) noexcept
+             ports::PlaySpaceControl& play_space, render::PostFxEffects& post_fx,
+             diag::ports::Log& log) noexcept
         : store_(store),
           display_reset_(display_reset),
           signals_(signals),
           play_space_(play_space),
+          post_fx_(post_fx),
           log_(log) {}
 
     // Runs the mvr_ command `cmd` (the raw console input, its first
@@ -71,6 +74,7 @@ private:
     DisplayReset& display_reset_;
     ports::GameSignals& signals_;
     ports::PlaySpaceControl& play_space_;
+    render::PostFxEffects& post_fx_;
     diag::ports::Log& log_;
 };
 

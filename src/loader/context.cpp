@@ -68,7 +68,7 @@ Context::Context(void* self) noexcept
       body_controls(hud_toggle, clock),
       settings_push(
           {script_vars, display_reset, schemes, settings.current(), runtime_state, play_space_control, log}),
-      commands(settings, display_reset, console, play_space_control, log),
+      commands(settings, display_reset, console, play_space_control, post_fx, log),
       xr(log, clock, dialogs, failure),
       openvr_probe(log),
       openxr_probe(xr),
