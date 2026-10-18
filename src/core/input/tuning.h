@@ -55,4 +55,46 @@ inline constexpr std::chrono::milliseconds kDpadModifierHold{300};
 inline constexpr std::uint8_t kAppendedFlagsDigital = 0;
 inline constexpr std::uint8_t kAppendedFlagsAnalog  = 1;
 
+// ---- Gestures (22 §8, §9). Distances in metres, runtime space before the
+// world scale; head frame: x right, y up, z back (22 §8.1). ----
+
+// 22 §8.1: after input focus returns no gesture fires for this long, so a
+// hand held still while the dashboard closes fires nothing.
+inline constexpr std::chrono::milliseconds kGestureFocusSettle{500};
+
+// 22 §8.2: both hands this close to the head with both grips held this
+// long recenters; at the face for most of a second does not happen in play.
+inline constexpr float kRecenterHandDistance = 0.30f;
+inline constexpr std::chrono::milliseconds kRecenterHold{750};
+
+// 22 §8.4: the holster zones, starting values to tune in play. The
+// shoulders: above the head's height minus kShoulderBelowHead and behind
+// the head by more than kShoulderBehind. The left hip: below the head's
+// height minus kHipBelowHead and left of centre by more than kHipLeftOf.
+// The chest: between kChestBelowTop and kChestBelowBottom below the head,
+// within kChestHalfWidth of centre and in front by more than kChestInFront.
+inline constexpr float kShoulderBelowHead = 0.25f;
+inline constexpr float kShoulderBehind    = 0.05f;
+inline constexpr float kHipBelowHead      = 0.55f;
+inline constexpr float kHipLeftOf         = 0.10f;
+inline constexpr float kChestBelowTop     = 0.30f;
+inline constexpr float kChestBelowBottom  = 0.55f;
+inline constexpr float kChestHalfWidth    = 0.15f;
+inline constexpr float kChestInFront      = 0.10f;
+
+// 22 §9.2: a deliberate lean is well beyond kLeanStart, a breath or a nod
+// stays within kLeanStop (the hysteresis avoids chatter); the lean grows
+// in proportion to the offset up to kLeanFull, then is full.
+inline constexpr float kLeanStart = 0.08f;
+inline constexpr float kLeanStop  = 0.05f;
+inline constexpr float kLeanFull  = 0.25f;
+
+// 22 §9.3: the mouth point, below and in front of the head position, and
+// "hand over mouth" (press within kMouthPress, release beyond
+// kMouthRelease), not "hand near the face".
+inline constexpr float kMouthBelowHead = 0.09f;
+inline constexpr float kMouthInFront   = 0.07f;
+inline constexpr float kMouthPress     = 0.12f;
+inline constexpr float kMouthRelease   = 0.18f;
+
 } // namespace omvr::core::input

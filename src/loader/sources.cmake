@@ -10,6 +10,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/d3d11_forwarders.cpp
     ${CMAKE_CURRENT_LIST_DIR}/d3d11_forwarders.h
     ${CMAKE_CURRENT_LIST_DIR}/dll_main.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/gesture_context.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/gesture_context.h
     ${CMAKE_CURRENT_LIST_DIR}/headset_audio.cpp
     ${CMAKE_CURRENT_LIST_DIR}/headset_audio.h
     ${CMAKE_CURRENT_LIST_DIR}/hook_targets.h
