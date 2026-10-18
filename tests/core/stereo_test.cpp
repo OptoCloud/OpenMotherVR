@@ -15,6 +15,7 @@
 #include "core/stereo/stereo_update.h"
 #include "core/stereo/tuning.h"
 #include "core/stereo/ui_placement.h"
+#include "core/update_input.h"
 #include "fakes/fakes.h"
 #include "util/math/matrix.h"
 
@@ -170,17 +171,8 @@ TEST_CASE("smooth turn: centre zone, linear ramp, degrees per second") {
 namespace update_test {
 
 using omvr::core::config::Settings;
+using omvr::tests::pad_input;
 using Time = std::chrono::steady_clock::time_point;
-
-UpdateInput pad_input(Time now, float turn, float yaw) {
-    UpdateInput in;
-    in.now           = now;
-    in.pad           = true;
-    in.turn          = turn;
-    in.follow_active = true;
-    in.follow_yaw    = yaw;
-    return in;
-}
 
 } // namespace update_test
 

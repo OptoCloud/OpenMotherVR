@@ -8,6 +8,7 @@
 #include "core/stereo/scene_tracker.h"
 #include "core/stereo/stereo_update.h"
 #include "core/stereo/turn_block.h"
+#include "core/update_input.h"
 #include "fakes/fakes.h"
 
 #include <doctest/doctest.h>
@@ -21,21 +22,12 @@ namespace {
 using namespace omvr::core::stereo;
 using omvr::core::config::Settings;
 using omvr::core::input::Interaction;
+using omvr::tests::pad_input;
 using omvr::tests::RecordingLog;
 using namespace std::chrono_literals;
 using Time = std::chrono::steady_clock::time_point;
 
 constexpr float kDeg = std::numbers::pi_v<float> / 180.0f;
-
-UpdateInput stick(Time now, float turn, float move_y = 0.0f) {
-    UpdateInput in;
-    in.now           = now;
-    in.pad           = true;
-    in.turn          = turn;
-    in.move_y        = move_y;
-    in.follow_active = true;
-    return in;
-}
 
 } // namespace
 
@@ -152,35 +144,35 @@ TEST_CASE("stereo update: vignette target from stick movement and turning") {
     const Time t0{1s};
 
     SUBCASE("movement above 0.1 drives it, below does not") {
-        CHECK(update.run(stick(t0, 0.0f, 0.05f)).vignette_target == 0.0f);
-        CHECK(update.run(stick(t0 + 10ms, 0.0f, 0.5f)).vignette_target == 0.8f);
+        CHECK(update.run(pad_input(t0, 0.0f, 0.0f, 0.05f)).vignette_target == 0.0f);
+        CHECK(update.run(pad_input(t0 + 10ms, 0.0f, 0.0f, 0.5f)).vignette_target == 0.8f);
     }
     SUBCASE("the game's own look turning with the stick, past 0.33") {
-        CHECK(update.run(stick(t0, 0.3f)).vignette_target == 0.0f);
-        CHECK(update.run(stick(t0 + 10ms, 0.6f)).vignette_target == 0.8f);
+        CHECK(update.run(pad_input(t0, 0.3f)).vignette_target == 0.0f);
+        CHECK(update.run(pad_input(t0 + 10ms, 0.6f)).vignette_target == 0.8f);
     }
     SUBCASE("smooth turn changing the yaw") {
         s.comfort.smooth_turn_speed = 90.0f;
-        CHECK(update.run(stick(t0, 1.0f)).vignette_target == 0.0f); // the first update turns by nothing
-        CHECK(update.run(stick(t0 + 10ms, 1.0f)).vignette_target == 0.8f);
+        CHECK(update.run(pad_input(t0, 1.0f)).vignette_target == 0.0f); // the first update turns by nothing
+        CHECK(update.run(pad_input(t0 + 10ms, 1.0f)).vignette_target == 0.8f);
     }
     SUBCASE("snap steps do not drive it; they ask for the fade when it is on") {
         s.input.snap_rotation    = true;
         s.comfort.snap_turn_fade = true;
-        const UpdateOutput out   = update.run(stick(t0, 1.0f));
+        const UpdateOutput out   = update.run(pad_input(t0, 1.0f));
         CHECK(out.yaw.has_value());
         CHECK(out.snap_fade);
         CHECK(out.vignette_target == 0.0f);
     }
     SUBCASE("no fade with the setting off") {
         s.input.snap_rotation = true;
-        CHECK_FALSE(update.run(stick(t0, 1.0f)).snap_fade);
+        CHECK_FALSE(update.run(pad_input(t0, 1.0f)).snap_fade);
     }
     SUBCASE("never in the menu screen or without a camera") {
-        UpdateInput menu = stick(t0, 0.0f, 1.0f);
+        UpdateInput menu = pad_input(t0, 0.0f, 0.0f, 1.0f);
         menu.mode        = StereoMode::Screen;
         CHECK(update.run(menu).vignette_target == 0.0f);
-        UpdateInput cutscene   = stick(t0 + 10ms, 0.0f, 1.0f);
+        UpdateInput cutscene   = pad_input(t0 + 10ms, 0.0f, 0.0f, 1.0f);
         cutscene.follow_active = false;
         CHECK(update.run(cutscene).vignette_target == 0.0f);
     }
@@ -191,7 +183,7 @@ TEST_CASE("stereo update: interaction-aware turning blocks snap, smooth and game
     SceneTracker scene;
     StereoUpdate update(s, scene);
     const Time t0{1s};
-    UpdateInput keypad      = stick(t0, 1.0f);
+    UpdateInput keypad      = pad_input(t0, 1.0f);
     keypad.in_interaction   = true;
     keypad.interaction_kind = Interaction::Keypad;
 
@@ -206,31 +198,31 @@ TEST_CASE("stereo update: interaction-aware turning blocks snap, smooth and game
         keypad.now = t0 + 1s;
         CHECK_FALSE(update.run(keypad).yaw.has_value());
         // The block ends with the stick still held: no step, and no repeat.
-        UpdateOutput out = update.run(stick(t0 + 2s, 1.0f));
+        UpdateOutput out = update.run(pad_input(t0 + 2s, 1.0f));
         CHECK_FALSE(out.yaw.has_value());
         REQUIRE(out.block_changed.has_value());
         CHECK(out.block_changed->block == TurnBlock::None);
-        CHECK_FALSE(update.run(stick(t0 + 3s, 1.0f)).yaw.has_value());
-        CHECK_FALSE(update.run(stick(t0 + 4s, 1.0f)).yaw.has_value());
+        CHECK_FALSE(update.run(pad_input(t0 + 3s, 1.0f)).yaw.has_value());
+        CHECK_FALSE(update.run(pad_input(t0 + 4s, 1.0f)).yaw.has_value());
         // Released inside 0.5, then the next flick steps.
-        CHECK_FALSE(update.run(stick(t0 + 5s, 0.0f)).yaw.has_value());
-        CHECK(update.run(stick(t0 + 5s + 10ms, 1.0f)).yaw.has_value());
+        CHECK_FALSE(update.run(pad_input(t0 + 5s, 0.0f)).yaw.has_value());
+        CHECK(update.run(pad_input(t0 + 5s + 10ms, 1.0f)).yaw.has_value());
     }
     SUBCASE("smooth: stops, then resumes with no step") {
         s.controls.interaction_aware_turning = true;
         s.input.snap_rotation                = false;
         s.comfort.smooth_turn_speed          = 90.0f;
-        CHECK_FALSE(update.run(stick(t0, 1.0f)).yaw.has_value());
-        CHECK(update.run(stick(t0 + 10ms, 1.0f)).yaw.has_value());
+        CHECK_FALSE(update.run(pad_input(t0, 1.0f)).yaw.has_value());
+        CHECK(update.run(pad_input(t0 + 10ms, 1.0f)).yaw.has_value());
         keypad.now = t0 + 20ms;
         CHECK_FALSE(update.run(keypad).yaw.has_value());
-        CHECK_FALSE(update.run(stick(t0 + 30ms, 1.0f)).yaw.has_value());
-        CHECK(update.run(stick(t0 + 40ms, 1.0f)).yaw.has_value());
+        CHECK_FALSE(update.run(pad_input(t0 + 30ms, 1.0f)).yaw.has_value());
+        CHECK(update.run(pad_input(t0 + 40ms, 1.0f)).yaw.has_value());
     }
     SUBCASE("game look: the look byte stays off for the pad, on for the mouse") {
         s.controls.interaction_aware_turning = true;
         s.input.snap_rotation                = false;
-        CHECK(update.run(stick(t0, 0.0f)).look_enabled == true);
+        CHECK(update.run(pad_input(t0, 0.0f)).look_enabled == true);
         keypad.now             = t0 + 10ms;
         const UpdateOutput out = update.run(keypad);
         CHECK(out.look_enabled == false);
@@ -244,7 +236,7 @@ TEST_CASE("stereo update: interaction-aware turning blocks snap, smooth and game
     }
     SUBCASE("the breathing game and cutscenes block; hiding alone does not") {
         s.controls.interaction_aware_turning = true;
-        UpdateInput breathing                = stick(t0, 1.0f);
+        UpdateInput breathing                = pad_input(t0, 1.0f);
         breathing.breathing_game             = true;
         const UpdateOutput out               = update.run(breathing);
         CHECK_FALSE(out.yaw.has_value());
@@ -261,21 +253,21 @@ TEST_CASE("stereo update: the turning in use is reported once per change") {
     SceneTracker scene;
     StereoUpdate update(s, scene);
     const Time t0{1s};
-    UpdateOutput out = update.run(stick(t0, 0.0f));
+    UpdateOutput out = update.run(pad_input(t0, 0.0f));
     REQUIRE(out.turning_changed.has_value());
     CHECK(out.turning_changed->turning == Turning::Snap);
     CHECK(out.turning_changed->repeat_ms == 300);
-    CHECK_FALSE(update.run(stick(t0 + 10ms, 0.0f)).turning_changed.has_value());
+    CHECK_FALSE(update.run(pad_input(t0 + 10ms, 0.0f)).turning_changed.has_value());
 
     s.input.snap_rotation       = false;
     s.comfort.smooth_turn_speed = 90.0f;
-    out                         = update.run(stick(t0 + 20ms, 0.0f));
+    out                         = update.run(pad_input(t0 + 20ms, 0.0f));
     REQUIRE(out.turning_changed.has_value());
     CHECK(out.turning_changed->turning == Turning::Smooth);
     CHECK(out.turning_changed->speed_deg_s == 90.0f);
 
     s.comfort.smooth_turn_speed = 0.0f;
-    out                         = update.run(stick(t0 + 30ms, 0.0f));
+    out                         = update.run(pad_input(t0 + 30ms, 0.0f));
     REQUIRE(out.turning_changed.has_value());
     CHECK(out.turning_changed->turning == Turning::GameLook);
 }
