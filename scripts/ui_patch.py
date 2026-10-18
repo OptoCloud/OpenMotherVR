@@ -2,7 +2,7 @@
 against the player's own DATA/UI.PAK, so no game files are distributed.
 
     python -I scripts/ui_patch.py make  <stock UI.PAK> <modded UI.PAK> <out.bin>
-    python -I scripts/ui_patch.py apply <stock UI.PAK> <patch.bin> <out.PAK>
+    python -I scripts/ui_patch.py apply <stock UI.PAK> <patch.bin> <out.PAK> [<variant tag>]
     python -I scripts/ui_patch.py check <stock UI.PAK> <modded UI.PAK> <patch.bin>
 
 Patch format (little-endian), read by src/core/ui/ui_patch.cpp:
@@ -20,6 +20,11 @@ Patch format (little-endian), read by src/core/ui/ui_patch.cpp:
                       u8 0 (copy):   u32 stock offset, u32 length
                       u8 1 (insert): u32 length, then the bytes
         kind 2:   u32 size, then the bytes
+
+A variant entry (spec 23 §6.2) is named "<entry>|<tag>" and follows the
+entry it can replace; kinds 0 and 1 then refer to the stock entry <entry>.
+The DLL puts the variant whose tag it asks for in place of <entry> and drops
+the others; apply does the same with the optional tag.
 """
 import struct
 import sys
@@ -31,6 +36,7 @@ import pak2  # noqa: E402
 
 MAGIC = b"MVRUIP01"
 BLOCK = 16
+VARIANT = "|"
 
 # Edits to the modded UI before diffing, as length-prefixed strings in the
 # movies' ActionScript string tables (same length, so nothing moves): the
@@ -49,6 +55,11 @@ def edited(entries: dict[str, bytes]) -> dict[str, bytes]:
                 data = data.replace(old, new)
         out[name] = data
     return out
+
+
+def base_name(name: str) -> str:
+    """The entry a variant entry replaces; the name itself otherwise."""
+    return name.split(VARIANT, 1)[0]
 
 
 def pak_alignment(path: Path) -> int:
@@ -92,7 +103,7 @@ def make(stock_path: Path, mod_path: Path) -> bytes:
     for name, data in mod.items():
         enc = name.encode("ascii")
         out += struct.pack("<H", len(enc)) + enc
-        base = stock.get(name)
+        base = stock.get(base_name(name))
         if base is None:
             out += struct.pack("<BI", 2, len(data)) + data
         elif base == data:
@@ -123,7 +134,7 @@ def apply(stock_path: Path, patch: bytes) -> tuple[int, dict[str, bytes]]:
             entries[name] = patch[p:p + size]; p += size
             continue
         size, crc = struct.unpack_from("<II", patch, p); p += 8
-        base = stock[name]
+        base = stock[base_name(name)]
         if len(base) != size or zlib.crc32(base) != crc:
             raise SystemExit(f"{name}: the stock archive differs from the one the patch was made for")
         if kind == 0:
@@ -144,6 +155,19 @@ def apply(stock_path: Path, patch: bytes) -> tuple[int, dict[str, bytes]]:
     return align, entries
 
 
+def select_variant(entries: dict[str, bytes], tag: str | None) -> dict[str, bytes]:
+    """The archive the DLL builds for `tag` (None: no variant)."""
+    out: dict[str, bytes] = {}
+    for name, data in entries.items():
+        if VARIANT not in name:
+            out[name] = data
+        elif tag is not None and name.split(VARIANT, 1)[1] == tag:
+            if base_name(name) not in out:
+                raise SystemExit(f"{name}: no entry before it to replace")
+            out[base_name(name)] = data
+    return out
+
+
 def write_pak(path: Path, align: int, entries: dict[str, bytes]) -> None:
     names = b"".join(n.encode("ascii") + b"\0" for n in entries)
     header = struct.pack("<4sIII", b"PAK2", len(names), len(entries), align) + names
@@ -162,12 +186,14 @@ def write_pak(path: Path, align: int, entries: dict[str, bytes]) -> None:
 
 def main() -> None:
     cmd, a, b, c = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4])
+    tag = sys.argv[5] if len(sys.argv) > 5 else None
     if cmd == "make":
         patch = make(a, b)
         c.write_bytes(patch)
         print(f"{c}: {len(patch)} bytes")
     elif cmd == "apply":
         align, entries = apply(a, b.read_bytes())
+        entries = select_variant(entries, tag)
         write_pak(c, align, entries)
         print(f"{c}: {len(entries)} entries")
     elif cmd == "check":
