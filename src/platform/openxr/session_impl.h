@@ -58,7 +58,7 @@ struct Session::Impl {
     bool copy_into(Swapchain& sc, ID3D11Texture2D* src, D3D11_BOX box);
 
     // ---- session.cpp: session, spaces and events (09 §2, §3, §6)
-    SessionInfo init(ID3D11Device* device) noexcept;
+    bool init(ID3D11Device* device) noexcept;
     void warn_adapter_mismatch(ID3D11Device* device, const XrGraphicsRequirementsD3D11KHR& reqs);
     bool create_session(ID3D11Device* device);
     bool create_spaces();

@@ -15,7 +15,7 @@ std::optional<bool> VirtualScreen::start(core::stereo::SwapchainHandle handle) n
     ComPtr<ID3D11Device> device;
     if (!swapchain || FAILED(swapchain->GetDevice(IID_PPV_ARGS(device.put())))) return std::nullopt;
     // The session takes its own reference; ours goes at the end of the scope.
-    return session_.init(d3d11::gpu_device(device.get())).ok;
+    return session_.init(d3d11::gpu_device(device.get()));
 }
 
 void VirtualScreen::recenter() noexcept { session_.recenter(); }

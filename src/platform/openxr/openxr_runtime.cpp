@@ -152,7 +152,7 @@ public:
     bool create_render_resources(core::vr::GpuDevice gpu, core::vr::GpuContext) override {
         if (session_) return true;
         if (gpu == core::vr::GpuDevice{}) return false;
-        session_ = xr_.init(gpu).ok;
+        session_ = xr_.init(gpu);
         logf(log_, kLogSession, session_ ? "created on the game's device" : "failed");
         return session_;
     }

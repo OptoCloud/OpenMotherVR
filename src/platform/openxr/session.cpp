@@ -268,9 +268,8 @@ void Session::Impl::create_floor_space() {
     }
 }
 
-SessionInfo Session::Impl::init(ID3D11Device* device) noexcept {
-    SessionInfo r{};
-    if (!device || !init_system()) return r;
+bool Session::Impl::init(ID3D11Device* device) noexcept {
+    if (!device || !init_system()) return false;
 
     // Required before xrCreateSession (XR_KHR_D3D11_enable).
     PFN_xrGetD3D11GraphicsRequirementsKHR get_reqs = nullptr;
@@ -280,12 +279,12 @@ SessionInfo Session::Impl::init(ID3D11Device* device) noexcept {
     if (!get_reqs ||
         !check(get_reqs(state.instance.get(), state.system, &reqs), "xrGetD3D11GraphicsRequirementsKHR")) {
         teardown();
-        return r;
+        return false;
     }
     warn_adapter_mismatch(device, reqs);
     if (!create_session(device) || !create_spaces()) {
         teardown();
-        return r;
+        return false;
     }
 
     std::uint32_t n = 0;
@@ -297,11 +296,9 @@ SessionInfo Session::Impl::init(ID3D11Device* device) noexcept {
 
     if (!input.create(state.instance.get(), state.session.get())) log.line(kLogNoInput);
 
-    r.ok            = true;
-    r.recommended_w = state.config_views[0].recommendedImageRectWidth;
-    r.recommended_h = state.config_views[0].recommendedImageRectHeight;
-    logf(log, kLogCreated, r.recommended_w, r.recommended_h);
-    return r;
+    logf(log, kLogCreated, state.config_views[0].recommendedImageRectWidth,
+         state.config_views[0].recommendedImageRectHeight);
+    return true;
 }
 
 void Session::Impl::shutdown() noexcept {
@@ -349,7 +346,7 @@ Session::~Session() = default;
 
 std::filesystem::path Session::probe() noexcept { return impl_->probe(); }
 
-SessionInfo Session::init(core::vr::GpuDevice device) noexcept { return impl_->init(d3d11::to_d3d(device)); }
+bool Session::init(core::vr::GpuDevice device) noexcept { return impl_->init(d3d11::to_d3d(device)); }
 
 bool Session::init_system() noexcept { return impl_->init_system(); }
 

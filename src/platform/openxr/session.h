@@ -43,13 +43,6 @@ class RuntimeFailure;
 
 namespace omvr::platform::openxr {
 
-// The result of creating the session.
-struct SessionInfo {
-    bool ok                     = false;
-    std::uint32_t recommended_w = 0; // per-eye image size
-    std::uint32_t recommended_h = 0;
-};
-
 // What the runtime reports about the system before a session exists.
 struct SystemInfo {
     std::uint32_t recommended_w = 0, recommended_h = 0;         // per eye
@@ -132,9 +125,9 @@ public:
     std::filesystem::path probe() noexcept;
 
     // Create instance, system, session (bound to the game's device), reference
-    // spaces, controller actions and swapchains. Logs and returns ok=false on
+    // spaces, controller actions and swapchains. Logs and returns false on
     // any failure; partial state is torn down.
-    SessionInfo init(core::vr::GpuDevice device) noexcept;
+    bool init(core::vr::GpuDevice device) noexcept;
 
     // Instance, system and view configuration, without a graphics device: what
     // the stereo device needs before the game has created its D3D11 device.
