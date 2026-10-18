@@ -16,4 +16,6 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/shader_fix_stats.h
     ${CMAKE_CURRENT_LIST_DIR}/tuning.h
     ${CMAKE_CURRENT_LIST_DIR}/types.h
+    ${CMAKE_CURRENT_LIST_DIR}/upright_sprites.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/upright_sprites.h
 )

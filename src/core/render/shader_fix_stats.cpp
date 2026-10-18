@@ -12,18 +12,31 @@ namespace {
 constexpr std::string_view kStatsLog = "proxy: pixel shaders: {} created, {} dither-fixed, {} rejected";
 constexpr std::string_view kRejectedLog =
     "proxy: patched pixel shader rejected (hr=0x{:08X}), using the original";
+// 24 §14.7.
+constexpr std::string_view kSpriteStatsLog =
+    "proxy: upright sprites: {1} of {0} vertex shaders changed so far; {2} refused by the device";
+constexpr std::string_view kSpriteRejectedLog =
+    "proxy: upright-sprite vertex shader refused by the device (hr=0x{:08X}), using the original";
 
 } // namespace
 
 void ShaderFixStats::count_fixed(int total) noexcept {
     const int n = ++fixed_;
-    if (n == 1 || n % kShaderStatsLogPeriod == 0)
-        diag::ports::logf(log_, kStatsLog, total, n, rejected_.load());
+    if (n == 1 || n % kShaderStatsLogPeriod == 0) {
+        if (fix_ == ShaderFix::Dither)
+            diag::ports::logf(log_, kStatsLog, total, n, rejected_.load());
+        else
+            diag::ports::logf(log_, kSpriteStatsLog, total, n, rejected_.load());
+    }
 }
 
 void ShaderFixStats::count_rejected(long hr) noexcept {
-    if (++rejected_ <= kShaderRejectLogLimit)
-        diag::ports::logf(log_, kRejectedLog, static_cast<unsigned>(hr));
+    if (++rejected_ <= kShaderRejectLogLimit) {
+        if (fix_ == ShaderFix::Dither)
+            diag::ports::logf(log_, kRejectedLog, static_cast<unsigned>(hr));
+        else
+            diag::ports::logf(log_, kSpriteRejectedLog, static_cast<unsigned>(hr));
+    }
 }
 
 } // namespace omvr::core::render

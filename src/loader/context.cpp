@@ -90,7 +90,8 @@ Context::Context(void* self) noexcept
              &manager.si.eye_texture[0].srv, log),
       vignette(log),
       window(stereo, log),
-      shader_fixes(log) {}
+      shader_fixes(log),
+      sprite_fixes(log, core::render::ShaderFix::UprightSprites) {}
 
 Context& create_context(void* module) noexcept {
     // Leaked on purpose: nothing of the mod runs at process exit (no

@@ -38,18 +38,25 @@ inline constexpr std::size_t kTokenBytes = sizeof(std::uint32_t);
 
 // Token 0 is the version (the program type in its high half, 0 for a pixel
 // shader), token 1 the program's length in tokens.
-inline constexpr std::size_t kProgramHeaderTokens  = 2;
-inline constexpr std::uint32_t kProgramTypeShift   = 16;
-inline constexpr std::uint32_t kProgramTypeMask    = 0xFFFF;
-inline constexpr std::uint32_t kPixelShaderProgram = 0;
+inline constexpr std::size_t kProgramHeaderTokens   = 2;
+inline constexpr std::uint32_t kProgramTypeShift    = 16;
+inline constexpr std::uint32_t kProgramTypeMask     = 0xFFFF;
+inline constexpr std::uint32_t kPixelShaderProgram  = 0;
+inline constexpr std::uint32_t kVertexShaderProgram = 1;
 
 // Opcode token: opcode, length in tokens, extended flag.
 inline constexpr std::uint32_t kOpMad = 0x32, kOpMul = 0x38, kOpNop = 0x3A, kOpCustomData = 0x35,
                                kOpDclConstantBuffer = 0x59;
-inline constexpr std::uint32_t kOpcodeMask          = 0x7FF;
-inline constexpr std::uint32_t kLengthShift         = 24;
-inline constexpr std::uint32_t kLengthMask          = 0x7F;
-inline constexpr std::uint32_t kExtendedFlag        = 0x80000000u;
+// The arithmetic the upright-sprite fix inserts, and the declarations it
+// reads or changes.
+inline constexpr std::uint32_t kOpAdd = 0x00, kOpDp2 = 0x0F, kOpDp4 = 0x11, kOpLt = 0x31, kOpMax = 0x34,
+                               kOpMov = 0x36, kOpMovc = 0x37, kOpRsq = 0x44, kOpSqrt = 0x4B,
+                               kOpDclTemps = 0x68;
+
+inline constexpr std::uint32_t kOpcodeMask   = 0x7FF;
+inline constexpr std::uint32_t kLengthShift  = 24;
+inline constexpr std::uint32_t kLengthMask   = 0x7F;
+inline constexpr std::uint32_t kExtendedFlag = 0x80000000u;
 
 // Operand token: component count, selection mode, mask or swizzle, operand
 // type, index dimension and each index's representation.
@@ -59,6 +66,8 @@ inline constexpr std::uint32_t kSelectionShift     = 2;
 inline constexpr std::uint32_t kSelectionMaskBits  = 0x3;
 inline constexpr std::uint32_t kSelectMask         = 0; // a write mask follows
 inline constexpr std::uint32_t kSelectSwizzle      = 1; // a swizzle follows
+inline constexpr std::uint32_t kSelect1            = 2; // one component follows
+inline constexpr std::uint32_t kOneComponent       = 1; // a scalar immediate
 inline constexpr std::uint32_t kComponentShift     = 4;
 inline constexpr std::uint32_t kWriteMaskBits      = 0xF;
 inline constexpr std::uint32_t kSwizzleBits        = 2; // per component
@@ -80,6 +89,9 @@ inline constexpr std::uint32_t kTypeTemp = 0, kTypeInput = 1, kTypeImmediate32 =
 // Components and write-mask bits.
 inline constexpr std::uint32_t kX = 0, kY = 1, kZ = 2, kW = 3;
 inline constexpr std::uint32_t kMaskXY = 0x3;
+
+// The extended operand token of a negated source (modifier type 1, negate).
+inline constexpr std::uint32_t kNegateModifier = 0x41;
 
 // 0.001f as a 32-bit immediate.
 inline constexpr std::uint32_t kPoint001 = 0x3A83126F;
@@ -110,6 +122,25 @@ inline std::uint32_t with_type(std::uint32_t tok, std::uint32_t type) {
 // A 4-component swizzle.
 constexpr std::uint32_t swizzle(std::uint32_t x, std::uint32_t y, std::uint32_t z, std::uint32_t w) {
     return x | (y << kSwizzleBits) | (z << (2 * kSwizzleBits)) | (w << (3 * kSwizzleBits));
+}
+
+// A 4-component destination operand token with a write mask and immediate
+// indices.
+constexpr std::uint32_t masked_destination(std::uint32_t mask, std::uint32_t type, std::uint32_t index_dim) {
+    return kFourComponents | (kSelectMask << kSelectionShift) | (mask << kComponentShift) |
+           (type << kTypeShift) | (index_dim << kIndexDimShift);
+}
+
+// A 4-component source operand token selecting one component.
+constexpr std::uint32_t selected_source(std::uint32_t component, std::uint32_t type,
+                                        std::uint32_t index_dim) {
+    return kFourComponents | (kSelect1 << kSelectionShift) | (component << kComponentShift) |
+           (type << kTypeShift) | (index_dim << kIndexDimShift);
+}
+
+// An opcode token of `length` tokens.
+constexpr std::uint32_t opcode_token(std::uint32_t op, std::uint32_t length) {
+    return op | (length << kLengthShift);
 }
 
 // A 4-component source operand token with a swizzle and immediate indices.

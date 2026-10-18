@@ -10,6 +10,7 @@
 #include "core/render/dither_fix.h"
 #include "loader/context.h"
 #include "loader/hooks/crash_hook.h"
+#include "loader/hooks/render_sprite_hooks.h"
 #include "loader/hooks/window_hooks.h"
 #include "platform/d3d11/constants.h"
 #include "platform/d3d11/swapchain.h"
@@ -174,6 +175,7 @@ void install_device_hooks(void* device) noexcept {
         ctx.targets.create_pixel_shader = prev;
         ctx.log.line(kPixelShaderLog);
     }
+    install_vertex_shader_hook(vtable_of(device)); // 24 §14
 }
 
 void install_swapchain_hooks(void* swapchain) noexcept {

@@ -199,6 +199,8 @@ struct Context {
     core::stereo::VirtualScreenPolicy screen_policy;
     core::stereo::DesktopWindow window;
     core::render::ShaderFixStats shader_fixes;
+    // The upright-sprite fix of the vertex shaders (24 §14).
+    core::render::ShaderFixStats sprite_fixes;
     // Dev. Debug Options: the particle lighting lookup's correction, logged
     // once per change (dumps/13). Render thread.
     core::render::AlphaLightTrace alpha_light_trace;

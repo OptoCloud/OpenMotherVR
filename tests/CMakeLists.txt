@@ -26,6 +26,7 @@ add_executable(omvr_tests
     core/play_space_test.cpp
     core/presence_test.cpp
     core/ui_test.cpp
+    core/upright_sprites_test.cpp
     core/vr_off_test.cpp
     core/vr_test.cpp
     game/address_table_test.cpp

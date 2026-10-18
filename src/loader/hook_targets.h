@@ -47,6 +47,8 @@ struct HookTargets {
     void* resize_buffers      = nullptr;
     void* set_fullscreen      = nullptr;
     void* create_pixel_shader = nullptr;
+    // ID3D11Device::CreateVertexShader, for the upright sprites (24 §14).
+    void* create_vertex_shader = nullptr;
 
     // The vtable slots are shared by every swapchain of the class in the
     // process, including one an OpenXR runtime or an overlay creates

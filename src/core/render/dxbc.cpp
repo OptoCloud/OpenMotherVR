@@ -81,4 +81,77 @@ DxbcChecksum dxbc_checksum(std::span<const std::uint8_t> blob) noexcept {
     return state;
 }
 
+namespace {
+
+std::uint32_t read_u32(std::span<const std::uint8_t> in, std::size_t at) noexcept {
+    std::uint32_t v = 0;
+    std::memcpy(&v, in.data() + at, sizeof(v));
+    return v;
+}
+
+bool is_program_chunk(const std::uint8_t* chunk) noexcept {
+    return std::memcmp(chunk, kProgramChunkSm5.data(), kFourCcBytes) == 0 ||
+           std::memcmp(chunk, kProgramChunkSm4.data(), kFourCcBytes) == 0;
+}
+
+} // namespace
+
+std::optional<ProgramChunk> find_program(std::span<const std::uint8_t> in) noexcept {
+    if (in.size() < kContainerHeaderSize) return std::nullopt;
+    const DxbcChecksum sum = dxbc_checksum(in);
+    if (std::memcmp(sum.data(), in.data() + kChecksumOffset, kChecksumBytes) != 0) return std::nullopt;
+    const std::uint32_t declared = read_u32(in, kTotalSizeOffset);
+    ProgramChunk p;
+    p.chunk_count = read_u32(in, kChunkCountOffset);
+    if (declared != in.size() || kChunkOffsetsOffset + std::size_t(p.chunk_count) * kTokenBytes > in.size())
+        return std::nullopt;
+    for (std::uint32_t c = 0; c < p.chunk_count; ++c) {
+        const std::uint32_t off = read_u32(in, kChunkOffsetsOffset + kTokenBytes * std::size_t(c));
+        if (std::size_t(off) + kChunkHeaderSize > in.size()) return std::nullopt;
+        if (!is_program_chunk(in.data() + off)) continue;
+        if (p.offset) return std::nullopt;
+        const std::uint32_t bytes = read_u32(in, off + kChunkSizeOffset);
+        if (std::size_t(off) + kChunkHeaderSize + bytes > in.size() || bytes % kTokenBytes)
+            return std::nullopt;
+        p.offset = off;
+        p.bytes  = bytes;
+    }
+    if (!p.offset || p.bytes < kProgramHeaderTokens * kTokenBytes) return std::nullopt;
+    return p;
+}
+
+std::vector<std::uint32_t> program_tokens(std::span<const std::uint8_t> in, const ProgramChunk& chunk) {
+    std::vector<std::uint32_t> t(chunk.bytes / kTokenBytes);
+    std::memcpy(t.data(), in.data() + chunk.offset + kChunkHeaderSize, chunk.bytes);
+    return t;
+}
+
+std::vector<std::uint8_t> reassemble(std::span<const std::uint8_t> in, const ProgramChunk& chunk,
+                                     const std::vector<std::uint32_t>& prog) {
+    const std::size_t prog_bytes = prog.size() * kTokenBytes;
+    const std::size_t grow       = prog_bytes - chunk.bytes;
+    const std::size_t data_at    = chunk.offset + kChunkHeaderSize;
+    std::vector<std::uint8_t> out;
+    out.reserve(in.size() + grow);
+    out.insert(out.end(), in.begin(), in.begin() + static_cast<std::ptrdiff_t>(data_at));
+    out.resize(data_at + prog_bytes);
+    std::memcpy(out.data() + data_at, prog.data(), prog_bytes);
+    out.insert(out.end(), in.begin() + static_cast<std::ptrdiff_t>(data_at + chunk.bytes), in.end());
+
+    const auto put = [&out](std::size_t at, std::size_t v) {
+        const auto u = static_cast<std::uint32_t>(v);
+        std::memcpy(out.data() + at, &u, sizeof(u));
+    };
+    put(kTotalSizeOffset, out.size());
+    put(chunk.offset + kChunkSizeOffset, chunk.bytes + grow);
+    for (std::uint32_t c = 0; c < chunk.chunk_count; ++c) {
+        const std::size_t entry = kChunkOffsetsOffset + kTokenBytes * std::size_t(c);
+        const std::uint32_t off = read_u32(in, entry);
+        if (off > chunk.offset) put(entry, std::size_t(off) + grow);
+    }
+    const DxbcChecksum sum = dxbc_checksum(out);
+    std::memcpy(out.data() + kChecksumOffset, sum.data(), kChecksumBytes);
+    return out;
+}
+
 } // namespace omvr::core::render

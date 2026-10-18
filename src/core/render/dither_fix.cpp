@@ -103,52 +103,6 @@ bool match_mad(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s) 
     return true;
 }
 
-// ---- The container ---------------------------------------------------------------
-
-std::uint32_t read_u32(std::span<const std::uint8_t> in, std::size_t at) noexcept {
-    std::uint32_t v = 0;
-    std::memcpy(&v, in.data() + at, sizeof(v));
-    return v;
-}
-
-// The program chunk (SHEX or SHDR): where its header starts and its size.
-struct ProgramChunk {
-    std::size_t offset        = 0;
-    std::size_t bytes         = 0;
-    std::uint32_t chunk_count = 0;
-};
-
-bool is_program_chunk(const std::uint8_t* chunk) noexcept {
-    return std::memcmp(chunk, kProgramChunkSm5.data(), kFourCcBytes) == 0 ||
-           std::memcmp(chunk, kProgramChunkSm4.data(), kFourCcBytes) == 0;
-}
-
-// The container is one this fix understands: its header, a stored checksum
-// equal to ours, a declared size equal to the blob's, chunk offsets inside
-// it, and exactly one program chunk. Returns that chunk.
-std::optional<ProgramChunk> find_program(std::span<const std::uint8_t> in) noexcept {
-    const DxbcChecksum sum = dxbc_checksum(in);
-    if (std::memcmp(sum.data(), in.data() + kChecksumOffset, kChecksumBytes) != 0) return std::nullopt;
-    const std::uint32_t declared = read_u32(in, kTotalSizeOffset);
-    ProgramChunk p;
-    p.chunk_count = read_u32(in, kChunkCountOffset);
-    if (declared != in.size() || kChunkOffsetsOffset + std::size_t(p.chunk_count) * kTokenBytes > in.size())
-        return std::nullopt;
-    for (std::uint32_t c = 0; c < p.chunk_count; ++c) {
-        const std::uint32_t off = read_u32(in, kChunkOffsetsOffset + kTokenBytes * std::size_t(c));
-        if (std::size_t(off) + kChunkHeaderSize > in.size()) return std::nullopt;
-        if (!is_program_chunk(in.data() + off)) continue;
-        if (p.offset) return std::nullopt;
-        const std::uint32_t bytes = read_u32(in, off + kChunkSizeOffset);
-        if (std::size_t(off) + kChunkHeaderSize + bytes > in.size() || bytes % kTokenBytes)
-            return std::nullopt;
-        p.offset = off;
-        p.bytes  = bytes;
-    }
-    if (!p.offset || p.bytes < kProgramHeaderTokens * kTokenBytes) return std::nullopt;
-    return p;
-}
-
 // ---- The program -----------------------------------------------------------------
 
 // The program's dither sites and its cb2 declaration (token index), or
@@ -236,37 +190,6 @@ std::vector<std::uint32_t> rewrite(std::vector<std::uint32_t>& t, const Sites& s
     return prog;
 }
 
-// The container with `prog` in place of the program chunk's tokens: the
-// bytes up to the program, the program, the chunks after it, whose offsets
-// move by the growth; then the total size, the chunk size and the checksum.
-std::vector<std::uint8_t> reassemble(std::span<const std::uint8_t> in, const ProgramChunk& chunk,
-                                     const std::vector<std::uint32_t>& prog) {
-    const std::size_t prog_bytes = prog.size() * kTokenBytes;
-    const std::size_t grow       = prog_bytes - chunk.bytes;
-    const std::size_t data_at    = chunk.offset + kChunkHeaderSize;
-    std::vector<std::uint8_t> out;
-    out.reserve(in.size() + grow);
-    out.insert(out.end(), in.begin(), in.begin() + static_cast<std::ptrdiff_t>(data_at));
-    out.resize(data_at + prog_bytes);
-    std::memcpy(out.data() + data_at, prog.data(), prog_bytes);
-    out.insert(out.end(), in.begin() + static_cast<std::ptrdiff_t>(data_at + chunk.bytes), in.end());
-
-    const auto put = [&out](std::size_t at, std::size_t v) {
-        const auto u = static_cast<std::uint32_t>(v);
-        std::memcpy(out.data() + at, &u, sizeof(u));
-    };
-    put(kTotalSizeOffset, out.size());
-    put(chunk.offset + kChunkSizeOffset, chunk.bytes + grow);
-    for (std::uint32_t c = 0; c < chunk.chunk_count; ++c) {
-        const std::size_t entry = kChunkOffsetsOffset + kTokenBytes * std::size_t(c);
-        const std::uint32_t off = read_u32(in, entry);
-        if (off > chunk.offset) put(entry, std::size_t(off) + grow);
-    }
-    const DxbcChecksum sum = dxbc_checksum(out);
-    std::memcpy(out.data() + kChecksumOffset, sum.data(), kChecksumBytes);
-    return out;
-}
-
 std::vector<std::uint8_t> patch(std::span<const std::uint8_t> in, int& sites) {
     if (in.size() < kContainerHeaderSize || std::memcmp(in.data(), kDxbcMagic.data(), kDxbcMagicBytes) != 0)
         return {};
@@ -277,8 +200,7 @@ std::vector<std::uint8_t> patch(std::span<const std::uint8_t> in, int& sites) {
 
     const auto chunk = find_program(in);
     if (!chunk) return {};
-    std::vector<std::uint32_t> t(chunk->bytes / kTokenBytes);
-    std::memcpy(t.data(), in.data() + chunk->offset + kChunkHeaderSize, chunk->bytes);
+    std::vector<std::uint32_t> t = program_tokens(in, *chunk);
     if (((t[0] >> kProgramTypeShift) & kProgramTypeMask) != kPixelShaderProgram) return {};
     if (t[1] < kProgramHeaderTokens || t[1] > t.size()) return {};
 

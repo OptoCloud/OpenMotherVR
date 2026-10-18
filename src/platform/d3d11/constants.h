@@ -26,6 +26,8 @@ inline constexpr std::size_t kResizeBuffersVtblIndex      = 13;
 
 // ID3D11Device: 15 CreatePixelShader (hooked for the shader fixes, 08).
 inline constexpr std::size_t kCreatePixelShaderVtblIndex = 15;
+// ID3D11Device: 12 CreateVertexShader (hooked for the upright sprites, 24 §14).
+inline constexpr std::size_t kCreateVertexShaderVtblIndex = 12;
 
 // The system DLL the proxy forwards to, under the system directory (01 §1.1).
 inline constexpr wchar_t kSystemD3d11[] = L"\\d3d11.dll";

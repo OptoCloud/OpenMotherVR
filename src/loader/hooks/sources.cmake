@@ -30,6 +30,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/post_fx_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/render_fix_hooks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/render_fix_hooks.h
+    ${CMAKE_CURRENT_LIST_DIR}/render_sprite_hooks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/render_sprite_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/stereo_device_hooks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/stereo_device_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/stereo_update_hooks.cpp

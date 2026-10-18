@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <vector>
 
 // The parts of the DXBC container and program format the shader fixes read
 // (08 §1). Pure.
@@ -33,5 +34,28 @@ bool is_immediate4(const std::uint32_t* t, const Operand& o, std::uint32_t x, st
 // container header.
 using DxbcChecksum = std::array<std::uint32_t, 4>;
 DxbcChecksum dxbc_checksum(std::span<const std::uint8_t> blob) noexcept;
+
+// The program chunk (SHEX or SHDR) of a container: where the chunk starts,
+// the size of its data and the container's chunk count.
+struct ProgramChunk {
+    std::size_t offset        = 0;
+    std::size_t bytes         = 0;
+    std::uint32_t chunk_count = 0;
+};
+
+// The container is one the shader fixes understand: its header, a stored
+// checksum equal to ours, a declared size equal to the blob's, chunk
+// offsets inside it, and exactly one program chunk. Returns that chunk.
+std::optional<ProgramChunk> find_program(std::span<const std::uint8_t> in) noexcept;
+
+// The program chunk's tokens. `chunk` is one find_program returned for `in`.
+std::vector<std::uint32_t> program_tokens(std::span<const std::uint8_t> in, const ProgramChunk& chunk);
+
+// The container with `prog` in place of the program chunk's tokens: the
+// bytes up to the program, the program, the chunks after it, whose offsets
+// move by the growth; then the total size, the chunk size and the checksum.
+// `prog` is at least as long as the original program.
+std::vector<std::uint8_t> reassemble(std::span<const std::uint8_t> in, const ProgramChunk& chunk,
+                                     const std::vector<std::uint32_t>& prog);
 
 } // namespace omvr::core::render

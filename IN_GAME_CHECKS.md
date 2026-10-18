@@ -446,6 +446,18 @@ Controls keys in `mothervr.json`, Dev. Debug Options on.
       true, the game's effect is kept in VR` lines and no `[render] 2D
       effects` line.
 
+## Upright sprites
+
+- [ ] **Smoke and steam stay upright (24 §14).** Near smoke or steam
+      (Sevastopol vents, Torrens), tilt the head to each side: the sprites
+      stay upright in the room instead of turning with the head; nodding
+      and turning look as before. Look straight down into steam and up into
+      smoke: no spinning or flicker. Close each eye in turn: both alike.
+      Check a planar reflection with smoke in it. Runtime None: unchanged.
+      Log: `proxy: CreateVertexShader hooked (upright sprites)` at start-up,
+      and after a level loads `proxy: upright sprites: N of M vertex shaders
+      changed so far; 0 refused by the device` with N > 0.
+
 ## Options pages
 
 Options > MotherVR has seven new entries, Comfort, Controls, Hands,
