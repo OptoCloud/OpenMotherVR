@@ -81,6 +81,23 @@ struct AimRay {
     util::Vec3 end{};
 };
 
+// The current item as the aim reads it in one frame (21 §2.5, §5.2).
+struct WeaponSample {
+    std::optional<game::WeaponType> type; // nullopt: no weapon object
+    // The item's world transform as the game last placed it (WeaponTransform,
+    // 21 §2.5), when it was read this frame.
+    std::optional<util::Matrix34> transform;
+    // The item is drawn in the hand the arm edit moved (21 §4.2 item 6), so
+    // its transform is where the player sees the weapon in the hand.
+    bool drawn_in_moved_hand = false;
+};
+
+// A line the aim ray is laid along: a start and a unit direction.
+struct AimLine {
+    util::Vec3 start{};
+    util::Vec3 direction{};
+};
+
 // The player character's health (21 §2.2, §14.2).
 struct Health {
     std::uintptr_t player = 0; // which character: another one (a reload, a new level) starts afresh

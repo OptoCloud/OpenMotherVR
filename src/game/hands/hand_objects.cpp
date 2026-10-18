@@ -16,6 +16,9 @@ using util::Vec3;
 using AimRayUpdateFn = void(__fastcall*)(void* self, void* edx);
 using CurrentItemFn  = void*(__fastcall*)(void* self, void* edx);
 using TrackerScanFn  = bool(__fastcall*)(void* self, void* edx);
+// 21 §2.5: one stack argument (the matrix to fill), ret 4; returns it.
+using WeaponTransformFn = float*(__fastcall*)(void* self, void* edx, float* out);
+static_assert(sizeof(util::Matrix34) == 3 * 4 * sizeof(float), "WeaponTransform fills a 3x4 float matrix");
 
 // Above this the game's truncation to a 32-bit integer overflows.
 constexpr float kHealthProductLimit = 2147483648.0f;
@@ -106,16 +109,35 @@ void write_aim_ray(void* component, const AimRay& ray) noexcept {
     write_vec3(component, kAimEndCopy, ray.end);
 }
 
-std::optional<WeaponType> current_weapon_type(const HandTargets& t, void* component) noexcept {
+CurrentWeapon current_weapon(const HandTargets& t, void* component) noexcept {
     const CurrentItemFn fn = CodeAddress{t.current_item};
-    const void* weapon     = fn(component, nullptr);
-    if (!weapon) return std::nullopt;
-    const auto type = read_field<std::int32_t>(weapon, kWeaponType);
-    if (type < static_cast<std::int32_t>(WeaponType::NoWeapon) ||
-        type > static_cast<std::int32_t>(WeaponType::Cattleprod)) {
-        return WeaponType::Unknown;
+    CurrentWeapon w;
+    w.object = fn(component, nullptr);
+    if (!w.object) return w;
+    const auto type = read_field<std::int32_t>(w.object, kWeaponType);
+    w.type          = type < static_cast<std::int32_t>(WeaponType::NoWeapon) ||
+                              type > static_cast<std::int32_t>(WeaponType::Cattleprod)
+                          ? WeaponType::Unknown
+                          : static_cast<WeaponType>(type);
+    return w;
+}
+
+std::optional<WeaponType> current_weapon_type(const HandTargets& t, void* component) noexcept {
+    return current_weapon(t, component).type;
+}
+
+std::optional<util::Matrix34> weapon_transform(const HandTargets& t, void* weapon) noexcept {
+    // What the game's function would place the weapon by; with neither it
+    // is not called.
+    if (!t.weapon_transform || !weapon ||
+        (!pointer_field(weapon, kWeaponRenderObject) &&
+         !pointer_field(weapon, kWeaponRenderObjectFallback))) {
+        return std::nullopt;
     }
-    return static_cast<WeaponType>(type);
+    const WeaponTransformFn fn = CodeAddress{t.weapon_transform};
+    util::Matrix34 m{};
+    fn(weapon, nullptr, &m.m[0][0]);
+    return m;
 }
 
 bool call_tracker_scan(const HandTargets& t, void* tracker) noexcept {

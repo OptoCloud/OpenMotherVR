@@ -55,6 +55,30 @@ bool aims_from_hand(WeaponClass c) noexcept;
 // direction, in game world metres (21 §5.2, §22 item 5).
 float muzzle_offset(WeaponClass c) noexcept;
 
+// 21 §5.2 (r11): where a weapon's aim comes from. The revolver, the shotgun
+// and the flamethrower aim along the weapon's own transform while it is
+// drawn in the moved hand; everything else that aims from the hand (the
+// bolt gun, no weapon) along the right hand's aim pose.
+enum class AimSource : std::uint8_t { AimPose, WeaponTransform };
+[[nodiscard]] bool barrel_from_transform(std::optional<game::WeaponType> type) noexcept;
+[[nodiscard]] AimSource aim_source(std::optional<game::WeaponType> type, bool drawn_in_moved_hand) noexcept;
+
+// From the weapon transform's origin to the muzzle or nozzle along its
+// barrel column, in game world metres (21 §5.2, §21 item 5).
+float transform_muzzle_offset(WeaponClass c) noexcept;
+
+// 21 §5.2 (r11): the barrel's line of a weapon's world transform (row-major
+// 3x4, translation in the fourth column): from its origin `offset` along
+// the barrel column, along that column. nullopt when the transform cannot
+// be used: the identity (the game's answer without a render object), a
+// value that is not finite, or a degenerate column.
+std::optional<AimLine> weapon_barrel(const util::Matrix34& transform, float offset) noexcept;
+
+// The aim ray along `line`, at the range the game used (the length of the
+// game's ray); `weight` (21 §3.3) blends from the game's ray (0) to the
+// line (1). The direction is unit length.
+AimRay aim_ray_along(const AimRay& game, const AimLine& line, float weight) noexcept;
+
 // The aim ray of 21 §5.2 from the hand's world aim pose `aim`: it starts
 // `offset` along the aim direction, points along it, and ends at the range
 // the game used (the length of the game's ray). `weight` (21 §3.3) blends

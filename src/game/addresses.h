@@ -255,6 +255,9 @@ struct HandRvas {
     // and its call in the tracker's timed update 0x4327D0.
     std::uint32_t tracker_scan;
     std::uint32_t tracker_scan_call;
+    // 21 §2.5 (r11): WeaponTransform (thiscall on the weapon object
+    // CurrentItem returns, one argument: the 3x4 matrix it fills, ret 4).
+    std::uint32_t weapon_transform;
 };
 
 inline constexpr HandRvas kHandRvas2015 = {
@@ -267,6 +270,7 @@ inline constexpr HandRvas kHandRvas2015 = {
     .fire_gate_threshold = 0x00DC6780,
     .tracker_scan        = 0x00431E40,
     .tracker_scan_call   = 0x0043287D,
+    .weapon_transform    = 0x003A07D0,
 };
 
 inline constexpr HandRvas kHandRvas2020 = {};

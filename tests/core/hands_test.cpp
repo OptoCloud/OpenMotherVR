@@ -341,14 +341,14 @@ TEST_CASE("Hands: off by default; on, the right hand aims and the left faces the
 
     // Hands.Enabled off (the default): nothing at all.
     rig.run(std::chrono::milliseconds(11), 5, {});
-    CHECK_FALSE(rig.hands.aim(game, cam, WeaponType::Pistol, rig.now).ray.has_value());
-    CHECK_FALSE(rig.hands.tracker_facing(cam, rig.now).has_value());
+    CHECK_FALSE(rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now).ray.has_value());
+    CHECK_FALSE(rig.hands.tracker_facing(cam, std::nullopt, rig.now).has_value());
     CHECK(rig.log.lines.empty());
 
     rig.settings.enabled = true;
     rig.run(std::chrono::milliseconds(11), 30, HandsRig::active());
     CHECK(rig.log.contains("hands: tracked hands active"));
-    const auto r = rig.hands.aim(game, cam, WeaponType::Pistol, rig.now);
+    const auto r = rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now);
     REQUIRE(r.ray.has_value());
     CHECK(r.hand_aiming);
     check_close(r.ray->start, {5.5f, 0, 5});
@@ -356,21 +356,21 @@ TEST_CASE("Hands: off by default; on, the right hand aims and the left faces the
     check_close(r.ray->end, {25.5f, 0, 5});
 
     // Contact weapons keep the game's ray; so does Aim from Hand off.
-    CHECK_FALSE(rig.hands.aim(game, cam, WeaponType::Melee, rig.now).ray.has_value());
+    CHECK_FALSE(rig.hands.aim(game, cam, {WeaponType::Melee}, rig.now).ray.has_value());
     rig.settings.aim_from_hand = false;
-    CHECK_FALSE(rig.hands.aim(game, cam, WeaponType::Pistol, rig.now).ray.has_value());
+    CHECK_FALSE(rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now).ray.has_value());
     rig.settings.aim_from_hand = true;
 
-    const auto facing = rig.hands.tracker_facing(cam, rig.now);
+    const auto facing = rig.hands.tracker_facing(cam, std::nullopt, rig.now);
     REQUIRE(facing.has_value());
     CHECK(facing->x == doctest::Approx(1.0f));
     rig.settings.tracker_in_hand = false;
-    CHECK_FALSE(rig.hands.tracker_facing(cam, rig.now).has_value());
+    CHECK_FALSE(rig.hands.tracker_facing(cam, std::nullopt, rig.now).has_value());
     rig.settings.tracker_in_hand = true;
 
     // No update for a while (a menu): stale, the game's ray.
     CHECK_FALSE(
-        rig.hands.aim(game, cam, WeaponType::Pistol, rig.now + std::chrono::seconds(1)).ray.has_value());
+        rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now + std::chrono::seconds(1)).ray.has_value());
 }
 
 TEST_CASE("Hands: a cutscene hands the aim back to the head over the blend") {
@@ -381,9 +381,108 @@ TEST_CASE("Hands: a cutscene hands the aim back to the head over the blend") {
     cut.cutscene_or_fade = true;
     rig.run(std::chrono::milliseconds(10), 40, cut); // past kBlendOut
     const AimRay game{{0, 0, 0}, {0, 0, 1}, {0, 0, 20}};
-    CHECK_FALSE(rig.hands.aim(game, CameraPose{}, WeaponType::Pistol, rig.now).ray.has_value());
+    CHECK_FALSE(rig.hands.aim(game, CameraPose{}, {WeaponType::Pistol}, rig.now).ray.has_value());
     // Episodes are logged only with debug options on.
     CHECK_FALSE(rig.log.contains("cutscene"));
+}
+
+// A weapon transform turned 90 degrees about +Y (its local +Z, the barrel
+// column, along world +X) at (2, 1, 3): row-major, translation in the
+// fourth column, as WeaponTransform fills it (21 §2.5).
+Matrix34 weapon_along_x() { return Matrix34{{{0, 0, 1, 2}, {0, 1, 0, 1}, {-1, 0, 0, 3}}}; }
+
+TEST_CASE("aim source: the revolver, shotgun and flamethrower from the drawn weapon; the rest the aim pose") {
+    CHECK(aim_source(WeaponType::Pistol, true) == AimSource::WeaponTransform);
+    CHECK(aim_source(WeaponType::Shotgun, true) == AimSource::WeaponTransform);
+    CHECK(aim_source(WeaponType::Flamethrower, true) == AimSource::WeaponTransform);
+    CHECK(aim_source(WeaponType::Boltgun, true) == AimSource::AimPose); // compared in game first
+    CHECK(aim_source(std::nullopt, true) == AimSource::AimPose);        // throwables
+    CHECK(aim_source(WeaponType::NoWeapon, true) == AimSource::AimPose);
+    // Not drawn in the moved hand: the game's animation placed it.
+    CHECK(aim_source(WeaponType::Pistol, false) == AimSource::AimPose);
+}
+
+TEST_CASE("weapon barrel: origin and barrel column; identity, NaN and degenerate are not used") {
+    const auto line = weapon_barrel(weapon_along_x(), 0.0f);
+    REQUIRE(line.has_value());
+    check_close(line->start, {2, 1, 3});
+    check_close(line->direction, {1, 0, 0});
+    const auto ahead = weapon_barrel(weapon_along_x(), 0.5f);
+    REQUIRE(ahead.has_value());
+    check_close(ahead->start, {2.5f, 1, 3});
+
+    CHECK_FALSE(weapon_barrel(Matrix34{{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}}}, 0.0f).has_value());
+    Matrix34 nan = weapon_along_x();
+    nan.m[1][3]  = std::nanf("");
+    CHECK_FALSE(weapon_barrel(nan, 0.0f).has_value());
+    CHECK_FALSE(weapon_barrel(Matrix34{{{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 0, 1}}}, 0.0f).has_value());
+}
+
+TEST_CASE("Hands: a weapon drawn in the moved hand aims along its barrel; otherwise the aim pose") {
+    HandsRig rig;
+    rig.settings.enabled = true;
+    rig.run(std::chrono::milliseconds(11), 30, HandsRig::active());
+    const AimRay game{{0, 0, 0}, {0, 0, 1}, {0, 0, 20}};
+    const CameraPose cam{yaw(std::numbers::pi_v<float> / 2), {5, 0, 5}};
+
+    const auto barrel = rig.hands.aim(game, cam, {WeaponType::Shotgun, weapon_along_x(), true}, rig.now);
+    REQUIRE(barrel.ray.has_value());
+    CHECK(barrel.hand_aiming);
+    check_close(barrel.ray->start, {2, 1, 3});
+    check_close(barrel.ray->direction, {1, 0, 0});
+    check_close(barrel.ray->end, {22, 1, 3});
+
+    // The bolt gun, a weapon the game's animation placed, and a transform
+    // that cannot be used all aim from the aim pose: 0.5 m ahead of the
+    // camera at (5, 0, 5), along world +X.
+    for (const WeaponSample& w :
+         {WeaponSample{WeaponType::Boltgun, weapon_along_x(), true},
+          WeaponSample{WeaponType::Pistol, weapon_along_x(), false},
+          WeaponSample{WeaponType::Pistol, Matrix34{{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}}}, true},
+          WeaponSample{WeaponType::Flamethrower, std::nullopt, true}}) {
+        const auto r = rig.hands.aim(game, cam, w, rig.now);
+        REQUIRE(r.ray.has_value());
+        check_close(r.ray->start, {5.5f, 0, 5});
+        check_close(r.ray->direction, {1, 0, 0});
+    }
+}
+
+TEST_CASE("Hands: the weapon transform is read where it aims, or once per type with debug options") {
+    HandsRig rig;
+    rig.settings.enabled = true;
+    rig.run(std::chrono::milliseconds(11), 30, HandsRig::active());
+    const AimRay game{{0, 0, 0}, {0, 0, 1}, {0, 0, 20}};
+    const CameraPose cam{yaw(std::numbers::pi_v<float> / 2), {5, 0, 5}};
+
+    CHECK(rig.hands.weapon_transform_wanted(WeaponType::Pistol, true, rig.now));
+    CHECK_FALSE(rig.hands.weapon_transform_wanted(WeaponType::Pistol, false, rig.now));
+    CHECK_FALSE(rig.hands.weapon_transform_wanted(WeaponType::Melee, true, rig.now));
+    CHECK_FALSE(rig.hands.weapon_transform_wanted(WeaponType::Boltgun, false, rig.now));
+
+    rig.log.debug = true;
+    CHECK(rig.hands.weapon_transform_wanted(WeaponType::Pistol, false, rig.now));
+    (void)rig.hands.aim(game, cam, {WeaponType::Pistol, weapon_along_x(), false}, rig.now);
+    CHECK(rig.log.contains(
+        "[diag] hands: weapon transform, weapon type 2: columns (+0.000 +0.000 -1.000) "
+        "(+0.000 +1.000 +0.000) (+1.000 +0.000 +0.000), origin (2.000 1.000 3.000); aim pose "
+        "forward (+1.000"));
+    CHECK(rig.log.contains("drawn by the game's animation"));
+    CHECK_FALSE(rig.hands.weapon_transform_wanted(WeaponType::Pistol, false, rig.now)); // once per type
+    CHECK(rig.hands.weapon_transform_wanted(WeaponType::Shotgun, false, rig.now));
+}
+
+TEST_CASE("Hands: the tracker faces by the drawn left hand when given, else its aim pose") {
+    HandsRig rig;
+    rig.settings.enabled = true;
+    rig.run(std::chrono::milliseconds(11), 30, HandsRig::active());
+    const CameraPose cam{yaw(std::numbers::pi_v<float> / 2), {5, 0, 5}};
+    const auto drawn = rig.hands.tracker_facing(cam, Vec3{0, 0.5f, -2}, rig.now);
+    REQUIRE(drawn.has_value());
+    CHECK(drawn->x == doctest::Approx(0.0f));
+    CHECK(drawn->y == doctest::Approx(-1.0f));
+    const auto aim = rig.hands.tracker_facing(cam, std::nullopt, rig.now);
+    REQUIRE(aim.has_value());
+    CHECK(aim->x == doctest::Approx(1.0f));
 }
 
 } // namespace

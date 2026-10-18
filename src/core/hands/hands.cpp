@@ -22,6 +22,10 @@ constexpr std::string_view kLogGate =
     "hand aims)";
 constexpr std::string_view kLogNoAim =
     "hands: the runtime gives no aim pose for the right hand; aiming stays on the head";
+constexpr std::string_view kLogTransform =
+    "[diag] hands: weapon transform, weapon type {}: columns ({:+.3f} {:+.3f} {:+.3f}) ({:+.3f} {:+.3f} "
+    "{:+.3f}) ({:+.3f} {:+.3f} {:+.3f}), origin ({:.3f} {:.3f} {:.3f}); aim pose forward ({:+.3f} {:+.3f} "
+    "{:+.3f}), position ({:.3f} {:.3f} {:.3f}); {}";
 constexpr std::string_view kLogAim =
     "[diag] hands: aim ray start ({:.2f} {:.2f} {:.2f}) dir ({:+.2f} {:+.2f} {:+.2f}) weight {:.2f}";
 
@@ -34,6 +38,13 @@ const char* class_name(WeaponClass c) noexcept {
         case WeaponClass::Unknown: return "unknown (head ray)";
     }
     return "unknown";
+}
+
+// The bit of a weapon type in Hands::transform_logged_; none for a type
+// outside the game's enumeration.
+std::uint32_t type_bit(std::optional<game::WeaponType> type) noexcept {
+    if (!type || *type < game::WeaponType::NoWeapon || *type > game::WeaponType::Cattleprod) return 0;
+    return 1U << static_cast<unsigned>(*type);
 }
 
 // Seconds between two updates, 0 for the first and clamped to
@@ -122,23 +133,57 @@ bool Hands::aim_wanted(TimePoint now) const noexcept {
     return view && view->hands[kRightHand].weight > 0.0f;
 }
 
-Hands::AimResult Hands::aim(const AimRay& game, const CameraPose& camera,
-                            std::optional<game::WeaponType> type, TimePoint now) noexcept {
+bool Hands::weapon_transform_wanted(std::optional<game::WeaponType> type, bool drawn_in_moved_hand,
+                                    TimePoint now) const noexcept {
+    if (!barrel_from_transform(type) || !aim_wanted(now)) return false;
+    if (aim_source(type, drawn_in_moved_hand) == AimSource::WeaponTransform) return true;
+    return log_.debug_enabled() && (transform_logged_ & type_bit(type)) == 0;
+}
+
+// 21 §18 (r11): once per weapon type, with Dev. Debug Options, the
+// transform next to the aim pose, so the barrel column and the offsets can
+// be read from a tester's log (21 §21 item 5).
+void Hands::log_weapon_transform(const WeaponSample& weapon, const HandView& right,
+                                 const CameraPose& camera) noexcept {
+    const std::uint32_t bit = type_bit(weapon.type);
+    if (!weapon.transform || !log_.debug_enabled() || (transform_logged_ & bit) != 0 || !right.has_aim)
+        return;
+    transform_logged_ |= bit;
+    const auto& m          = weapon.transform->m;
+    const WorldPose pose   = to_world(camera, right.aim);
+    const util::Vec3 ahead = pointing(pose);
+    logf(log_, kLogTransform, static_cast<int>(*weapon.type), m[0][0], m[1][0], m[2][0], m[0][1], m[1][1],
+         m[2][1], m[0][2], m[1][2], m[2][2], m[0][3], m[1][3], m[2][3], ahead.x, ahead.y, ahead.z,
+         pose.position.x, pose.position.y, pose.position.z,
+         weapon.drawn_in_moved_hand ? "drawn in the moved hand" : "drawn by the game's animation");
+}
+
+Hands::AimResult Hands::aim(const AimRay& game, const CameraPose& camera, const WeaponSample& weapon,
+                            TimePoint now) noexcept {
     if (!settings_.enabled || !settings_.aim_from_hand) return {};
     const auto view = fresh_view(now);
     if (!view) return {};
-    const WeaponClass c = weapon_class(type);
+    const WeaponClass c = weapon_class(weapon.type);
     if (class_logged_.changed(c) && log_.debug_enabled()) {
-        logf(log_, kLogClass, class_name(c), type ? static_cast<int>(*type) : 0);
+        logf(log_, kLogClass, class_name(c), weapon.type ? static_cast<int>(*weapon.type) : 0);
     }
     const HandView& right = view->hands[kRightHand];
     if (!aims_from_hand(c) || !(right.weight > 0.0f)) return {};
-    if (!right.has_aim) {
+    log_weapon_transform(weapon, right, camera);
+    // 21 §5.2 (r11): the weapon's own barrel where it is the source and can
+    // be read this frame; the aim pose otherwise.
+    std::optional<AimLine> barrel;
+    if (aim_source(weapon.type, weapon.drawn_in_moved_hand) == AimSource::WeaponTransform &&
+        weapon.transform) {
+        barrel = weapon_barrel(*weapon.transform, transform_muzzle_offset(c));
+    }
+    if (!barrel && !right.has_aim) {
         if (no_aim_noted_.first()) log_.line(kLogNoAim);
         return {};
     }
     AimResult r;
-    r.ray         = hand_aim_ray(game, to_world(camera, right.aim), right.weight, muzzle_offset(c));
+    r.ray         = barrel ? aim_ray_along(game, *barrel, right.weight)
+                           : hand_aim_ray(game, to_world(camera, right.aim), right.weight, muzzle_offset(c));
     r.hand_aiming = true;
     if (fire_gate_noted_.first()) log_.line(kLogGate);
     if (aim_log_.tick() && log_.debug_enabled()) {
@@ -149,13 +194,18 @@ Hands::AimResult Hands::aim(const AimRay& game, const CameraPose& camera,
     return r;
 }
 
-std::optional<util::Vec2> Hands::tracker_facing(const CameraPose& camera, TimePoint now) noexcept {
-    const auto view = settings_.enabled && settings_.tracker_in_hand ? fresh_view(now) : std::nullopt;
-    if (!view || !(view->hands[kLeftHand].weight > 0.0f) || !view->hands[kLeftHand].has_aim) {
+std::optional<util::Vec2> Hands::tracker_facing(const CameraPose& camera,
+                                                const std::optional<util::Vec3>& drawn,
+                                                TimePoint now) noexcept {
+    const auto view      = settings_.enabled && settings_.tracker_in_hand ? fresh_view(now) : std::nullopt;
+    const HandView* left = view ? &view->hands[kLeftHand] : nullptr;
+    if (!left || !(left->weight > 0.0f) || (!drawn && !left->has_aim)) {
         tracker_.reset();
         return std::nullopt;
     }
-    return tracker_.update(pointing(to_world(camera, view->hands[kLeftHand].aim)));
+    // 21 §6.2 (r11): the drawn left hand when its pose is there, the hand's
+    // aim direction otherwise.
+    return tracker_.update(drawn ? *drawn : pointing(to_world(camera, left->aim)));
 }
 
 } // namespace omvr::core::hands

@@ -52,6 +52,19 @@ inline constexpr float kTrackerMinHorizontal = 0.1f;
 inline constexpr float kBarrelOffsetMetres = 0.0f;
 inline constexpr float kNozzleOffsetMetres = 0.0f;
 
+// 21 §5.2 (r11): the weapon transform's (WeaponTransform, 21 §2.5) column
+// that is the barrel's axis, and the distance from its origin to the muzzle
+// or nozzle along it, per class. Which column is the barrel and the offsets
+// are to be read in game (21 §21 item 5): the column is the one the game's
+// own camera and poses look along (local +Z, 21 §2.4), and 0 keeps the ray
+// on the barrel's line meanwhile. Used only while the weapon is drawn in
+// the hand the arm edit moved (21 §4.2 item 6).
+inline constexpr int kWeaponBarrelColumn            = 2;
+inline constexpr float kTransformBarrelOffsetMetres = 0.0f;
+inline constexpr float kTransformNozzleOffsetMetres = 0.0f;
+// A barrel column shorter than this (a degenerate transform) is not used.
+inline constexpr float kMinBarrelColumnLength = 1.0e-3f;
+
 // 21 §5.3: the fire alignment test passes when its length is above the
 // threshold; a negative threshold passes every length the test computes.
 inline constexpr float kFireGateAlwaysPass = -1.0f;

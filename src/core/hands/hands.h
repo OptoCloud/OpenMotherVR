@@ -53,15 +53,27 @@ public:
     bool aim_wanted(TimePoint now) const noexcept;
 
     // 21 §5.2: the player's aim ray right after the game wrote `game` from
-    // `camera`, for the current item's weapon type `type` (nullopt: no
-    // weapon object). Game thread.
-    AimResult aim(const AimRay& game, const CameraPose& camera, std::optional<game::WeaponType> type,
+    // `camera`, for the current item `weapon`. The revolver, shotgun and
+    // flamethrower aim along the weapon's transform while it is drawn in
+    // the moved hand and the transform can be used; otherwise, and for
+    // every other class that aims from the hand, along the right hand's
+    // aim pose. Game thread.
+    AimResult aim(const AimRay& game, const CameraPose& camera, const WeaponSample& weapon,
                   TimePoint now) noexcept;
 
+    // The weapon's transform is worth reading for aim() this frame: it is
+    // the aim's source (21 §5.2), or, with Dev. Debug Options, it was not
+    // yet logged for this weapon type (21 §18). Game thread.
+    bool weapon_transform_wanted(std::optional<game::WeaponType> type, bool drawn_in_moved_hand,
+                                 TimePoint now) const noexcept;
+
     // 21 §6.2: the horizontal facing the tracker scan should read now, or
-    // nullopt to leave the game's. `camera` is the active camera. One
+    // nullopt to leave the game's. `camera` is the active camera; `drawn`
+    // the drawn left hand's world direction from the pose the player saw
+    // last frame (r11), nullopt when that pose is not available. One
     // thread (the one the game runs the scan on).
-    std::optional<util::Vec2> tracker_facing(const CameraPose& camera, TimePoint now) noexcept;
+    std::optional<util::Vec2> tracker_facing(const CameraPose& camera, const std::optional<util::Vec3>& drawn,
+                                             TimePoint now) noexcept;
 
 private:
     struct HandView {
@@ -79,6 +91,8 @@ private:
     void update_hand(std::size_t h, const HandFrame& frame, float dt_s, float world_scale) noexcept;
     void note_activity(Activity a) noexcept;
     void publish(TimePoint now, float activity) noexcept;
+    void log_weapon_transform(const WeaponSample& weapon, const HandView& right,
+                              const CameraPose& camera) noexcept;
     std::optional<View> fresh_view(TimePoint now) const noexcept;
 
     const config::HandsSettings& settings_;
@@ -100,6 +114,7 @@ private:
     util::FramePeriod aim_log_{diag::kDebugLogPeriodFrames};
     util::OnceLatch fire_gate_noted_;
     util::OnceLatch no_aim_noted_;
+    std::uint32_t transform_logged_ = 0; // a bit per weapon type whose transform was logged (21 §18)
 
     // The tracker scan's thread.
     TrackerFacing tracker_;

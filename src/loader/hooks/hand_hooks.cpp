@@ -33,6 +33,14 @@ constexpr std::string_view kLogArmsOff =
     "and the model-to-world transform are not known yet (21 §22 items 2, 3); aiming and the tracker follow "
     "the hands";
 
+// 21 §4.2 item 6: the held item is drawn in the hand the arm edit moved.
+// This build has no arm pose edit (the arms keep the game's animation), so
+// the weapon is where the game's animation put it and the aim keeps the
+// right hand's aim pose (21 §5.2); the drawn left hand is not the
+// controller either, so the tracker faces by the left hand's aim pose
+// (21 §6.2's fallback).
+constexpr bool kArmsFollowHands = false;
+
 // The thresholds of the fire alignment test (21 §5.3). The game's code reads
 // `fire_gate_threshold` at a fixed address once its test is pointed here:
 // a global, as the patched code needs one. It holds the game's own value
@@ -117,8 +125,12 @@ void __fastcall aim_ray_update(void* component, void*) noexcept {
             fire_gate_threshold = game_fire_gate_threshold;
             return;
         }
-        const auto r        = ctx.hands.aim(game::hands::read_aim_ray(component), *cam,
-                                            game::hands::current_weapon_type(t, component), now);
+        const auto weapon = game::hands::current_weapon(t, component);
+        hands::WeaponSample sample{weapon.type, std::nullopt, kArmsFollowHands};
+        if (ctx.hands.weapon_transform_wanted(sample.type, sample.drawn_in_moved_hand, now)) {
+            sample.transform = game::hands::weapon_transform(t, weapon.object);
+        }
+        const auto r        = ctx.hands.aim(game::hands::read_aim_ray(component), *cam, sample, now);
         fire_gate_threshold = hands::fire_gate_threshold(r.hand_aiming, game_fire_gate_threshold);
         if (r.ray) game::hands::write_aim_ray(component, *r.ray);
     });
@@ -133,7 +145,7 @@ bool __fastcall tracker_scan(void* tracker, void*) noexcept {
     guarded("TrackerScan", [&] {
         const auto cam = game::hands::active_camera(t);
         if (!cam) return;
-        const auto facing = ctx.hands.tracker_facing(*cam, ctx.clock.now());
+        const auto facing = ctx.hands.tracker_facing(*cam, std::nullopt, ctx.clock.now());
         if (!facing) return;
         saved = game::hands::read_tracker_facing(tracker);
         game::hands::write_tracker_facing(tracker, {facing->x, facing->y});

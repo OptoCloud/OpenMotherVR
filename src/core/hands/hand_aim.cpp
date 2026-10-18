@@ -2,9 +2,12 @@
 #include "core/hands/hand_aim.h"
 
 #include "core/hands/tuning.h"
+#include "util/math/finite.h"
 #include "util/math/quat.h"
 
 #include <cmath>
+#include <cstddef>
+#include <span>
 
 namespace omvr::core::hands {
 
@@ -47,22 +50,74 @@ float muzzle_offset(WeaponClass c) noexcept {
     }
 }
 
-AimRay hand_aim_ray(const AimRay& game, const WorldPose& aim, float weight, float offset) noexcept {
-    const float range           = util::length(util::sub(game.end, game.start));
-    const util::Vec3 hand_dir   = pointing(aim);
-    const util::Vec3 hand_start = util::add(aim.position, util::scaled(hand_dir, offset));
+bool barrel_from_transform(std::optional<game::WeaponType> type) noexcept {
+    return type == game::WeaponType::Pistol || type == game::WeaponType::Shotgun ||
+           type == game::WeaponType::Flamethrower;
+}
+
+AimSource aim_source(std::optional<game::WeaponType> type, bool drawn_in_moved_hand) noexcept {
+    // 21 §5.2: the bolt gun keeps the aim pose until its drawn barrel and
+    // its transform's axis are compared in game; a weapon not drawn in the
+    // moved hand is where the game's animation put it, not in the hand.
+    return drawn_in_moved_hand && barrel_from_transform(type) ? AimSource::WeaponTransform
+                                                              : AimSource::AimPose;
+}
+
+float transform_muzzle_offset(WeaponClass c) noexcept {
+    switch (c) {
+        case WeaponClass::Barrel: return kTransformBarrelOffsetMetres;
+        case WeaponClass::Nozzle: return kTransformNozzleOffsetMetres;
+        default: return 0.0f;
+    }
+}
+
+namespace {
+
+constexpr std::size_t kMatrix34Floats = 12;
+
+bool is_identity(const util::Matrix34& t) noexcept {
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 4; ++c) {
+            if (t.m[r][c] != (r == c ? 1.0f : 0.0f)) return false;
+        }
+    }
+    return true;
+}
+
+} // namespace
+
+std::optional<AimLine> weapon_barrel(const util::Matrix34& transform, float offset) noexcept {
+    if (!util::all_finite(std::span<const float>{&transform.m[0][0], kMatrix34Floats}) ||
+        is_identity(transform)) {
+        return std::nullopt;
+    }
+    const util::Vec3 column{transform.m[0][kWeaponBarrelColumn], transform.m[1][kWeaponBarrelColumn],
+                            transform.m[2][kWeaponBarrelColumn]};
+    const float length = util::length(column);
+    if (!(length >= kMinBarrelColumnLength)) return std::nullopt;
+    const util::Vec3 axis = util::scaled(column, 1.0f / length);
+    return AimLine{util::add(util::translation_of(transform), util::scaled(axis, offset)), axis};
+}
+
+AimRay aim_ray_along(const AimRay& game, const AimLine& line, float weight) noexcept {
+    const float range = util::length(util::sub(game.end, game.start));
     AimRay out;
-    out.start          = util::lerp(game.start, hand_start, weight);
-    const util::Vec3 d = util::lerp(game.direction, hand_dir, weight);
+    out.start          = util::lerp(game.start, line.start, weight);
+    const util::Vec3 d = util::lerp(game.direction, line.direction, weight);
     const float length = util::length(d);
     // Opposite directions half way blend to nothing: take the nearer one.
     if (length > 0.0f) {
         out.direction = util::scaled(d, 1.0f / length);
     } else {
-        out.direction = weight < 1.0f / 2 ? game.direction : hand_dir;
+        out.direction = weight < 1.0f / 2 ? game.direction : line.direction;
     }
     out.end = util::add(out.start, util::scaled(out.direction, range));
     return out;
+}
+
+AimRay hand_aim_ray(const AimRay& game, const WorldPose& aim, float weight, float offset) noexcept {
+    const util::Vec3 hand_dir = pointing(aim);
+    return aim_ray_along(game, {util::add(aim.position, util::scaled(hand_dir, offset)), hand_dir}, weight);
 }
 
 float fire_gate_threshold(bool hand_aiming, float game_threshold) noexcept {

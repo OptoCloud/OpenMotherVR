@@ -3,6 +3,7 @@
 
 #include "core/hands/types.h"
 #include "game/constants.h"
+#include "util/math/matrix.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -46,6 +47,10 @@ inline constexpr std::ptrdiff_t kAimStart     = 0x70;
 inline constexpr std::ptrdiff_t kAimEndCopy   = 0x90;
 // The weapon object's type (the WeaponType enumeration).
 inline constexpr std::ptrdiff_t kWeaponType = 0xD4;
+// 21 §2.5 (r11): the weapon object's render object WeaponTransform places
+// it by, and the one it takes when that is null.
+inline constexpr std::ptrdiff_t kWeaponRenderObject         = 0xCC;
+inline constexpr std::ptrdiff_t kWeaponRenderObjectFallback = 0x1C;
 // The tracker's horizontal facing the scan reads: x and z.
 inline constexpr std::ptrdiff_t kTrackerFacingX = 0xF0;
 inline constexpr std::ptrdiff_t kTrackerFacingZ = 0xF8;
@@ -60,6 +65,9 @@ struct HandTargets {
     void* aim_ray_update = nullptr; // void __thiscall (weapon component)
     void* current_item   = nullptr; // void* __thiscall (weapon component)
     void* tracker_scan   = nullptr; // bool __thiscall (tracker)
+    // float* __thiscall (weapon object, float* out 3x4); null: not checked
+    // or not as expected, and the aim keeps the aim pose (21 §5.2).
+    void* weapon_transform = nullptr;
 };
 
 // The player character, or null before a level has one.
@@ -93,6 +101,19 @@ void write_aim_ray(void* component, const core::hands::AimRay& ray) noexcept;
 // The weapon type of the component's current item (CurrentItem), nullopt
 // when it holds no weapon object.
 std::optional<WeaponType> current_weapon_type(const HandTargets& t, void* component) noexcept;
+
+// The component's current item (CurrentItem): the weapon object (null when
+// it holds none) and its type.
+struct CurrentWeapon {
+    void* object = nullptr;
+    std::optional<WeaponType> type;
+};
+CurrentWeapon current_weapon(const HandTargets& t, void* component) noexcept;
+
+// 21 §2.5 (r11): the weapon's world transform as the game last placed it
+// (WeaponTransform), nullopt when the function was not found or the weapon
+// has no render object to be placed by.
+std::optional<util::Matrix34> weapon_transform(const HandTargets& t, void* weapon) noexcept;
 
 // The game's own TrackerScan on `tracker`. The scan's thread.
 bool call_tracker_scan(const HandTargets& t, void* tracker) noexcept;

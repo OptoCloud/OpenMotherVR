@@ -24,6 +24,9 @@ constexpr std::string_view kLogAimCode =
     "CurrentItem or the fire alignment test (RVA {:08X})";
 constexpr std::string_view kLogAimOn =
     "[hook] hands, aim from hand: in place (AimRayUpdate call RVA {:08X}, fire alignment test RVA {:08X})";
+constexpr std::string_view kLogTransformCode =
+    "[hook] hands, aim from hand: the weapon transform is not used; unexpected code at WeaponTransform "
+    "(RVA {:08X})";
 constexpr std::string_view kLogTrackerCode =
     "[hook] hands, motion tracker in hand: off; unexpected code at TrackerScan's call (RVA {:08X}) or "
     "TrackerScan";
@@ -49,6 +52,10 @@ constexpr std::array<std::uint8_t, 7> kCurrentItemStart = {0x80, 0xB9, 0x10, 0x1
 constexpr std::array<std::uint8_t, 3> kComissXmm0Abs = {x86::kTwoByte, x86::kComiss, x86::kModAbsolute};
 constexpr std::array<std::uint8_t, 2> kJbeShort11    = {x86::kJbeRel8, 0x11};
 constexpr std::size_t kGateJbeOffset                 = x86::kComissDispOffset + x86::kRel32Size;
+// 21 §2.5 (r11): WeaponTransform's first instructions, `push ecx; push
+// esi; push edi; push ecx; mov esi, ecx; cmp dword [esi+0xCC], 0`.
+constexpr std::array<std::uint8_t, 12> kWeaponTransformStart = {0x51, 0x56, 0x57, 0x51, 0x8B, 0xF1,
+                                                                0x83, 0xBE, 0xCC, 0x00, 0x00, 0x00};
 // 21 §2.6: TrackerScan's prologue, `push ebp; mov ebp, esp; and esp, -16`.
 constexpr auto kTrackerScanPrologue = x86::kAlignedFramePrologue;
 
@@ -72,6 +79,17 @@ bool aim_code_expected(const GameImage& g, const HandRvas& r) noexcept {
            x86::matches(g.at_rva(r.current_item), kCurrentItemStart) && fire_gate_expected(g, r);
 }
 
+// 21 §5.2 (r11): WeaponTransform is only called, never patched; a mismatch
+// leaves the aim on the aim pose.
+void find_weapon_transform(const GameImage& g, Patcher& p, const HandRvas& r, HandTargets& out) noexcept {
+    if (r.weapon_transform == 0) return;
+    if (!x86::matches(g.at_rva(r.weapon_transform), kWeaponTransformStart)) {
+        ports::logf(p.log(), kLogTransformCode, r.weapon_transform);
+        return;
+    }
+    out.weapon_transform = g.at_rva(r.weapon_transform);
+}
+
 // 21 §5: the aim ray call and the fire alignment test, both or neither.
 bool install_aim(const GameImage& g, Patcher& p, const HandRvas& r, const HandHooks& hooks,
                  HandTargets& out) noexcept {
@@ -87,6 +105,7 @@ bool install_aim(const GameImage& g, Patcher& p, const HandRvas& r, const HandHo
         return false;
     }
     ports::logf(p.log(), kLogAimOn, r.aim_ray_call, r.fire_gate_compare);
+    find_weapon_transform(g, p, r, out);
     return true;
 }
 

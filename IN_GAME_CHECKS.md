@@ -267,6 +267,14 @@ poses are always declared). Try on OpenVR and OpenXR.
       right controller. `[diag] hands: aim ray` lines start near the hand.
 - [ ] **Firing away from the view.** Firing works with the hand held away
       from the head.
+- [ ] **Weapon transform (21 §5.2, §21 item 5).** Dev. Debug Options on:
+      equip the revolver, the shotgun, the flamethrower and the bolt gun in
+      turn with the right controller held out ahead. Each gives one
+      `[diag] hands: weapon transform, weapon type N: columns (...) (...)
+      (...), origin (...); aim pose forward (...), position (...); drawn
+      by the game's animation`. Send these lines: they show which column
+      is the barrel and how far the origin is from the muzzle. While the
+      arms keep the game's animation the aim stays on the aim pose.
 - [ ] **Head aim kept where it should be.** Melee and stun baton aim with
       the head; `"AimFromHand": false` puts all aiming back on the head.
 - [ ] **Motion tracker in the left hand.** Raise the tracker: blips turn
