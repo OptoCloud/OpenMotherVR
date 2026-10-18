@@ -100,6 +100,21 @@ side of the head and Map hides or shows the HUD (`[diag] hud: ...`).
       level load: `proxy: Dither fix: N of M pixel shaders changed so far;
       0 with the dither's constants left unchanged; 0 refused by the
       device` (if the middle count is not 0, send the log).
+- [ ] **Reflections up to the edge, each pass in its half (07 §4.7,
+      §4.8, §7 steps 5 and 5a).** Planar Reflections On, OpenVR or
+      OpenXR, a glossy floor on the Torrens at the start of a new game.
+      Log at start: `[hook] per-eye reflections: in place on 5 sites` and
+      `[hook] per-eye reflections: the reflection's object list covers
+      both eyes (ReflectionUpdateCall, RVA 005B4640)`. Turn the head until
+      the reflection of a door frame or a lamp is at the far left of the
+      left eye, then the far right of the right eye: it is in the
+      reflection up to the edge, not cut off. With Dev. Debug Options, F10
+      on the floor writes `mothervr_reflection_0.dds` and `_1.dds`: after
+      both passes half 0 holds the right eye's reflection and half 1 the
+      left eye's, neither erased. Send whether the log has `[stereo]
+      reflection pass N viewport confined to its half of a W-pixel-wide
+      target: ...` (the game lost the viewport origin, 07 §8 item 1) or
+      not (it keeps it).
 
 - [ ] **Sharper reflections and 4096 shadows.** `"Graphics":
       {"EngineSettingsOverride": true, "ShadowMap4096": true,

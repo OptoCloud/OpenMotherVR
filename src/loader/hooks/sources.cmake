@@ -28,6 +28,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/pad_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/post_fx_hooks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/post_fx_hooks.h
+    ${CMAKE_CURRENT_LIST_DIR}/reflection_hooks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/reflection_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/render_fix_hooks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/render_fix_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/render_sprite_hooks.cpp

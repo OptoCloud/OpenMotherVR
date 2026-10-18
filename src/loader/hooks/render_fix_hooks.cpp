@@ -10,6 +10,7 @@
 #include "game/stereo/stereo_objects.h"
 #include "loader/context.h"
 #include "loader/hooks/guard.h"
+#include "loader/hooks/reflection_hooks.h"
 #include "platform/d3d11/render/texture_dump.h"
 
 #include <d3d11.h>
@@ -55,6 +56,12 @@ void capture_reflection(int eye) noexcept {
     });
 }
 
+// After a pass whose target is captured: the pass ends, then the capture.
+void end_pass_and_capture(int eye) noexcept {
+    end_reflection_pass(eye);
+    capture_reflection(eye);
+}
+
 // Who decides where the view is, for the head-in-wall fade. Game thread.
 core::stereo::ViewOwner view_owner(Context& ctx) noexcept {
     return {.cutscene_or_fade = ctx.scene.cutscene_or_fade(),
@@ -89,11 +96,18 @@ constexpr const char* kHeadClipPivotLog =
 
 } // namespace
 
-bool install_reflections(const game::stereo::ReflectionTargets& targets) noexcept {
-    auto& ctx        = context();
-    const bool ready = game::stereo::gate_reflection_clear(targets, ctx.log);
-    ctx.reflections.set_ready(ready);
-    return ready;
+game::stereo::ReflectionInstall install_reflections(game::stereo::ReflectionTargets& targets) noexcept {
+    auto& ctx               = context();
+    const auto replacements = reflection_replacements();
+    game::stereo::ReflectionInstall in{};
+    in.clear_gated = game::stereo::gate_reflection_clear(targets, ctx.log);
+    in.halves      = in.clear_gated && game::stereo::detour_reflection_halves(targets, replacements, ctx.log);
+    // 07 §5: without the update call the fix still goes in, without §4.7.
+    in.covers_both_eyes =
+        in.halves && game::stereo::redirect_reflection_update(targets, replacements, ctx.log);
+    ctx.reflections.set_covers_both_eyes(in.covers_both_eyes);
+    ctx.reflections.set_ready(in.halves);
+    return in;
 }
 
 void __fastcall render_reflection(void* pov, void*) noexcept {
@@ -112,9 +126,10 @@ void __fastcall render_reflection(void* pov, void*) noexcept {
                                              pov); // flat, or nothing to render: as the game does
         return;
     }
-    const bool capture = ctx.reflections.take_capture_request();
-    game::stereo::render_reflection_per_eye(ctx.targets.render_fixes.reflection, ctx.manager, pov,
-                                            capture ? &capture_reflection : nullptr);
+    const bool capture                             = ctx.reflections.take_capture_request();
+    const game::stereo::EyePassCallbacks callbacks = {
+        .before = &begin_reflection_pass, .after = capture ? &end_pass_and_capture : &end_reflection_pass};
+    game::stereo::render_reflection_per_eye(ctx.targets.render_fixes.reflection, ctx.manager, pov, callbacks);
     ctx.reflections.note_rendered();
 }
 

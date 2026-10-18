@@ -11,10 +11,12 @@
 // into values, asks the stereo logic and calls the game's own function.
 namespace omvr::loader::hooks {
 
-// Takes the reflection targets, gates the game's clear and records whether
-// that worked; false if the clear does not hold the expected prologue (07
-// §5). For game::sites::RenderFixHooks::install_reflections.
-bool install_reflections(const game::stereo::ReflectionTargets& targets) noexcept;
+// Takes the reflection targets, gates the game's clear, detours the
+// viewport setter and the vertex constant writer and redirects the
+// reflection update, and records what went in (07 §5). The fix is on only
+// with the gate and both detours. For
+// game::sites::RenderFixHooks::install_reflections.
+game::stereo::ReflectionInstall install_reflections(game::stereo::ReflectionTargets& targets) noexcept;
 
 // Replaces the call of ReflectionPOV render. __thiscall, no args. Render
 // thread.

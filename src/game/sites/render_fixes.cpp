@@ -26,7 +26,9 @@ namespace ports = core::diag::ports;
 
 // ---- Areas, their site counts and log templates -------------------------------
 
-constexpr int kReflectionSites = 2; // the render call and the clear gate
+// The render call, the clear gate, the viewport setter and the vertex
+// constant writer; the update call when it goes in too.
+constexpr int kReflectionSites = 4;
 constexpr int kHeadClipSites   = 1;
 constexpr int kEventTapSites   = 1;
 constexpr int kAlphaLightSites = 1;
@@ -36,6 +38,15 @@ constexpr std::string_view kReflectionCallLog =
 constexpr std::string_view kClearGateLog =
     "[hook] {}: off; the clear gate at RendererClear (RVA {:08X}) does not hold the expected prologue, "
     "reflections stay mono";
+constexpr std::string_view kHalvesLog =
+    "[hook] {}: off; ViewportSetter (RVA {:08X}) or VsConstantWriter (RVA {:08X}) does not hold the expected "
+    "prologue or could not be detoured, reflections stay mono";
+// 07 §6: whether the object list covers both eyes (07 §4.7), once.
+constexpr std::string_view kBothEyesLog =
+    "[hook] {}: the reflection's object list covers both eyes (ReflectionUpdateCall, RVA {:08X})";
+constexpr std::string_view kNotBothEyesLog =
+    "[hook] {}: on without the both-eye object list; ReflectionUpdateCall (RVA {:08X}) is not the expected "
+    "call, objects at the outer edges of each eye's reflection may be missing";
 constexpr std::string_view kStereoAaCodeLog =
     "[hook] {}: off; unexpected code at StereoOutputDrawCall (RVA {:08X}), SmaaCall (RVA {:08X}), "
     "PostFxInstance or AaPass";
@@ -71,7 +82,27 @@ bool postfx_getter_is_expected(const std::uint8_t* getter) noexcept {
 
 // ---- One function per fix -------------------------------------------------------
 
-// Planar reflections render per eye (07).
+// Logs what install_reflections put in (07 §5, §6).
+void log_reflections(ports::Log& log, const ReconRvas& r, const stereo::ReflectionInstall& in) noexcept {
+    if (!in.clear_gated) {
+        ports::logf(log, kClearGateLog, kReflectionsArea, r.clear_render_target);
+        return;
+    }
+    if (!in.halves) {
+        ports::logf(log, kHalvesLog, kReflectionsArea, r.viewport_setter, r.vs_constant_writer);
+        return;
+    }
+    area_on(log, kReflectionsArea, kReflectionSites + (in.covers_both_eyes ? 1 : 0));
+    if (in.covers_both_eyes) {
+        ports::logf(log, kBothEyesLog, kReflectionsArea, r.reflection_update_call);
+    } else {
+        ports::logf(log, kNotBothEyesLog, kReflectionsArea, r.reflection_update_call);
+    }
+}
+
+// Planar reflections render per eye (07). Every site is checked before the
+// first write (07 §5); only the update call may differ, and the fix then
+// goes in without the both-eye object list (07 §4.7).
 void fix_reflections(const GameImage& g, Patcher& p, const ReconRvas& r,
                      const RenderFixHooks& hooks) noexcept {
     ports::Log& log    = p.log();
@@ -80,6 +111,14 @@ void fix_reflections(const GameImage& g, Patcher& p, const ReconRvas& r,
         ports::logf(log, kReflectionCallLog, kReflectionsArea, r.reflection_render_call);
         return;
     }
+    // A pass that drew outside its half would erase the other's (07 §5).
+    if (!x86::matches(g.at_rva(r.viewport_setter), stereo::kViewportSetterPrologue) ||
+        !x86::matches(g.at_rva(r.vs_constant_writer), stereo::kVsConstantWriterPrologue)) {
+        ports::logf(log, kHalvesLog, kReflectionsArea, r.viewport_setter, r.vs_constant_writer);
+        return;
+    }
+    std::uint8_t* update_call = g.at_rva(r.reflection_update_call);
+    const bool update_ok      = calls(update_call, g.at_rva(r.reflection_update));
     hooks.targets->reflection = {
         .render              = g.at_rva(r.reflection_render),
         .apply_eye_transform = g.at_rva(r.apply_eye_transform),
@@ -87,16 +126,15 @@ void fix_reflections(const GameImage& g, Patcher& p, const ReconRvas& r,
         .renderer_eye_owner  = CodeAddress{g.at_rva(r.renderer_eye_owner)},
         .clear               = g.at_rva(r.clear_render_target),
         .reflection_manager  = CodeAddress{g.at_rva(r.reflection_manager)},
+        .update              = g.at_rva(r.reflection_update),
+        .update_call         = update_ok ? update_call : nullptr,
+        .viewport_setter     = g.at_rva(r.viewport_setter),
+        .vs_constant_writer  = g.at_rva(r.vs_constant_writer),
     };
     if (!p.redirect_call(site, hooks.render_reflection, "reflections")) return;
-    // render_reflection renders flat until the clear gate is in, so the
-    // gate goes in only once the call reaches it.
-    const bool gated = hooks.install_reflections(hooks.targets->reflection);
-    if (gated) {
-        area_on(log, kReflectionsArea, kReflectionSites);
-    } else {
-        ports::logf(log, kClearGateLog, kReflectionsArea, r.clear_render_target);
-    }
+    // render_reflection renders flat until all of it is in, so the rest
+    // goes in only once the call reaches it.
+    log_reflections(log, r, hooks.install_reflections(hooks.targets->reflection));
 }
 
 // Anti-aliasing in stereo (08 §3). Both sites or neither: without the SMAA

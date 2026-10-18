@@ -46,9 +46,10 @@ struct RenderFixHooks {
     const void* alpha_light_eye_ndc;
     // Where the targets the replacements call are kept.
     RenderFixTargets* targets;
-    // Gates the game's clear for the reflection targets; false if the
-    // clear does not hold the expected prologue.
-    bool (*install_reflections)(const stereo::ReflectionTargets& targets) noexcept;
+    // Puts in the per-eye reflections' clear gate, the detours that keep
+    // each pass in its half and the update redirect (07 §4.3, §4.7, §4.8),
+    // trampolines into `targets`, and says which went in.
+    stereo::ReflectionInstall (*install_reflections)(stereo::ReflectionTargets& targets) noexcept;
 };
 
 // 8b: each fix checks its own sites, right before it is written, and stays

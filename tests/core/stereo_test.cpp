@@ -504,3 +504,89 @@ TEST_CASE("reflection POV log: a new POV, a flag change and a quality change eac
     CHECK(log.lines.size() == 3);
     CHECK(log.contains("quality 6"));
 }
+
+TEST_CASE("reflection passes: viewports stay inside their half of the target (07 §4.8)") {
+    using omvr::core::stereo::confine_viewport;
+    using omvr::core::stereo::PixelViewport;
+    // A 1280-wide target: half 0 is columns 0..639, half 1 640..1279.
+    const PixelViewport full = {.x = 0, .y = 0, .width = 1280, .height = 720};
+    CHECK(confine_viewport(full, 1280, 0) == PixelViewport{0, 0, 640, 720});
+    CHECK(confine_viewport(full, 1280, 1) == PixelViewport{640, 0, 640, 720});
+    // Set inside the half already (eye k's viewport, 07 §2.6): kept.
+    CHECK(confine_viewport({640, 0, 640, 720}, 1280, 1) == PixelViewport{640, 0, 640, 720});
+    CHECK(confine_viewport({0, 0, 640, 720}, 1280, 0) == PixelViewport{0, 0, 640, 720});
+    CHECK(confine_viewport({700, 8, 100, 50}, 1280, 1) == PixelViewport{700, 8, 100, 50});
+    // The origin lost in pass 1 (07 §8 item 1): moved into half 1.
+    CHECK(confine_viewport({0, 0, 640, 720}, 1280, 1) == PixelViewport{640, 0, 640, 720});
+    // Height and top are kept.
+    CHECK(confine_viewport({0, 4, 1280, 300}, 1280, 1) == PixelViewport{640, 4, 640, 300});
+    // A mip level of the target, 320 wide: halves of 160.
+    CHECK(confine_viewport({0, 0, 320, 180}, 320, 1) == PixelViewport{160, 0, 160, 180});
+    // An odd width: halves floor(w/2) wide, the last column unused.
+    CHECK(confine_viewport({0, 0, 641, 10}, 641, 0) == PixelViewport{0, 0, 320, 10});
+    CHECK(confine_viewport({0, 0, 641, 10}, 641, 1) == PixelViewport{320, 0, 320, 10});
+    // Straddling the seam: what lies in the half.
+    CHECK(confine_viewport({600, 0, 100, 10}, 1280, 0) == PixelViewport{600, 0, 40, 10});
+    CHECK(confine_viewport({600, 0, 100, 10}, 1280, 1) == PixelViewport{640, 0, 60, 10});
+}
+
+TEST_CASE("reflection passes: the screen mapping follows the confined viewport (07 §4.8)") {
+    using omvr::core::stereo::confine_screen_mapping;
+    using omvr::core::stereo::ScreenMapping;
+    // c21 = (vpW / W, vpH / H, left / W, top / H) (07 §2.7).
+    const ScreenMapping full = {.scale_x = 1.0f, .scale_y = 1.0f, .offset_x = 0.0f, .offset_y = 0.0f};
+    CHECK(confine_screen_mapping(full, 1280, 0) == ScreenMapping{0.5f, 1.0f, 0.0f, 0.0f});
+    CHECK(confine_screen_mapping(full, 1280, 1) == ScreenMapping{0.5f, 1.0f, 0.5f, 0.0f});
+    // Describing half 1 already: unchanged.
+    const ScreenMapping half1 = {0.5f, 0.75f, 0.5f, 0.25f};
+    CHECK(confine_screen_mapping(half1, 1280, 1) == half1);
+    // The origin lost in pass 1: moved over.
+    CHECK(confine_screen_mapping({0.5f, 1.0f, 0.0f, 0.0f}, 1280, 1) == ScreenMapping{0.5f, 1.0f, 0.5f, 0.0f});
+    // An odd width: 320 of 641 columns.
+    const ScreenMapping odd = confine_screen_mapping(full, 641, 1);
+    CHECK(odd.scale_x == doctest::Approx(320.0f / 641.0f));
+    CHECK(odd.offset_x == doctest::Approx(320.0f / 641.0f));
+}
+
+TEST_CASE(
+    "reflection passes: the pass runs only on its thread, the first move is logged once (07 §4.8, §6)") {
+    const NoKeys keys;
+    const omvr::core::config::Settings settings{};
+    omvr::tests::RecordingLog log;
+    omvr::core::stereo::ReflectionPass pass(keys, settings, log);
+    constexpr std::uint32_t kRenderThread = 42;
+    constexpr std::uint32_t kJobThread    = 7;
+    CHECK_FALSE(pass.pass_on(kRenderThread).has_value());
+    pass.begin_pass(1, kRenderThread);
+    CHECK(pass.pass_on(kRenderThread) == 1);
+    CHECK_FALSE(pass.pass_on(kJobThread).has_value());
+    // A viewport already in its half: nothing logged.
+    using omvr::core::stereo::PixelViewport;
+    CHECK(pass.pass_viewport(1, {640, 0, 640, 720}, 1280) == PixelViewport{640, 0, 640, 720});
+    CHECK(log.lines.empty());
+    CHECK(pass.pass_viewport(1, {0, 0, 1280, 720}, 1280) == PixelViewport{640, 0, 640, 720});
+    CHECK(pass.pass_viewport(1, {0, 0, 640, 360}, 640) == PixelViewport{320, 0, 320, 360});
+    REQUIRE(log.lines.size() == 1);
+    CHECK(log.contains("pass 1"));
+    CHECK(log.contains("1280-pixel-wide"));
+    CHECK(log.contains("0,0 1280x720 -> 640,0 640x720"));
+    pass.end_pass();
+    CHECK_FALSE(pass.pass_on(kRenderThread).has_value());
+}
+
+TEST_CASE(
+    "reflection object list: widened only with the fix in, stereo running and the POV active (07 §4.7)") {
+    const NoKeys keys;
+    const omvr::core::config::Settings settings{};
+    omvr::tests::RecordingLog log;
+    omvr::core::stereo::ReflectionPass pass(keys, settings, log);
+    CHECK_FALSE(pass.widens_object_list(true, true));
+    pass.set_ready(true);
+    CHECK_FALSE(pass.widens_object_list(true, true)); // the update call is not redirected
+    pass.set_covers_both_eyes(true);
+    CHECK(pass.widens_object_list(true, true));
+    CHECK_FALSE(pass.widens_object_list(false, true)); // flat play: the update's projection is kept
+    CHECK_FALSE(pass.widens_object_list(true, false)); // no plane
+    pass.set_ready(false);
+    CHECK_FALSE(pass.widens_object_list(true, true));
+}
