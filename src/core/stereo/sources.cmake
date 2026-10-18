@@ -5,7 +5,6 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/blinders.h
     ${CMAKE_CURRENT_LIST_DIR}/comfort_view.cpp
     ${CMAKE_CURRENT_LIST_DIR}/comfort_view.h
-    ${CMAKE_CURRENT_LIST_DIR}/cull_policy.h
     ${CMAKE_CURRENT_LIST_DIR}/desktop_window.cpp
     ${CMAKE_CURRENT_LIST_DIR}/desktop_window.h
     ${CMAKE_CURRENT_LIST_DIR}/head_clip_delay.cpp

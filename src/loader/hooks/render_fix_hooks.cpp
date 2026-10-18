@@ -1,7 +1,6 @@
 // OpenMotherVR-Provenance: clean
 #include "loader/hooks/render_fix_hooks.h"
 
-#include "core/stereo/cull_policy.h"
 #include "core/stereo/reflection_pass.h"
 #include "core/stereo/stereo_aa.h"
 #include "game/stereo/cull.h"
@@ -147,18 +146,35 @@ void __cdecl run_smaa(void* color, void* second, const std::uint8_t* temporal) n
     game::stereo::call_smaa(ctx.targets.render_fixes.aa, color, second, temporal);
 }
 
+// Object culling in stereo (08 §2). The game's per-object visibility loop
+// (0xa1fd20, run on job threads) tests each object against a distance/LOD
+// limit, the view frustum, and, where its cull context has them, two
+// optional tests. Which POV culls decides which of those exist (POV +0x314
+// is its render-list group, CreatePOV's second argument):
+//   group 2, BUILD_MAIN_RENDER_LIST: the main POV, the only one whose +0x310
+//     holds the software occlusion buffer (ctx+0x5c), drawn from the single
+//     centre view. In stereo it drops objects one eye still sees.
+//   group 1, BUILD_SHADOWS_RENDER_LISTS: the shadow lights (POV type 2),
+//     the only ones that get a view volume (ctx+0x60); the game's test runs.
+//   group 0, BUILD_PRE_MAIN_RENDER_LISTS: the reflection POV, neither test.
+// So the occlusion replacement only ever sees main-POV culling, and no phase
+// global is needed. The distance limit (scaled from the FOV) makes small
+// props pop in and out, in every group.
+//
+// While the stereo device runs, the distance test passes in every group and
+// the occlusion test passes for the main POV; otherwise the game's tests run.
 // Job threads; StereoDevice::running() is atomic.
 bool __cdecl cull_distance(const void* bounds, const float* camera, float scale) noexcept {
     const auto& ctx = context();
-    return core::stereo::cull_test_passes_in_stereo(ctx.stereo.running()) ||
+    return ctx.stereo.running() ||
            game::stereo::call_cull_distance(ctx.targets.render_fixes.cull, bounds, camera, scale);
 }
 
 // Only reached while the main POV culls: `buffer` is the context's
-// occlusion buffer, which no other POV has (see core/stereo/cull_policy.h).
+// occlusion buffer, which no other POV has (see cull_distance).
 bool __cdecl cull_occlusion(const void* bounds, const void* ctx, const void* buffer) noexcept {
     const auto& c = context();
-    return core::stereo::cull_test_passes_in_stereo(c.stereo.running()) ||
+    return c.stereo.running() ||
            game::stereo::call_cull_occlusion(c.targets.render_fixes.cull, bounds, ctx, buffer);
 }
 

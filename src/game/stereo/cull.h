@@ -2,7 +2,8 @@
 #pragma once
 
 // The game's object culling tests (08 §2). Which tests exist and why the
-// stereo device passes them is core/stereo/cull_policy.h.
+// stereo device passes them is at cull_distance in
+// loader/hooks/render_fix_hooks.cpp.
 namespace omvr::game::stereo {
 
 // The AI.exe functions the culling fix calls, found by the installer.
