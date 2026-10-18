@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 
 // Behaviour parameters of the VR controls (04 §5). Each value names its
@@ -38,6 +39,16 @@ inline constexpr float kWeaponStickDeflection = 0.5f;
 // 04 §5.1: every analog value handed to the game stays within the range the
 // game's own pad delivers.
 inline constexpr float kAnalogLimit = 1.0f;
+
+// 22 §7: the left stick presses a d-pad direction beyond this along that
+// axis (the larger of the two), and releases it below kDpadRelease, so a
+// stick held at the threshold does not chatter.
+inline constexpr float kDpadPress   = 0.6f;
+inline constexpr float kDpadRelease = 0.4f;
+
+// 22 §7: the left stick click held this long is the d-pad modifier; a
+// shorter click stays sprint.
+inline constexpr std::chrono::milliseconds kDpadModifierHold{300};
 
 // 04 §3.2 item 3: the flags an appended pad record gets, by kind of action
 // (composite-reference bit clear).

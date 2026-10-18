@@ -9,6 +9,15 @@ namespace omvr::core::input {
 
 using util::Vec2;
 
+// The four directions of a d-pad, each pressed or not (22 §7). A real
+// d-pad sets any of them; the emulation one at a time.
+struct Dpad {
+    bool up = false, down = false, left = false, right = false;
+
+    [[nodiscard]] constexpr bool any() const noexcept { return up || down || left || right; }
+    friend constexpr bool operator==(const Dpad&, const Dpad&) = default;
+};
+
 // One frame of semantic controls (04 §5.8.1), written to the game's action
 // tiers by the ControlsSink. Render thread.
 struct Controls {
@@ -20,6 +29,7 @@ struct Controls {
     bool sprint = false, interact = false, reload = false, radial = false;
     bool map = false, flashlight = false, pause = false;
     bool touchpad_scheme = false; // the touchpad scheme of 04 §5.2 (Vive wands)
+    Dpad dpad;                    // a controller's own d-pad (04 §5.8.1, 22 §7)
 };
 
 // One hand's controller as a runtime reports it, before the scheme of
@@ -33,6 +43,7 @@ struct HandInput {
     bool primary       = false; // lower face button (A / X)
     bool secondary     = false; // upper face button (B / Y)
     bool menu          = false;
+    Dpad dpad; // a d-pad on the controller (the Steam Frame's left hand)
 };
 
 // The touchpad regions of 04 §5.1: where the pad is pressed, and which

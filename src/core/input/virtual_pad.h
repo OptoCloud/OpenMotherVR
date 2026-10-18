@@ -4,6 +4,7 @@
 #include "core/input/action_tiers.h"
 #include "core/input/glyphs.h"
 #include "core/input/remap.h"
+#include "core/input/types.h"
 #include "util/sync/once_latch.h"
 
 #include <array>
@@ -58,6 +59,12 @@ public:
     // HasActivity hook, which makes the pad the active device and switches
     // the button glyphs to VR. Render thread.
     void note_vr_activity() noexcept { vr_activity_.store(true); }
+
+    // This frame's d-pad press from the VR controllers: a controller's own
+    // d-pad and the emulation (22 §7). Every digital action of maps 0 and 1
+    // whose stock pad control is that direction reads it, merged by OR.
+    // Render thread.
+    void set_dpad(Dpad d) noexcept;
 
     // The mod's UI archive (MOTHER.PAK) is not in use this run, so the movies
     // register no VR glyph ids: prompts stay in stock-glyph mode for the rest
@@ -122,6 +129,9 @@ public:
 
 private:
     void log_remap() noexcept;
+    // Digital action `code` of map 0 or 1 had a d-pad direction now pressed
+    // from VR as its stock pad control.
+    [[nodiscard]] bool dpad_down(int code) const noexcept;
 
     const Glyphs& glyphs_;
     diag::ports::Log& log_;
@@ -130,6 +140,10 @@ private:
     // Game thread, except vr_activity_ (set on the render thread).
     bool vr_glyphs_ = true;
     std::atomic<bool> vr_activity_{false};
+    // The VR d-pad press, one bit per direction (kDpadBit*); render thread to
+    // game thread. Relaxed: the bits are independent and nothing else hangs
+    // on them, as with the tiers' VR state (04 §3.6).
+    std::atomic<std::uint8_t> dpad_{0};
     bool device_pulse_ = false;
     // False when the mod's UI archive is not in use this run: the stock
     // movies register no VR glyph ids, so a VR name would show no button at

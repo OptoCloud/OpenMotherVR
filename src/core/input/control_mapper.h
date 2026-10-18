@@ -1,12 +1,28 @@
 #pragma once
 
 #include "core/config/settings.h"
+#include "core/diag/ports/clock.h"
+#include "core/diag/ports/log.h"
 #include "core/input/control_scheme.h"
+#include "core/input/dpad_emulation.h"
 #include "core/input/ports/controls_sink.h"
+#include "core/input/ports/stick_context.h"
 
 namespace omvr::core::input {
 
 class VirtualPad;
+
+// What the control mapper writes to and reads. The settings are read on
+// every write, so a menu change applies on the next frame (04 §5.6, 22 §3.1).
+struct ControlMapperDeps {
+    VirtualPad& pad;
+    ControlSchemes& schemes;
+    const config::InputSettings& input;
+    const config::ControlsSettings& controls; // Controls.DpadEmulation (22 §7)
+    const ports::StickContext& stick;         // where the left stick is free for the d-pad
+    const diag::ports::Clock& clock;          // the d-pad modifier's hold
+    diag::ports::Log& log;                    // the d-pad's changes, with DebugOptions
+};
 
 // VR controls into the gamepad action tiers (04 §5.8.5).
 //
@@ -15,16 +31,24 @@ class VirtualPad;
 // the thumbstick behaviour follows its Oculus Touch scheme (FUN_10004960).
 class ControlMapper final : public ports::ControlsSink {
 public:
-    // `settings` is read on every write, so a menu change applies on the
-    // next frame (04 §5.6).
-    ControlMapper(VirtualPad& pad, ControlSchemes& schemes, const config::InputSettings& settings) noexcept
-        : pad_(pad), schemes_(schemes), settings_(settings) {}
+    explicit ControlMapper(const ControlMapperDeps& deps) noexcept
+        : pad_(deps.pad),
+          schemes_(deps.schemes),
+          settings_(deps.input),
+          controls_(deps.controls),
+          stick_(deps.stick),
+          clock_(deps.clock),
+          log_(deps.log) {}
 
     // Render thread.
     void write(const Controls& c, bool right_hand_near_head) noexcept override;
     void set_scheme(ControlScheme scheme) noexcept override;
 
 private:
+    // The d-pad of 22 §7 for this write: the press handed to the pad, and
+    // the controls with the stick and click it takes cleared.
+    [[nodiscard]] Controls apply_dpad(const Controls& in) noexcept;
+
     // Aim and motion tracker with Input.ToggleGrips (04 §5.6): the edge
     // detectors follow the grips on every write whatever the option; the
     // toggled states start off, flip on a rising edge only while the option
@@ -44,7 +68,13 @@ private:
     VirtualPad& pad_;
     ControlSchemes& schemes_;
     const config::InputSettings& settings_;
+    const config::ControlsSettings& controls_;
+    const ports::StickContext& stick_;
+    const diag::ports::Clock& clock_;
+    diag::ports::Log& log_;
     GripToggles grips_;
+    DpadEmulation dpad_;
+    Dpad dpad_logged_{}; // the press last logged (render thread)
 };
 
 } // namespace omvr::core::input

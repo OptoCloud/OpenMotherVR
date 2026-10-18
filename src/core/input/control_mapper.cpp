@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <string_view>
 
 namespace omvr::core::input {
 
@@ -144,6 +145,14 @@ void write_menu_map(TierWriter& w, const Controls& c, const GameActions& a) noex
     w.analog(kTurnY, c.turn.y);
 }
 
+constexpr std::string_view kLogDpad = "[input] d-pad up {} down {} left {} right {} (emulated {})";
+
+// 22 §7: a controller's own d-pad and the emulation both press.
+Dpad either(Dpad a, Dpad b) noexcept {
+    return {
+        .up = a.up || b.up, .down = a.down || b.down, .left = a.left || b.left, .right = a.right || b.right};
+}
+
 } // namespace
 
 void ControlMapper::GripToggles::update(bool grip_r, bool grip_l, bool toggle) noexcept {
@@ -155,7 +164,32 @@ void ControlMapper::GripToggles::update(bool grip_r, bool grip_l, bool toggle) n
     prev_grip_l_ = grip_l;
 }
 
-void ControlMapper::write(const Controls& c, bool near_head) noexcept {
+// 22 §7: the emulated d-pad takes the left stick from walking while it
+// presses, and its modifier from sprint while held. The press itself goes to
+// the pad, which drives the actions on the d-pad by their stock control.
+Controls ControlMapper::apply_dpad(const Controls& in) noexcept {
+    const bool enabled = controls_.dpad_emulation;
+    const DpadEmulationResult emu =
+        dpad_.update(in, enabled && stick_.stick_free(), enabled,
+                     enabled ? clock_.now() : std::chrono::steady_clock::time_point{});
+    Controls c = in;
+    if (emu.stick_used) c.move = {};
+    if (emu.modifier_held) c.sprint = false;
+    c.dpad = either(in.dpad, emu.dpad);
+    pad_.set_dpad(c.dpad);
+    // Dev. Debug Options: each change of the press, so a tester's log shows
+    // the d-pad reaching the game (11 §4.3).
+    if (c.dpad != dpad_logged_) {
+        dpad_logged_ = c.dpad;
+        if (log_.debug_enabled())
+            diag::ports::logf(log_, kLogDpad, c.dpad.up, c.dpad.down, c.dpad.left, c.dpad.right,
+                              emu.dpad.any());
+    }
+    return c;
+}
+
+void ControlMapper::write(const Controls& in, bool near_head) noexcept {
+    const Controls c  = apply_dpad(in);
     const bool toggle = settings_.toggle_grips;
     grips_.update(c.grip_r, c.grip_l, toggle);
     const bool aim            = toggle ? grips_.aim() : c.grip_r;
@@ -168,7 +202,7 @@ void ControlMapper::write(const Controls& c, bool near_head) noexcept {
     write_player_map(player, c, actions);
     write_menu_map(menu, c, actions);
 
-    if (player.active() || menu.active()) pad_.note_vr_activity();
+    if (player.active() || menu.active() || c.dpad.any()) pad_.note_vr_activity();
 }
 
 void ControlMapper::set_scheme(ControlScheme scheme) noexcept { schemes_.set(scheme); }

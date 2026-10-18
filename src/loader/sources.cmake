@@ -23,4 +23,6 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/resources.rc
     ${CMAKE_CURRENT_LIST_DIR}/runtime_state.cpp
     ${CMAKE_CURRENT_LIST_DIR}/runtime_state.h
+    ${CMAKE_CURRENT_LIST_DIR}/stick_context.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/stick_context.h
 )

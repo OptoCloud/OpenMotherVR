@@ -48,6 +48,7 @@
 #include "loader/launch_options.h"
 #include "loader/play_space_control.h"
 #include "loader/runtime_state.h"
+#include "loader/stick_context.h"
 #include "platform/d3d11/render/mirror_renderer.h"
 #include "platform/d3d11/render/vignette_renderer.h"
 #include "platform/d3d11/system_d3d11.h"
@@ -114,6 +115,9 @@ struct Context {
     core::input::Glyphs glyphs;
     core::input::ControlSchemes schemes;
     core::input::VirtualPad pad;
+    // Where the left stick is free for the d-pad (22 §7); over `manager`
+    // and `interactions`, declared below.
+    StickContextView stick_context;
     core::input::ControlMapper controls;
     core::input::InteractionState interactions;
     // hands (21): the tracked hands, aim from the hand, the tracker in hand

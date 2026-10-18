@@ -21,6 +21,15 @@ constexpr std::string_view kRemapLog = "[input] action maps virtualised: digital
 constexpr std::string_view kStockGlyphsLog =
     "[input] no mod UI archive: button prompts keep the game's pad glyphs";
 
+// The VR d-pad press as bits: bit (code - DPAD_UP) for each direction's pad
+// code (04 §2.3: DPAD_UP..DPAD_RIGHT are 0x04..0x07).
+constexpr std::uint8_t dpad_bit(int pad_code) noexcept {
+    return static_cast<std::uint8_t>(1u << static_cast<unsigned>(pad_code - game::kPadDpadUp));
+}
+constexpr bool is_dpad_code(int pad_code) noexcept {
+    return pad_code >= game::kPadDpadUp && pad_code <= game::kPadDpadRight;
+}
+
 } // namespace
 
 // From: FUN_100031b0.
@@ -34,7 +43,28 @@ bool VirtualPad::merge_down(int code, bool stock_down) const noexcept {
     const ActionTier& t = tier_for(tiers_, code);
     const int k         = code - t.base;
     const bool vr_down  = k >= 0 && k < t.num_digital && t.digital[static_cast<std::size_t>(k)] != 0;
-    return stock_down || vr_down;
+    return stock_down || vr_down || dpad_down(code);
+}
+
+void VirtualPad::set_dpad(Dpad d) noexcept {
+    std::uint8_t bits = 0;
+    if (d.up) bits |= dpad_bit(game::kPadDpadUp);
+    if (d.down) bits |= dpad_bit(game::kPadDpadDown);
+    if (d.left) bits |= dpad_bit(game::kPadDpadLeft);
+    if (d.right) bits |= dpad_bit(game::kPadDpadRight);
+    dpad_.store(bits, std::memory_order_relaxed);
+}
+
+// 22 §7: by the action's stock control, so whatever the player bound to the
+// d-pad follows it; map 2 gets no VR state (04 §5.8.5).
+bool VirtualPad::dpad_down(int code) const noexcept {
+    const std::uint8_t bits = dpad_.load(std::memory_order_relaxed);
+    if (bits == 0 || code >= game::kTierBase[kTierCount - 1]) return false; // map 2
+    const ActionTier& t = tier_for(tiers_, code);
+    const int k         = code - t.base;
+    if (k < 0 || k >= t.num_digital) return false;
+    const int stock = t.stock_code[static_cast<std::size_t>(k)];
+    return is_dpad_code(stock) && (bits & dpad_bit(stock)) != 0;
 }
 
 // float GetValue(int code). From: FUN_10008f00 (ret 4).

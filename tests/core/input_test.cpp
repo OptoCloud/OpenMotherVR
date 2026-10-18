@@ -30,6 +30,12 @@ using namespace omvr::core::input;
 namespace game = omvr::game;
 using omvr::tests::RecordingLog;
 
+// The left stick walks the player (no menu, no interaction).
+class FixedStick final : public ports::StickContext {
+public:
+    bool stick_free() const noexcept override { return false; }
+};
+
 TEST_CASE("touchpad regions: down interacts, up reloads, the centre opens the radial") {
     TouchpadRegions r = decode_touchpad({0.0f, -0.8f}, true);
     CHECK(r.interact);
@@ -280,7 +286,10 @@ TEST_CASE("the control mapper writes the player and menu tiers") {
     VirtualPad pad(glyphs, log);
     ControlSchemes schemes(glyphs);
     omvr::core::config::InputSettings settings;
-    ControlMapper mapper(pad, schemes, settings);
+    omvr::core::config::ControlsSettings controls;
+    FixedStick stick_context;
+    omvr::tests::FakeClock clock;
+    ControlMapper mapper({pad, schemes, settings, controls, stick_context, clock, log});
 
     Controls c;
     c.trigger_r = 0.9f;
@@ -317,7 +326,10 @@ TEST_CASE("the control mapper: turn, weapons, move and clamps") {
     VirtualPad pad(glyphs, log);
     ControlSchemes schemes(glyphs);
     omvr::core::config::InputSettings settings;
-    ControlMapper mapper(pad, schemes, settings);
+    omvr::core::config::ControlsSettings controls;
+    FixedStick stick_context;
+    omvr::tests::FakeClock clock;
+    ControlMapper mapper({pad, schemes, settings, controls, stick_context, clock, log});
     const ActionTier& player = pad.tiers()[game::kPlayerMap];
     namespace pa             = game::player_action;
 
@@ -361,7 +373,10 @@ TEST_CASE("the control mapper: grips hold, or toggle") {
     VirtualPad pad(glyphs, log);
     ControlSchemes schemes(glyphs);
     omvr::core::config::InputSettings settings;
-    ControlMapper mapper(pad, schemes, settings);
+    omvr::core::config::ControlsSettings controls;
+    FixedStick stick_context;
+    omvr::tests::FakeClock clock;
+    ControlMapper mapper({pad, schemes, settings, controls, stick_context, clock, log});
     const ActionTier& player = pad.tiers()[game::kPlayerMap];
     namespace pa             = game::player_action;
 

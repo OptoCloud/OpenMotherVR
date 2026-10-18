@@ -54,7 +54,9 @@ Context::Context(void* self) noexcept
       display_reset(console, runtime_state, log),
       schemes(glyphs),
       pad(glyphs, log),
-      controls(pad, schemes, settings.current().input),
+      stick_context(manager, interactions),
+      controls(
+          {pad, schemes, settings.current().input, settings.current().controls, stick_context, clock, log}),
       interactions(log),
       hands(settings.current().hands, log),
       haptics(settings.current().hands.haptics, clock, log),
