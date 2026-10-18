@@ -70,4 +70,8 @@ std::string version_string(void* module) {
 
 void* module_handle(const char* name) noexcept { return ::GetModuleHandleA(name); }
 
+void* proc_address(void* module, const char* name) noexcept {
+    return reinterpret_cast<void*>(::GetProcAddress(static_cast<HMODULE>(module), name));
+}
+
 } // namespace omvr::platform::win32

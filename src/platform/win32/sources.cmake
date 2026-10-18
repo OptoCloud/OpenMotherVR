@@ -34,8 +34,6 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/named_mutex.h
     ${CMAKE_CURRENT_LIST_DIR}/payload_files.cpp
     ${CMAKE_CURRENT_LIST_DIR}/payload_files.h
-    ${CMAKE_CURRENT_LIST_DIR}/proc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/proc.h
     ${CMAKE_CURRENT_LIST_DIR}/process_info.cpp
     ${CMAKE_CURRENT_LIST_DIR}/process_info.h
     ${CMAKE_CURRENT_LIST_DIR}/registry.cpp

@@ -3,7 +3,7 @@
 
 #include "platform/win32/constants.h"
 #include "platform/win32/environment.h"
-#include "platform/win32/proc.h"
+#include "platform/win32/module.h"
 #include "platform/win32/text.h"
 #include "platform/win32/unique_handle.h"
 

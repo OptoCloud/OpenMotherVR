@@ -12,7 +12,6 @@
 #include "platform/win32/dll_directory_scope.h"
 #include "platform/win32/module.h"
 #include "platform/win32/payload_files.h"
-#include "platform/win32/proc.h"
 #include "platform/win32/text.h"
 
 #include <openvr.h>

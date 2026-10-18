@@ -5,7 +5,7 @@
 #include "platform/d3d11/system_d3d11.h"
 
 #include "platform/d3d11/constants.h"
-#include "platform/win32/proc.h"
+#include "platform/win32/module.h"
 
 #include <windows.h>
 
