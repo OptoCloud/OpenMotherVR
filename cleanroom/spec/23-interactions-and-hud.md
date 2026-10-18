@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were verified by the spec side in the game's data; the existence of a terminal font change and of lever input emulation was known from the analysis of another mod. The camera takeover sites of 2.4 were located with the help of that analysis and verified. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). r2: second clean-room review: terminal text steps derived from this project's own legibility criterion; the reduced animation set defined by a criterion; facts with no use removed; item highlight stated as a result; the HUD game facts cited from 22 §2.4 (one description); the tap's thread left open as 11 §8 does; lever interactions own turning and the move action (22 §4.1, §7); the master switch of 20 §1.3. r3 (spec r7 cross-check): the controls help cited from 04 §5.7 (it is not in 06); the interaction names passed to `ScriptEventTap` (11 §5.1). r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Interaction` and `HUD` pages of the options page given exactly (item order, labels, control kinds, value names, ranges, steps and display formats, description lines, greying), and the controls help rows of the lever mapping, as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the activation distances' suggested values move from a first offered value to the item's description. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Interaction` and `HUD` pages are reached from the `MotherVR` page (22 §12.1). r6 (spec-side game analysis of the 2015 `AI.exe`, static, while implementing 5 to 7): the icon highlight update and its "highlight disabled" bit (2.6; §12 item 7 resolved for the update, the receiver of its messages left open); the crosshair update's two invoke sites and the movie invoke's missing null check (2.7); the scripted HUD entity's four methods and the six table slots they fill, and the UI-ready byte the game tests before each lookup (2.7, §12 item 10 in part); the terminal text steps built as tagged variant entries of the UI patch (6.2). r7 (spec-side analysis of the stock `TERMINALINTERACTION.GFX`, `FONTS_EN.GFX`, `DATA\FONT_CONFIG.XML` and `DATA\TEXT\ENGLISH\*.TXT`, static, while building the terminal text steps): the containers of the entry titles and folder names, the fonts' line boxes, and the sizes the steps give them (2.8, 6.2); the stock English texts carry no font size (§12 item 9 resolved for English); the scroll range compared with the line pitch the font gives (§12 item 13, new); `Levers by Hand` and `Camera Takeovers` shown greyed while their features have no effect (section 8, under 22 §12.1's rule). Revision: r7 -->
+<!-- Provenance: game analysis of AI.exe 2015 (UI entity message handler and the interaction names it passes to the script event tap; the Interaction entity's messages; RTTI class names of the game's interaction and camera entities; StealCamera and CameraResource methods, the camera director's behaviour lookup, the follow camera's steer, re-align and pitch-level methods, the camera manager's reset request; CMD_PlayAnimation's parameter names and its PlayerAnimDrivenView getter; the interaction icon update loop and its range float; UI_Icon's parameter getters and defaults; the HUD movies' forced-hidden methods and the crosshair update); the stock game data (DATA\TEXT\ENGLISH\UI.TXT prompt texts, DATA\GLOBAL\ANIMATION.PAK and the levels' COMMANDS.PAK names, DATA\INPUT.XML); the stock DATA\UI.PAK movies WEAPONSTUFF, PICKUPOVERLAY, TERMINALINTERACTION and TERMINALINTERACTIONATTRACT (text field records and their scripts), read with the spec side's own tools; v1 documents 04, 05, 06, 08, 11, 14 and 20. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. The lever, junction and terminal-text facts were verified by the spec side in the game's data; the existence of a terminal font change and of lever input emulation was known from the analysis of another mod. The camera takeover sites of 2.4 were located with the help of that analysis and verified. 2020 values: none (v2 gives 2015 RVAs only; 2020 is `?` throughout). r2: second clean-room review: terminal text steps derived from this project's own legibility criterion; the reduced animation set defined by a criterion; facts with no use removed; item highlight stated as a result; the HUD game facts cited from 22 §2.4 (one description); the tap's thread left open as 11 §8 does; lever interactions own turning and the move action (22 §4.1, §7); the master switch of 20 §1.3. r3 (spec r7 cross-check): the controls help cited from 04 §5.7 (it is not in 06); the interaction names passed to `ScriptEventTap` (11 §5.1). r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Interaction` and `HUD` pages of the options page given exactly (item order, labels, control kinds, value names, ranges, steps and display formats, description lines, greying), and the controls help rows of the lever mapping, as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the activation distances' suggested values move from a first offered value to the item's description. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Interaction` and `HUD` pages are reached from the `MotherVR` page (22 §12.1). r6 (spec-side game analysis of the 2015 `AI.exe`, static, while implementing 5 to 7): the icon highlight update and its "highlight disabled" bit (2.6; §12 item 7 resolved for the update, the receiver of its messages left open); the crosshair update's two invoke sites and the movie invoke's missing null check (2.7); the scripted HUD entity's four methods and the six table slots they fill, and the UI-ready byte the game tests before each lookup (2.7, §12 item 10 in part); the terminal text steps built as tagged variant entries of the UI patch (6.2). r7 (spec-side analysis of the stock `TERMINALINTERACTION.GFX`, `FONTS_EN.GFX`, `DATA\FONT_CONFIG.XML` and `DATA\TEXT\ENGLISH\*.TXT`, static, while building the terminal text steps): the containers of the entry titles and folder names, the fonts' line boxes, and the sizes the steps give them (2.8, 6.2); the stock English texts carry no font size (§12 item 9 resolved for English); the scroll range compared with the line pitch the font gives (§12 item 13, new); `Levers by Hand` and `Camera Takeovers` shown greyed while their features have no effect (section 8, under 22 §12.1's rule). r8 (a comparison with the behaviour of another VR mod for the game; facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and `DATA\GLOBAL\ANIMATION.PAK` by the spec side): `Camera Takeovers` `Reduced` applies its steer and re-align parts (4.2 (b), (c)) now, its animation part (a) only once §12 items 5 and 12 are resolved, and the item is no longer greyed (section 8); candidate names for the short device animations, each present in `ANIMATION.PAK` (§12 item 12); the dormant range test's comparison and a lead for the record's prompt key (2.5, §12 item 1); the alternatives considered for the crosshair, the HUD and the takeovers, with this document's reasons (new 7.5). Revision: r8 -->
 
 # 23. Interactions and HUD
 
@@ -180,6 +180,18 @@ other code or data refers to it (searched by its address in every section).
 So in the stock game this test never passes, and the stock activation
 range of terminals and rewire stations is decided elsewhere [likely: by
 the level's trigger volumes and `Interaction` entities; to be found, §12].
+
+r8 [sure for the code]: the test takes the record as a candidate when the
+float is not below the distance (`comiss` at 0x3C5582 then `jb`); a
+candidate then needs the icon manager's byte `+0x27054`, or the record's
+byte `+0x57` bit 2 together with a match of the manager's `+0x27044`, and
+it sets the record's state byte `+0x5B` (whose previous value the loop
+keeps in `+0x5A`, 0x3C543B). The position the test reads is at the
+pointer the loop holds for the record (ESI at 0x3C5512). A lead, to be
+checked by logging in game: the 0x40 bytes before that position hold the
+record's prompt key as text (for example `AI_UI_INTERACT_ACCESS_TERMINAL`
+and `AI_UI_INTERACT_ACCESS_REWIRE`) [guess], which would let a per-record
+range be chosen by prompt (§5.2, §12 item 1).
 
 ### 2.6 `UI_Icon` parameters [sure]
 
@@ -428,6 +440,14 @@ grabs, deaths and cutscenes keep the game's camera.
 | Convergence (walk-to-marker) | kept | the game needs the body at the marker for the animation to line up with the device; it moves the body, not the view's yaw, once `OrientationConvergence` turns are covered by the rows above [likely; check that orientation convergence does not rotate the view] |
 
 With `"Game"` (default) every takeover is the game's, as in v1.
+
+r8: parts (b) and (c) below apply as soon as `"Reduced"` is set; part
+(a) applies only once §12 items 5 and 12 are resolved (until then the
+animation-driven view stays the game's and that is logged once) [project
+decision: the steer and re-align sites are verified (2.4) and turning the
+world without the head is the larger discomfort; the animation part needs
+a verified list]. Level cameras (`CameraResource` start) stay the game's
+in both: removing them was considered and rejected (7.5).
 
 Required results, not a mechanism: while `"Reduced"` is in effect, (a) a
 `CMD_PlayAnimation` request for one of the short device animations has
@@ -701,6 +721,21 @@ Off: the defaults give exactly 05 §4.3.
 §3.2e): Follow re-places at once. Cutscenes: the HUD keeps its placement.
 Headset off: no change.
 
+### 7.5 Choices against alternatives [r8]
+
+Alternatives considered for this document's features, and why it keeps
+its own (project decisions; each reason is a player-visible effect):
+
+| Feature | Alternative | This document | Reason |
+|---|---|---|---|
+| Crosshair off (7.1) | the whole crosshair update not run | only the crosshair's show is withheld | the update also shows the ammunition counter; a player without a crosshair still needs the ammunition |
+| Crosshair default | off by default | `"On"` (v1), with `"Auto"` while the hand aims | v1's default (20 §1.1); `"Auto"` removes the one case where a head-centred crosshair is wrong |
+| Item highlight off (7.3) | the highlight distance read as 0 for every icon | an icon is never highlighted, by the game's own "highlight disabled" bit or an equivalent | the same result; a distance of 0 can still highlight through the view-cone path of 2.6 |
+| HUD toggle | a button near the head | 22 §8.3's gesture and `Hud.Hidden` | 22 §8.5 |
+| Camera takeovers (4.2) | also removing level cameras (`CameraResource`) while the player's camera is in use | level cameras kept | a level camera frames a scripted shot; removing it shows the scene from a place it was not built for |
+| Short device animations (4.2 (a)) | playing a stand-still animation instead of the device animation | the device animation plays and only its view is detached | the hands and the device still move as the game plays them; replacing the animation would leave the device moving without hands |
+| Terminal and rewire distance (5) | a range for every other icon, so the dormant test of 2.5 offers every prompt | only terminals and rewire stations, once shown in game | other prompts keep the game's ranges, which work at standing height |
+
 ## 8. Settings
 
 Inside `Settings`, in two new objects `Interaction` and `Hud` (20 §5).
@@ -746,13 +781,13 @@ gets, in the fewest words that fit the stock description length, 22
 | 5 | `Terminal Text Size` | list | `100%`, `125%`, `150%`, `175%` | `Interaction.TerminalTextScale` | `Requires restart! Larger text on terminal screens` |
 
 Items 3 and 4 are shown greyed with `Not available yet` until the game's
-activation for these devices is located (5.2; 22 §12.1). Items 1 and 2
-are shown greyed with `Not available yet` while their features have no
-effect, that is until §12 items 2 to 4 (levers) and 5, 6 and 12 (camera
-takeovers) are resolved [project decision of r7, under 22 §12.1's rule
-for an item whose game input or site is not yet confirmed: a control that
-changes nothing must not look like a setting that works]. Their keys are
-kept and still set from the file. The distances
+activation for these devices is located (5.2; 22 §12.1). Item 1 is shown
+greyed with `Not available yet` while its feature has no effect, that is
+until §12 items 2 to 4 are resolved [project decision of r7, under 22
+§12.1's rule for an item whose game input or site is not yet confirmed: a
+control that changes nothing must not look like a setting that works].
+Item 2 is not greyed from r8: `"Reduced"` has an effect (4.2 (b) and
+(c)). Their keys are kept and still set from the file. The distances
 show one decimal and the unit (`1.0 m`) [proposal: a list value is read as
 a measure, so it keeps its unit, while a slider's number does not, 22
 §12.1].
@@ -827,7 +862,9 @@ OpenXR unless stated.
    station, a door button: the view does not swing or snap at start or
    end; climbing a ladder and entering a vent still move the view along
    the path; a scripted look-at (`StealCamera`) does not turn the world.
-   `"Game"`: all as v1.
+   `"Game"`: all as v1. r8: until §12 items 5 and 12 are resolved, the
+   view still follows the device animation's head (part (a) is not yet
+   applied; the log says so once), but no yaw snap happens at the end.
 6. `Interaction.TerminalTextScale` 1.5, restart: terminal body text is
    larger, a long log scrolls to its last line; 1.0 restores the stock
    look.
@@ -846,9 +883,9 @@ OpenXR unless stated.
 11. With every key at its default, the frame time on a terminal and in
     gameplay equals v1 within measurement noise (20 §1.1 rule 2).
 12. The `Interaction` and `HUD` pages show the labels, values, order and
-    description lines of section 8; `Levers by Hand`, `Camera Takeovers`,
-    `Terminal Distance` and `Rewire Distance` are greyed with `Not
-    available yet` while their features have no effect (section 8);
+    description lines of section 8; `Levers by Hand`, `Terminal Distance`
+    and `Rewire Distance` are greyed with `Not available yet` while their
+    features have no effect, and `Camera Takeovers` is not (r8, section 8);
     with `Levers by Hand` on, `View Controls` ends with the two rows of
     3.1.
 
@@ -896,7 +933,13 @@ OpenXR unless stated.
     in front of a device without travel. To resolve: list the
     `1ST_PERSON` animation set's names and keep those whose device class
     (2.2) is not traversal; confirm with the tap's log (11 §4.3) which of
-    them play during each interaction kind.
+    them play during each interaction kind. r8 candidates, each name
+    present in `DATA\GLOBAL\ANIMATION.PAK`: `PUSH_BUTTON_01`,
+    `LIFT_BUTTON_PRESS`, `LEVER_2_USE`, `PORTABLE_COMPUTER_USE_01`,
+    `USE_TERMINAL_INTRO`, `USE_TERMINAL_BREATHE`, `USE_TERMINAL_EXIT`,
+    `REWIRE_BOX_OPEN_PLAYER`, `REWIRE_BOX_USE_PLAYER`,
+    `REWIRE_BOX_CLOSE_PLAYER` [likely]; the opening scene's
+    `M01_SCENE01_PLAYER` is a staged moment and keeps the game's view.
 13. **Scroll range and line pitch.** `scroll_up` stops at `numLines x
     LINE_HEIGHT - 10` (2.8), while the body's lines are about `1.223 h +
     2` px apart (2.8: 26.5 px in stock, 44.8 px at 35 px). If the game's

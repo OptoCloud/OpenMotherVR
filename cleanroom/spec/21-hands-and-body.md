@@ -1,4 +1,4 @@
-<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). r6 (project decision: with the aim poses made only at runtime start, turning tracked hands on in the menu left aiming on the head until the next start): the aim pose actions are declared and bound whatever `Hands.Enabled` is, so the key applies at once as §15.1 says; a binding that lacks them is logged. r7 (static analysis of the 2015 `AI.exe` and the game's data by the spec side, without a lead): `FinalPoseStep`'s single return corrected (0x2A5553 belongs to the next function); the pose's hand-over to the model's render objects (`SkinSetPose` 0x28E9A0, its two calls in `FinalPoseStep`, which render objects receive which pose, and that it reads the pose without keeping it); the skeleton's name field and the model-space array's size; the crouch methods' condition byte `+0x3E2E` (corrects §2.2); the game's first-person camera offsets in `DATA\GLOBALCONSTANTS.TXT` (§22 item 14, the crouch drop); body visibility's method made exact (collapse at the nearest drawn joint, in a copy handed to the render objects; the held item's bone always drawn); real crouch's press through the v1 crouch control; room-scale kept off until the frame of the game's movement input and the body's yaw are established (new §22 items 25, 26); new open items 27 (parts posed from another skeleton) and 28 (the requested crouch byte in play). r8 (a tester's log: a value set in a menu was never applied): a skeleton that cannot be read is read again once a second until it can be (§10.2, project decision with its reason), and that is logged once per change with its reason (§18). r9 (game analysis of the 2015 `AI.exe` by the spec side, facts located with the help of an analysis of another mod and verified in the code): the character's model-to-world transform on the animation component and the bone world query `BoneWorldTransform` 0x2A2FB0 with its pose selector (§2.3); the final pose is entry 7 of the component's pose array; the held item's attachment query at 0x3B4E06 and what makes the item follow the edited hand (§4.2 item 6, §22 item 3); the game's limb IK is not run for the player's first-person skeleton while tracked hands are active (§4.2 item 7, §22 item 4); the game's CCD and two-joint IK solvers (§22 item 23); the grip to hand-bone mapping derived from each skeleton's own finger bones at run time (new §3.5, §22 item 2). r10 (a tester's log on OpenXR with a Valve Index: the player's skeleton `FEMALEFP` had no bone names, so body visibility drew the body whole): game data read by the spec side in the Steam 2015 `DATA\GLOBAL\ANIMATION.PAK` (the compiled first-person skeletons, their name-hash tables and parent indices, resolved with the game's reference skeleton files) and static analysis of the 2015 `AI.exe` (the bone-group and mirror reader's upper-casing and FNV-1a hash); the bone table, the matching rule with its parent check and its logging (§2.3, §10.2, §18, §21 item 2). Fixed bone indices for these rigs had been seen in an analysis of another mod; they served only as a lead, and the table rests on the game's data. Other section numbers are unchanged from r9. Revision: r10 -->
+<!-- Provenance: game analysis of the 2015 AI.exe (PE timestamp 0x54E3199D) by the spec side with static analysis (the frame stage table and its stage names, the player getter, health fields, crouch methods, the character final-pose step and its job scheduling, the Havok pose layout, the game's limb IK, the active camera's pose fields, the aim ray update and its caller, the fire alignment gate, the current-item getter and the weapon type enumeration, the motion tracker scan, the rigid-body velocity helper, the XInput rumble output); the game's own data files (GBL_ITEM.XML item and weapon definitions, UI.TXT item names, the first-person skeleton bone groups and mirror files in GLOBAL/ANIMATION.PAK, the first-person model part names in each level's MODELS_LEVEL.BIN); public OpenVR and OpenXR API definitions (grip and aim poses, haptic output); proposals of this project, pending user confirmation where marked [proposal]. Game facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; requirements are proposals of this project, pending user confirmation where marked. Facts found without a lead (the frame stage names, the rumble output, the weapon type enumeration, the item data, the first-person model parts, the bone names) need no such note. 2020 values: none (v2 gives 2015 RVAs only; every 2020 value is `?`). r2: second clean-room review: setting keys, labels and feature names chosen afresh by this project; behaviours restated as required results with this project's reasons (eye forward offset during framed screens, tracker heading, firing with the weapon away from the head, arming a throw, melee by motion, wrist health colour); solution hints reduced to places to look; seated and standing mode and calibration referred to 22 (one owner, 20 §5); the master switch of 20 §1.3. r3 (spec r7 cross-check): cross-references corrected (the hand mapping's game conventions cite 03 §1 and the view matrix convention of 05 §1; the haptics thread row cites §14.3 of this document); the interaction and hiding state named as the logging of game script events of 11 §5. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Hands` and `Body` pages of the options page given exactly (item order, labels, control kinds, value names, ranges and steps, description lines, greying), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; no message box for standing mode and calibration (the page texts say it); the controls help rows while hands are on listed as open. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Hands` and `Body` pages are reached from the `MotherVR` page (22 §12.1). r6 (project decision: with the aim poses made only at runtime start, turning tracked hands on in the menu left aiming on the head until the next start): the aim pose actions are declared and bound whatever `Hands.Enabled` is, so the key applies at once as §15.1 says; a binding that lacks them is logged. r7 (static analysis of the 2015 `AI.exe` and the game's data by the spec side, without a lead): `FinalPoseStep`'s single return corrected (0x2A5553 belongs to the next function); the pose's hand-over to the model's render objects (`SkinSetPose` 0x28E9A0, its two calls in `FinalPoseStep`, which render objects receive which pose, and that it reads the pose without keeping it); the skeleton's name field and the model-space array's size; the crouch methods' condition byte `+0x3E2E` (corrects §2.2); the game's first-person camera offsets in `DATA\GLOBALCONSTANTS.TXT` (§22 item 14, the crouch drop); body visibility's method made exact (collapse at the nearest drawn joint, in a copy handed to the render objects; the held item's bone always drawn); real crouch's press through the v1 crouch control; room-scale kept off until the frame of the game's movement input and the body's yaw are established (new §22 items 25, 26); new open items 27 (parts posed from another skeleton) and 28 (the requested crouch byte in play). r8 (a tester's log: a value set in a menu was never applied): a skeleton that cannot be read is read again once a second until it can be (§10.2, project decision with its reason), and that is logged once per change with its reason (§18). r9 (game analysis of the 2015 `AI.exe` by the spec side, facts located with the help of an analysis of another mod and verified in the code): the character's model-to-world transform on the animation component and the bone world query `BoneWorldTransform` 0x2A2FB0 with its pose selector (§2.3); the final pose is entry 7 of the component's pose array; the held item's attachment query at 0x3B4E06 and what makes the item follow the edited hand (§4.2 item 6, §22 item 3); the game's limb IK is not run for the player's first-person skeleton while tracked hands are active (§4.2 item 7, §22 item 4); the game's CCD and two-joint IK solvers (§22 item 23); the grip to hand-bone mapping derived from each skeleton's own finger bones at run time (new §3.5, §22 item 2). r10 (a tester's log on OpenXR with a Valve Index: the player's skeleton `FEMALEFP` had no bone names, so body visibility drew the body whole): game data read by the spec side in the Steam 2015 `DATA\GLOBAL\ANIMATION.PAK` (the compiled first-person skeletons, their name-hash tables and parent indices, resolved with the game's reference skeleton files) and static analysis of the 2015 `AI.exe` (the bone-group and mirror reader's upper-casing and FNV-1a hash); the bone table, the matching rule with its parent check and its logging (§2.3, §10.2, §18, §21 item 2). Fixed bone indices for these rigs had been seen in an analysis of another mod; they served only as a lead, and the table rests on the game's data. Other section numbers are unchanged from r9. r11 (game analysis of the 2015 `AI.exe` by the spec side, static; facts located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; a tester's report that the controllers vibrate constantly while the motion tracker is raised): the game's rumble path from its motion output to `RumbleSetMotors`, its send-on-change rule and its pad curve (§2.9), and a new haptic rule for the game rumble and the tracker ping with its reason (§14); the tracker scan's call site, its result and its raised byte (§2.6), and the tracker heading taken from the drawn left hand (§6.2); the weapon's world transform 0x3A07D0 (§2.5, §5.2; §22 item 5 resolved in part); the start methods of the player's melee and other scripted actions and the play-animation command's request (§2.11), so melee leaves the arm to the game's animation for the swing (§8.2, §22 item 13) and those actions are episodes of §12 (§22 item 15 in part); the velocity helper's linear call (§2.7); the eye forward offset not applied during hacking and cutting (§11.2, §22 item 24 in part); hands kept on the controllers while the body moves (§4.2 item 10); the forearm twist split (§4.2 item 3); the throw by a fire press at the release and `Hands.ThrowStrength` on the horizontal part only (§9.2); the camera height re-sync after a load or a suit change, `Body.CrouchResync` (new §11.6); new items in §15, §18, §20, §21 and §22. Other section numbers are unchanged from r10. Revision: r11 -->
 
 # 21. Hands and body
 
@@ -46,6 +46,7 @@ their `mothervr.json` key inside `Settings` (06 §1): `Hands.Enabled` is
 | Room-scale walking | 11.3 | `Body.RoomScale` | the body stays put; the head may leave it up to the head-in-wall limit (05 §7.2, 08 §4) |
 | Seated eye raise; the head pose in standing mode | 11.4 | `Body.SeatedEyeRaise`; the mode and calibration are 22's (`Comfort.PlayMode`, `Comfort.StandingEyeHeight`, 22 §6) | eye height relative to the height at the last recenter (03 §2.1) |
 | Real crouch drives the game's crouch | 11.5 | `Body.RealCrouch` | crouch on the control of 04 only |
+| Camera height re-sync after a load or a suit change | 11.6 | `Body.CrouchResync` | the view height as the game leaves it |
 | Control hand-back after the game's animations | 12 | active whenever any of 4, 11.2 to 11.5 is on | nothing to restore |
 | Health on the wrist | 13 | `Hands.WristHealth` | health only on the game's HUD |
 | Haptics | 14 | `Hands.Haptics.Enabled` | no haptics (04 §5.1) |
@@ -395,6 +396,22 @@ What the length measures exactly (most likely whether the held weapon is far
 enough from the head to be "out", or clear of the ray start) is open
 (§22 item 6); §5.3 states the required result.
 
+**Weapon world transform [sure for the code; likely for the meaning,
+r11].** `WeaponTransform` 0x3A07D0 (`51 56 57 51 8b f1 83 be cc 00 00
+00`), `thiscall` on the weapon object `CurrentItem` returns, one stack
+argument (a pointer to a 3x4 float matrix it fills, 48 bytes), `ret 4`,
+returns that pointer in EAX. It takes the item's render object (`+0xCC`,
+or `+0x1C` when that is null) and fills the matrix through 0x3A0050, which
+starts from the identity. The matrix is row-major with the translation in
+the fourth column (`+0x0C`, `+0x1C`, `+0x2C`). One of its callers is the
+fire alignment gate itself: at 0x3ABE05 it calls `CurrentItem` on the
+weapon component and, when there is an item, calls 0x3A07D0 on it at
+0x3ABE21 (`e8 aa 49 ff ff`) and takes the translation as the held item's
+point; other callers are at 0x06E003, 0x14A473, 0x14A64A and 0x3AB12E. So
+it gives the held weapon's world transform as the game last placed it
+[likely: which of its rotation columns is the barrel is to be read in
+game, §21 item 5].
+
 ### 2.6 Motion tracker [sure]
 
 `TrackerScan` 0x431E40 (`55 8b ec 83 e4 f0`), `thiscall` on the tracker
@@ -408,6 +425,22 @@ horizontal direction vector at tracker `+0xF0` (x) and `+0xF8` (z):
 drives the UI with the method names `ClearMotionBlips` and
 `setTrackerDisabled`. Which code writes `+0xF0` is not found (§22 item 7).
 
+r11 [sure for the code; likely for the meanings]: the scan has one caller,
+the call at 0x43287D (`e8 be f5 ff ff`) inside 0x4327D0, right after the
+timer is restarted; nothing runs between that call and the scan's own read
+of the facing. The caller stores the scan's result ANDed with byte
+`+0x1378` in byte `+0x1379`; the scan clears the blips and the tracker's
+display (`ClearMotionBlips`, `setTrackerDisabled`) according to `+0x1378`
+too, so `+0x1378` is set while the tracker is raised and in use [likely].
+The scan returns 1 when the float at tracker `+0x11C` is greater than the
+distance it computed for the nearest contact, else 0 (the comparison at
+0x43278E), after it has sent the display its contact and ping values
+(`SetMotionLocation`, `TargetdistancePing`) and three sound parameters;
+so the result is "a contact is within the tracker's range" [likely: from
+the names of the values it sends]. The caller also sends the display the
+player's camera yaw (`SetPlayerRotation`) whenever that yaw changes, so
+the display's own rotation follows the camera, not `+0xF0`.
+
 ### 2.7 Throwables and physics velocity [sure for the helper; open for the throw]
 
 `SetBodyVelocities` 0x3EF590 (`55 8b ec 83 e4 f0 83 ec 3c`), `cdecl`, three
@@ -419,6 +452,12 @@ interface's vtable slot at `+0x40` (linear) or `+0x44` (angular) on the
 object's `+0xE0` sub-object. Nine call sites (0x3F16C8, 0x3F196F, 0x3F1BA0,
 0x3F235E, 0x3F4F7E, 0x3F50F8, 0x3F51E1, 0x3F52F9, 0x3F8CC8). Which of them,
 if any, gives a thrown item its launch velocity is open (§22 item 8).
+r11: the linear call is the indirect call at 0x3EF62A (its return address
+0x3EF62C); it reaches the body's set-linear-velocity method 0x73F5A0
+(`8b 44 24 04 0f 28 00 0f 29 81 d0 00`), which no code calls directly
+[sure]. So every linear velocity the game gives a body through this helper
+passes 0x3EF62A, and a launch made through the helper can be recognised
+there by its physics object.
 
 The prompts the game shows for throwables are the localisation ids
 `AI_UI_IED_HOLD_TO_AIM`, `AI_UI_IED_PRESS_TO_THROW`,
@@ -468,6 +507,57 @@ The game drives XInput pad vibration in two places:
 Which game events produce rumble, and whether `RumbleSetMotors` is called
 while no physical pad is connected, are open (§22 item 9).
 
+**r11: how the game feeds `RumbleSetMotors` [sure for the code; likely
+for the audio side].**
+
+- **Who calls it.** Its only reference is its vtable, stored by the
+  constructor at 0xC09388; it is called through that vtable only, from
+  `RumbleMotionOutput` 0xC08B50 (`0f 57 c9 83 ec 08 56 8b f1`), slot
+  `+0x50` of the rumble output's vtable at 0x11C177C (set by the
+  constructor at 0xC08C70). That object holds the motor device created by
+  the factory 0xC08CA0 (the call at 0xC08AE5) at `+0xAC`.
+- **What it sends.** `RumbleMotionOutput` reads the current frame's two
+  channel values from a small ring in the object (index at `+0x92`),
+  clamps each to [0, 1], and calls `RumbleSetMotors(channel 0, channel 1)`
+  (low-frequency motor, high-frequency motor) **only when either value
+  differs from the last pair sent** (kept at `+0xA8` and `+0xA4`). After a
+  call it records the pair, except when `RumbleSetMotors` returns 0x4D
+  (its result when `XInputSetState` reports the device busy); a missing
+  pad (any other failure) still records it. So a steady level is sent
+  once, and the pad's motors keep that speed until the next change.
+- **Where the values come from.** The same object's slots `+0x1C`
+  (0xC09030) and `+0x20` (0xC09140) fill the ring from a block of audio
+  samples: per channel, the peak absolute sample of each half of the
+  block, times a gain at `+0x98` (1.0 at construction, the float at
+  0xDBED34). Slot `+0x28` (0xC08E30) takes one frame from the ring and
+  calls slot `+0x50`; slot `+0x24` (0xC08D00) writes zeros when there is
+  no data. So the motor levels are the peak loudness of the game's rumble
+  mix (`RumbleMixBus`), two values per audio block, and every sound the
+  game routes to that mix rumbles the pad at its loudness [likely: the
+  object's names are the audio middleware's motion classes, and the
+  values are audio peaks].
+- **The pad curve.** `RumbleSetMotors` turns a level `L` into a motor
+  speed out of 65535:
+
+  | Motor | `L` at most 0.05 | 0.05 < `L` at most 0.4 | `L` above 0.4 |
+  |---|---|---|---|
+  | low frequency (first argument) | 0 | `11468.626 L + 5242.8` | `75365.25 L - 9830.25` |
+  | high frequency (second argument) | 0 | `57343 L + 8192` | `57343 L + 8192` |
+
+  (constants: the double 0.05 at 0x1051678, the float 0.4 at 0xDBC084,
+  the floats at 0x11C1828 to 0x11C1838 and 8192.0 at 0xEAB50C). As a
+  fraction `v` of full speed: a low level of 0.08 runs the low motor at
+  about 9 % and the high one at about 20 %; 1.0 runs both at 100 %. A pad
+  turns such low speeds into a faint purr, because an eccentric-mass
+  motor's force grows with the square of its speed (about 1 % and 4 % of
+  full force here) [sure for the curve; the force law is the physics of
+  such motors].
+- **The game's own vibration option.** The options sync at 0x430430
+  pushes `setRumble` (string at 0xEFE030, the push at 0x4305FE) to the
+  options menu with a byte read from `[[0x12F0C88] + 0x80] + 0x1B` [likely
+  the game's Vibration setting; where the audio side honours it is not
+  located].
+
 ### 2.10 Signals v1 already provides
 
 | Signal | v1 source |
@@ -480,7 +570,37 @@ while no physical pad is connected, are open (§22 item 9).
 | head pose, recenter reference | device slot 11, manager `+0x78` (03 §1, §2) |
 | grip poses and linear velocities of both hands, converted, handed to the game thread | 04 §5.11 |
 
-## 3. Hand poses in the game's world
+### 2.11 The player's scripted actions and animations [r11; sure for the code, likely for the meanings]
+
+The game's player actions are objects whose start method refers to the
+action's name (strings in `.rdata`). The start methods found by those
+references, each `thiscall` with no stack arguments and a plain `ret`:
+
+| Action name | Start method | First bytes | Where it is referred to |
+|---|---|---|---|
+| `ACT_PLAYER_MELEE` (string at 0xEAF004) | 0x268670 and 0x268AF0 (two melee actions) | `55 8b ec 83 e4 f0 81 ec b4 00 00 00` (both) | slot 24 of the vtables at 0xEAC528 and 0xEAC5E8 |
+| `ACT_PLAYER_MELEE_KILL` | 0x26DC20 | `6a ff 68 78 6a 12 01 64 a1 00 00 00` | called at 0x27055A |
+| `ACT_PLAYER_TRAP_BREAK` | 0x26E3F0 | `83 ec 54 53 55 56 8b f1 8b 4e 04 57` | |
+| `ACT_PLAYER_MELEE_INTERCEPT` | 0x2702C0 | `83 ec 54 53 56 57 83 ec 10 89 64 24` | called at 0x270E28 |
+| `ACT_PLAYER_IMPACT_STANDING` | 0x2737E0 | `55 8b ec 83 e4 f0 83 ec 64 53 56 8b` | |
+| `ACT_PLAYER_TRAP_VICTIM` | 0x275560 | `55 8b ec 83 e4 f0 81 ec d4 00 00 00` | |
+
+The two melee starts are the player's own swing (the melee tool and the
+stun baton on the fire action) [likely: the name, and the string
+`animation_finished` that follows it in `.rdata`]; the others are grabs,
+kills and hits that take the body away. Where each action ends is not
+located (§22 item 15).
+
+**The play-animation command [likely].** The function at 0x130A70
+(`64 a1 00 00 00 00 6a ff 68 e0 26 12`, `thiscall`, two stack arguments,
+`ret 8`) reports the command's error `play already requested before
+loaded!!!` (the push at 0x130BC2) and sits in slot `+0x3D0` of the method
+table at 0xE34960, the table the command's constructors store (references
+at 0x12F51C and 0x13066A); the next slot holds 0x130CE0 (`6a ff 64 a1 00
+00 00 00 68 a8 10 12`, same convention). So 0x130A70 starts a
+`CMD_PlayAnimation` play request and 0x130CE0 is its counterpart [likely
+for the first, guess for the second: acceptance item 20 confirms both]. The
+request's flags, including the animation-driven view, are 23 §2.3's.
 
 ### 3.1 Mapping [required]
 
@@ -633,7 +753,13 @@ player character only (§2.2), every frame:
    spread over the forearm's roll bones (`ForeArmRoll`, `ForeArmRoll1`) so
    the forearm does not visibly wring. How the twist is spread is the
    implementation's choice; the result is that no roll bone turns more than
-   half the hand's twist relative to its neighbour.
+   half the hand's twist relative to its neighbour. r11 [proposal: the
+   simplest even split, which a player sees as a forearm that turns
+   along its length]: `ForeArmRoll` takes one third of the twist and
+   `ForeArmRoll1` two thirds, each about the forearm's long axis, while
+   the hand keeps the full target rotation. The two roll bones are
+   siblings of the hand under `ForeArm` (§2.3), so turning them does not
+   move the hand.
 4. **Elbow.** The elbow points down and outwards, away from the body,
    in the plane given by the shoulder, the hand and a hint below and behind
    the elbow (reason: the natural pose for a held object; a hint is the
@@ -659,6 +785,16 @@ player character only (§2.2), every frame:
 9. **Model-space consistency.** After the edit the pose's local and model
    transforms agree (the flags of §2.3 are left so the game recomputes what
    it needs), so ragdoll, attachments and rendering see one pose.
+10. **Moving body** (r11). While the character moves (walking, sprinting,
+    a lift, a vent), the drawn hands stay at the controllers: in the frame
+    shown, each hand bone is within 1 cm of where §3.1 puts the controller
+    for that frame's eye, also at sprint speed [proposal: a hand that
+    trails the body by a frame's travel, about 5 cm at sprint speed, is
+    seen as drift]. If the world targets are computed from a camera pose
+    older than the character's movement of the frame, they are moved by
+    the character's displacement since that pose (the change of the
+    model-to-world translation of §2.3 between the two), so they belong to
+    the body the pose edit works on. How is the implementation's choice.
 
 Where the edit is made is the implementation's choice among the verified
 sites: inside `FinalPoseStep` for the player (on its job thread, §17), or
@@ -681,8 +817,9 @@ character exists; a FollowBehavior is tracked and active (05 §6.1); no
 cutscene or level fade is in progress (05 §3.2g); no loading screen; the
 interaction state (11 §5.3) says no interaction, or an interaction of a
 kind the hands may join (none in r1 [proposal: 23 decides which
-interactions become physical]); the player is not hiding (§12); the player
-is alive (health above 0, §2.2). Otherwise the arms play the game's
+interactions become physical]); the player is not hiding (§12); no
+player action or scripted player animation episode of §12.1 runs (r11);
+the player is alive (health above 0, §2.2). Otherwise the arms play the game's
 animation, with the blends of §3.3 on each change. A hand that is not
 tracked follows §3.3.
 
@@ -741,6 +878,19 @@ Per weapon class (the weapon type at `+0xD4` of `CurrentItem`'s result,
 | `MELEE` (4) | unchanged | unchanged | §8 |
 | no weapon (0, or null): throwables, flare, medikit | the right hand's aim pose origin | the right hand's aim pose forward | throws and placement follow the hand when §9 is off; nothing visible otherwise |
 
+r11: for the revolver, the shotgun and the flamethrower the barrel's axis
+and the muzzle point come from the weapon's world transform
+(`WeaponTransform` 0x3A07D0, §2.5) of the item as drawn in the moved hand
+(§4.2 item 6): its origin plus a per-class offset along its barrel column,
+and that column as the direction [likely: the column and the offsets are
+read in game, §21 item 5]. For the bolt gun the right hand's aim pose with
+a per-class offset is used instead, with the same 5 cm result [proposal:
+the bolt gun's drawn barrel and its transform's axis are to be compared in
+game first; until the comparison shows them within half a degree, the aim
+pose is the safer source]. Throwables keep the aim pose (table). If the
+transform cannot be read for a frame (no item, no render object, the
+identity returned), that frame uses the aim pose.
+
 "Barrel's axis" and "muzzle point" are those of the **weapon model as drawn
 in the hand** after §4.2: the weapon's own transform where the game
 exposes it (§22 item 5), otherwise the right hand's **aim pose** (OpenXR
@@ -784,6 +934,11 @@ Off (or the right hand not tracked, §3.3): `AimRayUpdate` runs unchanged,
 the gate is the game's, exactly v1. Hand aiming never applies to other
 characters.
 
+The game's own spread around the aim ray is kept [proposal: spread is part
+of the game's weapon balance; with hand aiming the player's own unsteady
+hand adds to it, as a held gun does, and removing it would make every
+weapon a laser].
+
 ### 5.6 Edge cases
 
 | Situation | Result |
@@ -816,6 +971,16 @@ hand is tracked:
   display]. Where and when the facing the scan reads is set is the
   implementation's choice, provided no game write comes between it and the
   scan (§22 item 7);
+- r11: the hand direction is that of the **drawn** left hand: the
+  horizontal direction from the `LeftHand` bone to `LeftHandMiddle1`
+  (indices 9 and 13 in `FEMALEFP`, §2.3) in the world, from the pose the
+  player saw last frame [proposal: the tracker is read in the drawn hand,
+  so its cone must point where the drawn device points; the knuckle line
+  is the hand's own forward and needs no per-controller offset]. When that
+  pose is not available (tracked hands inactive for the left hand in the
+  last frame, or the bones not found), the left hand's aim direction is
+  used. Writing the facing just before the scan's call at 0x43287D (§2.6)
+  meets the "no game write between" condition [likely; acceptance item 7];
 - when that horizontal length is below 0.1 (the hand points nearly
   straight up or down), the previous facing is kept (reason: the heading is
   undefined there; no NaN).
@@ -874,6 +1039,19 @@ weapon type (§2.5) is `MELEE` or `CATTLEPROD`:
   animation while the swing runs (tracked hands blending out and back as
   §3.3) depends on what the game's hit test follows, which is open (§22
   item 13).
+- r11: **the swing is the game's animation.** From the start of the
+  player's melee action (either start method of `ACT_PLAYER_MELEE`, §2.11;
+  whether the swing came from a motion or from the Fire control), the
+  right arm plays the game's melee animation: the tracked right hand
+  blends out over 0.05 s, stays out for 0.9 s from the start, then blends
+  back over 0.15 s (§3.3); the left hand stays tracked. A new melee start
+  during that time restarts the 0.9 s. [likely for the reason: the game's
+  melee hit follows the animated weapon, so an arm held at the controller
+  through the swing lands no hits; proposal for 0.9 s: about the length of
+  the game's swing and recovery, to be replaced by the action's end once it
+  is located, §22 item 13.] The swing by motion therefore starts the
+  game's swing, and the player sees the stock swing from the hand's last
+  tracked place. The 0.6 s lockout above still applies to motion swings.
 
 Off: melee on the Fire control only (v1).
 
@@ -902,10 +1080,22 @@ item is one of the throwables of §2.5:
   hand at rest is far below]; below it the throw is cancelled and the item
   stays in hand (reason: opening the hand by accident must not throw a
   pipe bomb at the player's feet).
+- r11: **the throw is the game's.** A release that throws presses the
+  game's fire action (map 0 0x0B, the action the Fire control drives, 04
+  §5.8.5) for 100 ms at the release, merged by OR [proposal: the game's
+  own throw then runs, with its prompt, its consumption of the item and
+  its sounds; 100 ms is the press length of §8.2]. The item must leave the
+  hand within 0.15 s of the release [proposal: a longer delay is felt as
+  the item sticking to the hand]; if the game's throw animation takes
+  longer before it launches the item, that is logged with the measured
+  delay (§18) and is §22 item 8's to solve.
 - **Velocity.** The thrown object's initial linear velocity in the world is
   the release velocity of the hand, mapped as in §3.1 (rotation only:
-  `rotate(Qc, M Rh^T v)` scaled by `s`), multiplied by
-  `Hands.ThrowStrength`. The release velocity is the runtime's
+  `rotate(Qc, M Rh^T v)` scaled by `s`), with its horizontal part
+  multiplied by `Hands.ThrowStrength` and its vertical part unchanged (r11
+  [proposal]: a seated or cramped player lacks reach, not height; scaling
+  the vertical part too sends a lob into the ceiling, and gravity already
+  limits what a real throw's height can do). The release velocity is the runtime's
   reported linear velocity of the right grip, the largest-magnitude sample
   over the last 50 ms before the release [proposal: the hand decelerates as
   the fingers open, so the peak just before release is what the player
@@ -927,7 +1117,9 @@ Off, or no tracked right hand: the game's own throw on the Fire control
 |---|---|---|
 | release threshold | 1.5 m/s | §9.2 |
 | velocity window | 50 ms | §9.2 |
-| `Hands.ThrowStrength` | default 1.0, range 0.5 to 2.0 [proposal] | players with little room, or seated, cannot swing fully and need a throw to carry as far as the game's own; 1.0 throws with the hand's real speed; 2.0 lets a short seated flick reach the distance of a full throw, and 0.5 tames a player who throws hard |
+| `Hands.ThrowStrength` | default 1.0, range 0.5 to 2.0 [proposal]; scales the horizontal part only (r11) | players with little room, or seated, cannot swing fully and need a throw to carry as far as the game's own; 1.0 throws with the hand's real speed; 2.0 lets a short seated flick reach the distance of a full throw, and 0.5 tames a player who throws hard |
+| press at release | fire action, 100 ms | §9.2 |
+| release to launch | at most 0.15 s | §9.2 |
 
 ## 10. Body visibility
 
@@ -1069,7 +1261,18 @@ running, the eye forward offset is not applied, so that screen is seen as
 the game frames it [proposal: a moved eye would crop or misalign a screen
 composed for the body's own eye point]. Which interaction kinds (11 §5.3)
 these are is to be listed from in-game observation (§22 item 24); until
-then the offset applies in every interaction.
+then the offset applies in every interaction. r11: the kinds **hacking**
+and **cutting** are such interactions [likely: the access tuner's screen
+and the cutting torch's panel are held up to the body's own eye point by
+their animations; acceptance item 11 checks the others]: while the
+interaction kind is either, the offset is 0, eased out and back in over
+0.2 s [proposal: a step of up to 0.2 m at the start of an interaction
+would be seen as a jump].
+
+With the offset applied the player sees less of the character's own chest
+and neck when looking down [likely]; the item's description line suggests
+0.10 m (§15.3) [proposal: a value players of VR ports commonly settle on,
+small enough to stay inside the head; the default stays 0, v1].
 
 ### 11.3 Room-scale
 
@@ -1200,6 +1403,56 @@ crossing [proposal: the player always has a manual override]. `Input.ToggleCrouc
 
 Off, or seated: crouch by control only (v1).
 
+### 11.6 Camera height after a load or a suit change [r11]
+
+**Player experience.** After loading a level or a save, and after the
+suit changes on and off, the view starts at the character's standing eye
+height, without the player crouching and standing once to put it right.
+
+**The problem.** In a headset the view can start at a wrong height after
+those transitions until the game's crouch has been engaged and released
+once [likely: an effect players of an earlier VR mod reported, which a
+crouch and a stand fixed; its game-side cause is not located, §22 item
+29]. So this section requires the result and logs the evidence.
+
+**Required results** with `Body.CrouchResync` on:
+
+- **When.** On the first frame the player controls the body after: a
+  loading screen closes (05 §5); a suit change interaction ends
+  (`suit_change_interaction_finish`, 11 §5.3); the player's first-person
+  skeleton changes by name (§2.3, for example `FEMALEFP` to `SPACESUITFP`).
+  The re-sync starts 0.5 s after that frame [proposal: lets the game
+  settle its own transition first], only while the player is standing
+  (requested crouch byte 0, §2.2), not in an interaction or hiding, and
+  not in a vent.
+- **What.** The game's crouch is engaged and released once: a press of
+  the v1 crouch control (§11.5's press, 100 ms), and when the requested
+  crouch byte has followed it, a second press 0.15 s later [proposal: the
+  game's own crouch path re-derives the camera's height; the second press
+  only after the byte followed, so a press the game ignored never leaves
+  the player crouched]. If the byte has not followed within 0.5 s, no
+  second press is made and that is logged once (§18).
+- **Unseen.** From the first press until 0.3 s after the byte is back at
+  0, both eyes show black, fading back in over 0.15 s [proposal: the dip
+  of a crouch is a vertical lurch of the world; right after a loading
+  screen or a suit change a short black is part of the transition]. The
+  black is drawn like the snap-turn fade of 22 §4.3. At most 1.5 s in all;
+  after that the view returns whatever the state.
+- **Yaw.** At the end of a suit change a recenter is queued as at a
+  loading screen's close (03 §2.2) [proposal: the suit change's animation
+  turns the body; play resumes facing where the player faces].
+- **Evidence.** With `DebugOptions` on, the vertical distance from the
+  body pivot to the eye (the arguments of HeadClipFade, §2.10) is logged
+  on the first controlled frame after each trigger, before the re-sync,
+  and again 1 s after it (§18), so a log shows whether the height was
+  wrong and whether the re-sync fixed it.
+
+With real crouch on (§11.5) the re-sync is not made while the player
+crouches for real; the presses are not counted as real-crouch presses.
+
+**Off** (default): no presses, no black, no recenter at a suit change, no
+evidence lines (v1).
+
 ## 12. When the game hands control back
 
 ### 12.1 What the game does
@@ -1222,6 +1475,22 @@ kill) have no verified signal yet; the game's player actions such as
 `AI.exe`, and the script entity `CMD_PlayAnimation` has a parameter
 `PlayerAnimDrivenView` [sure for the names only]; how to observe them is
 open (§22 item 15).
+
+r11: two more episode kinds, through the start methods of §2.11:
+
+| Episode | Start | End |
+|---|---|---|
+| player action | a start of `ACT_PLAYER_MELEE_KILL`, `ACT_PLAYER_MELEE_INTERCEPT`, `ACT_PLAYER_TRAP_VICTIM`, `ACT_PLAYER_TRAP_BREAK` or `ACT_PLAYER_IMPACT_STANDING` (§2.11) for the player | the first of: the current item (§2.5) changing from none to an item, or from one item to another (the player draws or the game hands back a weapon); 0.5 s after the FollowBehavior is active again after having been inactive during the episode; 5 s after the start [proposal: these actions end with the player taking up an item or the camera returning; 5 s is a safety so the hands never stay off] |
+| scripted player animation | a play-animation request (0x130A70, §2.11) whose character is the player and whose animation-driven view flag (23 §2.3) is set | the counterpart 0x130CE0 for that request, or the FollowBehavior active again, or 10 s [proposal: a safety bound] |
+
+The player's own melee swing is not an episode: it is §8.2's arm
+hand-off, which leaves the left hand tracked and the other features
+running. Whether each start method runs only for the player is to be
+checked by the log (§18) [likely: they are player actions by name]; a
+start for another character is ignored. How a play request names its
+character, and so whether it is the player's, is §22 item 15's; until it
+is known, the scripted player animation episode is not used and only
+logged (§18).
 
 ### 12.2 Required results
 
@@ -1312,10 +1581,10 @@ distinguishable without masking the others.
 
 | Event | Game source | Hand | Pulse |
 |---|---|---|---|
-| game rumble | `RumbleSetMotors` (§2.9): the two motor levels, sampled each frame | both: low-frequency motor to the left, high-frequency to the right [proposal: keeps the game's two channels apart] | continuous, amplitude = the motor level, frequency 0 (runtime default) |
+| game rumble | `RumbleSetMotors` (§2.9): the two motor levels, each held until the game sends the next pair | both: low-frequency motor to the left, high-frequency to the right [proposal: keeps the game's two channels apart] | continuous; amplitude from the level by §14.4 (r11), frequency 0 (runtime default) |
 | damage | the player's current health (§2.2) falls between two frames | both | amplitude 0.3 + 2 * (lost fraction of maximum), capped at 1; 150 ms |
 | death | current health reaches 0 | both | 1.0, 600 ms |
-| tracker ping | each `TrackerScan` run (§2.6) while the tracker is raised | the hand holding the tracker (left) | 0.15, 20 ms [proposal: a tick per scan, felt but faint] |
+| tracker ping | r11: a `TrackerScan` run (§2.6) that returns 1 (a contact within range) while the tracker is raised (`+0x1378` set) | the hand holding the tracker (left) | 0.15, 20 ms [proposal: one faint tick when the tracker shows movement, §14.4] |
 | firing | the fire action pressed while a ranged weapon (types 1, 2, 3, 5) is current and the alignment byte allows firing (§2.5); replaced by a verified shot event when one is found (§22 item 17) | right | 0.6, 60 ms (flamethrower: 0.3, repeated while held) |
 | hacking start, finish | event tap kinds hacking and cutting (11 §5.3) | both | 0.4, 80 ms |
 | hacking steps | not verified (§22 item 18) | | |
@@ -1333,7 +1602,8 @@ When the game rumble is on, the damage and firing pulses are still played
   played with `IVRInput::TriggerHapticVibrationAction` (start 0, the pulse's
   duration, frequency, amplitude, `k_ulInvalidInputValueHandle`).
   Continuous output is a series of short vibrations renewed each frame
-  while the level is above 0.02.
+  while the amplitude of §14.4 is not 0 (r11; r10 used a level above
+  0.02).
 - **Output, OpenVR legacy (04 §5.8.3)**: `IVRSystem::TriggerHapticPulse`
   on the hand's device index, axis 0, with a duration in microseconds of
   `amplitude * 3000` [proposal: the API's pulse length range is about 0 to
@@ -1364,6 +1634,55 @@ When the game rumble is on, the damage and firing pulses are still played
   poses (04 §5.11) [20 §10 item 2].
 - **Real pad**: when a physical XInput pad is in use, the game rumble also
   reaches the pad as before (the game's call is always made).
+
+### 14.4 Game rumble and the raised tracker [r11]
+
+A tester reported that the controllers vibrate constantly while the motion
+tracker is held up, and that it is too much. Two things vibrate then:
+
+- **The game's rumble.** The game sends the pad the peak loudness of its
+  rumble mix, only when it changes, and its pad curve turns a quiet level
+  into a slow motor speed that a pad barely feels (§2.9). The tracker's
+  sounds play while it is raised [likely that they reach the rumble mix:
+  the vibration is felt only while the tracker is up]. Played as a linear
+  amplitude, a level of 0.08 is 8 % of a VR controller's full output,
+  continuously: a buzz a pad never made.
+- **The tracker ping as r10 defined it**: a tick at every scan, twice a
+  second for as long as the tracker is raised, contact or not.
+
+Required, so that the hands feel what a pad's player felt:
+
+1. **The game's curve.** Each channel's level `L` becomes the motor speed
+   fraction `v` of the game's own pad curve (§2.9: 0 at or below 0.05,
+   then the table's value / 65535, at most 1). Reason: the game's dead
+   zone and its two motors' different responses are part of how its
+   rumble was tuned.
+2. **Force, not speed.** The amplitude is `v * v` [the force of the
+   eccentric-mass motor the curve was tuned for grows with the square of
+   its speed, §2.9; a VR controller's actuator is driven by force]. 1.0
+   stays 1.0; the tracker-level 0.08 gives about 0.01 (left) and 0.04
+   (right).
+3. **Floor.** An amplitude below 0.05 is not played [proposal: below 5 %
+   of full output a VR actuator gives a buzz with no information, which
+   the pad gave as an unfelt motor turning slowly]. The floor replaces
+   r10's 0.02 on the level.
+4. **Hold.** The amplitude holds from one `RumbleSetMotors` call to the
+   next, as the pad's motors do; it is renewed on the render thread as
+   §14.3 says while it is not 0, and is dropped to 0 when no call came for
+   0.5 s while the last pair was not 0 [proposal: a safety against a
+   level stuck on after the game's audio stops, for example at a pause].
+5. **Strength last.** `Hands.Haptics.Strength` multiplies the amplitude
+   after the floor, so lowering the strength never turns a felt rumble
+   into a constant faint buzz.
+6. **Tracker ping** only on a scan that shows a contact (§14.2) [proposal:
+   the game's display and sounds already say the tracker is on; a tick
+   carries information only when there is something on it].
+
+Result: holding up the tracker with nothing on it vibrates nothing; a
+contact gives one faint tick per scan; the game's strong rumbles (an
+explosion, a level near 1) are felt as on a pad. With `DebugOptions` on,
+the log gives the rumble levels it receives (§18), so the tracker's actual
+level can be read from a tester's log and the floor checked against it.
 
 ## 15. Settings
 
@@ -1408,6 +1727,7 @@ master key on gives the whole feature; the master keys default off (20
 | `Body.RoomScale` | bool | false | | non-bool: false | at once |
 | `Body.SeatedEyeRaise` | number | 0.0 | -0.50 to 0.50 (metres) | outside: clamped; NaN: 0.0 | at once; seated mode only |
 | `Body.RealCrouch` | bool | false | | non-bool: false | at once; only in standing mode with a calibration (22 §6) |
+| `Body.CrouchResync` | bool | false | | non-bool: false | at the next trigger of §11.6 (r11) |
 
 ### 15.3 Options page and console
 
@@ -1430,14 +1750,14 @@ description length, 22 §12.1].
 | 4 | `Flashlight Aim` | list | `Head`, `Left Hand`, `Right Hand` | `Hands.FlashlightAim` | `What the flashlight points with` | `Tracked Hands` off; shown greyed with `Not available yet` until §7.2's object is verified |
 | 5 | `Melee by Swing` | toggle | on / off | `Hands.MeleeByMotion` | `Swing your hand to strike with a melee weapon` | `Tracked Hands` off |
 | 6 | `Throw by Motion` | toggle | on / off | `Hands.ThrowByMotion` | `Thrown items fly with your hand's motion` | `Tracked Hands` off |
-| 7 | `Throw Strength` | slider | 0.5 to 2 in steps of 0.1 | `Hands.ThrowStrength` | `Multiplies the speed of your throws` | `Tracked Hands` or `Throw by Motion` off |
+| 7 | `Throw Strength` | slider | 0.5 to 2 in steps of 0.1 | `Hands.ThrowStrength` | `Multiplies how far your throws carry` | `Tracked Hands` or `Throw by Motion` off |
 | 8 | `Hand Smoothing` | slider | 0 to 1 in steps of 0.1 | `Hands.Smoothing` | `Steadies the hands. Higher values steady more but lag behind` | `Tracked Hands` off |
 | 9 | `Wrist Health` | toggle | on / off | `Hands.WristHealth` | `Turn your left wrist up to see your health` | |
 | 10 | `Haptics` | toggle | on / off | `Hands.Haptics.Enabled` | `Requires restart! Controllers vibrate for game events` | |
 | 11 | `Haptics Strength` | slider | 0 to 1 in steps of 0.1 | `Hands.Haptics.Strength` | `Strength of every vibration` | `Haptics` off |
 | 12 | `Vibrate on Game Rumble` | toggle | on / off | `Hands.Haptics.GameRumble` | `Vibrate whenever the game would rumble a gamepad` | `Haptics` off |
 | 13 | `Vibrate on Damage` | toggle | on / off | `Hands.Haptics.Damage` | `Vibrate when you are hurt` | `Haptics` off |
-| 14 | `Vibrate on Tracker Pings` | toggle | on / off | `Hands.Haptics.Tracker` | `A faint tick for each motion tracker ping` | `Haptics` off |
+| 14 | `Vibrate on Tracker Pings` | toggle | on / off | `Hands.Haptics.Tracker` | `A faint tick when the motion tracker shows movement` | `Haptics` off |
 | 15 | `Vibrate on Firing` | toggle | on / off | `Hands.Haptics.Firing` | `Vibrate your right hand when you fire` | `Haptics` off |
 | 16 | `Vibrate on Hacking` | toggle | on / off | `Hands.Haptics.Hacking` | `Vibrate when hacking or cutting starts and ends` | `Haptics` off |
 
@@ -1446,10 +1766,11 @@ description length, 22 §12.1].
 | # | Label | Kind | Values shown | Key | Description line | Greyed while |
 |---|---|---|---|---|---|---|
 | 1 | `Body` | list | `Full`, `Arms and Hands`, `Hands Only`, `None` | `Body.Visible` | `Which parts of your character's body you see` | |
-| 2 | `Eye Forward` | slider | -0.2 to 0.2 in steps of 0.01 | `Body.EyeForward` | `Moves your view forward (positive) or back from the body, in metres` | |
+| 2 | `Eye Forward` | slider | -0.2 to 0.2 in steps of 0.01 | `Body.EyeForward` | `Moves your view forward (positive) or back from the body, in metres. Suggested: 0.10` | |
 | 3 | `Room-Scale` | toggle | on / off | `Body.RoomScale` | `Walking in your play space moves you in the game` | |
 | 4 | `Seated Eye Raise` | slider | -0.5 to 0.5 in steps of 0.05 | `Body.SeatedEyeRaise` | `Raises (positive) or lowers the view when seated, in metres` | `Play Mode` is `Standing` (22 §12.2) |
 | 5 | `Real Crouch` | toggle | on / off | `Body.RealCrouch` | `Crouch for real to crouch in the game. Needs Standing play and a calibration` | `Play Mode` is `Seated`, or no standing height is calibrated (22 §6.2) |
+| 6 | `Height Fix After Loading` | toggle | on / off | `Body.CrouchResync` | `Crouches and stands once, unseen, after a load or a suit change, to set the view height` | |
 
 Console commands in the `mvr_*` family for these keys are the
 implementation's choice of names (they are not compatibility names); 06
@@ -1523,6 +1844,13 @@ locking or logging on the render thread or in the job (12 §6).
 | body visibility: the player's skeleton could not be read (§10.2) | WRN, once per change of the skeleton, pose, value or reason | the skeleton's name; why (the reason, the bone count read, the first bone without a name); that the body is drawn whole until it can be read and how often it is read again |
 | real crouch: a press the byte did not follow (§11.5) | WRN, once | the time waited |
 | `Body.RoomScale` on while §11.3's facts are open | INF, once | that room-scale is off in this build and why |
+| r11: game rumble, with `DebugOptions` | VRB, every 900 frames while any level was not 0 | the highest level per channel received since the last line, the number of calls, and the highest amplitude played after §14.4 |
+| r11: a scripted action start (§2.11) | DBG | the action name; whether it was the player's; the episode it began (§12.1) or that it was ignored |
+| r11: a play-animation request or its counterpart (§2.11) | DBG, with `DebugOptions` | the call; until §22 item 15 is resolved, that the episode is not used |
+| r11: melee arm hand-off (§8.2) | DBG | start and end, and whether the swing came from a motion |
+| r11: throw release to launch (§9.2) | DBG; WRN once when above 0.15 s | the measured delay |
+| r11: camera height re-sync (§11.6) | INF | the trigger; the pivot-to-eye height before and 1 s after (with `DebugOptions`); the presses made; on a press the byte did not follow, WRN once |
+| r11: weapon transform first read per weapon class (§5.2) | INF, with `DebugOptions` | the class; the transform's three columns and origin next to the aim pose's forward and position |
 
 The calibration and the play mode are logged by 22 (22 §16).
 | haptic actions created, or bound/unbound | INF / WRN | per hand; that a saved binding lacks them |
@@ -1580,6 +1908,13 @@ every row. Names are spec labels.
 | `TrackerScan` | 0x431E40 | ? | function | `55 8b ec 83 e4 f0`; facing at tracker +0xF0 / +0xF8 | 2.6 |
 | `SetBodyVelocities` | 0x3EF590 | ? | function | `55 8b ec 83 e4 f0 83 ec 3c` | 2.7 |
 | `RumbleSetMotors` | 0xC09280 | ? | function, vtable slot at 0x11C1840 | `f3 0f 10 44 24 04` | 2.9 |
+| `RumbleMotionOutput` | 0xC08B50 | ? | function, slot `+0x50` of the vtable at 0x11C177C | `0f 57 c9 83 ec 08 56 8b f1`; last pair sent at `+0xA8` / `+0xA4`, device at `+0xAC` | 2.9 |
+| `WeaponTransform` | 0x3A07D0 | ? | function | `51 56 57 51 8b f1 83 be cc 00 00 00`; `thiscall` on the item, (out 3x4*), `ret 4` | 2.5, 5.2 |
+| tracker scan call | 0x43287D | ? | call site | `e8 be f5 ff ff` (to 0x431E40); raised byte tracker `+0x1378`, range float `+0x11C` | 2.6, 6.2, 14 |
+| velocity helper linear call | 0x3EF62A | ? | call site | indirect call to the body's slot `+0x40` (0x73F5A0, `8b 44 24 04 0f 28 00 0f 29 81 d0 00`) | 2.7, 9.2 |
+| melee action starts | 0x268670 / 0x268AF0 | ? | functions | `55 8b ec 83 e4 f0 81 ec b4 00 00 00`; `thiscall`, plain `ret`; slot 24 of the vtables at 0xEAC528 / 0xEAC5E8 | 2.11, 8.2 |
+| scripted action starts | 0x26DC20, 0x26E3F0, 0x2702C0, 0x2737E0, 0x275560 | ? | functions | bytes in §2.11; `thiscall`, plain `ret` | 2.11, 12 |
+| play-animation request / counterpart | 0x130A70 / 0x130CE0 | ? | functions, slots `+0x3D0` / `+0x3D4` of the table at 0xE34960 | bytes in §2.11; `thiscall`, `ret 8` | 2.11, 12 |
 | HeadClipFade call (v1) | 0x34E2C1 | (as 08) | call site | `e8 1a 8b ff ff` | 2.10 |
 
 ## 21. Acceptance
@@ -1654,6 +1989,36 @@ where a VRB line is needed.
 19. The `Hands` and `Body` pages show the labels, values, order and
     description lines of §15.3; with `Tracked Hands` off, items 2 to 8 of
     `Hands` are greyed; in seated play `Real Crouch` is greyed.
+20. r11, scripted actions: with `DebugOptions`, get grabbed by an android
+    and break free, and do a melee kill: the log names each action start
+    of §2.11 as the player's, the hands go to the game's animation and come
+    back within one second of the player taking up an item. Play a
+    scripted scene with a play-animation request: the log shows the
+    request and its counterpart in pairs.
+21. r11, melee: swing the maintenance jack at an android with the trigger
+    and by motion: both land hits; the right arm plays the stock swing and
+    is back on the controller within about 1 s; the left hand stays.
+22. r11, rumble: with `Hands.Haptics.Enabled` on and `DebugOptions`, raise
+    the tracker with nothing near for 30 s: no vibration on either hand;
+    the log's rumble line gives the levels received. With a contact on the
+    tracker: one faint tick per scan on the left hand. A pipe bomb
+    exploding nearby: a strong rumble on both hands. With a real pad also
+    connected, the pad rumbles as without the mod.
+23. r11, throwing: throw a noisemaker by motion: it leaves the hand within
+    0.15 s of opening the grip (log: the delay); seated, with
+    `Hands.ThrowStrength` 2.0, a short flick carries it about twice as far
+    without flying higher.
+24. r11, height re-sync: `Body.CrouchResync` and `DebugOptions` on: load a
+    save standing, and complete a suit change: the log gives the
+    pivot-to-eye height before and after; after the re-sync the view is
+    at the standing height (as after a manual crouch and stand), the black
+    lasts under 1.5 s, and play resumes facing the way the player faces.
+    With the key off nothing happens and nothing is logged.
+25. r11, drift: sprint forward with both hands held out: the in-game hands
+    stay on the controllers (no trailing behind the body).
+26. r11, tracker heading: raise the tracker and turn the left wrist so the
+    drawn tracker points 45 degrees off the controller's pointing
+    direction: the blips follow the drawn tracker.
 
 ## 22. Open questions
 
@@ -1672,21 +2037,38 @@ where a VRB line is needed.
    which limbs its four call sites serve stays open and no longer blocks
    anything.
 5. **Weapon transform**: where the drawn weapon's muzzle and barrel axis
-   can be read (a candidate is the function at 0x3A07D0 on the weapon; its
-   meaning is not verified).
+   can be read. r11: `WeaponTransform` 0x3A07D0 gives the held item's world
+   transform (§2.5) [likely]; still open: which of its columns is the
+   barrel, the muzzle offset per class, and whether the bolt gun's
+   transform follows its barrel. To resolve: the INF line of §18 per class
+   next to the aim pose, and acceptance item 5.
 6. **Fire alignment gate**: what the 0.75 m test measures (§2.5), and
    whether it also guards something the hand must still respect (a weapon
    pushed into a wall). Look at 0x3A0E50's result and the state values 6
    to 8 at `[+0x152C] + 4`.
 7. **Tracker facing writer**: which code writes tracker `+0xF0`/`+0xF8`, so
    the mod's value is not overwritten between its write and the scan; and
-   whether the scan runs while the tracker is lowered.
+   whether the scan runs while the tracker is lowered. r11: nothing runs
+   between the scan's one call (0x43287D) and its read, so a value written
+   just before that call holds for the scan; the scan's result counts only
+   while `+0x1378` is set (§2.6). The writer itself is still not located;
+   it no longer blocks §6.
 8. **Throw launch**: which of the nine `SetBodyVelocities` callers (§2.7),
    or another path, launches a thrown item; whether the game derives the
    throw direction from the aim ray; whether the spawn point can be set.
+   r11: every linear velocity of the helper passes its call at 0x3EF62A;
+   to find the throw, log the physics object and the caller there during
+   one throw (acceptance item 23). Also open: the delay from the fire
+   press to the launch (the game's throw animation), against §9.2's
+   0.15 s.
 9. **Rumble**: which game events rumble; whether `RumbleSetMotors` is
    called with no physical pad connected (the pad is virtual in v1, 04 §3);
-   and on which thread.
+   and on which thread. r11: it is called from the rumble mix's motion
+   output only, with that mix's peak levels, only on a change (§2.9); a
+   missing pad does not stop the calls once the output's device exists.
+   Still open: whether the factory creates the device with no pad
+   connected, which thread runs the output [likely the audio thread], and
+   whether the game's Vibration option silences it.
 10. **Clipping**: whether hands and weapons may pass through walls or must
     be stopped at geometry (and how, without writing physics).
 11. **Tracker model**: whether the game's tracker animation holds the
@@ -1697,6 +2079,11 @@ where a VRB line is needed.
     `ACT_PLAYER_MELEE` action), to replace the 0.6 s of §8.2; and whether
     the game's melee hit test follows the arm's animation (then the arm
     must play it during a swing by motion, §8.2) or the camera or body.
+    r11: the action's two start methods are located (§2.11) and §8.2 hands
+    the arm to the game's animation for 0.9 s from each start [likely that
+    the hit follows the animation; acceptance item 21]. Still open: the
+    action's end (its `animation_finished` handling), to replace the
+    0.9 s.
 14. **Crouch eye height**: the game's standing and crouched eye heights
     (or the camera's height change on crouch), for §11.5. r7: 0.63 m from
     the game's camera constants [likely] (§11.5); the code that reads them
@@ -1705,10 +2092,17 @@ where a VRB line is needed.
     observe that an animation drives the player's body and view
     (`CMD_PlayAnimation` and its `PlayerAnimDrivenView`, the
     `ACT_PLAYER_*` actions); the mission 4 android encounter of 05 §16 is
-    one case.
+    one case. r11: the player actions' start methods and the play
+    request's functions are located (§2.11) and the player actions are
+    episodes (§12.1). Still open: each action's end; how a play request
+    names its character (so only the player's are episodes); that 0x130CE0
+    is the request's end.
 16. **Watch part**: whether the in-game watch (`RIPLEY_FP`'s `WATCH`
     part, §2.8) could show health instead of the runtime panel of §13.2,
-    and what that would need.
+    and what that would need. r11 lead: tinting the watch part's colour
+    in steps of health (for example full, three quarters, half, a quarter,
+    blinking below) where the game draws that part; its material and
+    shader are not located.
 17. **A verified shot event** for the firing pulse (ammunition decrement
     or the weapon's fire function).
 18. **Hacking steps**: a per-step signal of the hacking device (correct and
@@ -1727,7 +2121,9 @@ where a VRB line is needed.
 24. **Screens framed for a fixed eye point** (§11.2): which interaction
     kinds of 11 §5.3 show a screen the game composes for the body's own
     eye point. To resolve: with `Body.EyeForward` at +0.2, use each kind
-    and note the screens that are cropped or misaligned.
+    and note the screens that are cropped or misaligned. r11: hacking and
+    cutting are such kinds (§11.2) [likely]; terminal, keypad and rewire
+    are still to be checked.
 25. **Frame of the move action** (§11.3): whether the game reads map 0
     analog 0 and 1 relative to the camera's yaw, the body's or the world's.
     To find: the player locomotion's reader of the move action; or in game,
@@ -1743,6 +2139,13 @@ where a VRB line is needed.
 28. **The requested crouch byte in play** (§2.2, §11.5): that `+0x3E3A`
     follows the game's crouch for the player, including crouches the game
     makes itself (vents, scripted). Acceptance item 14.
+29. **Camera height after a load or a suit change** (§11.6, r11): whether
+    the view starts at a wrong height in this mod at all, by how much, and
+    which game state a crouch and stand reset (for example the character's
+    crouched byte `+0x2AF`, which the crouch requests set for other
+    characters, §2.2). To resolve: acceptance item 24's log lines with the
+    key on; if the height is wrong in v1 too, the re-sync becomes a v1 fix
+    (§23).
 
 Answered by r7 from the open points the earlier revisions left inside §2:
 the final-pose step's return and the pose's way to the renderer (§2.3,
@@ -1792,6 +2195,11 @@ Not made here; for the next revisions:
   standing play and a calibration is said by the `Real Crouch`
   description and the calibration's texts on the options page (§15.3, 22
   §12.2). The player guide lists the `Hands` and `Body` pages.
+- r11: `05-game-patches.md` (v1): if §22 item 29 shows the wrong height
+  after a load in v1, §11.6's re-sync is moved there as a v1 fix with its
+  own acceptance item, and `Body.CrouchResync` is removed.
+- r11: `11-diagnostics.md`: the rumble, action, re-sync and weapon
+  transform events of §18.
 - `04-input.md` §5.7: which controls help rows change while tracked hands
   are on (for example `Aim` no longer on the right grip with
   `Hands.AimFromHand`) is to be given with the inputs of §16 [open: the
