@@ -51,4 +51,15 @@ private:
     core::diag::ports::Log& log_;
 };
 
+// A `call rel32` to point at a replacement with the callee's ABI, and its
+// name for the patcher's log.
+struct CallRedirect {
+    std::uint8_t* site;
+    const void* fn;
+    std::string_view what;
+};
+
+// Redirects `calls` in order and stops at the first that fails; false then.
+bool redirect_all(Patcher& patcher, std::span<const CallRedirect> calls) noexcept;
+
 } // namespace omvr::game

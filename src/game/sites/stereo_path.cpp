@@ -54,10 +54,12 @@ bool point_recenter_sites(const GameImage& g, Patcher& p) noexcept {
 }
 
 bool redirect_manager_calls(const GameImage& g, Patcher& p, const StereoDeviceHooks& hooks) noexcept {
-    return p.redirect_call(g.at(AiAddr::CreateDeviceCall), hooks.create_device, "CreateDevice") &&
-           p.redirect_call(g.at(AiAddr::HmdResolutionCall), hooks.get_hmd_resolution, "GetHmdResolution") &&
-           p.redirect_call(g.at(AiAddr::RenderTargetSizeCall), hooks.get_render_target_size,
-                           "GetRenderTargetSize");
+    const std::array calls{
+        CallRedirect{g.at(AiAddr::CreateDeviceCall), hooks.create_device, "CreateDevice"},
+        CallRedirect{g.at(AiAddr::HmdResolutionCall), hooks.get_hmd_resolution, "GetHmdResolution"},
+        CallRedirect{g.at(AiAddr::RenderTargetSizeCall), hooks.get_render_target_size,
+                     "GetRenderTargetSize"}};
+    return redirect_all(p, calls);
 }
 
 } // namespace

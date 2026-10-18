@@ -45,4 +45,11 @@ util::Result<void> Patcher::redirect_call(std::uint8_t* site, const void* fn,
     return {};
 }
 
+bool redirect_all(Patcher& p, std::span<const CallRedirect> calls) noexcept {
+    for (const CallRedirect& c : calls) {
+        if (!p.redirect_call(c.site, c.fn, c.what)) return false;
+    }
+    return true;
+}
+
 } // namespace omvr::game

@@ -201,15 +201,14 @@ bool install_crosshair_sites(const GameImage& g, Patcher& p, const HudHooks& hoo
     // The invokes first: until the update's call is redirected the game's
     // own update runs them, and the replacements pass them through while
     // the gate has not hidden anything.
-    if (!p.redirect_call(g.at_rva(r.show_crosshairs_call), code_pointer(hooks.show_crosshairs),
-                         "ShowCrosshairs") ||
-        !p.redirect_call(g.at_rva(r.hide_crosshairs_call), code_pointer(hooks.hide_crosshairs),
-                         "HideCrosshairs") ||
-        !p.redirect_call(g.at_rva(r.crosshair_update_call), code_pointer(hooks.crosshair_update),
-                         "CrosshairUpdate")) {
-        return false;
-    }
-    ports::logf(p.log(), kLogOn, kCrosshairArea, 3);
+    const std::array calls{
+        CallRedirect{g.at_rva(r.show_crosshairs_call), code_pointer(hooks.show_crosshairs), "ShowCrosshairs"},
+        CallRedirect{g.at_rva(r.hide_crosshairs_call), code_pointer(hooks.hide_crosshairs), "HideCrosshairs"},
+        CallRedirect{g.at_rva(r.crosshair_update_call), code_pointer(hooks.crosshair_update),
+                     "CrosshairUpdate"}};
+    static_assert(calls.size() == 3);
+    if (!redirect_all(p, calls)) return false;
+    ports::logf(p.log(), kLogOn, kCrosshairArea, calls.size());
     return true;
 }
 
@@ -223,13 +222,12 @@ bool install_highlight_sites(const GameImage& g, Patcher& p, const HudHooks& hoo
                           c.call(r.icon_highlight_call_b, r.icon_highlight, "its second call");
     if (!expected) return false;
     out.icon_highlight = CodeAddress{g.at_rva(r.icon_highlight)};
-    if (!p.redirect_call(g.at_rva(r.icon_highlight_call_a), code_pointer(hooks.icon_highlight),
-                         "IconHighlight") ||
-        !p.redirect_call(g.at_rva(r.icon_highlight_call_b), code_pointer(hooks.icon_highlight),
-                         "IconHighlight")) {
-        return false;
-    }
-    ports::logf(p.log(), kLogOn, kHighlightArea, 2);
+    const std::array calls{
+        CallRedirect{g.at_rva(r.icon_highlight_call_a), code_pointer(hooks.icon_highlight), "IconHighlight"},
+        CallRedirect{g.at_rva(r.icon_highlight_call_b), code_pointer(hooks.icon_highlight), "IconHighlight"}};
+    static_assert(calls.size() == 2);
+    if (!redirect_all(p, calls)) return false;
+    ports::logf(p.log(), kLogOn, kHighlightArea, calls.size());
     return true;
 }
 

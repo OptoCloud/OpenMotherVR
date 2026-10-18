@@ -83,11 +83,12 @@ ControlsOutcome install_controls(const GameImage& g, Patcher& p, const PadReplac
                                  input::StockPad& stock) noexcept {
     if (!install_pad_slots(p, g.at(AiAddr::PadVtable), replacements, stock))
         return ControlsOutcome::SlotsNotWritten;
-    const bool ok = p.write(g.at(AiAddr::PadConnectedSet), kPadAlwaysConnected) &&
-                    p.redirect_call(g.at(AiAddr::LeftStickPromptCall), replacements.move_on_left_stick,
-                                    kLeftStickPrompt) &&
-                    p.redirect_call(g.at_rva(g.sites.left_stick_prompt_call_2),
-                                    replacements.move_on_left_stick, kLeftStickPrompt);
+    const std::array prompts{
+        CallRedirect{g.at(AiAddr::LeftStickPromptCall), replacements.move_on_left_stick, kLeftStickPrompt},
+        CallRedirect{g.at_rva(g.sites.left_stick_prompt_call_2), replacements.move_on_left_stick,
+                     kLeftStickPrompt}};
+    static_assert(static_cast<int>(prompts.size()) == kLeftStickPromptCalls);
+    const bool ok = p.write(g.at(AiAddr::PadConnectedSet), kPadAlwaysConnected) && redirect_all(p, prompts);
     return ok ? ControlsOutcome::Installed : ControlsOutcome::LaterWriteFailed;
 }
 

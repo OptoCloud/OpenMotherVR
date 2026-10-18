@@ -66,10 +66,9 @@ bool install_body_sites(const GameImage& g, Patcher& p, const void* hook, BodyTa
         return false;
     }
     out.skin_set_pose = CodeAddress{g.at_rva(r.skin_set_pose)};
-    if (!p.redirect_call(g.at_rva(r.skin_call_single), hook, "SkinSetPose") ||
-        !p.redirect_call(g.at_rva(r.skin_call_parts), hook, "SkinSetPose")) {
-        return false;
-    }
+    const std::array calls{CallRedirect{g.at_rva(r.skin_call_single), hook, "SkinSetPose"},
+                           CallRedirect{g.at_rva(r.skin_call_parts), hook, "SkinSetPose"}};
+    if (!redirect_all(p, calls)) return false;
     ports::logf(p.log(), kLogOn, r.skin_call_single, r.skin_call_parts);
     return true;
 }

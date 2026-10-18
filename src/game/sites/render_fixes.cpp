@@ -27,8 +27,6 @@ namespace ports = core::diag::ports;
 // ---- Areas, their site counts and log templates -------------------------------
 
 constexpr int kReflectionSites = 2; // the render call and the clear gate
-constexpr int kStereoAaSites   = 2; // the SMAA call and the stereo output draw
-constexpr int kCullingSites    = 2; // the distance and the occlusion test calls
 constexpr int kHeadClipSites   = 1;
 constexpr int kEventTapSites   = 1;
 constexpr int kAlphaLightSites = 1;
@@ -120,10 +118,11 @@ void fix_anti_aliasing(const GameImage& g, Patcher& p, const ReconRvas& r,
         .aa_pass         = g.at_rva(r.aa_pass),
         .smaa            = g.at_rva(r.smaa),
     };
-    if (p.redirect_call(smaa_site, hooks.run_smaa, "SMAA") &&
-        p.redirect_call(draw_site, hooks.stereo_final_draw, "stereo output draw")) {
-        area_on(p.log(), kStereoAaArea, kStereoAaSites);
-    }
+    // The SMAA call and the stereo output draw.
+    const std::array calls{CallRedirect{smaa_site, hooks.run_smaa, "SMAA"},
+                           CallRedirect{draw_site, hooks.stereo_final_draw, "stereo output draw"}};
+    static_assert(calls.size() == 2);
+    if (redirect_all(p, calls)) area_on(p.log(), kStereoAaArea, static_cast<int>(calls.size()));
 }
 
 // Object culling (08 §2). In stereo the distance/LOD test passes in every
@@ -141,9 +140,13 @@ void fix_culling(const GameImage& g, Patcher& p, const ReconRvas& r, const Rende
         .distance  = g.at_rva(r.cull_distance),
         .occlusion = g.at_rva(r.cull_occlusion),
     };
-    if (p.redirect_call(g.at_rva(r.cull_distance_call), hooks.cull_distance, "distance cull") &&
-        p.redirect_call(g.at_rva(r.cull_occlusion_call), hooks.cull_occlusion, "occlusion cull")) {
-        area_on(p.log(), kCullingArea, kCullingSites);
+    // The distance and the occlusion test calls.
+    const std::array calls{
+        CallRedirect{g.at_rva(r.cull_distance_call), hooks.cull_distance, "distance cull"},
+        CallRedirect{g.at_rva(r.cull_occlusion_call), hooks.cull_occlusion, "occlusion cull"}};
+    static_assert(calls.size() == 2);
+    if (redirect_all(p, calls)) {
+        area_on(p.log(), kCullingArea, static_cast<int>(calls.size()));
         p.log().line(kCullingOnLog);
     }
 }
