@@ -5,6 +5,7 @@
 #include "core/input/types.h"
 #include "core/vr/types.h"
 #include "platform/openvr/binding_manifest.h"
+#include "util/sync/once_latch.h"
 
 #include <array>
 #include <cstddef>
@@ -72,7 +73,6 @@ private:
     void register_actions(vr::IVRInput* input);
     bool controllers_bound() noexcept;
     void report_unbound_poses() noexcept;
-    void report_unbound_aim() noexcept;
     void report_haptic_binding() noexcept;
     void read_aim(std::size_t hand, int origin, HandPose& p) noexcept;
 
@@ -83,11 +83,11 @@ private:
     std::array<std::uint64_t, core::vr::kHandCount> pose_handles_{};               // hand_left, hand_right
     std::array<std::uint64_t, core::vr::kHandCount> aim_handles_{};                // aim_left, aim_right
     std::array<std::uint64_t, core::vr::kHandCount> haptic_handles_{}; // haptic_left, haptic_right
-    bool aim_poses_          = false;
-    bool haptics_            = false;
-    bool unbound_logged_     = false;
-    bool aim_unbound_logged_ = false;
-    bool haptics_logged_     = false;
+    bool aim_poses_      = false;
+    bool haptics_        = false;
+    bool unbound_logged_ = false;
+    util::OnceLatch aim_unbound_logged_;
+    bool haptics_logged_ = false;
 };
 
 } // namespace omvr::platform::openvr

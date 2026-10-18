@@ -16,6 +16,7 @@
 #include "platform/openxr/xr_handle.h"
 #include "platform/openxr/xr_headers.h"
 #include "platform/win32/com_ptr.h"
+#include "util/sync/once_latch.h"
 #include "util/sync/seqlock.h"
 
 #include <array>
@@ -168,7 +169,7 @@ struct Session::Impl {
     std::chrono::steady_clock::time_point running_since{};
     bool visible_reported = false;
     // The elevated-process note is logged once per process (09 §1).
-    bool elevation_logged = false;
+    util::OnceLatch elevation_logged;
 
     // The controllers, synced at the start of each frame.
     Input input;

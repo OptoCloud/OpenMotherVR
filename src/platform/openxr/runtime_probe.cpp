@@ -160,10 +160,7 @@ void Session::Impl::point_loader_at(const std::filesystem::path& manifest_path) 
 void Session::Impl::set_runtime_environment(const std::filesystem::path& manifest_path) noexcept {
     if (manifest_path.empty()) return;
     win32::set_crt_environment_variable(kRuntimeJsonVariable, manifest_path.native());
-    if (!elevation_logged && win32::process_elevated()) {
-        elevation_logged = true;
-        log.line(kLogElevated);
-    }
+    if (win32::process_elevated() && elevation_logged.first()) log.line(kLogElevated);
 }
 
 std::filesystem::path Session::Impl::probe() noexcept {

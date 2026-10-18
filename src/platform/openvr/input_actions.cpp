@@ -199,9 +199,11 @@ void Actions::read_aim(std::size_t hand, int origin, HandPose& p) noexcept {
         return;
     }
     // The grip is tracked, so the controller is bound: an inactive aim pose
-    // is a binding without it.
+    // is a binding without it (21 §16: a binding saved from a manifest
+    // before the aim poses were always declared). Said once, like the grip
+    // poses.
     if (!d.bActive) {
-        if (!aim_unbound_logged_) report_unbound_aim();
+        if (aim_unbound_logged_.first()) log_.line(kLogAimUnbound);
         return;
     }
     if (!d.pose.bPoseIsValid) return;
@@ -233,14 +235,6 @@ void Actions::report_haptic_binding() noexcept {
         logf(log_, kLogHapticsBound, bound[0], bound[1]);
     else
         logf(log_, kLogHapticsUnbound, bound[0], bound[1]);
-}
-
-// 21 §16: a hand tracked by its grip pose but without an aim pose: a
-// binding saved from a manifest before the aim poses were always declared.
-// Said once, like the grip poses.
-void Actions::report_unbound_aim() noexcept {
-    aim_unbound_logged_ = true;
-    log_.line(kLogAimUnbound);
 }
 
 // Controllers bound (fire reads active) but a hand pose not: a binding
