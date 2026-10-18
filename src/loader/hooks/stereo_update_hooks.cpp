@@ -23,7 +23,6 @@ namespace omvr::loader::hooks {
 namespace {
 
 using core::stereo::Matrix44;
-using core::stereo::ModePolicy;
 using core::stereo::StereoMode;
 using core::stereo::UpdateInput;
 using core::stereo::UpdateOutput;
@@ -109,7 +108,7 @@ void place_menu_screen(Context& ctx, StereoManager& m) noexcept {
 
 // Rule f (05 §3.2f): the stack count follows the mode.
 void sync_mode_stack(Context& ctx, StereoManager& m) noexcept {
-    const auto sync = ModePolicy::sync_mode_stack(
+    const auto sync = core::stereo::sync_mode_stack(
         game::stereo::mode_stack_state(m), game::stereo::has_mode_stack_append(ctx.targets.mode_stack));
     ctx.modes.report(game::stereo::apply_stack_sync(ctx.targets.mode_stack, m, sync));
 }
@@ -231,12 +230,12 @@ float* __cdecl place_hud_panel(float* out, float, float inv_aspect, float) noexc
 void __fastcall push_mode(StereoManager* self, void*, int mode) noexcept {
     auto& ctx = context();
     game::stereo::apply_mode_steps(ctx.addresses, ctx.log, *self,
-                                   ModePolicy::push(mode_of(*self), static_cast<StereoMode>(mode)));
+                                   core::stereo::push_mode(mode_of(*self), static_cast<StereoMode>(mode)));
 }
 
 void __fastcall pop_mode(StereoManager* self, void*) noexcept {
     auto& ctx = context();
-    game::stereo::apply_mode_steps(ctx.addresses, ctx.log, *self, ModePolicy::pop(mode_of(*self)));
+    game::stereo::apply_mode_steps(ctx.addresses, ctx.log, *self, core::stereo::pop_mode(mode_of(*self)));
 }
 
 // The control prompts ask whether movement is on the left stick; the game's

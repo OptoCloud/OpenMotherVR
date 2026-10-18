@@ -282,36 +282,34 @@ TEST_CASE("virtual screen and HUD quads follow the view") {
     CHECK(d[10] == 1.0f);
 }
 
-TEST_CASE("mode policy: push, pop, enter and leave screen mode") {
-    const ModeSteps open = ModePolicy::push(StereoMode::World, StereoMode::Screen);
+TEST_CASE("mode policy: push, pop (also leaving screen mode), enter screen mode") {
+    const ModeSteps open = push_mode(StereoMode::World, StereoMode::Screen);
     CHECK_FALSE(open.pop);
     CHECK(open.push == StereoMode::Screen);
 
-    const ModeSteps again = ModePolicy::push(StereoMode::Screen, StereoMode::Screen);
+    const ModeSteps again = push_mode(StereoMode::Screen, StereoMode::Screen);
     CHECK(again.pop);
     CHECK(again.push == StereoMode::Screen);
 
-    CHECK(ModePolicy::pop(StereoMode::Screen).pop_to_world);
-    CHECK_FALSE(ModePolicy::pop(StereoMode::World).pop_to_world);
+    CHECK(pop_mode(StereoMode::Screen).pop_to_world);
+    CHECK_FALSE(pop_mode(StereoMode::World).pop_to_world);
 
-    const ModeSteps enter = ModePolicy::enter_screen_mode(StereoMode::World);
+    const ModeSteps enter = enter_screen_mode(StereoMode::World);
     CHECK_FALSE(enter.pop);
     CHECK(enter.push == StereoMode::Screen);
-    CHECK(ModePolicy::enter_screen_mode(StereoMode::Screen).pop);
-    CHECK(ModePolicy::leave_screen_mode(StereoMode::Screen).pop_to_world);
-    CHECK_FALSE(ModePolicy::leave_screen_mode(StereoMode::World).pop_to_world);
+    CHECK(enter_screen_mode(StereoMode::Screen).pop);
 }
 
 TEST_CASE("mode policy: the stack count follows the mode") {
     using S = StackSync;
-    CHECK(ModePolicy::sync_mode_stack({StereoMode::World, 1, 4, true}, true) == S::Lower);
-    CHECK(ModePolicy::sync_mode_stack({StereoMode::Screen, 2, 4, true}, true) == S::Lower);
-    CHECK(ModePolicy::sync_mode_stack({StereoMode::Screen, 1, 4, true}, true) == S::None);
-    CHECK(ModePolicy::sync_mode_stack({StereoMode::World, 0, 0, false}, false) == S::None);
-    CHECK(ModePolicy::sync_mode_stack({StereoMode::Screen, 0, 0, false}, true) == S::Append);
-    CHECK(ModePolicy::sync_mode_stack({StereoMode::Screen, 0, 1, true}, false) == S::WriteInPlace);
-    CHECK(ModePolicy::sync_mode_stack({StereoMode::Screen, 0, 0, true}, false) == S::NoStorage);
-    CHECK(ModePolicy::sync_mode_stack({StereoMode::Screen, 0, 4, false}, false) == S::NoStorage);
+    CHECK(sync_mode_stack({StereoMode::World, 1, 4, true}, true) == S::Lower);
+    CHECK(sync_mode_stack({StereoMode::Screen, 2, 4, true}, true) == S::Lower);
+    CHECK(sync_mode_stack({StereoMode::Screen, 1, 4, true}, true) == S::None);
+    CHECK(sync_mode_stack({StereoMode::World, 0, 0, false}, false) == S::None);
+    CHECK(sync_mode_stack({StereoMode::Screen, 0, 0, false}, true) == S::Append);
+    CHECK(sync_mode_stack({StereoMode::Screen, 0, 1, true}, false) == S::WriteInPlace);
+    CHECK(sync_mode_stack({StereoMode::Screen, 0, 0, true}, false) == S::NoStorage);
+    CHECK(sync_mode_stack({StereoMode::Screen, 0, 4, false}, false) == S::NoStorage);
 }
 
 TEST_CASE("mode policy reports each failure once") {

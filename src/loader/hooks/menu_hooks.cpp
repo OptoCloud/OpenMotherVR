@@ -13,7 +13,6 @@ namespace omvr::loader::hooks {
 
 namespace {
 
-using core::stereo::ModePolicy;
 using core::stereo::StereoMode;
 
 // The game's methods these replace (05 §5, §6): thiscall, as
@@ -47,13 +46,13 @@ StereoMode current_mode(Context& ctx) noexcept { return static_cast<StereoMode>(
 void enter_screen_mode() noexcept {
     auto& ctx = context();
     game::stereo::apply_mode_steps(ctx.addresses, ctx.log, ctx.manager,
-                                   ModePolicy::enter_screen_mode(current_mode(ctx)));
+                                   core::stereo::enter_screen_mode(current_mode(ctx)));
 }
 
 void leave_screen_mode() noexcept {
     auto& ctx = context();
     game::stereo::apply_mode_steps(ctx.addresses, ctx.log, ctx.manager,
-                                   ModePolicy::leave_screen_mode(current_mode(ctx)));
+                                   core::stereo::pop_mode(current_mode(ctx)));
 }
 
 } // namespace

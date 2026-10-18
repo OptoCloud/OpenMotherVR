@@ -16,21 +16,15 @@ constexpr std::string_view kNoStorageLog =
 
 } // namespace
 
-ModeSteps ModePolicy::push(StereoMode current, StereoMode requested) noexcept {
+ModeSteps push_mode(StereoMode current, StereoMode requested) noexcept {
     if (requested == StereoMode::Screen && current == StereoMode::World) return {.push = StereoMode::Screen};
     return {.pop = true, .push = requested};
 }
 
-ModeSteps ModePolicy::pop(StereoMode current) noexcept {
-    return {.pop_to_world = current == StereoMode::Screen};
-}
+ModeSteps pop_mode(StereoMode current) noexcept { return {.pop_to_world = current == StereoMode::Screen}; }
 
-ModeSteps ModePolicy::enter_screen_mode(StereoMode current) noexcept {
+ModeSteps enter_screen_mode(StereoMode current) noexcept {
     return {.pop = current != StereoMode::World, .push = StereoMode::Screen};
-}
-
-ModeSteps ModePolicy::leave_screen_mode(StereoMode current) noexcept {
-    return {.pop_to_world = current == StereoMode::Screen};
 }
 
 // Lowering writes the count. Raising does not, because when the game
@@ -40,7 +34,7 @@ ModeSteps ModePolicy::leave_screen_mode(StereoMode current) noexcept {
 // allocates (on this thread, where the game pushes too). Without that
 // routine the count is raised only into storage the game already has, else
 // left as it is (the pop to the world still gets back to mode 0).
-StackSync ModePolicy::sync_mode_stack(const ModeStackState& stack, bool can_append) noexcept {
+StackSync sync_mode_stack(const ModeStackState& stack, bool can_append) noexcept {
     const auto mode = std::to_underlying(stack.mode);
     if (mode >= 0 && stack.count > mode) return StackSync::Lower;
     if (stack.mode != StereoMode::Screen || stack.count != 0) return StackSync::None;
