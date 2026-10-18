@@ -9,23 +9,22 @@ Addresses in the output are VAs at the file's preferred image base
 Needs: pip install pefile capstone
 """
 import sys
+from pathlib import Path
 
-import capstone
-import pefile
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pe_tools  # noqa: E402
 
 
 def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     rva_mode = "--rva" in sys.argv
-    pe = pefile.PE(args[0], fast_load=True)
+    pe = pe_tools.open_pe(args[0])
     base = pe.OPTIONAL_HEADER.ImageBase
     addr = int(args[1], 16)
     length = int(args[2], 16) if len(args) > 2 else 0x80
     va = base + addr if rva_mode else addr
     data = pe.get_data(va - base, length)
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-    for i in md.disasm(data, va):
-        print(f"{i.address:08x}  {i.bytes.hex():<20} {i.mnemonic} {i.op_str}")
+    pe_tools.print_disasm(va, data)
 
 
 if __name__ == "__main__":

@@ -12,8 +12,8 @@ import re
 import struct
 import sys
 
-import capstone
-import pefile
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import pe_tools  # noqa: E402
 
 INC = pathlib.Path(__file__).resolve().parent.parent / "src/game/ai_address_tables.inc"
 
@@ -26,24 +26,19 @@ def table(use_2020: bool) -> list[int]:
 
 def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    pe = pefile.PE(args[0], fast_load=True)
+    pe = pe_tools.open_pe(args[0])
     base = pe.OPTIONAL_HEADER.ImageBase
     rvas = table("--2020" in sys.argv)
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
     for name in args[1:]:
         g = int(name.removeprefix("DAT_"), 16)
         idx = (g - 0x10066BC8) // 4
         rva = rvas[idx]
-        sec = next((s for s in pe.sections
-                    if s.VirtualAddress <= rva < s.VirtualAddress + s.Misc_VirtualSize), None)
+        sec = pe_tools.section_of(pe, rva)
         sname = sec.Name.rstrip(b"\0").decode() if sec else "?"
         print(f"== {name} slot 0x{idx:02X} rva {rva:08X} va {base + rva:08X} [{sname}]")
         data = pe.get_data(rva, 64).ljust(64, b"\0")  # .bss tail reads as empty
-        if sec is not None and sec.Characteristics & 0x20000000:  # executable
-            for n, i in enumerate(md.disasm(data, base + rva)):
-                print(f"  {i.address:08x}  {i.bytes.hex():<20} {i.mnemonic} {i.op_str}")
-                if n >= 7:
-                    break
+        if sec is not None and sec.Characteristics & pe_tools.IMAGE_SCN_MEM_EXECUTE:
+            pe_tools.print_disasm(base + rva, data, max_n=8, indent="  ")
         else:
             print("  " + " ".join(f"{v:08x}" for v in struct.unpack_from("<8I", data)))
 
