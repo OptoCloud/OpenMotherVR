@@ -3,7 +3,7 @@
 
 #include "core/stereo/tuning.h"
 #include "core/stereo/ui_placement.h"
-#include "core/ui/hud_tuning.h"
+#include "core/ui/tuning.h"
 #include "util/math/finite.h"
 #include "util/math/matrix.h"
 #include "util/math/vec.h"

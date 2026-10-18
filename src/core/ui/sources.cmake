@@ -13,7 +13,6 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/hud_placement.h
     ${CMAKE_CURRENT_LIST_DIR}/hud_toggle.cpp
     ${CMAKE_CURRENT_LIST_DIR}/hud_toggle.h
-    ${CMAKE_CURRENT_LIST_DIR}/hud_tuning.h
     ${CMAKE_CURRENT_LIST_DIR}/hud_visibility.cpp
     ${CMAKE_CURRENT_LIST_DIR}/hud_visibility.h
     ${CMAKE_CURRENT_LIST_DIR}/notices.cpp
