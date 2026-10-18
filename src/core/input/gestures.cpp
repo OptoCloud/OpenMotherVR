@@ -191,7 +191,7 @@ bool HoldBreath::update(bool enabled, const Input& in) noexcept {
 GestureResult Gestures::update(const Controls& c, TimePoint now) noexcept {
     GestureResult out;
     const bool open               = gate_.open(c.poses.focused, now);
-    const ports::GameContext game = context_.game_context();
+    const ports::GameContext game = deps_.context.game_context();
     apply_holsters(c, game, open, out);
     Controls held = c; // the grips a holster took are not the recenter's
     if (out.grip_consumed[kLeftHand]) held.grip_l = false;
@@ -210,16 +210,16 @@ void Gestures::run_recenter(const Controls& c, bool open, TimePoint now) noexcep
         .fire  = c.trigger_r > kTriggerPressed,
         .open  = open,
     };
-    switch (recenter_.update(controls_.recenter_gesture, in, now)) {
+    switch (recenter_.update(deps_.controls.recenter_gesture, in, now)) {
         case RecenterGesture::Result::Fired:
             recenter_request_.store(true, std::memory_order_release);
-            log_.line(kLogRecenter);
+            deps_.log.line(kLogRecenter);
             break;
         case RecenterGesture::Result::SuppressedFire:
-            if (log_.debug_enabled()) diag::ports::logf(log_, kLogRecenterSuppressed, kReasonFire);
+            if (deps_.log.debug_enabled()) diag::ports::logf(deps_.log, kLogRecenterSuppressed, kReasonFire);
             break;
         case RecenterGesture::Result::SuppressedFocus:
-            if (log_.debug_enabled()) diag::ports::logf(log_, kLogRecenterSuppressed, kReasonFocus);
+            if (deps_.log.debug_enabled()) diag::ports::logf(deps_.log, kLogRecenterSuppressed, kReasonFocus);
             break;
         case RecenterGesture::Result::None: break;
     }
@@ -233,7 +233,7 @@ void Gestures::apply_holsters(const Controls& c, const ports::GameContext& game,
         .blocked = game.menu || game.interaction,
         .open    = open,
     };
-    const Holsters::Result r = holsters_.update(controls_.holster_gestures, in);
+    const Holsters::Result r = holsters_.update(deps_.controls.holster_gestures, in);
     out.grip_consumed        = r.consumed;
     for (const Holster z : r.held) {
         out.next_weapon |= z == Holster::RightShoulder;
@@ -244,37 +244,38 @@ void Gestures::apply_holsters(const Controls& c, const ports::GameContext& game,
     if (!r.event) return;
     const auto& e = *r.event;
     if (e.fired) {
-        diag::ports::logf(log_, kLogHolster, zone_name(e.zone), hand_name(e.hand), action_name(e.zone));
-    } else if (log_.debug_enabled()) {
+        diag::ports::logf(deps_.log, kLogHolster, zone_name(e.zone), hand_name(e.hand), action_name(e.zone));
+    } else if (deps_.log.debug_enabled()) {
         const std::string_view why = !open ? kReasonFocus : game.menu ? kReasonMenu : kReasonInteraction;
-        diag::ports::logf(log_, kLogHolsterSuppressed, zone_name(e.zone), hand_name(e.hand), why);
+        diag::ports::logf(deps_.log, kLogHolsterSuppressed, zone_name(e.zone), hand_name(e.hand), why);
     }
 }
 
 void Gestures::apply_lean(const Controls& c, const ports::GameContext& game, bool open,
                           GestureResult& out) noexcept {
-    const HidingLean::Result r = lean_.update(
-        controls_.hiding_lean, {.hiding = game.hiding, .menu = game.menu, .open = open, .poses = &c.poses});
+    const HidingLean::Result r =
+        lean_.update(deps_.controls.hiding_lean,
+                     {.hiding = game.hiding, .menu = game.menu, .open = open, .poses = &c.poses});
     out.lean = r.move;
-    if (r.reference_taken && log_.debug_enabled()) log_.line(kLogLeanReference);
+    if (r.reference_taken && deps_.log.debug_enabled()) deps_.log.line(kLogLeanReference);
     // Once per change (22 §16), never per frame.
     const bool active = lean_active(r.move);
     if (active == lean_logged_) return;
     lean_logged_ = active;
     if (active)
-        diag::ports::logf(log_, kLogLeanOn, r.move.x, r.move.y);
+        diag::ports::logf(deps_.log, kLogLeanOn, r.move.x, r.move.y);
     else
-        log_.line(kLogLeanOff);
+        deps_.log.line(kLogLeanOff);
 }
 
 void Gestures::apply_breath(const Controls& c, const ports::GameContext& game, bool open,
                             GestureResult& out) noexcept {
     out.hold_breath = breath_.update(
-        controls_.hold_breath_gesture,
+        deps_.controls.hold_breath_gesture,
         {.breathing_game = game.breathing_game, .menu = game.menu, .open = open, .poses = &c.poses});
     if (out.hold_breath == breath_logged_) return;
     breath_logged_ = out.hold_breath;
-    log_.line(out.hold_breath ? kLogBreathOn : kLogBreathOff);
+    deps_.log.line(out.hold_breath ? kLogBreathOn : kLogBreathOff);
 }
 
 } // namespace omvr::core::input

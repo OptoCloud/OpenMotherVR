@@ -175,59 +175,59 @@ void ControlMapper::GripToggles::update(bool grip_r, bool grip_l, bool toggle) n
 // presses, and its modifier from sprint while held. The press itself goes to
 // the pad, which drives the actions on the d-pad by their stock control.
 Controls ControlMapper::apply_dpad(const Controls& in) noexcept {
-    const bool enabled = controls_.dpad_emulation;
-    const DpadEmulationResult emu =
-        dpad_.update(in, enabled && stick_.stick_free(), enabled, enabled ? clock_.now() : TimePoint{});
-    Controls c = in;
+    const bool enabled            = deps_.controls.dpad_emulation;
+    const DpadEmulationResult emu = dpad_.update(in, enabled && deps_.stick.stick_free(), enabled,
+                                                 enabled ? deps_.clock.now() : TimePoint{});
+    Controls c                    = in;
     if (emu.stick_used) c.move = {};
     if (emu.modifier_held) c.sprint = false;
     c.dpad = in.dpad | emu.dpad; // 22 §7: a controller's own d-pad and the emulation both press
-    pad_.set_dpad(c.dpad);
+    deps_.pad.set_dpad(c.dpad);
     // Dev. Debug Options: each change of the press, so a tester's log shows
     // the d-pad reaching the game (11 §4.3).
     if (c.dpad != dpad_logged_) {
         dpad_logged_ = c.dpad;
-        if (log_.debug_enabled())
-            diag::ports::logf(log_, kLogDpad, c.dpad.up, c.dpad.down, c.dpad.left, c.dpad.right,
+        if (deps_.log.debug_enabled())
+            diag::ports::logf(deps_.log, kLogDpad, c.dpad.up, c.dpad.down, c.dpad.left, c.dpad.right,
                               emu.dpad.any());
     }
     return c;
 }
 
 void ControlMapper::write(const Controls& in, bool near_head) noexcept {
-    schemes_.refresh(); // the d-pad glyphs follow Controls.DpadEmulation (22 §7)
+    deps_.schemes.refresh(); // the d-pad glyphs follow Controls.DpadEmulation (22 §7)
     Controls c = apply_dpad(in);
     // 22 §8: the gestures see the controls as read; a grip a holster took
     // drives neither Aim nor the tracker, nor counts for ToggleGrips.
     GestureResult gestures;
     // Run with every gesture off too, so each one's state resets (v1: no
     // effect).
-    if (gestures_) {
-        gestures = gestures_->update(c, clock_.now());
+    if (deps_.gestures) {
+        gestures = deps_.gestures->update(c, deps_.clock.now());
         if (gestures.grip_consumed[kLeftHand]) c.grip_l = false;
         if (gestures.grip_consumed[kRightHand]) c.grip_r = false;
     }
-    const bool toggle = settings_.toggle_grips;
+    const bool toggle = deps_.input.toggle_grips;
     grips_.update(c.grip_r, c.grip_l, toggle);
     const bool aim      = toggle ? grips_.aim() : c.grip_r;
     const bool tracker  = toggle ? grips_.tracker() : c.grip_l && !c.radial;
-    GameActions actions = game_actions(c, near_head, settings_.snap_rotation, aim, tracker);
+    GameActions actions = game_actions(c, near_head, deps_.input.snap_rotation, aim, tracker);
     apply_gestures(actions, gestures);
 
-    auto& tiers = pad_.tiers();
+    auto& tiers = deps_.pad.tiers();
     TierWriter player{tiers[game::kPlayerMap]};
     TierWriter menu{tiers[game::kMenuMap]};
     write_player_map(player, c, actions);
     write_menu_map(menu, c, actions);
 
-    if (player.active() || menu.active() || c.dpad.any()) pad_.note_vr_activity();
+    if (player.active() || menu.active() || c.dpad.any()) deps_.pad.note_vr_activity();
 }
 
-void ControlMapper::set_scheme(ControlScheme scheme) noexcept { schemes_.set(scheme); }
+void ControlMapper::set_scheme(ControlScheme scheme) noexcept { deps_.schemes.set(scheme); }
 
 void ControlMapper::identify_controller(std::size_t hand, ControllerSource source,
                                         std::string_view id) noexcept {
-    schemes_.identify(hand, source, id);
+    deps_.schemes.identify(hand, source, id);
 }
 
 } // namespace omvr::core::input

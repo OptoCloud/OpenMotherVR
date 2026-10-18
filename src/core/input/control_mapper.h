@@ -33,15 +33,7 @@ struct ControlMapperDeps {
 // the thumbstick behaviour follows its Oculus Touch scheme (FUN_10004960).
 class ControlMapper final : public ports::ControlsSink {
 public:
-    explicit ControlMapper(const ControlMapperDeps& deps) noexcept
-        : pad_(deps.pad),
-          schemes_(deps.schemes),
-          settings_(deps.input),
-          controls_(deps.controls),
-          stick_(deps.stick),
-          clock_(deps.clock),
-          log_(deps.log),
-          gestures_(deps.gestures) {}
+    explicit ControlMapper(const ControlMapperDeps& deps) noexcept : deps_(deps) {}
 
     // Render thread.
     void write(const Controls& c, bool right_hand_near_head) noexcept override;
@@ -70,14 +62,7 @@ private:
         bool aim_ = false, tracker_ = false;
     };
 
-    VirtualPad& pad_;
-    ControlSchemes& schemes_;
-    const config::InputSettings& settings_;
-    const config::ControlsSettings& controls_;
-    const ports::StickContext& stick_;
-    const diag::ports::Clock& clock_;
-    diag::ports::Log& log_;
-    Gestures* gestures_;
+    ControlMapperDeps deps_;
     GripToggles grips_;
     DpadEmulation dpad_;
     Dpad dpad_logged_{}; // the press last logged (render thread)

@@ -165,8 +165,7 @@ struct GesturesDeps {
 // take_recenter on the game thread.
 class Gestures final {
 public:
-    explicit Gestures(const GesturesDeps& deps) noexcept
-        : controls_(deps.controls), context_(deps.context), log_(deps.log) {}
+    explicit Gestures(const GesturesDeps& deps) noexcept : deps_(deps) {}
 
     // One controls write: `c` as read, with its poses; `now` its time.
     // Called with every gesture off too, so each one's state resets.
@@ -185,9 +184,7 @@ private:
     void apply_breath(const Controls& c, const ports::GameContext& game, bool open,
                       GestureResult& out) noexcept;
 
-    const config::ControlsSettings& controls_;
-    const ports::GestureContext& context_;
-    diag::ports::Log& log_;
+    GesturesDeps deps_;
 
     // Render thread.
     FocusGate gate_;
