@@ -14,6 +14,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/head_clip.h
     ${CMAKE_CURRENT_LIST_DIR}/mode_stack.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mode_stack.h
+    ${CMAKE_CURRENT_LIST_DIR}/post_fx_effects.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/post_fx_effects.h
     ${CMAKE_CURRENT_LIST_DIR}/postfx.cpp
     ${CMAKE_CURRENT_LIST_DIR}/postfx.h
     ${CMAKE_CURRENT_LIST_DIR}/pov.cpp

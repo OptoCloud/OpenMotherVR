@@ -10,7 +10,10 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/dxbc_tokens.h
     ${CMAKE_CURRENT_LIST_DIR}/engine_settings.cpp
     ${CMAKE_CURRENT_LIST_DIR}/engine_settings.h
+    ${CMAKE_CURRENT_LIST_DIR}/post_fx.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/post_fx.h
     ${CMAKE_CURRENT_LIST_DIR}/shader_fix_stats.cpp
     ${CMAKE_CURRENT_LIST_DIR}/shader_fix_stats.h
     ${CMAKE_CURRENT_LIST_DIR}/tuning.h
+    ${CMAKE_CURRENT_LIST_DIR}/types.h
 )
