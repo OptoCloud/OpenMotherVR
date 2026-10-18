@@ -84,10 +84,7 @@ void StereoUpdate::report_turning(Turning turn, const config::ComfortSettings& c
     const TurningInUse now{.turning     = turn,
                            .repeat_ms   = turn == Turning::Snap ? comfort.snap_turn_repeat_ms : 0,
                            .speed_deg_s = turn == Turning::Smooth ? comfort.smooth_turn_speed : 0.0f};
-    if (reported_turning_ != now) {
-        reported_turning_   = now;
-        out.turning_changed = now;
-    }
+    if (reported_turning_.changed(now)) out.turning_changed = now;
 }
 
 // Spec 22 §5: the merged stick movement past its threshold, smooth turn

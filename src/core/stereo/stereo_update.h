@@ -4,6 +4,7 @@
 #include "core/stereo/scene_tracker.h"
 #include "core/stereo/turn_block.h"
 #include "core/stereo/types.h"
+#include "util/sync/change_latch.h"
 
 #include <chrono>
 #include <optional>
@@ -133,7 +134,7 @@ private:
     // did not, so the first one turns by nothing (spec 22 §4.2).
     std::optional<std::chrono::steady_clock::time_point> smooth_time_;
     // The turning and the block last reported (spec 22 §16).
-    std::optional<TurningInUse> reported_turning_;
+    util::ChangeLatch<TurningInUse> reported_turning_;
     TurnBlockChange reported_block_{};
 };
 

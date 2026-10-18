@@ -34,15 +34,15 @@ bool StereoAa::runs_aa_pass(AaMode mode) const noexcept {
 }
 
 void StereoAa::log_decision(AaMode mode, bool run) noexcept {
+    const AaAction action = action_of(mode, run);
+    if (!logged_.changed({mode, action})) return;
     const std::int32_t mode_id = std::to_underlying(mode);
-    const int action           = std::to_underlying(action_of(mode, run));
-    if (mode_id == logged_mode_ && action == logged_action_) return;
-    logged_mode_   = mode_id;
-    logged_action_ = action;
     const std::string_view name =
         is_known_mode(mode) ? kModeNames[static_cast<std::size_t>(mode_id)] : kUnknownMode;
     diag::ports::logf(log_, kDecisionLog, name,
-                      mode == AaMode::Off ? kNothingToRun : kActionNames[static_cast<std::size_t>(action)],
+                      mode == AaMode::Off
+                          ? kNothingToRun
+                          : kActionNames[static_cast<std::size_t>(std::to_underlying(action))],
                       config::to_string(settings_.rendering.stereo_aa));
 }
 

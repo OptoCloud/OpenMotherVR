@@ -4,6 +4,9 @@
 #include "core/config/settings.h"
 #include "core/diag/ports/log.h"
 #include "core/stereo/types.h"
+#include "util/sync/change_latch.h"
+
+#include <utility>
 
 namespace omvr::core::stereo {
 
@@ -61,8 +64,7 @@ private:
     const config::Settings& settings_;
     diag::ports::Log& log_;
     // The last logged mode and action; none before the first.
-    std::int32_t logged_mode_ = -1;
-    int logged_action_        = -1;
+    util::ChangeLatch<std::pair<AaMode, AaAction>> logged_;
 };
 
 } // namespace omvr::core::stereo
