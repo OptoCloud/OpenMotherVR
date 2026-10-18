@@ -55,6 +55,15 @@ inline constexpr std::uint32_t kOpAdd = 0x00, kOpDp2 = 0x0F, kOpDp4 = 0x11, kOpL
                                kOpMov = 0x36, kOpMovc = 0x37, kOpRsq = 0x44, kOpSqrt = 0x4B,
                                kOpDclTemps = 0x68;
 
+// The texture sample the constant smoke lighting replaces with a move (24
+// §15), and the declaration of a texture.
+inline constexpr std::uint32_t kOpSample = 0x45, kOpDclResource = 0x58;
+// The declarations: SM4's range, SM5's range and its last one; they read no
+// register as an instruction does.
+inline constexpr std::uint32_t kOpFirstSm4Declaration = 0x58, kOpLastSm4Declaration = 0x6A,
+                               kOpFirstSm5Declaration = 0x8F, kOpLastSm5Declaration = 0xA2,
+                               kOpDclGsInstanceCount = 0xCE;
+
 inline constexpr std::uint32_t kOpcodeMask   = 0x7FF;
 inline constexpr std::uint32_t kLengthShift  = 24;
 inline constexpr std::uint32_t kLengthMask   = 0x7F;
@@ -86,7 +95,20 @@ inline constexpr std::uint32_t kIndexRepMask       = 0x7;
 inline constexpr std::uint32_t kIndexImmediate32   = 0;
 
 // Operand types.
-inline constexpr std::uint32_t kTypeTemp = 0, kTypeInput = 1, kTypeImmediate32 = 4, kTypeConstantBuffer = 8;
+inline constexpr std::uint32_t kTypeTemp = 0, kTypeInput = 1, kTypeImmediate32 = 4, kTypeSampler = 6,
+                               kTypeResource = 7, kTypeConstantBuffer = 8;
+
+// The extended opcode token: its type (low 6 bits), and for a resource
+// dimension token the dimension (5 bits from bit 6). A chained token has
+// bit 31 set.
+inline constexpr std::uint32_t kExtendedTypeMask       = 0x3F;
+inline constexpr std::uint32_t kExtendedResourceDim    = 2;
+inline constexpr std::uint32_t kExtendedResourceReturn = 3;
+inline constexpr std::uint32_t kExtendedDimShift       = 6;
+inline constexpr std::uint32_t kExtendedDimMask        = 0x1F;
+inline constexpr std::uint32_t kResourceDimTexture2D   = 3;
+// The saturate flag of an opcode token.
+inline constexpr std::uint32_t kSaturateFlag = 1u << 13;
 
 // Components and write-mask bits.
 inline constexpr std::uint32_t kX = 0, kY = 1, kZ = 2, kW = 3;

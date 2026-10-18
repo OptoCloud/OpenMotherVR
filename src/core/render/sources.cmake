@@ -3,6 +3,8 @@
 target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/alpha_light.cpp
     ${CMAKE_CURRENT_LIST_DIR}/alpha_light.h
+    ${CMAKE_CURRENT_LIST_DIR}/constant_smoke.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/constant_smoke.h
     ${CMAKE_CURRENT_LIST_DIR}/dither_fix.cpp
     ${CMAKE_CURRENT_LIST_DIR}/dither_fix.h
     ${CMAKE_CURRENT_LIST_DIR}/dxbc.cpp

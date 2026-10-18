@@ -236,6 +236,13 @@ Playing
     when the game started applies at the next launch.
   - Shadow maps, reflections and the two memory sizes are greyed on the
     page while Engine Settings Override is off.
+  - "ConstantSmokeLighting": true lights smoke, steam and fog with one
+    even brightness everywhere, whatever the lights around them; they no
+    longer brighten near lamps or darken in shadow. Default false. File
+    only for now (no item on the page); applies at the next launch.
+  - "ConstantSmokeBrightness": 0 to 1, default 0.15: the brightness of
+    that smoke. Applies at the next launch.
+  - "FullShadowDetail" is saved but does nothing in this version.
 
 If something goes wrong
 - The headset shows the game as a flat screen (Theatre), or the game

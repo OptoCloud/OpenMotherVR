@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 // The parts of the DXBC container and program format the shader fixes read
@@ -51,10 +52,15 @@ std::optional<ProgramChunk> find_program(std::span<const std::uint8_t> in) noexc
 // The program chunk's tokens. `chunk` is one find_program returned for `in`.
 std::vector<std::uint32_t> program_tokens(std::span<const std::uint8_t> in, const ProgramChunk& chunk);
 
+// The data of the one chunk `fourcc` of a container, or nothing when it has
+// none, more than one, or one that does not fit.
+std::optional<std::span<const std::uint8_t>> find_chunk(std::span<const std::uint8_t> in,
+                                                        std::string_view fourcc) noexcept;
+
 // The container with `prog` in place of the program chunk's tokens: the
 // bytes up to the program, the program, the chunks after it, whose offsets
-// move by the growth; then the total size, the chunk size and the checksum.
-// `prog` is at least as long as the original program.
+// move by the change in size; then the total size, the chunk size and the
+// checksum. `prog` may be longer or shorter than the original program.
 std::vector<std::uint8_t> reassemble(std::span<const std::uint8_t> in, const ProgramChunk& chunk,
                                      const std::vector<std::uint32_t>& prog);
 

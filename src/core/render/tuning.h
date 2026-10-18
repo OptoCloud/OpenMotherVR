@@ -46,6 +46,13 @@ inline constexpr std::uint32_t kViewMatrixColumn1         = 5;
 inline constexpr std::uint32_t kViewProjRegister          = 0;
 inline constexpr std::uint32_t kSecondaryViewProjRegister = 12;
 
+// ---- Constant smoke and fog lighting (24 §15) -------------------------------
+
+// The particle lighting atlas as the level packs' pixel shaders bind it
+// (24 §15.2, 08 §8.1): its resource name and texture slot.
+inline constexpr std::string_view kAlphaLightResourceName = "alphalightIntensitiesReg_TEX";
+inline constexpr std::uint32_t kAlphaLightSlot            = 9;
+
 // ---- Engine settings for VR (24 §6) -----------------------------------------
 
 // The Setting names of the game's DATA\ENGINE_SETTINGS.XML the additions go

@@ -548,6 +548,23 @@ Controls keys in `mothervr.json`, Dev. Debug Options on.
       and after a level loads `proxy: upright sprites: N of M vertex shaders
       changed so far; 0 refused by the device` with N > 0.
 
+## Constant smoke lighting
+
+- [ ] **Smoke lit the same everywhere (24 §15.5).** `"Graphics":
+      {"ConstantSmokeLighting": true}`, restart. Near steam lit by a lamp
+      (Sevastopol vents, Torrens): the smoke has one brightness wherever it
+      is and wherever you look; turning the head and closing each eye in
+      turn change nothing; where smoke meets the floor its edge stays soft.
+      Log at start-up: `proxy: Constant smoke lighting on, brightness
+      0.15`, and after a level loads `proxy: Constant smoke lighting: N of
+      M pixel shaders changed so far; 0 refused by the device` with N > 0.
+- [ ] **Brightness.** In a dark corridor with smoke, set
+      `"ConstantSmokeBrightness"` (0 to 1, restart after each change) so
+      that smoke is a faint grey and does not glow; record the value and,
+      if it differs much from 0.15, propose it as the default.
+- [ ] **Off.** `"ConstantSmokeLighting": false`, restart: the game's own
+      particle lighting is back, and no `Constant smoke lighting` line.
+
 ## Options pages
 
 Options > MotherVR has seven new entries, Comfort, Controls, Hands,

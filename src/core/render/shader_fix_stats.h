@@ -8,11 +8,12 @@
 namespace omvr::core::render {
 
 // Which fix a ShaderFixStats counts: the dither fix of the pixel shaders
-// (08 §1) or the upright-sprite fix of the vertex shaders (24 §14).
-enum class ShaderFix { Dither, UprightSprites };
+// (08 §1), the upright-sprite fix of the vertex shaders (24 §14) or the
+// constant smoke lighting of the pixel shaders (24 §15).
+enum class ShaderFix { Dither, UprightSprites, ConstantSmoke };
 
 // Counts the shaders of one stage the game creates and the ones a fix
-// rewrote (08 §1, 24 §14), and logs them at a low rate. Any thread that
+// rewrote (08 §1, 24 §14, §15), and logs them at a low rate. Any thread that
 // creates shaders, so the counters are atomic (sequentially consistent: a
 // few increments per shader the game creates, never per frame).
 class ShaderFixStats final {

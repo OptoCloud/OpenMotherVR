@@ -91,7 +91,8 @@ Context::Context(void* self) noexcept
       vignette(log),
       window(stereo, log),
       shader_fixes(log),
-      sprite_fixes(log, core::render::ShaderFix::UprightSprites) {}
+      sprite_fixes(log, core::render::ShaderFix::UprightSprites),
+      constant_smoke(log) {}
 
 Context& create_context(void* module) noexcept {
     // Leaked on purpose: nothing of the mod runs at process exit (no

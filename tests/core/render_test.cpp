@@ -1,10 +1,12 @@
 // OpenMotherVR-Provenance: clean
 // core/render: the DXBC checksum against fxc's own on the project's mirror
 // shaders, the position-dither fix on synthetic pixel shaders in the
-// layouts of 08 §1.1, run through a small evaluator, and the particle
-// lighting lookup in stereo with its diagnostic (08 §8).
+// layouts of 08 §1.1, run through a small evaluator, the particle
+// lighting lookup in stereo with its diagnostic (08 §8), and the constant
+// smoke lighting on synthetic lit particle shaders (24 §15).
 
 #include "core/render/alpha_light.h"
+#include "core/render/constant_smoke.h"
 #include "core/render/dither_fix.h"
 #include "core/render/dxbc.h"
 #include "core/render/shader_fix_stats.h"
@@ -12,12 +14,15 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -597,6 +602,226 @@ TEST_CASE("the camera diagnostic samples each eye once every 900 frames") {
     }
     CHECK(first_frame == 900);
     CHECK(due == 4); // frames 900 and 1800, both eyes
+}
+
+// ---- Constant smoke and fog lighting (24 §15) -----------------------------------
+
+// A pixel shader container with an RDEF chunk binding `name` as a texture at
+// `slot`, the program, and a chunk after it (whose offset must follow the
+// program's size).
+std::vector<std::uint8_t> lit_container(const std::vector<std::uint32_t>& program,
+                                        std::string_view name = "alphalightIntensitiesReg_TEX",
+                                        std::uint32_t slot    = 9) {
+    // RDEF: header (7 words), one binding (8 words), the name.
+    std::vector<std::uint32_t> rdef = {0, 0, 1, 28, 0xFFFF0500, 0, 0};
+    rdef.insert(rdef.end(), {60, 2, 5, 4, 0xFFFFFFFF, slot, 1, 0x0C});
+    std::vector<std::uint8_t> rdef_bytes(rdef.size() * 4);
+    std::memcpy(rdef_bytes.data(), rdef.data(), rdef_bytes.size());
+    rdef_bytes.insert(rdef_bytes.end(), name.begin(), name.end());
+    rdef_bytes.push_back(0);
+    while (rdef_bytes.size() % 4) rdef_bytes.push_back(0);
+    const std::vector<std::uint8_t> stat(16, 0xAB);
+
+    const std::size_t rdef_at = 32 + 3 * 4;
+    const std::size_t shex_at = rdef_at + 8 + rdef_bytes.size();
+    const std::size_t stat_at = shex_at + 8 + program.size() * 4;
+    std::vector<std::uint8_t> out(stat_at + 8 + stat.size());
+    const auto put = [&out](std::size_t at, std::size_t v) {
+        const auto u = static_cast<std::uint32_t>(v);
+        std::memcpy(out.data() + at, &u, sizeof(u));
+    };
+    std::memcpy(out.data(), "DXBC", 4);
+    put(20, 1);
+    put(24, out.size());
+    put(28, 3);
+    put(32, rdef_at);
+    put(36, shex_at);
+    put(40, stat_at);
+    std::memcpy(out.data() + rdef_at, "RDEF", 4);
+    put(rdef_at + 4, rdef_bytes.size());
+    std::memcpy(out.data() + rdef_at + 8, rdef_bytes.data(), rdef_bytes.size());
+    std::memcpy(out.data() + shex_at, "SHEX", 4);
+    put(shex_at + 4, program.size() * 4);
+    std::memcpy(out.data() + shex_at + 8, program.data(), program.size() * 4);
+    std::memcpy(out.data() + stat_at, "STAT", 4);
+    put(stat_at + 4, stat.size());
+    std::memcpy(out.data() + stat_at + 8, stat.data(), stat.size());
+    const DxbcChecksum sum = dxbc_checksum(out);
+    std::memcpy(out.data() + 4, sum.data(), 16);
+    return out;
+}
+
+// The program of a container built by lit_container().
+std::vector<std::uint32_t> lit_program_of(const std::vector<std::uint8_t>& blob) {
+    const std::uint32_t at = u32_at(blob, 36);
+    std::vector<std::uint32_t> t(u32_at(blob, at + 4) / 4);
+    std::memcpy(t.data(), blob.data() + at + 8, t.size() * 4);
+    return t;
+}
+
+// sample_indexable(texture2d)(float,float,float,float) r0.<dst>, v1.xyxx,
+// t<slot>.<swizzle>, s9, as fxc encodes it.
+std::vector<std::uint32_t> atlas_sample(std::uint32_t dst_token, std::uint32_t resource_token,
+                                        std::uint32_t slot = 9) {
+    return {0x8B000045, 0x800000C2,     0x00155543, dst_token,  0, 0x00101046,
+            1,          resource_token, slot,       0x00106000, 9};
+}
+constexpr std::uint32_t kDstXyz = 0x00100072, kDstYzw = 0x001000E2, kDstXyw = 0x001000B2;
+constexpr std::uint32_t kAtlasXyzw = 0x00107E46, kAtlasWxyz = 0x00107936, kAtlasXywz = 0x00107B46;
+
+// ps_5_0: the declarations of t9 and s9, `mov r0.x, l(0.5)` (the depth fade
+// the yzw form keeps), `sample`, `mul o0.xyzw, r0.xyzw, r0.xxxx`, ret.
+std::vector<std::uint32_t> lit_program(const std::vector<std::uint32_t>& sample) {
+    std::vector<std::uint32_t> t = {
+        0x00000050, 0,                                     // ps_5_0, length below
+        0x04001858, 0x00107000, 9, 0x00005555,             // dcl_resource_texture2d t9
+        0x0300005A, 0x00106000, 9,                         // dcl_sampler s9
+        0x02000068, 1,                                     // dcl_temps 1
+        0x05000036, 0x00100012, 0, 0x00004001, 0x3F000000, // mov r0.x, l(0.5)
+    };
+    t.insert(t.end(), sample.begin(), sample.end());
+    t.insert(t.end(), {0x07000038, 0x001020F2, 0, 0x00100E46, 0, 0x00100006, 0, // mul o0, r0, r0.xxxx
+                       0x0100003E});                                            // ret
+    t[1] = static_cast<std::uint32_t>(t.size());
+    return t;
+}
+
+constexpr std::size_t kSampleAt = 16; // token index of the sample in lit_program()
+constexpr float kB              = 0.15f;
+constexpr std::uint32_t kBBits  = std::bit_cast<std::uint32_t>(kB);
+
+void check_smoke_rewrite(std::uint32_t dst, std::uint32_t resource) {
+    const std::vector<std::uint32_t> before = lit_program(atlas_sample(dst, resource));
+    const std::vector<std::uint8_t> in      = lit_container(before);
+    const std::vector<std::uint8_t> out     = patch_constant_smoke(in.data(), in.size(), kB);
+    REQUIRE(out.size() == in.size() - 12); // 11 tokens became 8
+    check_stored_checksum(out);
+    CHECK(u32_at(out, 24) == out.size());
+    CHECK(u32_at(out, 32) == u32_at(in, 32));      // RDEF, before the program, stays
+    CHECK(u32_at(out, 40) == u32_at(in, 40) - 12); // STAT, after it, moves
+    CHECK(std::memcmp(out.data() + u32_at(out, 40), "STAT", 4) == 0);
+
+    const std::vector<std::uint32_t> t = lit_program_of(out);
+    REQUIRE(t.size() == before.size() - 3);
+    CHECK(t[1] == t.size());
+    // Everything before the sample is unchanged, the depth fade included.
+    CHECK(std::equal(t.begin() + 2, t.begin() + kSampleAt, before.begin() + 2));
+    // mov r0.<same mask>, l(B, B, B, B).
+    const std::vector<std::uint32_t> mov(t.begin() + kSampleAt, t.begin() + kSampleAt + 8);
+    CHECK(mov == std::vector<std::uint32_t>{0x08000036, dst, 0, 0x00004002, kBBits, kBBits, kBBits, kBBits});
+    // And everything after it.
+    CHECK(std::equal(t.begin() + kSampleAt + 8, t.end(), before.begin() + kSampleAt + 11));
+}
+
+TEST_CASE("constant smoke: the xyz and yzw samples of the atlas become (B, B, B)") {
+    check_smoke_rewrite(kDstXyz, kAtlasXyzw);
+    check_smoke_rewrite(kDstYzw, kAtlasWxyz);
+}
+
+bool smoke_unchanged(const std::vector<std::uint8_t>& blob) {
+    return patch_constant_smoke(blob.data(), blob.size(), kB).empty();
+}
+
+TEST_CASE("constant smoke: any other form of the sample leaves the shader unchanged") {
+    // Another mask, a swizzle not matching the mask, saturate, another
+    // dimension, an offset.
+    CHECK(smoke_unchanged(lit_container(lit_program(atlas_sample(kDstXyw, kAtlasXywz)))));
+    CHECK(smoke_unchanged(lit_container(lit_program(atlas_sample(kDstXyz, kAtlasWxyz)))));
+    CHECK(smoke_unchanged(lit_container(lit_program(atlas_sample(kDstYzw, kAtlasXyzw)))));
+    auto sat = atlas_sample(kDstXyz, kAtlasXyzw);
+    sat[0] |= 1u << 13;
+    CHECK(smoke_unchanged(lit_container(lit_program(sat))));
+    auto cube = atlas_sample(kDstXyz, kAtlasXyzw);
+    cube[1]   = 0x80000000u | 2u | (10u << 6);
+    CHECK(smoke_unchanged(lit_container(lit_program(cube))));
+    auto offset = atlas_sample(kDstXyz, kAtlasXyzw);
+    offset.insert(offset.begin() + 1, 0x80000001u); // sample controls (an offset)
+    offset[0] = 0x8C000045;
+    CHECK(smoke_unchanged(lit_container(lit_program(offset))));
+
+    // Sampled twice, or read another way as well.
+    auto twice       = atlas_sample(kDstXyz, kAtlasXyzw);
+    const auto again = atlas_sample(kDstYzw, kAtlasWxyz);
+    twice.insert(twice.end(), again.begin(), again.end());
+    CHECK(smoke_unchanged(lit_container(lit_program(twice))));
+    auto ld = atlas_sample(kDstXyz, kAtlasXyzw);
+    ld.insert(ld.end(), {0x0700002D, 0x001000F2, 0, 0x00100006, 0, kAtlasXyzw, 9}); // ld r0, r0.x, t9
+    CHECK(smoke_unchanged(lit_container(lit_program(ld))));
+}
+
+TEST_CASE("constant smoke: only the atlas, bound by its name at t9, in a pixel shader") {
+    CHECK(smoke_unchanged(lit_container(lit_program(atlas_sample(kDstXyz, kAtlasXyzw, 8)))));
+    const auto good = lit_program(atlas_sample(kDstXyz, kAtlasXyzw));
+    CHECK_FALSE(smoke_unchanged(lit_container(good)));
+    CHECK(smoke_unchanged(lit_container(good, "alphalightIntensitiesReg_TEX", 8)));
+    CHECK(smoke_unchanged(lit_container(good, "SamplerBloomRound0_TEX")));
+    CHECK(smoke_unchanged(lit_container(good, "alphalightIntensitiesReg_TEX2")));
+
+    // A vertex shader, a stale checksum, junk, a shader without the atlas.
+    auto vertex = good;
+    vertex[0]   = 0x00010050;
+    CHECK(smoke_unchanged(lit_container(vertex)));
+    auto stale = lit_container(good);
+    stale[u32_at(stale, 36) + 8 + 4 * (kSampleAt + 3)] ^= 1;
+    CHECK(smoke_unchanged(stale));
+    const std::array<std::uint8_t, 8> junk = {1, 2, 3, 4, 5, 6, 7, 8};
+    CHECK(patch_constant_smoke(junk.data(), junk.size(), kB).empty());
+    CHECK(patch_constant_smoke(kMirrorPS, sizeof(kMirrorPS), kB).empty());
+}
+
+TEST_CASE("constant smoke: on top of the dither fix, both changes are kept") {
+    // The dither program of 08 §1.1, then the sampler and the atlas sample.
+    std::vector<std::uint32_t> t = dither_program();
+    t.pop_back(); // ret
+    t.insert(t.end(), {0x0300005A, 0x00106000, 9});
+    const auto sample = atlas_sample(kDstYzw, kAtlasWxyz);
+    t.insert(t.end(), sample.begin(), sample.end());
+    t.push_back(0x0100003E);
+    t[1] = static_cast<std::uint32_t>(t.size());
+
+    const std::vector<std::uint8_t> in = lit_container(t);
+    const DitherPatch dither           = patch_position_dither(in.data(), in.size());
+    REQUIRE(dither.sites == 1);
+    const std::vector<std::uint8_t> out = patch_constant_smoke(dither.blob.data(), dither.blob.size(), kB);
+    REQUIRE(out.size() == dither.blob.size() - 12);
+    check_stored_checksum(out);
+    const std::vector<std::uint32_t> both     = lit_program_of(out);
+    const std::vector<std::uint32_t> dithered = lit_program_of(dither.blob);
+    // The dither's rewrite, all before the sample, is as the dither fix left it.
+    const std::size_t sample_at = dithered.size() - 12;
+    CHECK(std::equal(both.begin() + 2, both.begin() + static_cast<std::ptrdiff_t>(sample_at),
+                     dithered.begin() + 2));
+    CHECK(both[sample_at] == 0x08000036u);
+    CHECK(both[sample_at + 1] == kDstYzw);
+    CHECK(both[sample_at + 4] == kBBits);
+    CHECK(both.back() == 0x0100003Eu);
+}
+
+TEST_CASE("constant smoke: on at device creation logs the brightness, and its event") {
+    omvr::tests::RecordingLog log;
+    ConstantSmoke off{log};
+    off.start(false, 0.5f);
+    CHECK_FALSE(off.brightness().has_value());
+    CHECK(log.lines.empty());
+
+    ConstantSmoke on{log};
+    on.start(true, 0.25f);
+    REQUIRE(on.brightness().has_value());
+    CHECK(*on.brightness() == 0.25f);
+    REQUIRE(log.lines.size() == 1);
+    CHECK(log.lines[0] == "proxy: Constant smoke lighting on, brightness 0.25");
+
+    ShaderFixStats& stats = on.stats();
+    stats.count_created();
+    stats.count_fixed(stats.count_created());
+    REQUIRE(log.lines.size() == 2);
+    CHECK(log.lines[1] ==
+          "proxy: Constant smoke lighting: 1 of 2 pixel shaders changed so far; 0 refused by the device");
+    stats.count_rejected(static_cast<long>(0x80070057u));
+    REQUIRE(log.lines.size() == 3);
+    CHECK(log.lines[2] ==
+          "proxy: constant smoke lighting pixel shader refused by the device "
+          "(hr=0x80070057), using the original");
 }
 
 } // namespace

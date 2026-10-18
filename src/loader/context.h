@@ -18,6 +18,7 @@
 #include "core/input/interaction_state.h"
 #include "core/input/virtual_pad.h"
 #include "core/render/alpha_light.h"
+#include "core/render/constant_smoke.h"
 #include "core/render/post_fx.h"
 #include "core/render/shader_fix_stats.h"
 #include "core/stereo/comfort_view.h"
@@ -201,6 +202,8 @@ struct Context {
     core::render::ShaderFixStats shader_fixes;
     // The upright-sprite fix of the vertex shaders (24 §14).
     core::render::ShaderFixStats sprite_fixes;
+    // Constant smoke and fog lighting of the pixel shaders (24 §15).
+    core::render::ConstantSmoke constant_smoke;
     // Dev. Debug Options: the particle lighting lookup's correction, logged
     // once per change (dumps/13). Render thread.
     core::render::AlphaLightTrace alpha_light_trace;

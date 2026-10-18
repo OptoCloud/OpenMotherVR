@@ -126,13 +126,32 @@ std::vector<std::uint32_t> program_tokens(std::span<const std::uint8_t> in, cons
     return t;
 }
 
+std::optional<std::span<const std::uint8_t>> find_chunk(std::span<const std::uint8_t> in,
+                                                        std::string_view fourcc) noexcept {
+    if (in.size() < kContainerHeaderSize || fourcc.size() != kFourCcBytes) return std::nullopt;
+    const std::uint32_t count = read_u32(in, kChunkCountOffset);
+    if (kChunkOffsetsOffset + std::size_t(count) * kTokenBytes > in.size()) return std::nullopt;
+    std::optional<std::span<const std::uint8_t>> found;
+    for (std::uint32_t c = 0; c < count; ++c) {
+        const std::uint32_t off = read_u32(in, kChunkOffsetsOffset + kTokenBytes * std::size_t(c));
+        if (std::size_t(off) + kChunkHeaderSize > in.size()) return std::nullopt;
+        if (std::memcmp(in.data() + off, fourcc.data(), kFourCcBytes) != 0) continue;
+        const std::uint32_t bytes = read_u32(in, off + kChunkSizeOffset);
+        if (found || std::size_t(off) + kChunkHeaderSize + bytes > in.size()) return std::nullopt;
+        found = in.subspan(std::size_t(off) + kChunkHeaderSize, bytes);
+    }
+    return found;
+}
+
 std::vector<std::uint8_t> reassemble(std::span<const std::uint8_t> in, const ProgramChunk& chunk,
                                      const std::vector<std::uint32_t>& prog) {
     const std::size_t prog_bytes = prog.size() * kTokenBytes;
-    const std::size_t grow       = prog_bytes - chunk.bytes;
-    const std::size_t data_at    = chunk.offset + kChunkHeaderSize;
+    // The program may grow (the dither and sprite fixes) or shrink (the
+    // constant smoke lighting): every size and later offset moves by `delta`.
+    const auto delta = static_cast<std::ptrdiff_t>(prog_bytes) - static_cast<std::ptrdiff_t>(chunk.bytes);
+    const std::size_t data_at = chunk.offset + kChunkHeaderSize;
     std::vector<std::uint8_t> out;
-    out.reserve(in.size() + grow);
+    out.reserve(in.size() + prog_bytes);
     out.insert(out.end(), in.begin(), in.begin() + static_cast<std::ptrdiff_t>(data_at));
     out.resize(data_at + prog_bytes);
     std::memcpy(out.data() + data_at, prog.data(), prog_bytes);
@@ -143,11 +162,12 @@ std::vector<std::uint8_t> reassemble(std::span<const std::uint8_t> in, const Pro
         std::memcpy(out.data() + at, &u, sizeof(u));
     };
     put(kTotalSizeOffset, out.size());
-    put(chunk.offset + kChunkSizeOffset, chunk.bytes + grow);
+    put(chunk.offset + kChunkSizeOffset, prog_bytes);
     for (std::uint32_t c = 0; c < chunk.chunk_count; ++c) {
         const std::size_t entry = kChunkOffsetsOffset + kTokenBytes * std::size_t(c);
         const std::uint32_t off = read_u32(in, entry);
-        if (off > chunk.offset) put(entry, std::size_t(off) + grow);
+        if (off > chunk.offset)
+            put(entry, static_cast<std::size_t>(static_cast<std::ptrdiff_t>(off) + delta));
     }
     const DxbcChecksum sum = dxbc_checksum(out);
     std::memcpy(out.data() + kChecksumOffset, sum.data(), kChecksumBytes);

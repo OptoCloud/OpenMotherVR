@@ -7,6 +7,7 @@
 
 #include "loader/hooks/d3d11_hooks.h"
 
+#include "core/render/constant_smoke.h"
 #include "core/render/dither_fix.h"
 #include "loader/context.h"
 #include "loader/hooks/crash_hook.h"
@@ -128,27 +129,44 @@ HRESULT __stdcall hook_resize_buffers(void* self, UINT buffer_count, UINT width,
     return hr;
 }
 
-// ---- ID3D11Device::CreatePixelShader: shader fixes (08) ----------------------
+// ---- ID3D11Device::CreatePixelShader: shader fixes (08, 24 §15) -----------
 // Also shared by every device of the class. Not limited to the game's: the
-// patch only rewrites the game's own dither pattern, so another device's
-// shaders pass through unchanged.
+// patches only rewrite the game's own dither pattern and atlas sample, so
+// another device's shaders pass through unchanged.
 
 HRESULT __stdcall hook_create_pixel_shader(void* self, const void* code, SIZE_T size, void* linkage,
                                            void** out) noexcept {
-    auto& ctx          = context();
-    const auto create  = system_method<CreatePixelShaderFn>(ctx.targets.create_pixel_shader);
-    auto& stats        = ctx.shader_fixes;
-    const int total    = stats.count_created();
-    const auto patched = core::render::patch_position_dither(code, size);
-    if (!patched.blob.empty()) {
-        const HRESULT hr = create(self, patched.blob.data(), patched.blob.size(), linkage, out);
+    auto& ctx         = context();
+    const auto create = system_method<CreatePixelShaderFn>(ctx.targets.create_pixel_shader);
+    auto& stats       = ctx.shader_fixes;
+    const int total   = stats.count_created();
+    const auto dither = core::render::patch_position_dither(code, size);
+    if (dither.blob.empty() && dither.has_constants) stats.count_unchanged(total);
+    const void* fixed       = dither.blob.empty() ? code : dither.blob.data();
+    const SIZE_T fixed_size = dither.blob.empty() ? size : dither.blob.size();
+
+    // 24 §15: on top of the dither fix, which changes other instructions.
+    if (const auto brightness = ctx.constant_smoke.brightness()) {
+        auto& smoke_stats     = ctx.constant_smoke.stats();
+        const int smoke_total = smoke_stats.count_created();
+        const auto smoke      = core::render::patch_constant_smoke(fixed, fixed_size, *brightness);
+        if (!smoke.empty()) {
+            const HRESULT hr = create(self, smoke.data(), smoke.size(), linkage, out);
+            if (SUCCEEDED(hr)) {
+                smoke_stats.count_fixed(smoke_total);
+                if (!dither.blob.empty()) stats.count_fixed(total);
+                return hr;
+            }
+            smoke_stats.count_rejected(hr);
+        }
+    }
+    if (!dither.blob.empty()) {
+        const HRESULT hr = create(self, dither.blob.data(), dither.blob.size(), linkage, out);
         if (SUCCEEDED(hr)) {
             stats.count_fixed(total);
             return hr;
         }
         stats.count_rejected(hr);
-    } else if (patched.has_constants) {
-        stats.count_unchanged(total);
     }
     return create(self, code, size, linkage, out);
 }
@@ -171,6 +189,9 @@ void install_device_hooks(void* device) noexcept {
     static std::atomic<bool> done{false};
     if (!device || done.exchange(true)) return;
     auto& ctx = context();
+    // 24 §15.3: the keys as they are now apply to the whole session.
+    const core::config::GraphicsSettings graphics = ctx.settings.current().graphics;
+    ctx.constant_smoke.start(graphics.constant_smoke_lighting, graphics.constant_smoke_brightness);
     if (auto* prev = replace_slot(vtable_of(device), kCreatePixelShaderVtblIndex,
                                   slot_value(&hook_create_pixel_shader), "CreatePixelShader", ctx.log)) {
         ctx.targets.create_pixel_shader = prev;

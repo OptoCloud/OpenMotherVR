@@ -21,13 +21,26 @@ constexpr std::string_view kSpriteStatsLog =
 constexpr std::string_view kSpriteRejectedLog =
     "proxy: upright-sprite vertex shader refused by the device (hr=0x{:08X}), using the original";
 
+// 24 §15.6.
+constexpr std::string_view kSmokeStatsLog =
+    "proxy: Constant smoke lighting: {1} of {0} pixel shaders changed so far; {2} refused by the device";
+constexpr std::string_view kSmokeRejectedLog =
+    "proxy: constant smoke lighting pixel shader refused by the device (hr=0x{:08X}), using the original";
+
 } // namespace
 
 void ShaderFixStats::log_counts(int total, int fixed) noexcept {
-    if (fix_ == ShaderFix::Dither)
-        diag::ports::logf(log_, kStatsLog, total, fixed, unchanged_.load(), rejected_.load());
-    else
-        diag::ports::logf(log_, kSpriteStatsLog, total, fixed, rejected_.load());
+    switch (fix_) {
+        case ShaderFix::Dither:
+            diag::ports::logf(log_, kStatsLog, total, fixed, unchanged_.load(), rejected_.load());
+            break;
+        case ShaderFix::UprightSprites:
+            diag::ports::logf(log_, kSpriteStatsLog, total, fixed, rejected_.load());
+            break;
+        case ShaderFix::ConstantSmoke:
+            diag::ports::logf(log_, kSmokeStatsLog, total, fixed, rejected_.load());
+            break;
+    }
 }
 
 void ShaderFixStats::count_fixed(int total) noexcept {
@@ -44,10 +57,12 @@ void ShaderFixStats::count_unchanged(int total) noexcept {
 
 void ShaderFixStats::count_rejected(long hr) noexcept {
     if (++rejected_ <= kShaderRejectLogLimit) {
-        if (fix_ == ShaderFix::Dither)
-            diag::ports::logf(log_, kRejectedLog, static_cast<unsigned>(hr));
-        else
-            diag::ports::logf(log_, kSpriteRejectedLog, static_cast<unsigned>(hr));
+        const auto code = static_cast<unsigned>(hr);
+        switch (fix_) {
+            case ShaderFix::Dither: diag::ports::logf(log_, kRejectedLog, code); break;
+            case ShaderFix::UprightSprites: diag::ports::logf(log_, kSpriteRejectedLog, code); break;
+            case ShaderFix::ConstantSmoke: diag::ports::logf(log_, kSmokeRejectedLog, code); break;
+        }
     }
 }
 
