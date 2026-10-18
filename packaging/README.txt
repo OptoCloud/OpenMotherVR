@@ -191,7 +191,7 @@ Playing
     the buttons of the controllers you hold (Index, Quest/Touch, WMR, Vive
     wands, Steam Frame), per hand. It applies the next time a controller
     is detected (switch it off and on, or restart). Default false.
-- Hud (preview; console commands mvr_*), in a "Hud" object under
+- Hud (preview; Options > MotherVR > HUD), in a "Hud" object under
   "Settings":
   - "Crosshair": "On" (default), "Off", or "Auto" (hidden while you aim
     with the hand). The ammo count stays.
@@ -203,12 +203,18 @@ Playing
     when you turn more than about 20 degrees); "Distance" 0.6 to 2.0 m,
     "Width" 0.3 to 1.2 m (a smaller HUD has smaller text), "Pitch" -30 to
     10 degrees (negative: below your view).
-- Interaction (preview), in an "Interaction" object under "Settings":
-  "TerminalTextScale" 1, 1.25, 1.5 or 1.75 is saved but has no visible
-  effect yet; "PhysicalLevers", "CameraTakeovers", "TerminalDistance" and
-  "RewireDistance" are saved but do nothing in this version.
-- Graphics (preview; mothervr.json only), in a "Graphics" object under
-  "Settings", all applied at the next launch:
+- Interaction (preview; Options > MotherVR > Interaction), in an
+  "Interaction" object under "Settings":
+  - "TerminalTextScale": 1 (default), 1.25, 1.5 or 1.75 (Terminal Text
+    Size 100% to 175%) makes the text of terminal documents larger; long
+    documents still scroll to the end. Entry titles and folder names grow
+    as far as their boxes allow. Applies at the next launch.
+  - "PhysicalLevers", "CameraTakeovers", "TerminalDistance" and
+    "RewireDistance" are saved but do nothing in this version; their
+    items are greyed with "Not available yet".
+- Graphics (preview; Options > MotherVR > Graphics), in a "Graphics"
+  object under "Settings". The engine settings apply at the next launch;
+  the three effects in the headset at once:
   - "EngineSettingsOverride": true adds the options below to the game's
     Video options. The game's own DATA\ENGINE_SETTINGS.XML is never
     changed: each launch the mod writes openmothervr_engine_settings.xml
@@ -223,6 +229,10 @@ Playing
   - "LensFlares", "ChromaticAberration", "FilmGrain": false turns that
     effect off in the headset only, whatever the game's Video setting;
     flat play and your saved game settings are unchanged. Default true.
+    Turning one back on applies at once; turning off one that was on
+    when the game started applies at the next launch.
+  - Shadow maps, reflections and the two memory sizes are greyed on the
+    page while Engine Settings Override is off.
 
 If something goes wrong
 - The headset shows the game as a flat screen (Theatre), or the game

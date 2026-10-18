@@ -366,8 +366,25 @@ Controls keys in `mothervr.json`, Dev. Debug Options on.
       recenter.
 - [ ] **Unfinished keys.** `"Interaction": {"PhysicalLevers": true}` or
       `"CameraTakeovers": "Reduced"`: only a one-time "has no effect"
-      line. `"TerminalTextScale": 1.5`: `ui patch: the embedded patch has no
-      variant text150; built without it`.
+      line.
+
+## Terminal text size
+
+- [ ] **Each size.** Options > MotherVR > Interaction > Terminal Text Size
+      at 125%, 150% and 175% in turn, restarting each time: the start logs
+      `ui patch: variant text125 built in` (text150, text175) and `ui
+      patch: built ... (556 entries)`. At a terminal with a long document
+      (for example a personal log in Seegson Systems): the body text is
+      larger at each step and wraps inside the same box; scrolling down
+      reaches the last line, and does not run on into an empty box far past
+      it (note how far past the last line it can scroll at 175%).
+- [ ] **Titles and folders.** The entry titles (29, 34, 34 px) stay on
+      their bars and are not cut at the right; the folder names (25, 26, 26
+      px) stay inside their tiles in at most three lines. Note any title or
+      name that is cut.
+- [ ] **Back to 100%.** Restart: no `variant` line, and the terminal looks
+      as in v1. Runtime None (`-vrforcenone`): no `variant` line whatever
+      the setting.
 
 ## Body
 
@@ -414,18 +431,44 @@ Controls keys in `mothervr.json`, Dev. Debug Options on.
 
 ## Options pages
 
-Options > MotherVR has four new entries, Comfort, Controls, Hands and
-Body, for every key of those sections. The menus' `GameMenu` class is
-recompiled to add them, so also watch for any menu that stops working.
+Options > MotherVR has seven new entries, Comfort, Controls, Hands,
+Body, Interaction, HUD and Graphics, for every key of those sections that
+has an item. The menus' `GameMenu` class is recompiled to add them, so
+also watch for any menu that stops working.
 
 - [ ] **Archive rebuilt.** First start of the new DLL: `ui patch: built
-      ... (522 entries)`; the next start: `payload: ... is current`.
+      ... (556 entries)`; the next start: `payload: ... is current`.
 - [ ] **Entries.** Front end and pause menu: Options > MotherVR lists VR
-      Runtime, Rendering, Input, Comfort, Controls, Hands, Body, Dev. Debug
-      Options, Skip Startup Intro; each new page's title is its entry's
-      label. The game-over menu still has no MotherVR entry.
-- [ ] **Greyed without VR.** With `-vrforcenone` the four new entries are
+      Runtime, Rendering, Input, Comfort, Controls, Hands, Body,
+      Interaction, HUD, Graphics, Dev. Debug Options, Skip Startup Intro;
+      each new page's title is its entry's label. The game-over menu still
+      has no MotherVR entry.
+- [ ] **Greyed without VR.** With `-vrforcenone` the seven new entries are
       greyed like Rendering and Input.
+- [ ] **Interaction page.** Levers by Hand, Camera Takeovers (`Game`,
+      `Reduced`), Terminal Distance and Rewire Distance (`Off`, `0.6 m` ...
+      `2.0 m`) are greyed with `Not available yet`; Terminal Text Size
+      shows `100%` to `175%` with `Requires restart! Larger text on
+      terminal screens`, and changing it logs
+      `[script_bridge] Interaction.TerminalTextScale changed to 1.50 by
+      command`.
+- [ ] **HUD page.** Crosshair (`On`, `Off`, `Auto`), Hide HUD, Item
+      Highlight, HUD Placement (`Head-Locked`, `Follow`), and the sliders
+      HUD Distance (`0.6` to `2`), HUD Width (`0.3` to `1.2`) and HUD
+      Pitch (`-30` to `10`), each with its description line. Changing
+      HUD Pitch logs `Hud.Pitch changed to ...` and moves the HUD when
+      play resumes; Crosshair logs `hud: crosshair ...` as in the HUD
+      checks.
+- [ ] **Graphics page.** Engine Settings Override, 4096 Shadow Maps, Sharp
+      Reflections, Texture Streaming Memory (`Game`, `300 MB` ... `1000
+      MB`, `1024 MB`), Model Streaming Memory (`Game`, `128 MB` ... `512
+      MB`), Lens Flares in VR, Chromatic Aberration in VR, Film Grain in
+      VR, and no other item. The four items after the override are greyed
+      while it is off. With `"Graphics": {"FilmGrain": false}` at start,
+      turning Film Grain in VR on brings the grain back at once (`[render]
+      2D effects in VR: ... film grain game's`) and off again removes it;
+      with it true at start, turning it off logs `Graphics.FilmGrain
+      changed to false by command` and the grain goes at the next launch.
 - [ ] **Values shown.** With `"Comfort": {"SmoothTurnSpeed": 37,
       "Vignette": 0.34}` and `"Body": {"EyeForward": 0.123}` written by
       hand, the pages show `30°/s`, `30%` and `0.12`, and `mothervr.json`
@@ -457,7 +500,8 @@ recompiled to add them, so also watch for any menu that stops working.
 - [ ] **-vrscale.** With `-vrscale 1.2`: World Scale greyed at `1.2`, its
       description `Set by -vrscale on the command line for this session`.
 - [ ] **Texts fit.** The longest description lines (D-Pad Emulation,
-      No Turning During Interactions) fit the description area.
+      No Turning During Interactions, Engine Settings Override, Texture
+      Streaming Memory) fit the description area.
 - [ ] **Stock menus intact.** Options > Game, Video (greyed in VR as
       before), Audio, Load Game, the controls help (Input > View Controls)
       and, with Dev. Debug Options, Select Level and Trigger Debug
