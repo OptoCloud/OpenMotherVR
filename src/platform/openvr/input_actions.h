@@ -70,6 +70,7 @@ private:
     Analog analog(Action a) noexcept;
     bool write_files(const std::filesystem::path& dir, const std::filesystem::path& manifest_path);
     void register_actions(vr::IVRInput* input);
+    bool controllers_bound() noexcept;
     void report_unbound_poses() noexcept;
     void report_unbound_aim() noexcept;
     void report_haptic_binding() noexcept;

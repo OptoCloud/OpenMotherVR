@@ -9,8 +9,10 @@
 #include <openvr.h>
 
 #include <array>
+#include <cstring>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -39,10 +41,13 @@ constexpr std::string_view kLogPosesUnbound =
     "openvr input: hand pose actions unbound; a custom SteamVR binding for this game "
     "from an older version lacks them (reset it to the default binding)";
 
-// The rows of a 3x4 pose, and the axes of a vector.
-constexpr int kPoseRows    = 3;
-constexpr int kPoseColumns = 4;
-constexpr int kAxes        = 3;
+// Copies an OpenVR array into the same array type of a HandPose (the 3x4
+// pose, float[3][4], or the velocity, float[3]); T is deduced from both.
+template <class T>
+void copy_same(T& dst, const T& src) noexcept {
+    static_assert(std::is_trivially_copyable_v<T>);
+    std::memcpy(&dst, &src, sizeof(T));
+}
 
 } // namespace
 
@@ -176,9 +181,8 @@ std::array<HandPose, core::vr::kHandCount> Actions::hand_poses(int origin) noexc
         // 21 §3.3: a pose SteamVR marks as running out of range counts as lost.
         if (!d.pose.bPoseIsValid || d.pose.eTrackingResult == vr::TrackingResult_Running_OutOfRange) continue;
         auto& p = out[h];
-        for (int r = 0; r < kPoseRows; ++r)
-            for (int c = 0; c < kPoseColumns; ++c) p.m[r][c] = d.pose.mDeviceToAbsoluteTracking.m[r][c];
-        for (int i = 0; i < kAxes; ++i) p.velocity[i] = d.pose.vVelocity.v[i];
+        copy_same(p.m, d.pose.mDeviceToAbsoluteTracking.m);
+        copy_same(p.velocity, d.pose.vVelocity.v);
         p.valid = true;
         if (aim_poses_) read_aim(h, origin, p);
     }
@@ -201,8 +205,7 @@ void Actions::read_aim(std::size_t hand, int origin, HandPose& p) noexcept {
         return;
     }
     if (!d.pose.bPoseIsValid) return;
-    for (int r = 0; r < kPoseRows; ++r)
-        for (int c = 0; c < kPoseColumns; ++c) p.aim[r][c] = d.pose.mDeviceToAbsoluteTracking.m[r][c];
+    copy_same(p.aim, d.pose.mDeviceToAbsoluteTracking.m);
     p.aim_valid = true;
 }
 
@@ -217,12 +220,7 @@ void Actions::vibrate(std::size_t hand, float seconds, float amplitude) noexcept
 // once the controllers are bound (fire reads active). A saved binding from
 // before the haptics leaves them unbound: said once, like the hand poses.
 void Actions::report_haptic_binding() noexcept {
-    vr::InputAnalogActionData_t fire{};
-    if (input_->GetAnalogActionData(handles_[index(Action::Fire)], &fire, sizeof(fire),
-                                    vr::k_ulInvalidInputValueHandle) != vr::VRInputError_None ||
-        !fire.bActive) {
-        return;
-    }
+    if (!controllers_bound()) return;
     haptics_logged_ = true;
     std::array<bool, core::vr::kHandCount> bound{};
     for (std::size_t h = 0; h < bound.size(); ++h) {
@@ -248,13 +246,17 @@ void Actions::report_unbound_aim() noexcept {
 // Controllers bound (fire reads active) but a hand pose not: a binding
 // saved from a manifest before the hand poses existed. Said once.
 void Actions::report_unbound_poses() noexcept {
+    if (!controllers_bound()) return;
+    unbound_logged_ = true;
+    log_.line(kLogPosesUnbound);
+}
+
+// A binding is in use: the fire action reads active.
+bool Actions::controllers_bound() noexcept {
     vr::InputAnalogActionData_t fire{};
-    if (input_->GetAnalogActionData(handles_[index(Action::Fire)], &fire, sizeof(fire),
-                                    vr::k_ulInvalidInputValueHandle) == vr::VRInputError_None &&
-        fire.bActive) {
-        unbound_logged_ = true;
-        log_.line(kLogPosesUnbound);
-    }
+    return input_->GetAnalogActionData(handles_[index(Action::Fire)], &fire, sizeof(fire),
+                                       vr::k_ulInvalidInputValueHandle) == vr::VRInputError_None &&
+           fire.bActive;
 }
 
 } // namespace omvr::platform::openvr
