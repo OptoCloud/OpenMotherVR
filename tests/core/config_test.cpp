@@ -342,7 +342,7 @@ TEST_CASE("the settings table: every v2 key has its own command and push") {
                         row.section == Section::Hands || row.section == Section::HandsHaptics ||
                         row.section == Section::Body || row.section == Section::Graphics ||
                         ((row.section == Section::Interaction || row.section == Section::Hud) &&
-                         row.key != "FastAnimations");
+                         key(row) != "FastAnimations");
         if (!row.command.empty()) CHECK(commands.insert(row.command).second);
         if (!v2) {
             CHECK(row.push.empty());

@@ -127,9 +127,9 @@ void read_row(const json& section, const SettingRow& row, Settings& cfg) {
             auto& value = field(cfg);
             using T     = std::remove_reference_t<decltype(value)>;
             if constexpr (kIsEnum<T>) {
-                value = get_enum_or(section, row.key, value);
+                value = get_enum_or(section, key(row), value);
             } else {
-                value = get_or(section, row.key, value);
+                value = get_or(section, key(row), value);
             }
         },
         row.field);
@@ -188,7 +188,7 @@ void write_config(json& root, const Settings& c) {
     written.vr_runtime = written_runtime(c.vr_runtime);
     json& s            = object_at(root, kSettingsKey);
     for (const SettingRow& row : settings_table()) {
-        section_at(s, row.section)[std::string(row.key)] = value_of(row, written);
+        section_at(s, row.section)[std::string(key(row))] = value_of(row, written);
     }
 }
 

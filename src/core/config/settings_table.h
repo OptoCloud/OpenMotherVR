@@ -38,6 +38,13 @@ enum class Section {
 template <class T>
 using Accessor = T& (*)(Settings&) noexcept;
 
+// The accessor of the member reached through `Members`, outermost first:
+// &at<&Settings::rendering, &RenderingSettings::pixel_scale>.
+template <auto... Members>
+constexpr auto& at(Settings& s) noexcept {
+    return (s.*....*Members);
+}
+
 using Field = std::variant<Accessor<bool>, Accessor<int>, Accessor<float>, Accessor<VRRuntime>,
                            Accessor<MirrorViewType>, Accessor<StereoAA>, Accessor<PlayMode>,
                            Accessor<FlashlightAim>, Accessor<BodyVisible>, Accessor<CameraTakeovers>,
@@ -79,7 +86,6 @@ enum class CommandEffect {
 
 struct SettingRow {
     Section section;
-    std::string_view key;  // in its section
     std::string_view path; // the key path in the log ("Rendering.PixelScale")
     Field field;
     std::string_view command = {}; // "mvr_..." or empty
@@ -91,6 +97,11 @@ struct SettingRow {
     // rows, which the push names one by one.
     std::string_view push = {};
 };
+
+// The row's key in its section: the last part of its path.
+constexpr std::string_view key(const SettingRow& row) noexcept {
+    return row.path.substr(row.path.rfind('.') + 1);
+}
 
 // Every setting, in the order the original's file lists them.
 std::span<const SettingRow> settings_table() noexcept;
