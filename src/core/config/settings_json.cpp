@@ -11,8 +11,9 @@
 
 #include "core/config/settings_table.h"
 
-#include <optional>
+#include <array>
 #include <type_traits>
+#include <utility>
 
 namespace omvr::core::config {
 
@@ -20,20 +21,8 @@ namespace {
 
 using nlohmann::json;
 
-// The object holding the settings, and the objects of its sections.
-constexpr const char* kSettingsKey  = "Settings";
-constexpr const char* kRenderingKey = "Rendering";
-constexpr const char* kInputKey     = "Input";
-constexpr const char* kComfortKey   = "Comfort";
-constexpr const char* kControlsKey  = "Controls";
-constexpr const char* kHandsKey     = "Hands";
-constexpr const char* kHapticsKey   = "Haptics";
-constexpr const char* kBodyKey      = "Body";
-constexpr const char* kGraphicsKey  = "Graphics";
-
-// The v2 interaction and HUD pages (spec 23 §8).
-constexpr const char* kInteractionKey = "Interaction";
-constexpr const char* kHudKey         = "Hud";
+// The object holding the settings.
+constexpr const char* kSettingsKey = "Settings";
 
 // The layout earlier builds of this project wrote: a top-level object
 // "DebugOptions" holding "SkipStartupIntro" and "DevDebugOptions".
@@ -41,28 +30,30 @@ constexpr const char* kLegacyDebugKey     = "DebugOptions";
 constexpr const char* kLegacySkipIntroKey = "SkipStartupIntro";
 constexpr const char* kLegacyDevDebugKey  = "DevDebugOptions";
 
-const char* section_key(Section s) noexcept {
-    switch (s) {
-        case Section::Rendering: return kRenderingKey;
-        case Section::Input: return kInputKey;
-        case Section::Comfort: return kComfortKey;
-        case Section::Controls: return kControlsKey;
-        case Section::Hands: return kHandsKey;
-        case Section::HandsHaptics: return kHapticsKey;
-        case Section::Body: return kBodyKey;
-        case Section::Graphics: return kGraphicsKey;
-        case Section::Interaction: return kInteractionKey;
-        case Section::Hud: return kHudKey;
-        case Section::Settings: break;
-    }
-    return nullptr;
-}
+// Each Section's object, by Section value: its key (none for Settings
+// itself) and the section it lies in.
+struct SectionObject {
+    const char* key;
+    Section parent = Section::Settings;
+};
+constexpr std::array<SectionObject, std::to_underlying(Section::Hud) + 1> kSections{{
+    {nullptr},
+    {"Rendering"},
+    {"Input"},
+    {"Comfort"},
+    {"Controls"},
+    {"Hands"},
+    {"Haptics", Section::Hands},
+    {"Body"},
+    {"Graphics"},
+    // The v2 interaction and HUD pages (spec 23 §8).
+    {"Interaction"},
+    {"Hud"},
+}};
 
-// The section a section lies in, or nullopt for one directly in Settings.
-std::optional<Section> parent_of(Section s) noexcept {
-    if (s == Section::HandsHaptics) return Section::Hands;
-    return std::nullopt;
-}
+constexpr const SectionObject& object_of(Section s) noexcept { return kSections[std::to_underlying(s)]; }
+static_assert(std::string_view(object_of(Section::HandsHaptics).key) == "Haptics" &&
+              std::string_view(object_of(Section::Hud).key) == "Hud");
 
 // Tolerant lookup: returns `fallback` if `key` is missing or has the wrong
 // type, so older or hand-edited files load with defaults for what they lack.
@@ -100,21 +91,19 @@ json& object_at(json& j, const char* key) {
 // The section object of `settings` a row reads from, or null when it is
 // missing or not an object.
 const json* section_in(const json& settings, Section section) {
-    const char* key = section_key(section);
-    if (!key) return &settings;
-    const auto parent  = parent_of(section);
-    const json* within = parent ? section_in(settings, *parent) : &settings;
+    const SectionObject& object = object_of(section);
+    if (!object.key) return &settings;
+    const json* within = section_in(settings, object.parent);
     if (!within) return nullptr;
-    const auto it = within->find(key);
+    const auto it = within->find(object.key);
     return it != within->end() && it->is_object() ? &*it : nullptr;
 }
 
 // The section object of `settings` a row writes to, made where missing.
 json& section_at(json& settings, Section section) {
-    const char* key = section_key(section);
-    if (!key) return settings;
-    const auto parent = parent_of(section);
-    return object_at(parent ? section_at(settings, *parent) : settings, key);
+    const SectionObject& object = object_of(section);
+    if (!object.key) return settings;
+    return object_at(section_at(settings, object.parent), object.key);
 }
 
 template <class T>
