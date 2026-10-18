@@ -147,6 +147,8 @@ HRESULT __stdcall hook_create_pixel_shader(void* self, const void* code, SIZE_T 
             return hr;
         }
         stats.count_rejected(hr);
+    } else if (patched.has_constants) {
+        stats.count_unchanged(total);
     }
     return create(self, code, size, linkage, out);
 }

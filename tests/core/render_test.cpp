@@ -7,6 +7,8 @@
 #include "core/render/alpha_light.h"
 #include "core/render/dither_fix.h"
 #include "core/render/dxbc.h"
+#include "core/render/shader_fix_stats.h"
+#include "fakes/fakes.h"
 
 #include <doctest/doctest.h>
 
@@ -469,6 +471,24 @@ TEST_CASE("the dither fix refuses what it does not understand") {
     vertex[0]                          = 0x00010050; // vs_5_0
     const std::vector<std::uint8_t> vs = container(vertex);
     CHECK(patch_position_dither(vs.data(), vs.size()).blob.empty());
+}
+
+TEST_CASE("the dither event counts the shaders left unchanged") {
+    omvr::tests::RecordingLog log;
+    ShaderFixStats stats{log};
+    stats.count_fixed(stats.count_created());
+    REQUIRE(log.lines.size() == 1);
+    CHECK(log.lines[0] ==
+          "proxy: Dither fix: 1 of 1 pixel shaders changed so far; 0 with the dither's "
+          "constants left unchanged; 0 refused by the device");
+    stats.count_created();
+    stats.count_unchanged(stats.count_created());
+    REQUIRE(log.lines.size() == 2);
+    CHECK(log.lines[1] ==
+          "proxy: Dither fix: 1 of 3 pixel shaders changed so far; 1 with the dither's "
+          "constants left unchanged; 0 refused by the device");
+    stats.count_unchanged(stats.count_created()); // rate limited
+    CHECK(log.lines.size() == 2);
 }
 
 // 08 §8.1, §8.3: the game addresses the lighting atlas with
