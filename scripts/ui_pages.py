@@ -16,19 +16,17 @@ files; it must be outside the repository's tracked files (build-*/ is
 ignored). Nothing here is shipped: the output archive goes to ui_patch.py
 make, and only the patch is committed.
 """
-import argparse
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ffdec_movie  # noqa: E402
 import pak2  # noqa: E402
 import ui_patch  # noqa: E402
 
 MOVIES = ["DATA/UI/NEWFRONTENDMENU.GFX", "DATA/UI/PAUSEMENU.GFX", "DATA/UI/GAMEOVERMENU.GFX"]
 CLASS = "frontend.GameMenu"
-DEFAULT_FFDEC = Path(r"C:\Tools\ffdec_26.3.0\ffdec.jar")
 MEMBERS = Path(__file__).resolve().parent / "ui_pages" / "v2_pages.as"
 
 # Imports the members use that the stock class does not import.
@@ -48,10 +46,6 @@ REQUIRED = ["motherV2Build", "motherV2SetRunning", "setMotherSmoothTurnSpeed", "
             "setMotherWorldScaleSwitch", "setMotherHudPitch", "setMotherFilmGrain"]
 
 
-def ffdec(jar: Path, *args: str) -> None:
-    subprocess.run(["java", "-Xmx2g", "-jar", str(jar), *args], check=True, stdout=subprocess.DEVNULL)
-
-
 def add_imports(src: str) -> str:
     anchor = "   import flash.external.ExternalInterface;\n"
     if src.count(anchor) != 1:
@@ -64,20 +58,8 @@ def append_to_method(src: str, method: str, statement: str) -> str:
     m = re.search(rf"function {method}\([^)]*\) : void\s*\n(\s*)\{{\n", src)
     if not m or len(re.findall(rf"function {method}\(", src)) != 1:
         raise SystemExit(f"GameMenu: {method} not found once")
-    depth, i = 1, m.end()
-    while depth:
-        depth += {"{": 1, "}": -1}.get(src[i], 0)
-        i += 1
-    close = src.rfind("\n", 0, i - 1) + 1  # start of the closing brace's line
+    close = ffdec_movie.line_start(src, ffdec_movie.block_end(src, m.end()) - 1)  # the closing brace's line
     return src[:close] + m.group(1) + "   " + statement + "\n" + src[close:]
-
-
-def add_members(src: str, members: str) -> str:
-    end = src.rstrip().rfind("}", 0, src.rstrip().rfind("}"))  # the class's closing brace
-    if end < 0:
-        raise SystemExit("GameMenu: class end not found")
-    line = src.rfind("\n", 0, end) + 1
-    return src[:line] + "\n" + members.rstrip() + "\n" + src[line:]
 
 
 def splice(src: str, members: str) -> str:
@@ -86,48 +68,21 @@ def splice(src: str, members: str) -> str:
     src = add_imports(src)
     for method, statement in CALLS:
         src = append_to_method(src, method, statement)
-    return add_members(src, members)
+    return ffdec_movie.add_before_class_end(src, members, "GameMenu")
 
 
-def class_source(jar: Path, movie: Path, out: Path) -> str:
-    ffdec(jar, "-selectclass", CLASS, "-export", "script", str(out), str(movie))
-    return (out / "scripts" / "frontend" / "GameMenu.as").read_text(encoding="utf-8")
-
-
-def rebuild_movie(jar: Path, name: str, data: bytes, work: Path, members: str) -> bytes:
-    stem = Path(name).stem
-    movie_dir = work / stem
-    movie_dir.mkdir(parents=True, exist_ok=True)
-    original = movie_dir / f"{stem}.GFX"
-    original.write_bytes(data)
-    src = splice(class_source(jar, original, movie_dir / "original"), members)
-    scripts = movie_dir / "edited" / "scripts" / "frontend"
-    scripts.mkdir(parents=True, exist_ok=True)
-    (scripts / "GameMenu.as").write_text(src, encoding="utf-8", newline="\n")
-    rebuilt = movie_dir / f"{stem}.v2.GFX"
-    ffdec(jar, "-importScript", str(original), str(rebuilt), str(movie_dir / "edited" / "scripts"))
-    out = rebuilt.read_bytes()
-    if out[:3] != b"GFX":
-        raise SystemExit(f"{name}: FFDec did not write a GFX movie")
-    check = class_source(jar, rebuilt, movie_dir / "check")
+def lacks(check: str) -> str | None:
     missing = [n for n in REQUIRED if f"function {n}(" not in check]
-    if missing:
-        raise SystemExit(f"{name}: the recompiled class lacks {', '.join(missing)}")
-    print(f"{name}: {len(data)} -> {len(out)} bytes")
-    return out
+    return ", ".join(missing) if missing else None
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("modded", type=Path)
-    ap.add_argument("out", type=Path)
-    ap.add_argument("work", type=Path)
-    ap.add_argument("--ffdec", type=Path, default=DEFAULT_FFDEC)
-    a = ap.parse_args()
+    a = ffdec_movie.parse_args(__doc__)
     members = MEMBERS.read_text(encoding="utf-8")
     entries = pak2.read_pak(str(a.modded))
     for name in MOVIES:
-        entries[name] = rebuild_movie(a.ffdec, name, entries[name], a.work, members)
+        entries[name] = ffdec_movie.rebuild_movie(a.ffdec, CLASS, name, entries[name], a.work, "v2",
+                                                  lambda src: splice(src, members), lacks)
     ui_patch.write_pak(a.out, ui_patch.pak_alignment(a.modded), entries)
     print(f"{a.out}: {len(entries)} entries")
 
