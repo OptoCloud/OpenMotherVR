@@ -3,6 +3,7 @@
 
 #include "platform/openxr/constants.h"
 
+#include <array>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -388,31 +389,30 @@ void Input::on_interaction_profile_changed() noexcept {
     if (session_ == XR_NULL_HANDLE) return;
     // 22 §10.1: each hand's profile picks that hand's glyphs.
     static_assert(kProfileNameSize == XR_MAX_PATH_LENGTH);
+    std::array<bool, core::vr::kHandCount> bound{}; // a profile path, even one that could not be named
     for (std::size_t h = 0; h < hand_path_.size(); ++h) {
         auto& name = state_.profiles[h];
         name.fill('\0');
         XrInteractionProfileState hp{XR_TYPE_INTERACTION_PROFILE_STATE};
         std::uint32_t len = 0;
-        if (XR_FAILED(xrGetCurrentInteractionProfile(session_, hand_path_[h], &hp)) ||
-            hp.interactionProfile == XR_NULL_PATH ||
+        bound[h]          = XR_SUCCEEDED(xrGetCurrentInteractionProfile(session_, hand_path_[h], &hp)) &&
+                            hp.interactionProfile != XR_NULL_PATH;
+        if (!bound[h] ||
             XR_FAILED(xrPathToString(instance_, hp.interactionProfile,
                                      static_cast<std::uint32_t>(name.size()), &len, name.data())))
             name.fill('\0');
     }
     ++state_.profile_generation;
-    XrInteractionProfileState ps{XR_TYPE_INTERACTION_PROFILE_STATE};
-    if (XR_FAILED(xrGetCurrentInteractionProfile(session_, hand_path_[1], &ps)) ||
-        ps.interactionProfile == XR_NULL_PATH) {
+    // The right hand's profile picks the family (04 §5.8.4).
+    if (!bound[1]) {
         state_.family = ControllerFamily::Unknown;
         log_.line(kLogNoProfile);
         return;
     }
-    char name[XR_MAX_PATH_LENGTH] = {};
-    std::uint32_t n               = 0;
-    xrPathToString(instance_, ps.interactionProfile, sizeof(name), &n, name);
-    state_.family = std::strstr(name, kViveProfile)                   ? ControllerFamily::Touchpad
-                    : std::strcmp(name, kFrameControllerProfile) == 0 ? ControllerFamily::Frame
-                                                                      : ControllerFamily::Thumbstick;
+    const char* name = state_.profiles[1].data();
+    state_.family    = std::strstr(name, kViveProfile)                   ? ControllerFamily::Touchpad
+                       : std::strcmp(name, kFrameControllerProfile) == 0 ? ControllerFamily::Frame
+                                                                         : ControllerFamily::Thumbstick;
     logf(log_, kLogProfile, name);
     log_haptic_binding();
 }
