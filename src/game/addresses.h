@@ -147,6 +147,16 @@ struct ReconRvas {
     std::uint32_t renderer_eye_owner;     // global pointer; its +0x2C is the current eye
     std::uint32_t clear_render_target;    // clear of the bound target (cdecl); 6-byte prologue
     std::uint32_t reflection_manager;     // global pointer; its +0x60 is the quality (07 §1, 24 §1.9)
+    // 07 §4.7: ReflectionPOV update (thiscall, no args, plain ret) and its
+    // one call in the POV manager update, `e8 9b fb ff ff` at 0x5B4640.
+    // 07 §4.8: the renderer's viewport setter (cdecl(context, const int
+    // vp[6])) and vertex constant writer (cdecl(renderer, buffer, first
+    // register, const float4*, count)). Checked in the 2015 AI.exe
+    // (timestamp 0x54E3199D).
+    std::uint32_t reflection_update_call;
+    std::uint32_t reflection_update;
+    std::uint32_t viewport_setter;
+    std::uint32_t vs_constant_writer;
 
     // Anti-aliasing in stereo.
     std::uint32_t stereo_output_draw_call; // `call FullscreenDraw` in the final post chain's stereo path
@@ -205,6 +215,10 @@ inline constexpr ReconRvas kReconRvas2015 = {
     .renderer_eye_owner      = 0x013583E4,
     .clear_render_target     = 0x00621770,
     .reflection_manager      = 0x0135835C,
+    .reflection_update_call  = 0x005B4640,
+    .reflection_update       = 0x005B41E0,
+    .viewport_setter         = 0x00621350,
+    .vs_constant_writer      = 0x00621C20,
     .stereo_output_draw_call = 0x006101DC,
     .fullscreen_draw         = 0x005A0980,
     .postfx_instance         = 0x005F19C0,
