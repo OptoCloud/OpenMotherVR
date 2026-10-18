@@ -38,8 +38,7 @@ constexpr std::string_view kClearGateLog =
     "reflections stay mono";
 constexpr std::string_view kStereoAaCodeLog =
     "[hook] {}: off; unexpected code at StereoOutputDrawCall (RVA {:08X}), SmaaCall (RVA {:08X}), "
-    "PostFxInstance "
-    "or AaPass";
+    "PostFxInstance or AaPass";
 constexpr std::string_view kCullingCodeLog =
     "[hook] {}: off; unexpected code at CullDistanceCall (RVA {:08X}) or CullPlaneTestACall (RVA {:08X})";
 constexpr std::string_view kCullingOnLog =

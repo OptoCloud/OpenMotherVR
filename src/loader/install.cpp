@@ -87,9 +87,8 @@ constexpr std::string_view kPadStockWhy = "the pad's vtable slots could not be w
 
 constexpr std::string_view kPatchSetLog = "[hook] patch set {} for runtime {} (from {})";
 constexpr std::string_view kWriteFailedLog =
-    "[hook] {}: a write failed after the preflight; earlier patches stay, later core patches skipped: AI.exe "
-    "is "
-    "partly patched";
+    "[hook] {}: a write failed after the preflight; earlier patches stay, later core patches skipped: "
+    "AI.exe is partly patched";
 
 // ---- Helpers ----------------------------------------------------------------
 
