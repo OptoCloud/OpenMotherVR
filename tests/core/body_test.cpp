@@ -733,6 +733,21 @@ TEST_CASE("body controls: a crouch press is added to the Crouch control for its 
     CHECK(next.last.trigger_l == 0.2f);
 }
 
+TEST_CASE("body controls: a fire press is added to the Fire control for its time (21 §8.2, §9.2)") {
+    RecordingControls next;
+    FakeClock clock;
+    BodyControls bc{next, clock};
+    omvr::core::input::Controls c;
+    c.trigger_r = 0.3f;
+    bc.press_fire_until(clock.now() + 100ms);
+    bc.write(c, false);
+    CHECK(next.last.trigger_r == 1.0f);
+    CHECK(next.last.trigger_l == 0.0f); // the crouch is not pressed with it
+    clock.advance(100ms);
+    bc.write(c, false);
+    CHECK(next.last.trigger_r == 0.3f);
+}
+
 TEST_CASE("play space: real crouch's raise is game metres at any world scale") {
     using namespace omvr::core::stereo;
     RecordingLog log;

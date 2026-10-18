@@ -295,6 +295,42 @@ poses are always declared). Try on OpenVR and OpenXR.
       OpenXR a profile without an aim pose logs `openxr input: right hand
       aim pose not bound by the current profile` once.
 - [ ] **Smoothing.** `"Smoothing": 1`: steadier hands.
+- [ ] **Player action sites (21 §2.11).** With hands on: `[hook] hands,
+      melee arm hand-off: in place (2 sites)` and `[hook] hands, player
+      action episodes: in place (5 sites)`; with Dev. Debug Options also
+      `[hook] hands, play-animation log: in place (2 sites)` and `[hook]
+      hands, throw launch log: in place (1 sites)`. No crash at a melee
+      swing, a grab or a scripted scene.
+- [ ] **Melee by motion (21 §8.2, acceptance 8, 21).** Dev. Debug Options
+      on. Maintenance jack and stun baton: a real swing of the right
+      controller swings in game and lands hits on an android, once per
+      swing; a slow movement does not; the trigger still swings. Each
+      swing logs `[diag] hands: melee: the right arm plays the game's
+      swing (started by a motion: yes)` (`no` for the trigger), then
+      `[diag] hands: melee: the right arm is back on the controller`
+      about 1 s later.
+- [ ] **Throw by motion (21 §9.2, acceptance 9, 23).** Dev. Debug Options
+      on. With a flare, a noisemaker or a pipe bomb: hold the right grip
+      (the game aims the throw), make a throwing motion and let go during
+      it: the item is thrown (`[diag] hands: throw by motion: release
+      speed S m/s, thrown`); open the grip without moving: it stays in
+      hand (`cancelled (too slow)`). Note whether the item leaves the hand
+      within about 0.15 s of letting go. The game's own throw velocity is
+      used in this build (`Hands.ThrowStrength` has no effect yet): send
+      the `[diag] hands: throw by motion: a velocity set T s after the
+      release (body B, caller RVA C): linear (...); the hand's (...)`
+      lines of a throw, which show which call launches the item
+      (21 §22 item 8) and how long after the release.
+- [ ] **Player action episodes (21 §12.1, acceptance 20).** Dev. Debug
+      Options on: get grabbed by an android and break free, and do a
+      melee kill. The log names each start (`[diag] hands:
+      ACT_PLAYER_TRAP_VICTIM started ...`, `ACT_PLAYER_MELEE_KILL`, ...)
+      with `tracked hands inactive (player action)`, then `player action
+      episode (player action) ended: ...` within about a second of taking
+      up an item or of the view returning, and tracked hands active
+      again. A scripted scene logs `[diag] hands: play-animation request
+      ...` and `... counterpart ...` lines: say whether they come in
+      pairs.
 - [ ] **Threads.** No crash or stutter when the weapon update runs (it is
       assumed to run on the game thread).
 

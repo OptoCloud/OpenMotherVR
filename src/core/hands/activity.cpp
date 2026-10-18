@@ -14,6 +14,7 @@ Activity activity(const ActivityInput& in) noexcept {
     if (!in.follow_active) return Activity::CameraTaken;
     if (in.interaction) return Activity::Interaction;
     if (in.hiding) return Activity::Hiding;
+    if (in.player_action) return Activity::PlayerAction;
     return Activity::Active;
 }
 
@@ -30,6 +31,7 @@ std::string_view to_string(Activity a) noexcept {
         case Activity::MenuScreen: return "menu or loading screen";
         case Activity::Interaction: return "interaction";
         case Activity::Hiding: return "hiding";
+        case Activity::PlayerAction: return "player action";
     }
     return "unknown";
 }
@@ -40,7 +42,8 @@ bool is_episode(Activity a) noexcept {
         case Activity::Cutscene:
         case Activity::MenuScreen:
         case Activity::Interaction:
-        case Activity::Hiding: return true;
+        case Activity::Hiding:
+        case Activity::PlayerAction: return true;
         default: return false;
     }
 }

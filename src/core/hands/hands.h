@@ -4,10 +4,12 @@
 #include "core/config/settings.h"
 #include "core/diag/ports/log.h"
 #include "core/diag/tuning.h"
+#include "core/hands/action_episode.h"
 #include "core/hands/activity.h"
 #include "core/hands/hand_track.h"
 #include "core/hands/pose_filter.h"
 #include "core/hands/hand_aim.h"
+#include "core/hands/motion_actions.h"
 #include "core/hands/types.h"
 #include "game/constants.h"
 #include "util/sync/change_latch.h"
@@ -31,6 +33,19 @@
 // camera of that moment (§3.1).
 namespace omvr::core::hands {
 
+// What the game thread reads of the player's item and controls with each
+// head pose, for melee and throwing by motion (21 §8.2, §9.2).
+struct PlayInput {
+    bool item_known = false;                // the current item was read (the hand sites are in place)
+    std::optional<game::WeaponType> weapon; // its weapon type; nullopt: no weapon object
+    bool aim_held = false;                  // the Aim control as the game is given it
+};
+
+// What an update asks of the game's controls.
+struct HandsOutput {
+    std::optional<TimePoint> press_fire_until; // a swing or a throw by motion (21 §8.2, §9.2)
+};
+
 class Hands final {
 public:
     Hands(const config::HandsSettings& settings, diag::ports::Log& log) noexcept
@@ -40,7 +55,32 @@ public:
     // and both hands of its prediction, `world_scale` the head's scale.
     // With Hands.Enabled off nothing runs (v1); turning it off in play is
     // logged once.
-    void update(const HandFrame& frame, const ActivityInput& in, TimePoint now, float world_scale) noexcept;
+    // `play` feeds melee and throwing by motion; the result is the fire
+    // press they ask for.
+    HandsOutput update(const HandFrame& frame, const ActivityInput& in, const PlayInput& play, TimePoint now,
+                       float world_scale) noexcept;
+
+    // Any thread (the melee action's start methods, 21 §2.11): the
+    // player's melee action started; the right arm goes to the game's
+    // swing (21 §8.2, r11).
+    void on_melee_start(TimePoint now) noexcept { melee_started_.store(now); }
+
+    // Any thread (the scripted actions' start methods, 21 §2.11): a player
+    // action started (21 §12.1, r11).
+    void on_player_action(PlayerAction a, TimePoint now) noexcept { episode_.on_start(a, now); }
+
+    // Game thread: a player action episode runs or has just started, so the
+    // current item is worth reading for player_action().
+    bool player_action_wanted() const noexcept { return episode_.pending_or_running(); }
+
+    // Game thread, each frame (from the activity signals of the hands and
+    // the body): `item` the current item (0: none), `follow_active` the
+    // first-person camera. True while a player action episode runs.
+    bool player_action(std::uintptr_t item, bool follow_active, TimePoint now) noexcept;
+
+    // Any thread: the last throw by motion, while it is within
+    // kThrowLaunchWatch of `now` (for the launch diagnostic, 21 §22 item 8).
+    std::optional<ThrowRelease> recent_throw(TimePoint now) const noexcept;
 
     struct AimResult {
         std::optional<AimRay> ray; // the ray to write, or nullopt: the game's stays
@@ -91,6 +131,10 @@ private:
     void update_hand(std::size_t h, const HandFrame& frame, float dt_s, float world_scale) noexcept;
     void note_activity(Activity a) noexcept;
     void publish(TimePoint now, float activity) noexcept;
+    HandsOutput motion_actions(const HandFrame& frame, const PlayInput& play, bool active, TimePoint now,
+                               float world_scale) noexcept;
+    void take_melee_start(TimePoint now) noexcept;
+    void note_throw(const ThrowRelease& r) noexcept;
     void log_weapon_transform(const WeaponSample& weapon, const HandView& right,
                               const CameraPose& camera) noexcept;
     std::optional<View> fresh_view(TimePoint now) const noexcept;
@@ -108,6 +152,21 @@ private:
     bool off_noted_ = true; // Hands.Enabled off at start is v1: nothing to say
 
     util::SeqLock<View> view_;
+    MeleeByMotion melee_;
+    ThrowByMotion throw_;
+    ArmHandOff arm_hand_off_;
+    std::optional<TimePoint> melee_seen_; // the last melee start taken up
+    bool hand_off_noted_ = false;
+    ActionEpisode episode_; // also the activity signals' (game thread)
+
+    // Written by the melee start methods' thread.
+    util::AtomicStamp melee_started_;
+    // Game thread to any thread: the last throw and when (stamp ticks).
+    struct ThrowView {
+        std::int64_t stamp = 0;
+        ThrowRelease release{};
+    };
+    util::SeqLock<ThrowView> throw_view_;
 
     // Game thread (aim).
     util::ChangeLatch<WeaponClass> class_logged_;

@@ -3,6 +3,8 @@
 
 #include "util/time/steady.h"
 
+#include <cstddef>
+
 // Behaviour parameters of the hand and body features (spec 21), with the
 // section each one meets. Values marked [proposal] in the spec are the spec's.
 namespace omvr::core::hands {
@@ -68,6 +70,48 @@ inline constexpr float kMinBarrelColumnLength = 1.0e-3f;
 // 21 §5.3: the fire alignment test passes when its length is above the
 // threshold; a negative threshold passes every length the test computes.
 inline constexpr float kFireGateAlwaysPass = -1.0f;
+
+// ---- Melee and throwing by motion (21 §8, §9) ------------------------------------
+
+// 21 §8.2 [proposal]: a swing is the right hand above kSwingStartMps, then
+// below kSwingEndMps within kSwingWindow; it presses the fire action for
+// kMotionPress, and swings within kSwingLockout of a press are ignored.
+inline constexpr float kSwingStartMps = 2.0f;
+inline constexpr float kSwingEndMps   = 1.0f;
+inline constexpr Seconds kSwingWindow{0.5f};
+inline constexpr Seconds kMotionPress{0.1f};
+inline constexpr Seconds kSwingLockout{0.6f};
+// 21 §8.2 (r11) [proposal]: from each start of the player's melee action
+// the right hand blends out over kMeleeBlendOut, stays out until kMeleeHold
+// after the start and blends back as returning tracking does (§3.3).
+inline constexpr Seconds kMeleeBlendOut{0.05f};
+inline constexpr Seconds kMeleeHold{0.9f};
+inline constexpr Seconds kMeleeBlendBack = kBlendIn;
+// A melee start this soon after a press by motion is that swing, for the
+// log (21 §18; implementation choice: the press and the game's reaction to
+// it fit well inside).
+inline constexpr Seconds kMotionSwingAttribution{0.5f};
+
+// 21 §9.2, §9.3 [proposal]: a release throws at a peak speed of at least
+// kThrowReleaseMps over the kThrowVelocityWindow before it; the item should
+// leave the hand within kThrowLaunchLimit of the release.
+inline constexpr float kThrowReleaseMps = 1.5f;
+inline constexpr Seconds kThrowVelocityWindow{0.05f};
+inline constexpr Seconds kThrowLaunchLimit{0.15f};
+// Velocity samples kept for the window: 50 ms at up to 640 head poses a
+// second (implementation choice).
+inline constexpr std::size_t kThrowSamples = 32;
+// With Dev. Debug Options the game's velocity sets this long after a throw
+// are logged, at most kThrowLaunchLines of them, to find the throw's launch
+// (21 §22 item 8; implementation choice).
+inline constexpr Seconds kThrowLaunchWatch{1.0f};
+inline constexpr std::size_t kThrowLaunchLines = 4;
+
+// 21 §12.1 (r11) [proposal]: a player action episode ends
+// kActionCameraSettle after the first-person camera is back, or at the
+// latest kActionSafety after its start.
+inline constexpr Seconds kActionCameraSettle{0.5f};
+inline constexpr Seconds kActionSafety{5.0f};
 
 // ---- Haptics (21 §14) ----------------------------------------------------------
 

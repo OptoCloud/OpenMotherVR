@@ -21,6 +21,7 @@ struct ActivityInput {
     bool menu_screen      = false; // a loading, pause or title screen is up (05 §5)
     bool interaction      = false; // an interaction is in progress (11 §5.3)
     bool hiding           = false;
+    bool player_action    = false; // r11: a player action episode runs (21 §12.1)
 };
 
 // Why the hands are not active, or Active.
@@ -36,6 +37,7 @@ enum class Activity : std::uint8_t {
     MenuScreen,  // loading, pause, title
     Interaction, // r1: no interaction kind joins the hands (21 §4.4)
     Hiding,
+    PlayerAction, // r11: a grab, trap, melee kill or hit (21 §12.1)
 };
 
 // 21 §4.4: active only while every condition holds; the first that does not

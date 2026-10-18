@@ -26,6 +26,14 @@ constexpr std::string_view kLogTransform =
     "[diag] hands: weapon transform, weapon type {}: columns ({:+.3f} {:+.3f} {:+.3f}) ({:+.3f} {:+.3f} "
     "{:+.3f}) ({:+.3f} {:+.3f} {:+.3f}), origin ({:.3f} {:.3f} {:.3f}); aim pose forward ({:+.3f} {:+.3f} "
     "{:+.3f}), position ({:.3f} {:.3f} {:.3f}); {}";
+constexpr std::string_view kLogMeleeStart =
+    "[diag] hands: melee: the right arm plays the game's swing (started by a motion: {})";
+constexpr std::string_view kLogMeleeEnd = "[diag] hands: melee: the right arm is back on the controller";
+constexpr std::string_view kLogThrow    = "[diag] hands: throw by motion: release speed {:.2f} m/s, {}";
+constexpr std::string_view kLogActionStart =
+    "[diag] hands: {} started (taken as the player's: the action's character is not read); a player action "
+    "episode begins";
+constexpr std::string_view kLogActionEnd = "[diag] hands: player action episode ({}) ended: {}";
 constexpr std::string_view kLogAim =
     "[diag] hands: aim ray start ({:.2f} {:.2f} {:.2f}) dir ({:+.2f} {:+.2f} {:+.2f}) weight {:.2f}";
 
@@ -87,8 +95,8 @@ void Hands::update_hand(std::size_t h, const HandFrame& frame, float dt_s, float
     }
 }
 
-void Hands::update(const HandFrame& frame, const ActivityInput& in, TimePoint now,
-                   float world_scale) noexcept {
+HandsOutput Hands::update(const HandFrame& frame, const ActivityInput& in, const PlayInput& play,
+                          TimePoint now, float world_scale) noexcept {
     if (!in.enabled) {
         // v1: nothing runs. Said once when the key goes off in play.
         if (!off_noted_) note_activity(Activity::Off);
@@ -99,7 +107,7 @@ void Hands::update(const HandFrame& frame, const ActivityInput& in, TimePoint no
             activity_.set(0.0f);
             view_.store(View{});
         }
-        return;
+        return {};
     }
     off_noted_       = false;
     const float dt_s = seconds_since(last_update_, now);
@@ -107,7 +115,73 @@ void Hands::update(const HandFrame& frame, const ActivityInput& in, TimePoint no
     const Activity a = activity(in);
     note_activity(a);
     for (std::size_t h = 0; h < kHandCount; ++h) update_hand(h, frame, dt_s, world_scale);
+    take_melee_start(now);
+    const HandsOutput out = motion_actions(frame, play, a == Activity::Active, now, world_scale);
     publish(now, activity_.step(Seconds{dt_s}, a == Activity::Active));
+    return out;
+}
+
+// 21 §8.2 (r11): a melee start hands the right arm to the game's swing.
+void Hands::take_melee_start(TimePoint now) noexcept {
+    const auto started = melee_started_.load();
+    if (started && started != melee_seen_) {
+        melee_seen_ = started;
+        arm_hand_off_.start(*started);
+        if (!hand_off_noted_ && log_.debug_enabled())
+            logf(log_, kLogMeleeStart, melee_.pressed_shortly_before(*started) ? "yes" : "no");
+        hand_off_noted_ = true;
+    }
+    if (hand_off_noted_ && !arm_hand_off_.running(now)) {
+        hand_off_noted_ = false;
+        if (log_.debug_enabled()) log_.line(kLogMeleeEnd);
+    }
+}
+
+// 21 §8.2, §9.2: a swing with a contact weapon, or a release of the Aim
+// control with no weapon object (a throwable), presses fire.
+HandsOutput Hands::motion_actions(const HandFrame& frame, const PlayInput& play, bool active, TimePoint now,
+                                  float world_scale) noexcept {
+    const HandSample& s = frame.hands[kRightHand];
+    const HandTrack& t  = track_[kRightHand];
+    const bool right    = active && s.grip_valid && t.has_grip() && t.weight() > 0.0f;
+    const WeaponClass c = weapon_class(play.weapon);
+    // The grip's velocity in the camera's axes (21 §3.1, rotation only).
+    std::optional<util::Vec3> local;
+    if (s.velocity_valid) local = util::rotate_inverse(frame.head, s.velocity);
+    const std::optional<float> speed = local ? std::optional{speed_mps(*local, world_scale)} : std::nullopt;
+
+    HandsOutput out;
+    out.press_fire_until = melee_.update(
+        settings_.melee_by_motion && right && play.item_known && c == WeaponClass::Contact, speed, now);
+    const bool may_throw =
+        settings_.throw_by_motion && right && play.item_known && c == WeaponClass::NoWeapon;
+    if (const auto r = throw_.update(may_throw, play.aim_held, local, world_scale, now)) {
+        note_throw(*r);
+        if (r->thrown) out.press_fire_until = util::after(now, kMotionPress);
+    }
+    return out;
+}
+
+void Hands::note_throw(const ThrowRelease& r) noexcept {
+    if (log_.debug_enabled())
+        logf(log_, kLogThrow, r.speed_mps, r.thrown ? "thrown" : "cancelled (too slow)");
+    if (r.thrown) throw_view_.store({util::stamp_ticks(r.at), r});
+}
+
+std::optional<ThrowRelease> Hands::recent_throw(TimePoint now) const noexcept {
+    const ThrowView v = throw_view_.load();
+    const auto at     = util::from_stamp_ticks(v.stamp);
+    if (!at || now < *at || now > util::after(*at, kThrowLaunchWatch)) return std::nullopt;
+    return v.release;
+}
+
+bool Hands::player_action(std::uintptr_t item, bool follow_active, TimePoint now) noexcept {
+    const ActionEpisode::Change c = episode_.update(item, follow_active, now);
+    if (log_.debug_enabled()) {
+        if (c.started) logf(log_, kLogActionStart, action_name(*c.started));
+        if (c.ended) logf(log_, kLogActionEnd, to_string(Activity::PlayerAction), to_string(*c.ended));
+    }
+    return episode_.running();
 }
 
 void Hands::publish(TimePoint now, float activity) noexcept {
@@ -115,7 +189,9 @@ void Hands::publish(TimePoint now, float activity) noexcept {
     v.stamp = util::stamp_ticks(now);
     for (std::size_t h = 0; h < kHandCount; ++h) {
         const HandTrack& t = track_[h];
-        v.hands[h]         = {t.grip(), t.aim(), t.weight() * activity, t.has_grip(), t.has_aim()};
+        // 21 §8.2 (r11): the right arm is the game's while the melee swing runs.
+        const float hand_off = h == kRightHand ? arm_hand_off_.weight(now) : 1.0f;
+        v.hands[h] = {t.grip(), t.aim(), t.weight() * activity * hand_off, t.has_grip(), t.has_aim()};
     }
     view_.store(v);
 }

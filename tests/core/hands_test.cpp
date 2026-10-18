@@ -5,10 +5,12 @@
 // from the spec's formulas, computed here independently of the code.
 
 #include "core/config/settings.h"
+#include "core/hands/action_episode.h"
 #include "core/hands/activity.h"
 #include "core/hands/hand_aim.h"
 #include "core/hands/hand_track.h"
 #include "core/hands/hands.h"
+#include "core/hands/motion_actions.h"
 #include "core/hands/pose_filter.h"
 #include "core/hands/tuning.h"
 #include "core/vr/pose_convert.h"
@@ -229,6 +231,8 @@ TEST_CASE("hands are active only in first-person play the player controls (21 §
     with([](ActivityInput& c) { c.menu_screen = true; }, Activity::MenuScreen);
     with([](ActivityInput& c) { c.interaction = true; }, Activity::Interaction);
     with([](ActivityInput& c) { c.hiding = true; }, Activity::Hiding);
+    with([](ActivityInput& c) { c.player_action = true; }, Activity::PlayerAction);
+    CHECK(is_episode(Activity::PlayerAction));
     CHECK(is_episode(Activity::Cutscene));
     CHECK_FALSE(is_episode(Activity::Dead));
 }
@@ -329,7 +333,7 @@ struct HandsRig {
     void run(std::chrono::milliseconds step, int frames, const ActivityInput& in) {
         for (int i = 0; i < frames; ++i) {
             now += step;
-            hands.update(frame(), in, now, 1.0f);
+            (void)hands.update(frame(), in, {}, now, 1.0f);
         }
     }
 };
@@ -483,6 +487,251 @@ TEST_CASE("Hands: the tracker faces by the drawn left hand when given, else its 
     const auto aim = rig.hands.tracker_facing(cam, std::nullopt, rig.now);
     REQUIRE(aim.has_value());
     CHECK(aim->x == doctest::Approx(1.0f));
+}
+
+// ---- Melee and throwing by motion (21 §8.2, §9.2), player actions (§12.1) ----
+
+using std::chrono::milliseconds;
+
+TimePoint at_ms(int ms) { return TimePoint{std::chrono::seconds(100)} + milliseconds(ms); }
+
+TEST_CASE("swing: above 2 m/s, then below 1 m/s within 0.5 s") {
+    SwingDetector d;
+    CHECK_FALSE(d.update(0.5f, at_ms(0)));
+    CHECK_FALSE(d.update(2.5f, at_ms(10)));
+    CHECK_FALSE(d.update(1.5f, at_ms(200))); // slowing, not yet below 1
+    CHECK(d.update(0.8f, at_ms(400)));       // the swing
+    CHECK_FALSE(d.update(0.5f, at_ms(410)));
+
+    // A slow movement is no swing.
+    CHECK_FALSE(d.update(1.9f, at_ms(1000)));
+    CHECK_FALSE(d.update(0.5f, at_ms(1100)));
+
+    // Fast for longer than 0.5 s is no swing, and nothing counts until the
+    // hand has slowed below 1 m/s.
+    CHECK_FALSE(d.update(2.5f, at_ms(2000)));
+    CHECK_FALSE(d.update(2.5f, at_ms(2600)));
+    CHECK_FALSE(d.update(0.8f, at_ms(2650))); // the rest it waited for
+    CHECK_FALSE(d.update(2.5f, at_ms(2700)));
+    CHECK(d.update(0.5f, at_ms(2900)));
+
+    // Lost velocity drops a swing in progress.
+    CHECK_FALSE(d.update(2.5f, at_ms(4000)));
+    CHECK_FALSE(d.update(std::nullopt, at_ms(4010)));
+    CHECK_FALSE(d.update(0.5f, at_ms(4020)));
+}
+
+TEST_CASE("melee by motion: one 100 ms fire press per swing, none within 0.6 s of a press") {
+    MeleeByMotion m;
+    const auto swing = [&m](int start_ms, bool allowed = true) {
+        (void)m.update(allowed, 3.0f, at_ms(start_ms));
+        return m.update(allowed, 0.5f, at_ms(start_ms + 100));
+    };
+    const auto first = swing(0);
+    REQUIRE(first.has_value());
+    CHECK(*first == at_ms(200)); // pressed from 100 ms for 100 ms
+    CHECK(m.pressed_shortly_before(at_ms(300)));
+    CHECK_FALSE(swing(400).has_value()); // ends at 500 ms: within 0.6 s of the press at 100 ms
+    CHECK(swing(700).has_value());       // ends at 800 ms
+    CHECK_FALSE(swing(2000, false).has_value());
+}
+
+TEST_CASE("arm hand-off: out over 0.05 s, out until 0.9 s, back over 0.15 s; a restart keeps the arm out") {
+    ArmHandOff a;
+    CHECK(a.weight(at_ms(0)) == 1.0f);
+    CHECK_FALSE(a.running(at_ms(0)));
+    a.start(at_ms(0));
+    CHECK(a.weight(at_ms(0)) == doctest::Approx(1.0f));
+    CHECK(a.weight(at_ms(25)) == doctest::Approx(0.5f));
+    CHECK(a.weight(at_ms(50)) == doctest::Approx(0.0f));
+    CHECK(a.weight(at_ms(900)) == doctest::Approx(0.0f));
+    CHECK(a.weight(at_ms(975)) == doctest::Approx(0.5f));
+    CHECK(a.running(at_ms(975)));
+    CHECK(a.weight(at_ms(1050)) == doctest::Approx(1.0f));
+    CHECK_FALSE(a.running(at_ms(1050)));
+
+    // A new start half way back: the arm goes out again from there, and
+    // the 0.9 s run from the new start.
+    a.start(at_ms(0));
+    a.start(at_ms(975));
+    CHECK(a.weight(at_ms(975)) == doctest::Approx(0.5f));
+    CHECK(a.weight(at_ms(1000)) == doctest::Approx(0.0f));
+    CHECK(a.weight(at_ms(1875)) == doctest::Approx(0.0f));
+    CHECK(a.weight(at_ms(1950)) == doctest::Approx(0.5f));
+}
+
+TEST_CASE(
+    "throw by motion: a release at 1.5 m/s or more throws; slower cancels; the peak of the last 50 ms") {
+    ThrowByMotion t;
+    const Vec3 fast{0, 0, 2.0f};
+    const Vec3 slow{0, 0, 0.5f};
+    CHECK_FALSE(t.update(true, false, fast, 1.0f, at_ms(0)).has_value()); // not armed
+    CHECK_FALSE(t.update(true, true, slow, 1.0f, at_ms(10)).has_value());
+    CHECK_FALSE(t.update(true, true, fast, 1.0f, at_ms(20)).has_value());
+    const auto thrown = t.update(true, false, slow, 1.0f, at_ms(50));
+    REQUIRE(thrown.has_value());
+    CHECK(thrown->thrown);
+    CHECK(thrown->speed_mps == doctest::Approx(2.0f));
+    CHECK(thrown->local.z == doctest::Approx(2.0f));
+    CHECK(thrown->at == at_ms(50));
+
+    // The fast sample is older than 50 ms at the release: cancelled.
+    (void)t.update(true, true, fast, 1.0f, at_ms(1000));
+    (void)t.update(true, true, slow, 1.0f, at_ms(1040));
+    const auto late = t.update(true, false, slow, 1.0f, at_ms(1060));
+    REQUIRE(late.has_value());
+    CHECK_FALSE(late->thrown);
+    CHECK(late->speed_mps == doctest::Approx(0.5f));
+
+    // Speeds are in metres: at world scale 2 a velocity of 2.8 game units
+    // per second is 1.4 m/s.
+    (void)t.update(true, true, Vec3{0, 0, 2.8f}, 2.0f, at_ms(2000));
+    const auto scaled = t.update(true, false, std::nullopt, 2.0f, at_ms(2010));
+    REQUIRE(scaled.has_value());
+    CHECK_FALSE(scaled->thrown);
+
+    // Not allowed (another item, hands inactive) disarms without a release.
+    (void)t.update(true, true, fast, 1.0f, at_ms(3000));
+    CHECK_FALSE(t.update(false, true, fast, 1.0f, at_ms(3010)).has_value());
+    CHECK_FALSE(t.update(true, false, fast, 1.0f, at_ms(3020)).has_value());
+}
+
+TEST_CASE("throw velocity: rotated into the world, horizontal part times the strength, vertical kept") {
+    const CameraPose cam{yaw(std::numbers::pi_v<float> / 2), {5, 0, 5}}; // looking along world +X
+    check_close(throw_velocity(cam, {0, 1, 2}, 1.0f), {2, 1, 0});
+    check_close(throw_velocity(cam, {0, 1, 2}, 2.0f), {4, 1, 0});
+    check_close(throw_velocity(cam, {0, -1, 2}, 0.5f), {1, -1, 0});
+}
+
+TEST_CASE("player action episode: ends on an item taken up, the camera back 0.5 s, or after 5 s") {
+    ActionEpisode e;
+    CHECK_FALSE(e.pending_or_running());
+    e.on_start(PlayerAction::TrapVictim, at_ms(0));
+    CHECK(e.pending_or_running());
+    auto c = e.update(5, true, at_ms(10)); // holding item 5 as it starts
+    REQUIRE(c.started.has_value());
+    CHECK(*c.started == PlayerAction::TrapVictim);
+    CHECK(e.running());
+    CHECK_FALSE(e.update(0, true, at_ms(20)).ended.has_value()); // put away: not an end
+    c = e.update(7, true, at_ms(30));                            // a new item taken up
+    REQUIRE(c.ended.has_value());
+    CHECK(*c.ended == EpisodeEnd::ItemTaken);
+    CHECK_FALSE(e.running());
+
+    // The camera taken and given back: 0.5 s after it is back.
+    e.on_start(PlayerAction::MeleeKill, at_ms(1000));
+    (void)e.update(0, true, at_ms(1000));
+    CHECK_FALSE(e.update(0, false, at_ms(1100)).ended.has_value());
+    CHECK_FALSE(e.update(0, true, at_ms(1200)).ended.has_value());
+    CHECK_FALSE(e.update(0, true, at_ms(1600)).ended.has_value());
+    c = e.update(0, true, at_ms(1700));
+    REQUIRE(c.ended.has_value());
+    CHECK(*c.ended == EpisodeEnd::CameraBack);
+
+    // Nothing else: 5 s after the start.
+    e.on_start(PlayerAction::ImpactStanding, at_ms(2000));
+    (void)e.update(3, true, at_ms(2000));
+    CHECK_FALSE(e.update(3, true, at_ms(6900)).ended.has_value());
+    c = e.update(3, true, at_ms(7000));
+    REQUIRE(c.ended.has_value());
+    CHECK(*c.ended == EpisodeEnd::Safety);
+    CHECK(action_name(PlayerAction::MeleeIntercept) == "ACT_PLAYER_MELEE_INTERCEPT");
+}
+
+// HandsRig's frame with the right grip moving at `speed` m/s (world scale 1).
+HandFrame moving_frame(float speed) {
+    HandFrame f                        = HandsRig::frame();
+    f.hands[kRightHand].velocity       = {0, 0, speed};
+    f.hands[kRightHand].velocity_valid = true;
+    return f;
+}
+
+TEST_CASE("Hands: a swing with the melee tool presses fire; a throwable's fast release presses fire") {
+    HandsRig rig;
+    rig.settings.enabled = true;
+    rig.log.debug        = true;
+    rig.run(milliseconds(11), 30, HandsRig::active());
+    const PlayInput melee{true, WeaponType::Melee, false};
+
+    rig.now += milliseconds(11);
+    CHECK_FALSE(
+        rig.hands.update(moving_frame(3.0f), HandsRig::active(), melee, rig.now, 1.0f).press_fire_until);
+    rig.now += milliseconds(100);
+    const auto out = rig.hands.update(moving_frame(0.5f), HandsRig::active(), melee, rig.now, 1.0f);
+    REQUIRE(out.press_fire_until.has_value());
+    CHECK(*out.press_fire_until == rig.now + milliseconds(100));
+
+    // The same swing with the revolver, or with the item not read, does not.
+    const PlayInput pistol{true, WeaponType::Pistol, false};
+    rig.now += milliseconds(1000);
+    (void)rig.hands.update(moving_frame(3.0f), HandsRig::active(), pistol, rig.now, 1.0f);
+    rig.now += milliseconds(100);
+    CHECK_FALSE(
+        rig.hands.update(moving_frame(0.5f), HandsRig::active(), pistol, rig.now, 1.0f).press_fire_until);
+
+    // A throwable (no weapon object): the Aim control held, let go fast.
+    const PlayInput held{true, std::nullopt, true};
+    const PlayInput let_go{true, std::nullopt, false};
+    rig.now += milliseconds(11);
+    (void)rig.hands.update(moving_frame(2.0f), HandsRig::active(), held, rig.now, 1.0f);
+    rig.now += milliseconds(11);
+    const auto thrown = rig.hands.update(moving_frame(1.8f), HandsRig::active(), let_go, rig.now, 1.0f);
+    REQUIRE(thrown.press_fire_until.has_value());
+    CHECK(rig.log.contains("[diag] hands: throw by motion: release speed 2.00 m/s, thrown"));
+    REQUIRE(rig.hands.recent_throw(rig.now).has_value());
+    CHECK_FALSE(rig.hands.recent_throw(rig.now + std::chrono::seconds(2)).has_value());
+
+    // Let go slowly: cancelled, no press.
+    rig.now += milliseconds(11);
+    (void)rig.hands.update(moving_frame(0.3f), HandsRig::active(), held, rig.now, 1.0f);
+    rig.now += milliseconds(11);
+    CHECK_FALSE(
+        rig.hands.update(moving_frame(0.3f), HandsRig::active(), let_go, rig.now, 1.0f).press_fire_until);
+    CHECK(rig.log.contains("cancelled"));
+
+    // Hands.MeleeByMotion off: no press.
+    rig.settings.melee_by_motion = false;
+    rig.now += milliseconds(1000);
+    (void)rig.hands.update(moving_frame(3.0f), HandsRig::active(), melee, rig.now, 1.0f);
+    rig.now += milliseconds(100);
+    CHECK_FALSE(
+        rig.hands.update(moving_frame(0.5f), HandsRig::active(), melee, rig.now, 1.0f).press_fire_until);
+}
+
+TEST_CASE("Hands: a melee start hands the right arm to the game; the left hand stays") {
+    HandsRig rig;
+    rig.settings.enabled = true;
+    rig.log.debug        = true;
+    rig.run(milliseconds(10), 30, HandsRig::active());
+    const AimRay game{{0, 0, 0}, {0, 0, 1}, {0, 0, 20}};
+    const CameraPose cam{yaw(std::numbers::pi_v<float> / 2), {5, 0, 5}};
+    REQUIRE(rig.hands.aim(game, cam, {std::nullopt}, rig.now).ray.has_value());
+
+    rig.hands.on_melee_start(rig.now);
+    rig.run(milliseconds(10), 10, HandsRig::active()); // 0.1 s: out
+    CHECK(rig.log.contains(
+        "[diag] hands: melee: the right arm plays the game's swing (started by a motion: no)"));
+    CHECK_FALSE(rig.hands.aim(game, cam, {std::nullopt}, rig.now).ray.has_value());
+    CHECK(rig.hands.tracker_facing(cam, std::nullopt, rig.now).has_value());
+
+    rig.run(milliseconds(10), 100, HandsRig::active()); // past 0.9 s + 0.15 s
+    CHECK(rig.log.contains("[diag] hands: melee: the right arm is back on the controller"));
+    const auto back = rig.hands.aim(game, cam, {std::nullopt}, rig.now);
+    REQUIRE(back.ray.has_value());
+    check_close(back.ray->direction, {1, 0, 0});
+}
+
+TEST_CASE("Hands: a player action makes an episode until it ends, logged with debug options") {
+    HandsRig rig;
+    rig.log.debug = true;
+    CHECK_FALSE(rig.hands.player_action_wanted());
+    rig.hands.on_player_action(PlayerAction::TrapVictim, rig.now);
+    CHECK(rig.hands.player_action_wanted());
+    CHECK(rig.hands.player_action(0, true, rig.now));
+    CHECK(rig.log.contains("[diag] hands: ACT_PLAYER_TRAP_VICTIM started"));
+    CHECK_FALSE(rig.hands.player_action(9, true, rig.now + milliseconds(100)));
+    CHECK(rig.log.contains("[diag] hands: player action episode (player action) ended: an item taken up"));
+    CHECK_FALSE(rig.hands.player_action_wanted());
 }
 
 } // namespace

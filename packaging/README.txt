@@ -137,6 +137,14 @@ Playing
     keep the game's aim. Default true.
   - "TrackerInHand": with Enabled, the motion tracker's cone points where
     your left controller points. Default true.
+  - "MeleeByMotion": with Enabled, a real swing of your right controller
+    swings the maintenance jack or the stun baton, once per swing; the
+    trigger still works. Default true.
+  - "ThrowByMotion": with Enabled, hold the right grip with a flare or a
+    throwable and let go during a throwing motion to throw it; letting go
+    without moving keeps it in your hand. The game's own throw sets how
+    far it flies for now, so "ThrowStrength" has no effect yet. Default
+    true.
   - "Smoothing": 0 to 1 steadies the hands; higher steadies more but lags
     behind. 0 (the default) is off.
   - "Haptics": an object of its own inside "Hands" for controller

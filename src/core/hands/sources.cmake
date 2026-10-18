@@ -1,6 +1,8 @@
 # OpenMotherVR-Provenance: clean
 # Sources of src/core/hands/; each directory lists its own files.
 target_sources(omvr_core PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/action_episode.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/action_episode.h
     ${CMAKE_CURRENT_LIST_DIR}/activity.cpp
     ${CMAKE_CURRENT_LIST_DIR}/activity.h
     ${CMAKE_CURRENT_LIST_DIR}/body_controls.cpp
@@ -19,6 +21,8 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/haptics.h
     ${CMAKE_CURRENT_LIST_DIR}/hands.cpp
     ${CMAKE_CURRENT_LIST_DIR}/hands.h
+    ${CMAKE_CURRENT_LIST_DIR}/motion_actions.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/motion_actions.h
     ${CMAKE_CURRENT_LIST_DIR}/pose_filter.cpp
     ${CMAKE_CURRENT_LIST_DIR}/pose_filter.h
     ${CMAKE_CURRENT_LIST_DIR}/real_crouch.cpp
