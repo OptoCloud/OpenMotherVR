@@ -9,6 +9,7 @@
 #include "game/addresses.h"
 #include "game/code_address.h"
 #include "game/layout.h"
+#include "game/sites/area_log.h"
 #include "game/stereo/cull.h"
 #include "game/stereo/head_clip.h"
 #include "game/stereo/mode_stack.h"
@@ -28,14 +29,6 @@ namespace ports = core::diag::ports;
 
 // ---- Areas, their site counts and log templates -------------------------------
 
-constexpr std::string_view kReflections = kReflectionsArea;
-constexpr std::string_view kStereoAa    = kStereoAaArea;
-constexpr std::string_view kCulling     = kCullingArea;
-constexpr std::string_view kHeadClip    = kHeadClipArea;
-constexpr std::string_view kEventTap    = kEventTapArea;
-constexpr std::string_view kAlphaLight  = kAlphaLightArea;
-constexpr std::string_view kNoAddress   = "this build has no address for it";
-
 constexpr int kReflectionSites = 2; // the render call and the clear gate
 constexpr int kStereoAaSites   = 2; // the SMAA call and the stereo output draw
 constexpr int kCullingSites    = 2; // the distance and the occlusion test calls
@@ -43,8 +36,6 @@ constexpr int kHeadClipSites   = 1;
 constexpr int kEventTapSites   = 1;
 constexpr int kAlphaLightSites = 1;
 
-constexpr std::string_view kAreaOnLog  = "[hook] {}: in place on {} sites";
-constexpr std::string_view kAreaOffLog = "[hook] {}: off; {}";
 constexpr std::string_view kReflectionCallLog =
     "[hook] {}: off; ReflectionRenderCall (RVA {:08X}) is not the expected call";
 constexpr std::string_view kClearGateLog =
@@ -110,7 +101,7 @@ void fix_reflections(const GameImage& g, Patcher& p, const ReconRvas& r,
     ports::Log& log    = p.log();
     std::uint8_t* site = g.at_rva(r.reflection_render_call);
     if (!calls(site, g.at_rva(r.reflection_render))) {
-        ports::logf(log, kReflectionCallLog, kReflections, r.reflection_render_call);
+        ports::logf(log, kReflectionCallLog, kReflectionsArea, r.reflection_render_call);
         return;
     }
     hooks.targets->reflection = {
@@ -126,9 +117,9 @@ void fix_reflections(const GameImage& g, Patcher& p, const ReconRvas& r,
     // gate goes in only once the call reaches it.
     const bool gated = hooks.install_reflections(hooks.targets->reflection);
     if (gated) {
-        area_on(log, kReflections, kReflectionSites);
+        area_on(log, kReflectionsArea, kReflectionSites);
     } else {
-        ports::logf(log, kClearGateLog, kReflections, r.clear_render_target);
+        ports::logf(log, kClearGateLog, kReflectionsArea, r.clear_render_target);
     }
 }
 
@@ -141,7 +132,7 @@ void fix_anti_aliasing(const GameImage& g, Patcher& p, const ReconRvas& r,
     if (!calls(draw_site, g.at_rva(r.fullscreen_draw)) || !calls(smaa_site, g.at_rva(r.smaa)) ||
         !postfx_getter_is_expected(g.at_rva(r.postfx_instance)) ||
         !x86::matches(g.at_rva(r.aa_pass), kAaPassPrologue)) {
-        ports::logf(p.log(), kStereoAaCodeLog, kStereoAa, r.stereo_output_draw_call, r.smaa_call);
+        ports::logf(p.log(), kStereoAaCodeLog, kStereoAaArea, r.stereo_output_draw_call, r.smaa_call);
         return;
     }
     hooks.targets->aa = {
@@ -152,7 +143,7 @@ void fix_anti_aliasing(const GameImage& g, Patcher& p, const ReconRvas& r,
     };
     if (p.redirect_call(smaa_site, hooks.run_smaa, "SMAA") &&
         p.redirect_call(draw_site, hooks.stereo_final_draw, "stereo output draw")) {
-        area_on(p.log(), kStereoAa, kStereoAaSites);
+        area_on(p.log(), kStereoAaArea, kStereoAaSites);
     }
 }
 
@@ -164,7 +155,7 @@ void fix_culling(const GameImage& g, Patcher& p, const ReconRvas& r, const Rende
     if (!calls(g.at_rva(r.cull_distance_call), g.at_rva(r.cull_distance)) ||
         !calls(g.at_rva(r.cull_occlusion_call), g.at_rva(r.cull_occlusion)) ||
         !x86::matches(occlusion_args, kOcclusionArgs)) {
-        ports::logf(p.log(), kCullingCodeLog, kCulling, r.cull_distance_call, r.cull_occlusion_call);
+        ports::logf(p.log(), kCullingCodeLog, kCullingArea, r.cull_distance_call, r.cull_occlusion_call);
         return;
     }
     hooks.targets->cull = {
@@ -173,7 +164,7 @@ void fix_culling(const GameImage& g, Patcher& p, const ReconRvas& r, const Rende
     };
     if (p.redirect_call(g.at_rva(r.cull_distance_call), hooks.cull_distance, "distance cull") &&
         p.redirect_call(g.at_rva(r.cull_occlusion_call), hooks.cull_occlusion, "occlusion cull")) {
-        area_on(p.log(), kCulling, kCullingSites);
+        area_on(p.log(), kCullingArea, kCullingSites);
         p.log().line(kCullingOnLog);
     }
 }
@@ -183,12 +174,12 @@ void fix_culling(const GameImage& g, Patcher& p, const ReconRvas& r, const Rende
 void fix_head_clip_fade(const GameImage& g, Patcher& p, const ReconRvas& r,
                         const RenderFixHooks& hooks) noexcept {
     if (!calls(g.at_rva(r.head_clip_fade_call), g.at_rva(r.head_clip_fade))) {
-        ports::logf(p.log(), kHeadClipCallLog, kHeadClip, r.head_clip_fade_call);
+        ports::logf(p.log(), kHeadClipCallLog, kHeadClipArea, r.head_clip_fade_call);
         return;
     }
     hooks.targets->head_clip = {.fade = g.at_rva(r.head_clip_fade)};
     if (p.redirect_call(g.at_rva(r.head_clip_fade_call), hooks.head_clip_fade, "HeadClipFade")) {
-        area_on(p.log(), kHeadClip, kHeadClipSites);
+        area_on(p.log(), kHeadClipArea, kHeadClipSites);
     }
 }
 
@@ -197,9 +188,9 @@ void fix_head_clip_fade(const GameImage& g, Patcher& p, const ReconRvas& r,
 void tap_game_events(const GameImage& g, Patcher& p, const ReconRvas& r,
                      const RenderFixHooks& hooks) noexcept {
     if (install_event_tap(g.at_rva(r.event_tap), hooks.event_tap, *hooks.event_tap_trampoline, p.log())) {
-        area_on(p.log(), kEventTap, kEventTapSites);
+        area_on(p.log(), kEventTapArea, kEventTapSites);
     } else {
-        ports::logf(p.log(), kEventTapLog, kEventTap, r.event_tap);
+        ports::logf(p.log(), kEventTapLog, kEventTapArea, r.event_tap);
     }
 }
 
@@ -209,12 +200,12 @@ void tap_game_events(const GameImage& g, Patcher& p, const ReconRvas& r,
 void fix_alpha_light(const GameImage& g, Patcher& p, const ReconRvas& r,
                      const RenderFixHooks& hooks) noexcept {
     if (!calls(g.at_rva(r.alpha_light_ndc_call), g.at_rva(r.eye_ndc))) {
-        ports::logf(p.log(), kAlphaLightCallLog, kAlphaLight, r.alpha_light_ndc_call);
+        ports::logf(p.log(), kAlphaLightCallLog, kAlphaLightArea, r.alpha_light_ndc_call);
         return;
     }
     hooks.targets->alpha_light = {.eye_ndc = g.at_rva(r.eye_ndc)};
     if (p.redirect_call(g.at_rva(r.alpha_light_ndc_call), hooks.alpha_light_eye_ndc, "EyeNdc")) {
-        area_on(p.log(), kAlphaLight, kAlphaLightSites);
+        area_on(p.log(), kAlphaLightArea, kAlphaLightSites);
     }
 }
 
@@ -223,22 +214,10 @@ using Fix = void (*)(const GameImage&, Patcher&, const ReconRvas&, const RenderF
 // Runs `fix` when this build has its address (`rva`), else reports it off.
 void fix_if_known(std::uint32_t rva, std::string_view area, Fix fix, const GameImage& g, Patcher& p,
                   const ReconRvas& r, const RenderFixHooks& hooks) noexcept {
-    if (rva != 0) {
-        fix(g, p, r, hooks);
-    } else {
-        area_off(p.log(), area, kNoAddress);
-    }
+    if (known_or_off(p.log(), rva, area)) fix(g, p, r, hooks);
 }
 
 } // namespace
-
-void area_on(ports::Log& log, std::string_view area, int sites) noexcept {
-    ports::logf(log, kAreaOnLog, area, sites);
-}
-
-void area_off(ports::Log& log, std::string_view area, std::string_view why) noexcept {
-    ports::logf(log, kAreaOffLog, area, why);
-}
 
 void find_mode_stack_append(const GameImage& g, ports::Log& log, stereo::ModeStackTargets& out) noexcept {
     const ReconRvas& r = kReconRvas[g.version];
@@ -258,12 +237,12 @@ void find_mode_stack_append(const GameImage& g, ports::Log& log, stereo::ModeSta
 
 void install_render_fixes(const GameImage& g, Patcher& p, const RenderFixHooks& hooks) noexcept {
     const ReconRvas& r = kReconRvas[g.version];
-    fix_if_known(r.reflection_render_call, kReflections, &fix_reflections, g, p, r, hooks);
-    fix_if_known(r.stereo_output_draw_call, kStereoAa, &fix_anti_aliasing, g, p, r, hooks);
-    fix_if_known(r.cull_distance_call, kCulling, &fix_culling, g, p, r, hooks);
-    fix_if_known(r.head_clip_fade_call, kHeadClip, &fix_head_clip_fade, g, p, r, hooks);
-    fix_if_known(r.event_tap, kEventTap, &tap_game_events, g, p, r, hooks);
-    fix_if_known(r.alpha_light_ndc_call, kAlphaLight, &fix_alpha_light, g, p, r, hooks);
+    fix_if_known(r.reflection_render_call, kReflectionsArea, &fix_reflections, g, p, r, hooks);
+    fix_if_known(r.stereo_output_draw_call, kStereoAaArea, &fix_anti_aliasing, g, p, r, hooks);
+    fix_if_known(r.cull_distance_call, kCullingArea, &fix_culling, g, p, r, hooks);
+    fix_if_known(r.head_clip_fade_call, kHeadClipArea, &fix_head_clip_fade, g, p, r, hooks);
+    fix_if_known(r.event_tap, kEventTapArea, &tap_game_events, g, p, r, hooks);
+    fix_if_known(r.alpha_light_ndc_call, kAlphaLightArea, &fix_alpha_light, g, p, r, hooks);
 }
 
 } // namespace omvr::game::sites

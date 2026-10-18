@@ -24,11 +24,6 @@ inline constexpr std::string_view kHeadClipArea    = "head-in-wall delay";
 inline constexpr std::string_view kEventTapArea    = "event tap";
 inline constexpr std::string_view kAlphaLightArea  = "particle lighting";
 
-// One outcome line per feature area at attach, so a log shows which parts of
-// the mod are in place and, for those that are not, why (11).
-void area_on(core::diag::ports::Log& log, std::string_view area, int sites) noexcept;
-void area_off(core::diag::ports::Log& log, std::string_view area, std::string_view why) noexcept;
-
 // 8: the game's mode-stack append, so the stereo update can raise the stack
 // count through the game's allocator (05 §4.4). Nothing is written to the
 // game; on a build without the address, or other code at its call, the

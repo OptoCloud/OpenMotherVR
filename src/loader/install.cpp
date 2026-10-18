@@ -24,6 +24,7 @@
 #include "game/game_image.h"
 #include "game/patcher.h"
 #include "game/preflight.h"
+#include "game/sites/area_log.h"
 #include "game/sites/controls.h"
 #include "game/sites/game_behaviour.h"
 #include "game/sites/render_fixes.h"

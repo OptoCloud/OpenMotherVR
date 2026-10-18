@@ -6,7 +6,7 @@
 
 #include "game/addresses.h"
 #include "game/code_address.h"
-#include "game/sites/render_fixes.h"
+#include "game/sites/area_log.h"
 #include "game/x86.h"
 
 #include <array>
@@ -18,8 +18,6 @@ namespace omvr::game::sites {
 namespace {
 
 namespace ports = core::diag::ports;
-
-constexpr std::string_view kNoAddress = "this build has no address for it";
 
 constexpr std::string_view kKeyOnLog = "[hook] {}: off; Graphics.{} is true, the game's effect is kept in VR";
 constexpr std::string_view kLensFlareLog = "[hook] {}: off; unexpected code at LensFlareSite (RVA {:08X})";
@@ -166,9 +164,7 @@ void toggle_if(bool key, std::string_view key_name, std::uint32_t rva, std::stri
                const PostFxEffectHooks& hooks) noexcept {
     if (key) {
         ports::logf(p.log(), kKeyOnLog, area, key_name);
-    } else if (rva == 0) {
-        area_off(p.log(), area, kNoAddress);
-    } else {
+    } else if (known_or_off(p.log(), rva, area)) {
         toggle(g, p, r, hooks);
     }
 }

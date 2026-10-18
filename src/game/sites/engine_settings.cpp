@@ -5,7 +5,7 @@
 
 #include "game/addresses.h"
 #include "game/code_address.h"
-#include "game/sites/render_fixes.h"
+#include "game/sites/area_log.h"
 #include "game/x86.h"
 
 #include <array>
@@ -18,7 +18,6 @@ namespace {
 
 namespace ports = core::diag::ports;
 
-constexpr std::string_view kNoAddressWhy = "this build has no address for it";
 constexpr std::string_view kCodeLog =
     "[hook] engine settings: off; the code at 0x{:X} is not the expected settings load";
 constexpr std::string_view kPathLog  = "[hook] engine settings: off; the path at 0x{:X} is not a file name";
@@ -40,10 +39,7 @@ constexpr std::size_t kMaxPath = 260;
 
 std::string_view engine_settings_path(const GameImage& g, ports::Log& log) noexcept {
     const EngineSettingsRvas& r = kEngineSettingsRvas[g.version];
-    if (r.load_site == 0) {
-        area_off(log, kEngineSettingsArea, kNoAddressWhy);
-        return {};
-    }
+    if (!known_or_off(log, r.load_site, kEngineSettingsArea)) return {};
     const std::uint8_t* site = g.at_rva(r.load_site);
     if (site[0] != x86::kMovEaxMoffs || !holds_address(site + x86::kImm32Offset, g.at_rva(r.path_pointer)) ||
         !x86::matches(site + kMovEaxMoffsSize, kLoadArgs) ||
