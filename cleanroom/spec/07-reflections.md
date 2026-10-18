@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of AI.exe (2015 Steam build, re-checked against the binary for r2: reflection render and its single call, POV::SetEye including its FOV formula, renderer clear prologue, screen-constants upload); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; analysis of the game's level pixel shaders (LEVEL_SHADERS_DX11_BIN.PAK of the Torrens level); geometric derivation of the per-eye mapping by the spec side; observation in game by the spec side (an earlier mod showed reflections sliding against head motion; the per-eye render required here has not yet been seen running, because in every scene tested the reflection view never had both its active and render flags set). r4: some game facts (the side effects of POV::SetEye, mip generation by quality and the mip count at target creation, the values the graphics settings offer for setting 0x10) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and the game's `ENGINE_SETTINGS.XML` by the spec side; the viewport rebuild of §8 item 1 re-read in the 2015 `AI.exe`; requirements of §4.3, §4.6, §6 and §7 restated as results (clean-room review round 2); capture gating aligned with 11 and 13. Section numbers are unchanged from r3. Revision: r4 -->
+<!-- Provenance: static analysis of AI.exe (2015 Steam build, re-checked against the binary for r2: reflection render and its single call, POV::SetEye including its FOV formula, renderer clear prologue, screen-constants upload); 2020 values were taken from the earlier mod's per-build address table (and, for inline sites, its installer) and have not been verified against a 2020 `AI.exe`; analysis of the game's level pixel shaders (LEVEL_SHADERS_DX11_BIN.PAK of the Torrens level); geometric derivation of the per-eye mapping by the spec side; observation in game by the spec side (an earlier mod showed reflections sliding against head motion; the per-eye render required here has not yet been seen running, because in every scene tested the reflection view never had both its active and render flags set). r4: some game facts (the side effects of POV::SetEye, mip generation by quality and the mip count at target creation, the values the graphics settings offer for setting 0x10) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` and the game's `ENGINE_SETTINGS.XML` by the spec side; the viewport rebuild of §8 item 1 re-read in the 2015 `AI.exe`; requirements of §4.3, §4.6, §6 and §7 restated as results (clean-room review round 2); capture gating aligned with 11 and 13. Section numbers are unchanged from r3. r5 (with 24 r6): the reflection quality's values include the option the v2 engine settings override adds (§1); the reflection events of §6 also convey the reflection quality, project decision with its reason in §6. Revision: r5 -->
 
 # 07: Planar reflections in stereo
 
@@ -31,7 +31,7 @@ behaviour; §7 says exactly how to check it.
 
 | Object | 2015 | 2020 | Facts |
 |---|---|---|---|
-| Reflection manager | global pointer at 0x135835C | ? | `+0x04` reflection render target; `+0x56` byte, reflections usable; `+0x58`/`+0x5C` target width/height; `+0x60` quality = graphics setting 0x10 "Planar Reflections" (0 off; the game's `ENGINE_SETTINGS.XML` offers Off = 0 and On = 3); `+0x6C`/`+0x70` candidate reflection planes and their count; `+0x78` byte flag. [sure] |
+| Reflection manager | global pointer at 0x135835C | ? | `+0x04` reflection render target; `+0x56` byte, reflections usable; `+0x58`/`+0x5C` target width/height; `+0x60` quality = graphics setting 0x10 "Planar Reflections" (0 off; the game's `ENGINE_SETTINGS.XML` offers Off = 0 and On = 3; the v2 engine settings override can add Alternative = 6, 24 §6.2); `+0x6C`/`+0x70` candidate reflection planes and their count; `+0x78` byte flag. [sure] |
 | POV manager | global pointer at 0x1366A00 | 0x1376BB0 | Owns the POVs (camera views): count byte `+0x88`, POV pointers from `+0x08`. [sure] |
 | POV | allocated by the POV manager | | `+0x000` view matrix (4x4 float, row vectors), `+0x040` projection, `+0x080` copy of the projection used for shader constants, `+0x0E0` vertical FOV (radians), `+0x0E4` aspect, `+0x0E8` type (0 main/other, 1 reflection), `+0x33C`/`+0x340` width/height of its render target, `+0x36B` flags (bit 0 active, bit 2 cleared by SetEye, bit 4 renders, bit 7 main view), `+0x378` eye (-1 none; selects the viewport half). [sure] |
 | Stereo object | global pointer at 0x1366A2C | 0x1376BDC | `+0x04` stereo device; device `+0x04` state, 2 = stereo running (02). [sure] |
@@ -351,7 +351,12 @@ must convey what is listed):
   POV, its new flags and the device state. This is the event that shows
   whether a scene has an active reflection (§7 step 3). Bounded so a run
   cannot flood the log; the bounds are the implementation's choice;
-- the first per-eye render, once per run.
+- the first per-eye render, once per run;
+- with each reflection POV event above, the reflection quality (manager
+  `+0x60`), and each change of that quality seen at a reflection render,
+  within the same bound. Project decision of r5: a tester comparing
+  `On` (blurred mips) with `Alternative` (one sharp mip, 24 §6.2) can
+  tell from the log which mode the reflection rendered with.
 
 Nothing else is logged per frame.
 

@@ -1,4 +1,4 @@
-<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). r3 (spec r7 cross-check): 07 §8 item 1 no longer names the viewport setter or a viewport constant, so the viewport setter 0x621350 (it builds one viewport and calls `ID3D11DeviceContext::RSSetViewports`), the constant writers 0x621C20 and 0x621C90 and the pass set-up's type argument are given as this document's own facts, verified by the spec side in the 2015 `AI.exe`, and the velocity shader question no longer assumes a viewport constant; the settings setter labelled `SettingsSetOption` as in 01 §4, and whether it reaches the saved settings left open as 02 §11 item 5 does; the 2D-only effects keep the player's saved settings as 02 §6.5 now requires of v1. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Graphics` page of the options page given exactly (item order, labels, control kinds, value names, steps, description lines, greying and the rule for showing an item), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the game's English menu texts it names read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the anti-aliasing option names from `DATA\ENGINE_SETTINGS.XML`; the `Pixel Scale` item and the Video page's `Shadow Map Resolution` item named by their labels. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Graphics` page is reached from the `MotherVR` page (22 §12.1). Revision: r5 -->
+<!-- Provenance: static analysis of the 2015 `AI.exe` (PE timestamp 0x54E3199D, image base 0x400000) by the spec side: the final post chain and the anti-aliasing pass, the SMAA runner and its resources, the jitter matrix and the camera constants it feeds, the post-processing camera slots and the velocity pass, the main view's per-eye renders, the post-processing fade pair and its sources, the post-processing settings handler (anti-aliasing, depth of field, motion blur, chromatic aberration, film grain), the lens flare draw sites, the per-frame light submission of the transparent pass, the engine settings name table, the engine settings XML load, the shadow map and streaming heap reads; the stock game file `DATA\ENGINE_SETTINGS.XML` of the Steam 2015 install (option names, values and precedences read from the player's own copy); the levels' compiled shader packs (`RENDERABLE\LEVEL_SHADERS_DX11_BIN.PAK`, resource names read by the spec side). Some of these game facts (the AA path, the velocity pass and its per-eye matrices, the post-processing fade pair, the light submission site, the engine settings override point, state-setting wrappers) were located with the help of an analysis of another mod and verified in the 2015 `AI.exe` by the spec side; the rest (camera slot mapping, jitter matrix, lens flares, chromatic aberration and film grain fields, shadow map clamp, heap reads, setting id table, XML load path) were found by the spec side without a lead. Requirements are proposals of this project, pending user confirmation where marked [proposal]. Public API documentation: Direct3D 11, NVAPI variable rate shading for Direct3D 11, OpenVR, OpenXR. The engine settings override as a feature was known from that analysis; the additions of §6.2 are derived from this project's VR needs. Measurements quoted from 03 and 08. 2020 values: none (v2 gives 2015 RVAs only; every v2 feature here stays off on 2020). r2: second clean-room review: 2020 values removed; the pass set-up given as the RVA 0x595170 and re-read; the particle lighting, temporal AA, velocity and engine settings requirements stated as results with this project's reasons; the source of the particle shaders' resource name; the master switch of 20 §1.3 and the engine settings override after a failed runtime (20 §1.2). r3 (spec r7 cross-check): 07 §8 item 1 no longer names the viewport setter or a viewport constant, so the viewport setter 0x621350 (it builds one viewport and calls `ID3D11DeviceContext::RSSetViewports`), the constant writers 0x621C20 and 0x621C90 and the pass set-up's type argument are given as this document's own facts, verified by the spec side in the 2015 `AI.exe`, and the velocity shader question no longer assumes a viewport constant; the settings setter labelled `SettingsSetOption` as in 01 §4, and whether it reaches the saved settings left open as 02 §11 item 5 does; the 2D-only effects keep the player's saved settings as 02 §6.5 now requires of v1. r4 (CLEANROOM r3, what a player sees may be stated exactly): the `Graphics` page of the options page given exactly (item order, labels, control kinds, value names, steps, description lines, greying and the rule for showing an item), as this project's texts in the style of the v1 page players know, under the page rules of 22 §12.1; the game's English menu texts it names read by the spec side from `DATA\TEXT\ENGLISH\UI.TXT` and the anti-aliasing option names from `DATA\ENGINE_SETTINGS.XML`; the `Pixel Scale` item and the Video page's `Shadow Map Resolution` item named by their labels. r5 (user decision of 2026-10-16): no master switch; every key here applies on its own with its v1 value as default (20 §1.3); the `Graphics` page is reached from the `MotherVR` page (22 §12.1). r6 (user decision of 2026-10-18, a tester's request): the additions of §6.2 made exact: `ShadowMap4096` adds the option `4096` and `SharpReflections` the option `Alternative` with value 6 (replacing the proposed value 1), both ranked so that they never become the default, the heap additions' names, and an addition the player's file already offers is not made twice; how the Video page shows an option's name and that the C runtime's open of the engine settings file goes through `AI.exe`'s `CreateFileA` import (§1.9), the reflection quality compares in the reflection manager's code (§12 item 6) and the copy's file name (13 §2), read by the spec side in the 2015 `AI.exe`, `DATA\TEXT\ENGLISH\UI.TXT` and `DATA\ENGINE_SETTINGS.XML`. Revision: r6 -->
 
 # 24. Rendering in v2
 
@@ -256,6 +256,24 @@ screen space over the finished image.
   reader's load 0x462500). The reader opens the file with the C runtime's
   `fopen` (mode `rb`, statically linked) and parses from that stream. This
   runs after the stereo device is created (0x613941, 02 §6.1).
+- The path the game holds is the relative `DATA\engine_settings.xml`
+  (lower case). The reader passes it through the game's path alias list
+  (0x4B0290) before the open [likely: unchanged when no alias matches].
+  `fopen` (0x67472A) reaches the C runtime's narrow open, which calls
+  `CreateFileA` through `AI.exe`'s import of `kernel32.dll` (the call at
+  0x6849B7), for reading an existing file. So the game's only read of the
+  file is an open through that import [sure for the code path].
+- **Option names on the Video page.** The page shows each option by its
+  `name` attribute. Where `DATA\TEXT\ENGLISH\UI.TXT` has a key
+  `AI_UI_MENU_QUALITY_NAME_<NAME>` (the name upper-cased, spaces as `_`:
+  `ON`, `OFF`, `ULTRA`, `HIGH`, `MEDIUM`, `LOW`, `VERY_LOW`, `STANDARD`,
+  the texture filters) it shows that text in the player's language; names
+  without a key (`512` to `2048`, `FXAA`, `SMAA T1x`, `SMAA T2x`, `HDAO`)
+  are shown as written [likely: no key exists for those names, and the page
+  shows them]. So an added option is shown by its name as written, in every
+  language, and needs no change to the game's text files. The page lists a
+  setting's options in the file's order [likely; to be confirmed in game,
+  §6.4].
 - The stock file of the Steam 2015 install defines (values as written in
   the player's file):
 
@@ -554,8 +572,16 @@ applied, and only those:
 - if the player's file does not have the expected setting (a modified or
   unknown file), that addition is skipped and logged; the rest still
   applies;
+- if the setting already offers the addition (an option of the same name,
+  or, for an option that is never the default, of the same value; for a
+  heap size, the setting's default already has that value), it is not
+  added again and this is logged;
 - if the player's file cannot be read or parsed as XML by the mod, nothing
   is added and the game reads its file as without the mod.
+
+An added option goes after the setting's last option, on its own line, in
+the indentation and line ending of the lines around it, so a player
+comparing the copy with the original sees only the additions.
 
 Means: the implementation's choice, within these constraints. The game
 reads the file through the C runtime's `fopen` at the load site 0x5AFD02
@@ -586,10 +612,14 @@ meet:
 
 | Key (all `Graphics.`) | Setting | Addition | Reason |
 |---|---|---|---|
-| `ShadowMap4096` | ShadowMapResolution | a `4096` option, int 4096, no default requirements | shadows above. Never chosen automatically [proposal: it must not become the default on a fresh settings file; give it the highest precedence only if the precedence does not make it the default, otherwise a precedence below 2048's] |
-| `SharpReflections` | Planar Reflections | an option with a value other than 0, 2 and 3 (one mip, no blur, 1.9 and 07 §2.2) | reflections above. Value [proposal: 1, the smallest that is neither off nor a mip mode; must be checked in game that 1 is not treated as "off" elsewhere, §12 item 6] |
-| `StreamingTextureHeapMB` | Streaming Texture Heap Size | when not 0: an option with that int value, highest precedence | streaming heaps above. Range 300 to 1024 [proposal: 300 is the stock size; 1024 keeps a 32-bit process's address space safe, §12 item 7] |
-| `StreamingModelHeapMB` | Streaming Model Heap Size | when not 0: an option with that int value, highest precedence | streaming heaps above; range 128 to 512 [proposal: 128 is stock; 512 bounds address space] |
+| `ShadowMap4096` | ShadowMapResolution | an option named `4096`, int 4096, no default requirements, precedence one below the setting's lowest (not below 0) | shadows above. Never chosen automatically: the game picks the highest precedence whose requirements hold as the default of a new settings file (1.9), so the lowest precedence keeps a fresh install on the stock choice; the player chooses 4096 on the Video page |
+| `SharpReflections` | Planar Reflections | an option named `Alternative`, int 6, precedence one below the setting's lowest (not below 0) | reflections above. Value 6 is neither off (0) nor a mip mode (2, 3), so the engine renders one mip without blur (1.9, 07 §2.2); the reflection manager's code compares the quality only with 0, 2 and 3 (§12 item 6), so 6 behaves as 1 would. Name, value and rank: user decision of 2026-10-18 (tester request; the engine already supports value 6 and 4096); never the default for the same reason as 4096 |
+| `StreamingTextureHeapMB` | Streaming Texture Heap Size | when not 0: an option named `<value> MB` (for example `600 MB`) with that int value, precedence one above the setting's highest | streaming heaps above. Range 300 to 1024 [proposal: 300 is the stock size; 1024 keeps a 32-bit process's address space safe, §12 item 7] |
+| `StreamingModelHeapMB` | Streaming Model Heap Size | when not 0: as for the texture heap | streaming heaps above; range 128 to 512 [proposal: 128 is stock; 512 bounds address space] |
+
+The names `4096` and `Alternative` are what the player sees on the Video
+page (1.9): `Shadow Map Resolution` then offers `512`, `1024`, `1536`,
+`2048`, `4096`, and `Planar Reflections` offers `Off`, `On`, `Alternative`.
 
 The heap additions become the selected value only if the game selects by
 precedence for these two settings (they have no menu control) [likely]; if
@@ -612,7 +642,10 @@ options as long as a saved value names them.
 ### 6.4 Acceptance
 
 Override on with `ShadowMap4096`: the Video page's `Shadow Map Resolution`
-item offers `4096`; the
+item offers `4096`, after `2048`. Override on with `SharpReflections`: its
+`Planar Reflections` item offers `Alternative`, after `On`, and with it
+chosen the reflections are sharp. A fresh settings file (none saved yet)
+still starts on the stock choices. The
 log shows the additions made; shadows are sharper; the player's
 `DATA\ENGINE_SETTINGS.XML` is byte-identical to before. Override off: the
 menu is stock. A deliberately broken XML (in a test copy of the game only):
@@ -893,9 +926,13 @@ Each event must convey:
    (0x1250A88) on pause Open and Close; capture the stereo target while
    paused. If the game draws the world while paused, §5 could show the
    game's own paused frame instead of a stored copy.
-6. **Planar reflections value 1 (§6.2).** Does any code other than the
-   mip choice treat value 1 differently from 3 (target creation only when
-   not 0, 07 §1)? Look for: compares of reflection manager `+0x60`.
+6. **Planar reflections value 6 (§6.2).** Partly answered (spec r6): in
+   the reflection manager's code the quality `+0x60` is compared only with
+   0 (the render, 07 §2.2, and the target creation), 2 and 3 (the mip
+   count 0x5995A0, the mip build 0x59C8B0, the blur targets at 0x59A165).
+   Still open: whether the settings handler or any other code reads
+   setting 0x10's value directly and treats 6 differently. Look for: in
+   game, the reflection with `Alternative` chosen.
 7. **Heap settings in effect.** When are the heap sizes read (0x5F6E80,
    0x5F6D30) and does the saved settings file override the precedence
    choice for settings without a menu control? Look for: the callers of the
