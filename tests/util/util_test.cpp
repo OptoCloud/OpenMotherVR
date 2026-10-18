@@ -143,6 +143,10 @@ TEST_CASE("OnceLatch, ChangeLatch and FramePeriod") {
     CHECK(change.changed(1));
     CHECK_FALSE(change.changed(1));
     CHECK(change.changed(2));
+    // A seeded latch does not report its seed.
+    util::ChangeLatch<int> seeded(5);
+    CHECK_FALSE(seeded.changed(5));
+    CHECK(seeded.changed(6));
 
     util::FramePeriod period(3);
     CHECK_FALSE(period.tick());

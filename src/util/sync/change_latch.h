@@ -11,6 +11,11 @@ namespace omvr::util {
 template <class T>
 class ChangeLatch {
 public:
+    ChangeLatch() = default;
+    // Starts as if `initial` had been seen: only a different value is a
+    // change.
+    explicit ChangeLatch(T initial) : last_(std::move(initial)) {}
+
     [[nodiscard]] bool changed(const T& value) {
         if (last_ && *last_ == value) return false;
         last_ = value;
