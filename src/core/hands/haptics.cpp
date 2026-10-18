@@ -1,6 +1,8 @@
 // OpenMotherVR-Provenance: clean
 #include "core/hands/haptics.h"
 
+#include "core/hands/hand_aim.h"
+
 #include <algorithm>
 #include <cmath>
 #include <string_view>
@@ -52,12 +54,6 @@ float damage_amplitude(std::uint16_t before, std::uint16_t after, std::uint16_t 
     return std::min(kDamageBase + kDamagePerLostMaximum * lost, kHapticMaxAmplitude);
 }
 
-bool ranged(game::WeaponType type) noexcept {
-    using game::WeaponType;
-    return type == WeaponType::Flamethrower || type == WeaponType::Pistol || type == WeaponType::Shotgun ||
-           type == WeaponType::Boltgun;
-}
-
 // ---- Game side ------------------------------------------------------------------
 
 void Haptics::emit(HapticEvent e, Pulse p) noexcept {
@@ -86,7 +82,7 @@ void Haptics::on_health(const std::optional<Health>& health) noexcept {
 
 void Haptics::on_fire(const FireSample& fire, TimePoint now) noexcept {
     const bool pressed_now = fire.pressed && !std::exchange(fire_pressed_, fire.pressed);
-    const bool fires       = fire.pressed && fire.weapon && ranged(*fire.weapon) && fire.gate_open;
+    const bool fires = fire.pressed && fire.weapon && is_ranged(weapon_class(fire.weapon)) && fire.gate_open;
     if (!fires || !settings_.firing) {
         flame_until_.reset();
         return;

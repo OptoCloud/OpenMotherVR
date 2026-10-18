@@ -37,9 +37,7 @@ WeaponClass weapon_class(std::optional<game::WeaponType> type) noexcept {
     return WeaponClass::Unknown;
 }
 
-bool aims_from_hand(WeaponClass c) noexcept {
-    return c == WeaponClass::NoWeapon || c == WeaponClass::Barrel || c == WeaponClass::Nozzle;
-}
+bool aims_from_hand(WeaponClass c) noexcept { return c == WeaponClass::NoWeapon || is_ranged(c); }
 
 float muzzle_offset(WeaponClass c) noexcept {
     switch (c) {

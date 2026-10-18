@@ -4,6 +4,7 @@
 // lost-hand rules of §14.3. Expected values are the spec's numbers.
 
 #include "core/config/settings.h"
+#include "core/hands/hand_aim.h"
 #include "core/hands/haptics.h"
 #include "fakes/fakes.h"
 
@@ -64,6 +65,7 @@ TEST_CASE("haptics: damage amplitude is 0.3 + 2 * lost fraction, capped at 1") {
 }
 
 TEST_CASE("haptics: ranged weapons are types 1, 2, 3 and 5") {
+    const auto ranged = [](WeaponType t) { return is_ranged(weapon_class(t)); };
     CHECK(ranged(WeaponType::Flamethrower));
     CHECK(ranged(WeaponType::Pistol));
     CHECK(ranged(WeaponType::Shotgun));

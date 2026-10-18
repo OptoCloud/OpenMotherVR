@@ -42,10 +42,6 @@ struct Pulse {
 [[nodiscard]] float damage_amplitude(std::uint16_t before, std::uint16_t after,
                                      std::uint16_t maximum) noexcept;
 
-// 21 §14.2: the weapon types that fire (flamethrower, revolver, shotgun,
-// bolt gun).
-[[nodiscard]] bool ranged(game::WeaponType type) noexcept;
-
 class Haptics final : public vr::ports::HapticSource {
 public:
     Haptics(const config::HapticsSettings& settings, const diag::ports::Clock& clock,

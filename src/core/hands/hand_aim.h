@@ -42,6 +42,11 @@ util::Vec3 pointing(const WorldPose& pose) noexcept;
 // weapon object (throwables, flare, medikit).
 WeaponClass weapon_class(std::optional<game::WeaponType> type) noexcept;
 
+// The weapons that fire: barrel and nozzle (21 §5.2, §14.2).
+[[nodiscard]] constexpr bool is_ranged(WeaponClass c) noexcept {
+    return c == WeaponClass::Barrel || c == WeaponClass::Nozzle;
+}
+
 // The class aims from the hand: ranged weapons and no weapon; contact
 // weapons and unknown types keep the game's ray (21 §5.2).
 bool aims_from_hand(WeaponClass c) noexcept;
