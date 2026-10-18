@@ -2,10 +2,12 @@
 #pragma once
 
 #include "core/diag/tuning.h"
+#include "util/text/fixed_format.h"
 
 #include <array>
 #include <cstddef>
 #include <format>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -42,9 +44,7 @@ public:
     // Any other text, cut to fit the buffer.
     template <class... Args>
     void append(std::format_string<Args...> fmt, Args&&... args) {
-        const auto r =
-            std::format_to_n(buf_.data() + size_, buf_.size() - size_, fmt, std::forward<Args>(args)...);
-        size_ = static_cast<std::size_t>(r.out - buf_.data());
+        size_ += util::format_into(std::span(buf_).subspan(size_), fmt, std::forward<Args>(args)...).size();
     }
 
     std::string_view text() const noexcept { return {buf_.data(), size_}; }

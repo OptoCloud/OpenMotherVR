@@ -19,6 +19,7 @@
 #include "util/sync/seqlock.h"
 #include "util/text/ascii.h"
 #include "util/text/command_line_split.h"
+#include "util/text/fixed_format.h"
 #include "util/text/number_parse.h"
 
 #include <doctest/doctest.h>
@@ -28,6 +29,7 @@
 #include <cstdint>
 #include <limits>
 #include <numbers>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -221,6 +223,14 @@ TEST_CASE("4x4 identity and the camera position of a rigid view matrix") {
     CHECK(cam.x == -2.0f);
     CHECK(cam.y == 3.0f);
     CHECK(cam.z == -4.0f);
+}
+
+TEST_CASE("format_into: formats into the buffer, cut to fit") {
+    std::array<char, 8> buf{};
+    CHECK(util::format_into(buf, "{}-{}", 12, "ab") == "12-ab");
+    CHECK(util::format_into(buf, "{}", "longer than eight") == "longer t");
+    CHECK(util::format_into(std::span(buf).first(buf.size() - 1), "{}", 123456789) == "1234567");
+    CHECK(util::format_into(std::span<char>{}, "{}", 1).empty());
 }
 
 TEST_CASE("all_finite: any infinity or NaN fails") {
