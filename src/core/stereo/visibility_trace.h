@@ -23,6 +23,17 @@ public:
         return dark ? Change::Darkened : Change::Cleared;
     }
 
+    // update(), then on a change calls `darkened()` or `cleared(lowest())`:
+    // the two log lines of a traced value.
+    template <class Darkened, class Cleared>
+    void report(float visibility, Darkened&& darkened, Cleared&& cleared) noexcept {
+        switch (update(visibility)) {
+            case Change::Darkened: darkened(); break;
+            case Change::Cleared: cleared(lowest_); break;
+            case Change::None: break;
+        }
+    }
+
     // The lowest value since the last Darkened.
     float lowest() const noexcept { return lowest_; }
 

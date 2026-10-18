@@ -71,21 +71,17 @@ constexpr const char* kHeadClipClearLog = "[diag] head-in-wall fade clear again 
 // clear and comes back. Game thread, once per change.
 void trace_head_clip(Context& ctx, const float* eye, const float* pivot, float fade, float result,
                      bool ignored) noexcept {
-    using Change = core::stereo::VisibilityTrace::Change;
-    switch (ctx.head_clip_trace.update(fade)) {
-        case Change::Darkened:
+    ctx.head_clip_trace.report(
+        fade,
+        [&] {
             core::diag::ports::logf(
                 ctx.log, kHeadClipDarkLog, fade, result,
                 std::hypot(eye[0] - pivot[0], eye[1] - pivot[1], eye[2] - pivot[2]),
                 ctx.head_clip_pivot.real_displacement(),
                 ctx.head_clip_pivot.adjusted() ? ", pivot moved" : "",
                 ignored ? ", ignored (the game drives the view or the head is still)" : "");
-            break;
-        case Change::Cleared:
-            core::diag::ports::logf(ctx.log, kHeadClipClearLog, ctx.head_clip_trace.lowest());
-            break;
-        case Change::None: break;
-    }
+        },
+        [&](float lowest) { core::diag::ports::logf(ctx.log, kHeadClipClearLog, lowest); });
 }
 
 constexpr const char* kHeadClipPivotLog =

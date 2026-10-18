@@ -379,6 +379,21 @@ TEST_CASE("visibility trace: one change when darkening and one when clear again"
     CHECK(t.update(1.0f) == Change::Cleared);
     CHECK(t.update(0.8f) == Change::Darkened);
     CHECK(t.lowest() == 0.8f);
+
+    // report: the matching call on a change, nothing otherwise.
+    VisibilityTrace r;
+    int darkened    = 0;
+    float cleared   = -1.0f;
+    const auto feed = [&](float v) {
+        r.report(v, [&] { ++darkened; }, [&](float lowest) { cleared = lowest; });
+    };
+    feed(1.0f);
+    feed(0.4f);
+    feed(0.2f);
+    CHECK(darkened == 1);
+    CHECK(cleared == -1.0f);
+    feed(1.0f);
+    CHECK(cleared == 0.2f);
 }
 
 TEST_CASE("head-clip pivot: only the real head's movement counts") {

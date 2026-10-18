@@ -118,24 +118,20 @@ void sync_mode_stack(Context& ctx, StereoManager& m) noexcept {
 // it, each logged when it leaves clear and when it comes back, with what the
 // update knows. Game thread, once per change.
 void trace_visibility(Context& ctx, bool found, float visibility) noexcept {
-    using Change        = core::stereo::VisibilityTrace::Change;
-    auto& trace         = found ? ctx.found_visibility_trace : ctx.final_visibility_trace;
-    const char* where   = found ? "found at the stereo update" : "left for the frame";
-    const bool cutscene = ctx.scene.cutscene_or_fade();
-    const bool loading  = ctx.update.loading_blackout();
-    const char* camera  = ctx.follow.active() ? "player" : "taken";
-    switch (trace.update(visibility)) {
-        case Change::Darkened:
+    auto& trace       = found ? ctx.found_visibility_trace : ctx.final_visibility_trace;
+    const char* where = found ? "found at the stereo update" : "left for the frame";
+    trace.report(
+        visibility,
+        [&] {
             core::diag::ports::logf(ctx.log,
                                     "[diag] scene visibility {:.2f} {}; cutscene {}, loading {}, camera {}",
-                                    visibility, where, cutscene, loading, camera);
-            break;
-        case Change::Cleared:
+                                    visibility, where, ctx.scene.cutscene_or_fade(),
+                                    ctx.update.loading_blackout(), ctx.follow.active() ? "player" : "taken");
+        },
+        [&](float lowest) {
             core::diag::ports::logf(ctx.log, "[diag] scene visibility {} clear again (lowest {:.2f})", where,
-                                    trace.lowest());
-            break;
-        case Change::None: break;
-    }
+                                    lowest);
+        });
 }
 
 void apply(Context& ctx, StereoManager& m, StereoInterface& device, const UpdateOutput& out) {
