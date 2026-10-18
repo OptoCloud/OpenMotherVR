@@ -11,6 +11,7 @@ namespace omvr::core::hands {
 namespace {
 
 using diag::ports::logf;
+using util::after;
 using vr::ports::HapticHand;
 
 constexpr std::string_view kLogPulse = "[diag] haptics: {} pulse, amplitude {:.2f}, {:.0f} ms";
@@ -38,10 +39,6 @@ const char* event_name(HapticEvent e) noexcept {
 }
 
 std::size_t slot(HapticEvent e) noexcept { return static_cast<std::size_t>(e); }
-
-TimePoint after(TimePoint t, Seconds d) noexcept {
-    return t + std::chrono::duration_cast<std::chrono::steady_clock::duration>(d);
-}
 
 // A level from the game: 0 to 1, and 0 at or below the floor (or NaN).
 float audible(float level) noexcept { return level > kRumbleFloor ? std::min(level, 1.0f) : 0.0f; }
@@ -117,8 +114,7 @@ void Haptics::on_tracker_scan(bool raised) noexcept {
 void Haptics::on_rumble(float low, float high, TimePoint now) noexcept {
     rumble_low_.store(low, std::memory_order_relaxed);
     rumble_high_.store(high, std::memory_order_relaxed);
-    // At least 1, so a set at the clock's epoch is not "never".
-    rumble_stamp_.store(std::max<std::int64_t>(now.time_since_epoch().count(), 1), std::memory_order_release);
+    rumble_stamp_.store(now);
 }
 
 // ---- Render side ----------------------------------------------------------------
@@ -146,10 +142,8 @@ std::array<bool, kHandCount> Haptics::take_events(TimePoint now) noexcept {
 // The game's rumble per hand (21 §14.2), 0 when off, stale or below the
 // floor.
 std::array<float, kHandCount> Haptics::rumble_levels(TimePoint now) const noexcept {
-    const std::int64_t stamp = rumble_stamp_.load(std::memory_order_acquire);
-    if (!settings_.game_rumble || stamp == 0) return {};
-    const TimePoint set{std::chrono::steady_clock::duration{stamp}};
-    if (now - set > std::chrono::duration_cast<std::chrono::steady_clock::duration>(kRumbleStale)) return {};
+    const auto set = rumble_stamp_.load();
+    if (!settings_.game_rumble || !set || now > util::after(*set, kRumbleStale)) return {};
     return {audible(rumble_low_.load(std::memory_order_relaxed)),
             audible(rumble_high_.load(std::memory_order_relaxed))};
 }

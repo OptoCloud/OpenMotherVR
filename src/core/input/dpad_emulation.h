@@ -3,7 +3,6 @@
 
 #include "core/input/types.h"
 
-#include <chrono>
 #include <optional>
 
 // D-pad emulation (22 §7): the left stick's direction as a d-pad press while
@@ -31,15 +30,14 @@ public:
     // `enabled`: Controls.DpadEmulation; off resets the state and gives no
     // press (v1).
     [[nodiscard]] DpadEmulationResult update(const Controls& c, bool stick_free, bool enabled,
-                                             std::chrono::steady_clock::time_point now) noexcept;
+                                             TimePoint now) noexcept;
 
 private:
-    [[nodiscard]] bool modifier_engaged(const Controls& c,
-                                        std::chrono::steady_clock::time_point now) noexcept;
+    [[nodiscard]] bool modifier_engaged(const Controls& c, TimePoint now) noexcept;
 
     Dpad held_{};
     // When the thumbstick scheme's modifier (the left stick click) went down.
-    std::optional<std::chrono::steady_clock::time_point> modifier_since_;
+    std::optional<TimePoint> modifier_since_;
 };
 
 } // namespace omvr::core::input

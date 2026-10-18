@@ -12,13 +12,11 @@ constexpr float kTriggerFull = 1.0f;
 
 } // namespace
 
-void BodyControls::press_crouch_until(std::chrono::steady_clock::time_point until) noexcept {
-    crouch_until_.store(until.time_since_epoch().count(), std::memory_order_relaxed);
-}
+void BodyControls::press_crouch_until(util::TimePoint until) noexcept { crouch_until_.store(until); }
 
 void BodyControls::write(const input::Controls& c, bool right_hand_near_head) noexcept {
-    const std::int64_t until = crouch_until_.load(std::memory_order_relaxed);
-    if (until == 0 || clock_.now().time_since_epoch().count() >= until) {
+    const auto until = crouch_until_.load();
+    if (!until || clock_.now() >= *until) {
         next_.write(c, right_hand_near_head);
         return;
     }

@@ -15,7 +15,6 @@
 #include "util/sync/seqlock.h"
 
 #include <array>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -30,8 +29,6 @@
 // (aim, tracker_facing), which place them in the world through the active
 // camera of that moment (§3.1).
 namespace omvr::core::hands {
-
-using TimePoint = std::chrono::steady_clock::time_point;
 
 class Hands final {
 public:
@@ -74,7 +71,7 @@ private:
         bool has_aim  = false;
     };
     struct View {
-        std::int64_t stamp = 0; // steady_clock ticks of the update; 0: none
+        std::int64_t stamp = 0; // util::stamp_ticks of the update; 0: none
         std::array<HandView, kHandCount> hands{};
     };
 

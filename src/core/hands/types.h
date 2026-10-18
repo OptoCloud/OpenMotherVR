@@ -5,6 +5,7 @@
 #include "game/constants.h"
 #include "util/math/matrix.h"
 #include "util/math/vec.h"
+#include "util/time/steady.h"
 
 #include <array>
 #include <cstddef>
@@ -19,6 +20,7 @@ namespace omvr::core::hands {
 
 inline constexpr std::size_t kLeft  = 0;
 inline constexpr std::size_t kRight = 1;
+using util::TimePoint;
 using vr::kHandCount;
 
 // One hand as the runtime reported it for a frame (21 §3.1, §16): the grip

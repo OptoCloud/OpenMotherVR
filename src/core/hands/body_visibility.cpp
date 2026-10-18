@@ -1,7 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #include "core/hands/body_visibility.h"
 
-#include "core/hands/body_tuning.h"
+#include "core/hands/tuning.h"
 
 #include <algorithm>
 

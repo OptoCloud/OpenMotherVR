@@ -59,7 +59,7 @@ bool lean_active(const Vec2& v) noexcept { return v.x != 0.0f || v.y != 0.0f; }
 
 // ---- recenter (22 §8.2) --------------------------------------------------------
 
-RecenterGesture::Result RecenterGesture::update(bool enabled, const Input& in, GestureTime now) noexcept {
+RecenterGesture::Result RecenterGesture::update(bool enabled, const Input& in, TimePoint now) noexcept {
     if (!enabled || !(in.grips && in.near)) {
         since_.reset();
         fired_      = false;
@@ -190,7 +190,7 @@ bool HoldBreath::update(bool enabled, const Input& in) noexcept {
 
 // ---- the set -------------------------------------------------------------------
 
-GestureResult Gestures::update(const Controls& c, GestureTime now) noexcept {
+GestureResult Gestures::update(const Controls& c, TimePoint now) noexcept {
     GestureResult out;
     const bool open               = gate_.open(c.poses.focused, now);
     const ports::GameContext game = context_.game_context();
@@ -204,7 +204,7 @@ GestureResult Gestures::update(const Controls& c, GestureTime now) noexcept {
     return out;
 }
 
-void Gestures::run_recenter(const Controls& c, bool open, GestureTime now) noexcept {
+void Gestures::run_recenter(const Controls& c, bool open, TimePoint now) noexcept {
     const RecenterGesture::Input in{
         .grips = c.grip_l && c.grip_r,
         .near  = hand_near_head(c.poses, kLeftHand, kRecenterHandDistance) &&

@@ -4,7 +4,6 @@
 #include "core/input/types.h"
 #include "util/math/vec.h"
 
-#include <chrono>
 #include <cstddef>
 #include <optional>
 
@@ -52,8 +51,6 @@ private:
 // call open() once per controls write.
 class FocusGate {
 public:
-    using TimePoint = std::chrono::steady_clock::time_point;
-
     // Whether gestures may fire now.
     bool open(bool focused, TimePoint now) noexcept;
 

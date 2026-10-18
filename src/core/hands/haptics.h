@@ -11,7 +11,6 @@
 
 #include <array>
 #include <atomic>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -27,8 +26,6 @@
 // after the runtime reads the controls, so only the render thread calls
 // the runtime.
 namespace omvr::core::hands {
-
-using TimePoint = std::chrono::steady_clock::time_point;
 
 // The events of 21 §14.2 that have a verified game source.
 enum class HapticEvent : std::uint8_t { Damage, Death, TrackerPing, Firing, Hacking };
@@ -112,7 +109,7 @@ private:
     std::array<Channel, kHapticEventCount> channels_{};
     std::atomic<float> rumble_low_{0.0f};
     std::atomic<float> rumble_high_{0.0f};
-    std::atomic<std::int64_t> rumble_stamp_{0}; // steady_clock ticks of the last set; 0: never
+    util::AtomicStamp rumble_stamp_; // the last set; none: never
 
     // Game thread.
     std::optional<Health> health_;

@@ -43,7 +43,7 @@ const char* class_name(WeaponClass c) noexcept {
 // kMaxUpdateGap, so a menu or a hitch neither blends nor filters across it.
 float seconds_since(const std::optional<TimePoint>& last, TimePoint now) noexcept {
     if (!last) return 0.0f;
-    const float dt = std::chrono::duration_cast<Seconds>(now - *last).count();
+    const float dt = util::seconds_between(*last, now).count();
     return std::clamp(dt, 0.0f, kMaxUpdateGap.count());
 }
 
@@ -104,8 +104,7 @@ void Hands::update(const HandFrame& frame, const ActivityInput& in, TimePoint no
 
 void Hands::publish(TimePoint now, float activity) noexcept {
     View v;
-    v.stamp = now.time_since_epoch().count();
-    if (v.stamp == 0) v.stamp = 1; // 0 means "none"
+    v.stamp = util::stamp_ticks(now);
     for (std::size_t h = 0; h < kHandCount; ++h) {
         const HandTrack& t = track_[h];
         v.hands[h]         = {t.grip(), t.aim(), t.weight() * activity, t.has_grip(), t.has_aim()};
@@ -114,10 +113,9 @@ void Hands::publish(TimePoint now, float activity) noexcept {
 }
 
 std::optional<Hands::View> Hands::fresh_view(TimePoint now) const noexcept {
-    const View v = view_.load();
-    if (v.stamp == 0) return std::nullopt;
-    const TimePoint stamp{TimePoint::duration{v.stamp}};
-    if (now - stamp > std::chrono::duration_cast<TimePoint::duration>(kStaleAfter)) return std::nullopt;
+    const View v     = view_.load();
+    const auto stamp = util::from_stamp_ticks(v.stamp);
+    if (!stamp || now > util::after(*stamp, kStaleAfter)) return std::nullopt;
     return v;
 }
 

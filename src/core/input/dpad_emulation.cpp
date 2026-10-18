@@ -37,7 +37,7 @@ Dpad stick_dpad(Vec2 stick, Dpad held) noexcept {
 // stick click) it engages once held for kDpadModifierHold; on wands (the
 // left pad click) a click on an edge engages at once, and one in the centre
 // stays sprint.
-bool DpadEmulation::modifier_engaged(const Controls& c, std::chrono::steady_clock::time_point now) noexcept {
+bool DpadEmulation::modifier_engaged(const Controls& c, TimePoint now) noexcept {
     const bool pressed = c.sprint && (!c.touchpad_scheme || !decode_touchpad(c.move, true).centre);
     if (!pressed) {
         modifier_since_.reset();
@@ -49,7 +49,7 @@ bool DpadEmulation::modifier_engaged(const Controls& c, std::chrono::steady_cloc
 }
 
 DpadEmulationResult DpadEmulation::update(const Controls& c, bool stick_free, bool enabled,
-                                          std::chrono::steady_clock::time_point now) noexcept {
+                                          TimePoint now) noexcept {
     if (!enabled) {
         held_ = {};
         modifier_since_.reset();

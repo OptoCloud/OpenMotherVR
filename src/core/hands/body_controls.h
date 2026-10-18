@@ -5,9 +5,7 @@
 #include "core/input/ports/controls_sink.h"
 #include "core/input/types.h"
 
-#include <atomic>
-#include <chrono>
-#include <cstdint>
+#include "util/time/steady.h"
 
 // The body features' presses on the game's actions (spec 21 §11.5, §16):
 // real crouch presses the crouch action, which v1 drives from the Crouch
@@ -23,7 +21,7 @@ public:
         : next_(next), clock_(clock) {}
 
     // Game thread: press the crouch action until `until` (21 §11.5).
-    void press_crouch_until(std::chrono::steady_clock::time_point until) noexcept;
+    void press_crouch_until(util::TimePoint until) noexcept;
 
     // Render thread.
     void write(const input::Controls& c, bool right_hand_near_head) noexcept override;
@@ -36,9 +34,9 @@ public:
 private:
     input::ports::ControlsSink& next_;
     const diag::ports::Clock& clock_;
-    // The end of the press as steady_clock ticks; 0 for none. Game thread
-    // to render thread; relaxed: a press seen a frame late is harmless.
-    std::atomic<std::int64_t> crouch_until_{0};
+    // The end of the press; none before the first. Game thread to render
+    // thread (a press seen a frame late is harmless).
+    util::AtomicStamp crouch_until_;
 };
 
 } // namespace omvr::core::hands

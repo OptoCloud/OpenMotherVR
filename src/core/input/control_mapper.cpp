@@ -183,8 +183,7 @@ void ControlMapper::GripToggles::update(bool grip_r, bool grip_l, bool toggle) n
 Controls ControlMapper::apply_dpad(const Controls& in) noexcept {
     const bool enabled = controls_.dpad_emulation;
     const DpadEmulationResult emu =
-        dpad_.update(in, enabled && stick_.stick_free(), enabled,
-                     enabled ? clock_.now() : std::chrono::steady_clock::time_point{});
+        dpad_.update(in, enabled && stick_.stick_free(), enabled, enabled ? clock_.now() : TimePoint{});
     Controls c = in;
     if (emu.stick_used) c.move = {};
     if (emu.modifier_held) c.sprint = false;

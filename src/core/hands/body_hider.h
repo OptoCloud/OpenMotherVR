@@ -4,10 +4,10 @@
 #include "core/config/settings.h"
 #include "core/diag/ports/log.h"
 #include "core/hands/body_visibility.h"
+#include "core/hands/types.h"
 
 #include <array>
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -36,8 +36,6 @@ struct PlayerSkeleton {
     std::string_view name; // the skeleton's own name, for the log
 };
 
-using BodyTime = std::chrono::steady_clock::time_point;
-
 // Why the game side could not read the player's skeleton (21 §10.2, §18),
 // for the log.
 enum class SkeletonFault : std::uint8_t {
@@ -60,7 +58,7 @@ public:
     // Game thread. Whether update() needs the bones of `skeleton` this frame:
     // a new skeleton, pose or value while one is to be hidden, or, after a
     // skeleton could not be read, every kSkeletonRetry until it is (21 §10.2).
-    bool wants_bones(config::BodyVisible v, const PlayerSkeleton& s, BodyTime now) const noexcept;
+    bool wants_bones(config::BodyVisible v, const PlayerSkeleton& s, TimePoint now) const noexcept;
 
     // Game thread, each frame. `running`: the stereo device runs (20 §1.2:
     // nothing hidden otherwise). `bones` as read for `s.skeleton` when
@@ -69,7 +67,7 @@ public:
     // change of what is hidden, and an unreadable skeleton once until the
     // skeleton, pose, value or fault changes (21 §18).
     void update(config::BodyVisible v, bool running, const PlayerSkeleton& s, const SkeletonBones* bones,
-                BodyTime now, const SkeletonReadFault& fault = {}) noexcept;
+                TimePoint now, const SkeletonReadFault& fault = {}) noexcept;
 
     // Job threads: the plan to apply, or null when nothing is hidden. Valid
     // until the game thread's next update; the final-pose pass returns only
@@ -99,7 +97,7 @@ private:
     bool built_any_                  = false;
     // The last build could not read the skeleton: when to read it again, and
     // the fault last logged for this skeleton, pose and value (none: not yet).
-    std::optional<BodyTime> retry_at_;
+    std::optional<TimePoint> retry_at_;
     std::optional<SkeletonFault> unreadable_logged_;
     // The skeletons already logged (21 §18: the first time each is seen).
     std::array<std::uintptr_t, 8> logged_skeletons_{};

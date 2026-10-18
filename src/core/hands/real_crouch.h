@@ -1,7 +1,8 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
-#include <chrono>
+#include "util/time/steady.h"
+
 #include <cstdint>
 #include <optional>
 
@@ -42,38 +43,36 @@ struct RealCrouchOutput {
 
 class RealCrouch final {
 public:
-    using Clock = std::chrono::steady_clock;
-
-    RealCrouchOutput update(const RealCrouchInput& in, Clock::time_point now) noexcept;
+    RealCrouchOutput update(const RealCrouchInput& in, util::TimePoint now) noexcept;
 
     // 21 §12.2 item 3: an episode ended; the crouch is compared with the
     // head kHandBackSettle later and re-synced by one press if they differ.
-    void on_hand_back(Clock::time_point now) noexcept;
+    void on_hand_back(util::TimePoint now) noexcept;
 
     // Real crouch applies this frame (standing, calibrated, a head height).
     bool active() const noexcept { return active_; }
 
 private:
-    void press(bool crouch, Clock::time_point now, RealCrouchOutput& out) noexcept;
-    void follow_press(bool game_crouched, Clock::time_point now, RealCrouchOutput& out) noexcept;
-    void ease_raise(bool raised, Clock::time_point now) noexcept;
+    void press(bool crouch, util::TimePoint now, RealCrouchOutput& out) noexcept;
+    void follow_press(bool game_crouched, util::TimePoint now, RealCrouchOutput& out) noexcept;
+    void ease_raise(bool raised, util::TimePoint now) noexcept;
     void reset() noexcept;
 
     struct PendingCheck {
         bool crouch = false;
-        Clock::time_point at{};
+        util::TimePoint at{};
     };
 
     bool active_ = false;
     std::optional<bool> wanted_; // the head's state, with hysteresis
     bool crossing_ = false;      // a threshold crossing not yet matched
-    std::optional<Clock::time_point> last_press_;
+    std::optional<util::TimePoint> last_press_;
     std::optional<PendingCheck> check_; // the last press, until the byte follows
-    std::optional<Clock::time_point> resync_at_;
+    std::optional<util::TimePoint> resync_at_;
     bool followed_once_ = false; // a press of this session was followed
     bool engaged_       = false; // the game crouched on a press of ours
     float raise_m_      = 0.0f;
-    std::optional<Clock::time_point> last_update_;
+    std::optional<util::TimePoint> last_update_;
 };
 
 } // namespace omvr::core::hands

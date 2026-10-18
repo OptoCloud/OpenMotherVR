@@ -2,7 +2,7 @@
 #include "core/hands/body_hider.h"
 
 #include "core/config/settings_table.h"
-#include "core/hands/body_tuning.h"
+#include "core/hands/tuning.h"
 
 #include <algorithm>
 #include <format>
@@ -56,7 +56,7 @@ int index_of(const SkeletonBones& b, std::string_view name) noexcept {
 
 } // namespace
 
-bool BodyHider::wants_bones(BodyVisible v, const PlayerSkeleton& s, BodyTime now) const noexcept {
+bool BodyHider::wants_bones(BodyVisible v, const PlayerSkeleton& s, TimePoint now) const noexcept {
     if (v == BodyVisible::Full || s.pose == 0) return false;
     if (!built_any_ || v != built_value_ || s.skeleton != built_skeleton_ || s.pose != built_pose_)
         return true;
@@ -64,7 +64,7 @@ bool BodyHider::wants_bones(BodyVisible v, const PlayerSkeleton& s, BodyTime now
 }
 
 void BodyHider::update(BodyVisible v, bool running, const PlayerSkeleton& s, const SkeletonBones* bones,
-                       BodyTime now, const SkeletonReadFault& fault) noexcept {
+                       TimePoint now, const SkeletonReadFault& fault) noexcept {
     log_job_reports();
     if (v == BodyVisible::Full && built_any_ && built_value_ != BodyVisible::Full) {
         log_.line(kLogWhole);
@@ -89,7 +89,7 @@ void BodyHider::update(BodyVisible v, bool running, const PlayerSkeleton& s, con
         } else {
             // 21 §10.2: not ready yet (a menu, a level load) or not readable
             // at all: read again until it is, logged once per change.
-            retry_at_ = now + std::chrono::duration_cast<BodyTime::duration>(kSkeletonRetry);
+            retry_at_ = util::after(now, kSkeletonRetry);
             log_unreadable(s, fault);
         }
     }

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "util/math/vec.h"
+#include "util/time/steady.h"
 
 #include <array>
 #include <cmath>
@@ -10,6 +11,7 @@
 // whichever runtime read them (04 §5.8.1).
 namespace omvr::core::input {
 
+using util::TimePoint;
 using util::Vec2;
 using util::Vec3;
 

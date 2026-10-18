@@ -6,7 +6,7 @@
 
 #include "core/config/settings_table.h"
 #include "core/hands/activity.h"
-#include "core/hands/body_tuning.h"
+#include "core/hands/tuning.h"
 #include "core/hands/body_visibility.h"
 #include "core/ui/play_state.h"
 #include "game/code_address.h"
@@ -19,6 +19,7 @@
 #include "loader/context.h"
 #include "loader/hooks/guard.h"
 #include "util/sync/once_latch.h"
+#include "util/time/steady.h"
 
 #include <array>
 #include <cstdint>
@@ -117,7 +118,7 @@ hands::SkeletonFault fault_of(game::hands::SkeletonReadResult r) noexcept {
 // 21 §10: the plan for this frame's skeleton, published for the jobs. A
 // skeleton that cannot be read yet is read again until it can be (21 §10.2).
 void update_visibility(Context& ctx, BodyVisible v, bool running, void* player,
-                       std::chrono::steady_clock::time_point now) noexcept {
+                       util::TimePoint now) noexcept {
     if (v != BodyVisible::Full && !sites_tried) install_sites(ctx);
     if (!sites_in) v = BodyVisible::Full;
     hands::PlayerSkeleton skeleton;
@@ -149,7 +150,7 @@ std::string_view press_name(hands::CrouchPress p) noexcept {
 
 // 21 §11.5, §12.2 item 3.
 void update_crouch(Context& ctx, game::StereoInterface& device, void* player, hands::Activity activity,
-                   std::chrono::steady_clock::time_point now) noexcept {
+                   util::TimePoint now) noexcept {
     const auto& s = ctx.settings.current();
     hands::RealCrouchInput in;
     in.enabled               = s.body.real_crouch;
@@ -164,8 +165,7 @@ void update_crouch(Context& ctx, game::StereoInterface& device, void* player, ha
 
     const hands::RealCrouchOutput out = ctx.real_crouch.update(in, now);
     if (out.press != hands::CrouchPress::None) {
-        ctx.body_controls.press_crouch_until(
-            now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(hands::kCrouchPress));
+        ctx.body_controls.press_crouch_until(util::after(now, hands::kCrouchPress));
         if (ctx.log.debug_enabled())
             logf(ctx.log, kLogCrouchPress, press_name(out.press), in.head_height_m.value_or(0.0f),
                  out.crouch_below_m, out.stand_above_m);

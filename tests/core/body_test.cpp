@@ -9,7 +9,7 @@
 
 #include "core/hands/body_controls.h"
 #include "core/hands/body_hider.h"
-#include "core/hands/body_tuning.h"
+#include "core/hands/tuning.h"
 #include "core/hands/body_visibility.h"
 #include "core/hands/hand_back.h"
 #include "core/hands/real_crouch.h"
@@ -33,7 +33,7 @@ using omvr::core::config::BodyVisible;
 using omvr::tests::FakeClock;
 using omvr::tests::RecordingLog;
 using namespace std::chrono_literals;
-using Clock = RealCrouch::Clock;
+using Clock = omvr::util::SteadyClock;
 
 // A first-person skeleton shaped like the game's (21 §2.3): names with the
 // tools' namespace prefix, fingers and a weapon bone under each hand.
@@ -239,7 +239,7 @@ TEST_CASE("body hider: publishes a plan only while something is hidden and the d
     const auto s     = female_fp();
     const auto bones = s.bones();
     const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "FEMALEFP"};
-    const BodyTime t{std::chrono::seconds(100)};
+    const TimePoint t{std::chrono::seconds(100)};
 
     CHECK_FALSE(hider.wants_bones(BodyVisible::Full, player, t)); // the default reads nothing
     hider.update(BodyVisible::Full, true, player, nullptr, t);
@@ -277,7 +277,7 @@ TEST_CASE("body hider: a skeleton without the bones is drawn whole and logged on
     s.add("DallasFP:Hips", -1);
     const auto bones = s.bones();
     const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "DALLASFP"};
-    const BodyTime t{std::chrono::seconds(100)};
+    const TimePoint t{std::chrono::seconds(100)};
     hider.update(BodyVisible::None, true, player, &bones, t);
     CHECK(hider.current() == nullptr);
     CHECK(log.contains("no bone Spine by name"));
@@ -297,7 +297,7 @@ TEST_CASE("body hider: an unreadable skeleton is read again every second until i
     const auto s     = female_fp();
     const auto bones = s.bones();
     const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "FEMALEFP"};
-    const BodyTime t{std::chrono::seconds(100)};
+    const TimePoint t{std::chrono::seconds(100)};
     const SkeletonReadFault unnamed{SkeletonFault::UnnamedBone, 70, 0};
 
     REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t));
@@ -330,7 +330,7 @@ TEST_CASE("body hider: an unreadable skeleton is logged once per change") {
     RecordingLog log;
     BodyHider hider{log};
     const PlayerSkeleton menu{0x1000, 0x2000, 0x3000, "FEMALEFP"};
-    const BodyTime t{std::chrono::seconds(100)};
+    const TimePoint t{std::chrono::seconds(100)};
     const SkeletonReadFault no_bones{SkeletonFault::NoBones, 0, 0};
     const auto warnings = [&] {
         std::size_t n = 0;

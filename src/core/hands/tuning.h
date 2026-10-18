@@ -1,13 +1,13 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
-#include <chrono>
+#include "util/time/steady.h"
 
-// Behaviour parameters of the hand features (spec 21), with the section
-// each one meets. Values marked [proposal] in the spec are the spec's.
+// Behaviour parameters of the hand and body features (spec 21), with the
+// section each one meets. Values marked [proposal] in the spec are the spec's.
 namespace omvr::core::hands {
 
-using Seconds = std::chrono::duration<float>;
+using util::Seconds;
 
 // 21 §3.3 [proposal]: a lost hand keeps its last pose relative to the head
 // this long (covers brief occlusions without a jump), then blends to the
@@ -102,5 +102,46 @@ inline constexpr float kVibrationFrequencyDefault = 0.0f;
 // 21 §14.3 [proposal]: OpenVR legacy input pulses each frame for
 // amplitude * this many microseconds (the API's pulse is about 0 to 4 ms).
 inline constexpr float kLegacyPulseMicrosecondsPerAmplitude = 3000.0f;
+
+// ---- Body (21 §10 to §12) ------------------------------------------------------
+
+// 21 §10.2 [proposal]: a hidden bone's scale. Not 0: skin bound to hidden
+// bones only must shrink out of sight (a thousandth of its size is under a
+// millimetre for a whole limb) while its normals stay finite, so a
+// triangle shared with a drawn bone never shades from a zero normal.
+inline constexpr float kCollapseScale = 1.0e-3f;
+
+// 21 §10.2 (r8) [proposal]: a player skeleton that could not be read is
+// read again this often until it can be, so a value set before the game
+// has the player's skeleton ready (a menu, a level load) takes effect once
+// it is; a read costs a walk of at most 256 bones.
+inline constexpr Seconds kSkeletonRetry{1.0f};
+
+// 21 §11.5 [proposal]: the character crouches when the head's height above
+// the floor falls below kCrouchBelow * h and stands when it rises above
+// kStandAbove * h (h: the calibrated standing eye height).
+inline constexpr float kCrouchBelow = 0.78f;
+inline constexpr float kStandAbove  = 0.86f;
+
+// 21 §11.5 [proposal]: a press of the crouch action lasts this long, and
+// the next comes no sooner than kCrouchRetry after it.
+inline constexpr Seconds kCrouchPress{0.1f};
+inline constexpr Seconds kCrouchRetry{0.5f};
+// 21 §11.5: a press the game's requested crouch byte has not followed
+// within this time did not take (logged once; no retry of a crouch press).
+inline constexpr Seconds kCrouchConfirm{1.0f};
+// 21 §12.2 item 3 [proposal]: the crouch is re-synced this long after an
+// episode ends.
+inline constexpr Seconds kHandBackSettle{0.5f};
+
+// 21 §2.2, §11.5 [likely]: how far the game lowers the first-person camera
+// when the player crouches, game metres: the difference of the game's
+// `first_person_camera_offset_y` (0.01) and
+// `first_person_camera_crouch_offset_y` (-0.62) in DATA\GLOBALCONSTANTS.TXT.
+inline constexpr float kGameCrouchEyeDropM = 0.63f;
+// 21 §11.5 [proposal]: the eye compensation follows the game's crouch over
+// this time, so the view does not jump when the game's camera moves (the
+// game's own transition time is not known, 21 §22 item 14).
+inline constexpr Seconds kCrouchEyeBlend{0.3f};
 
 } // namespace omvr::core::hands

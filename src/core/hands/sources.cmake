@@ -9,7 +9,6 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/body_controls.h
     ${CMAKE_CURRENT_LIST_DIR}/body_hider.cpp
     ${CMAKE_CURRENT_LIST_DIR}/body_hider.h
-    ${CMAKE_CURRENT_LIST_DIR}/body_tuning.h
     ${CMAKE_CURRENT_LIST_DIR}/body_visibility.cpp
     ${CMAKE_CURRENT_LIST_DIR}/body_visibility.h
     ${CMAKE_CURRENT_LIST_DIR}/hand_back.cpp

@@ -9,7 +9,6 @@
 
 #include <array>
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <optional>
 
@@ -19,8 +18,6 @@
 // applies the result to the game's action tiers; the recenter is carried
 // out on the game thread (22 §15).
 namespace omvr::core::input {
-
-using GestureTime = std::chrono::steady_clock::time_point;
 
 // 22 §8.2. Both grips held with both hands near the head for kRecenterHold
 // fires once; the hold restarts whenever a condition breaks, and after
@@ -42,12 +39,12 @@ public:
 
     // `enabled`: Controls.RecenterGesture. Each suppression is reported once
     // per performance.
-    Result update(bool enabled, const Input& in, GestureTime now) noexcept;
+    Result update(bool enabled, const Input& in, TimePoint now) noexcept;
 
 private:
-    std::optional<GestureTime> since_; // the conditions have held since
-    bool fired_      = false;          // fired; waits for the grips or hands to leave
-    bool suppressed_ = false;          // a suppression was reported for this performance
+    std::optional<TimePoint> since_; // the conditions have held since
+    bool fired_      = false;        // fired; waits for the grips or hands to leave
+    bool suppressed_ = false;        // a suppression was reported for this performance
 };
 
 // The holster zones of 22 §8.4, each driving one map 0 action.
@@ -173,14 +170,14 @@ public:
 
     // One controls write: `c` as read, with its poses; `now` its time.
     // Called with every gesture off too, so each one's state resets.
-    GestureResult update(const Controls& c, GestureTime now) noexcept;
+    GestureResult update(const Controls& c, TimePoint now) noexcept;
 
     // A recenter the gesture asked for since the last call (22 §8.2, §15).
     // Game thread.
     bool take_recenter() noexcept { return recenter_request_.exchange(false, std::memory_order_acq_rel); }
 
 private:
-    void run_recenter(const Controls& c, bool open, GestureTime now) noexcept;
+    void run_recenter(const Controls& c, bool open, TimePoint now) noexcept;
     void apply_holsters(const Controls& c, const ports::GameContext& game, bool open,
                         GestureResult& out) noexcept;
     void apply_lean(const Controls& c, const ports::GameContext& game, bool open,

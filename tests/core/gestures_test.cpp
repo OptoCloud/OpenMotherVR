@@ -31,7 +31,7 @@ using omvr::tests::FakeClock;
 using omvr::tests::RecordingLog;
 
 constexpr float kQuarterTurn = std::numbers::pi_v<float> / 2.0f;
-const GestureTime kT0{std::chrono::seconds(100)};
+const TimePoint kT0{std::chrono::seconds(100)};
 
 class FakeContext final : public ports::GestureContext {
 public:
