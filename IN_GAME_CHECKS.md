@@ -12,6 +12,37 @@ Keys of one section share one object, for example
 Tick an item once it has been seen working, with the date, runtime and
 headset; move it to the roadmap in `README.md` as verified.
 
+## Next session: haptics and gestures
+
+A focused run for the items under Haptics and Gestures and hiding below.
+Before starting: Dev. Debug Options on, `"Hands": {"Haptics": {"Enabled":
+true}}`, and in `"Controls"` set `RecenterGesture`, `HolsterGestures`,
+`HidingLean`, `HoldBreathGesture` and `HudToggleGesture` to true.
+
+What each vibration should feel like (amplitude 0 to 1 before
+`Strength`), so the events can be told apart:
+
+| Do this | Feel | Controller | Log (`[diag] haptics: ...`) |
+|---|---|---|---|
+| One revolver or shotgun shot | one sharp short tap (0.60, 60 ms) | right | `firing pulse, amplitude 0.60, 60 ms` |
+| Hold the flamethrower | a soft buzz (0.30) for as long as it fires | right | `firing pulse, amplitude 0.30` repeating |
+| Tracker raised | a faint tick per scan (0.15, 20 ms) | left | `tracker pulse` |
+| A small hit | a medium thump (about 0.4 to 0.5, 150 ms) | both | `damage pulse, amplitude 0.4x, 150 ms` |
+| A big hit | a stronger thump, more health lost is stronger | both | higher amplitude |
+| Death | one long strong buzz (1.00, 600 ms) | both | `death pulse, amplitude 1.00, 600 ms` |
+| Hacking device or cutting torch starts and ends | a light tap (0.40, 80 ms) each time | both | `hacking pulse, amplitude 0.40, 80 ms` |
+| Explosions, heavy doors, the Alien's attacks | follows the game's pad rumble, ends within 0.5 s of it | left low motor, right high | `game rumble set N times ...` |
+
+Report per row: whether it happened, whether it came from the right
+controller, whether it felt too weak, too strong or wrong in kind (a buzz
+where a tap belongs), and any vibration with no event or one that stayed
+on. Hacking steps and the Alien close by have no vibration yet (the log
+says so at start-up).
+
+Gestures, per item under Gestures and hiding: did it fire, how easy was
+it, did it ever fire by accident. Also the HUD toggle: left hand at the
+side of the head and Map hides or shows the HUD (`[diag] hud: ...`).
+
 ## v1: still unconfirmed
 
 - [ ] **Desktop Game Theatre warning.** With SteamVR's Desktop Game Theatre
