@@ -21,12 +21,11 @@ constexpr std::string_view kUnexpectedLog = "[stereo] clear gate: unexpected cod
 
 // The clear's prologue: `push ebp; mov ebp, esp; sub esp, 0x10`. It does
 // not depend on where it runs, so the gate runs a copy of it.
-constexpr std::uint8_t kGroup1Imm8To32               = 0x83; // sub/add/... r/m32, imm8 (reg field selects)
-constexpr std::uint8_t kModRmSubEsp                  = 0xEC; // 83 /5, esp
-constexpr std::uint8_t kModRmEbpEsp                  = 0xEC; // 8B, ebp <- esp
-constexpr std::uint8_t kClearFrameSize               = 0x10;
-constexpr std::array<std::uint8_t, 6> kClearPrologue = {x86::kPushEbp,   x86::kMovR32Rm32, kModRmEbpEsp,
-                                                        kGroup1Imm8To32, kModRmSubEsp,     kClearFrameSize};
+constexpr std::uint8_t kClearFrameSize = 0x10;
+constexpr auto kClearPrologue =
+    x86::concat(x86::kFramePrologue,
+                std::array<std::uint8_t, 3>{x86::kGroup1Imm8Signed, x86::kModRmSubEsp, kClearFrameSize});
+static_assert(kClearPrologue == std::array<std::uint8_t, 6>{0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x10});
 
 // The gate's machine code: room for it, and the displacement of its `jne`
 // over the prologue copy and the jump back.

@@ -36,8 +36,12 @@ constexpr std::array<std::uint8_t, 3> kLoadCharacterList = {x86::kMovR32Rm32, 0x
 constexpr std::size_t kGetterListOffset                  = x86::kImm32Offset + x86::kRel32Size;
 // 21 §2.5: AimRayUpdate's prologue, `push ebp; mov ebp, esp; and esp, -16;
 // sub esp, 0x54`.
-constexpr std::array<std::uint8_t, 9> kAimRayUpdatePrologue = {0x55, 0x8B, 0xEC, 0x83, 0xE4,
-                                                               0xF0, 0x83, 0xEC, 0x54};
+constexpr std::uint8_t kAimRayFrameSize = 0x54;
+constexpr auto kAimRayUpdatePrologue =
+    x86::concat(x86::kAlignedFramePrologue,
+                std::array<std::uint8_t, 3>{x86::kGroup1Imm8Signed, x86::kModRmSubEsp, kAimRayFrameSize});
+static_assert(kAimRayUpdatePrologue ==
+              std::array<std::uint8_t, 9>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x83, 0xEC, 0x54});
 // 21 §2.5: CurrentItem's first instruction, `cmp byte [ecx+0x1510], 0`.
 constexpr std::array<std::uint8_t, 7> kCurrentItemStart = {0x80, 0xB9, 0x10, 0x15, 0x00, 0x00, 0x00};
 // 21 §2.5: the fire alignment test, `comiss xmm0, [threshold]` (the
@@ -46,7 +50,7 @@ constexpr std::array<std::uint8_t, 3> kComissXmm0Abs = {x86::kTwoByte, x86::kCom
 constexpr std::array<std::uint8_t, 2> kJbeShort11    = {x86::kJbeRel8, 0x11};
 constexpr std::size_t kGateJbeOffset                 = x86::kComissDispOffset + x86::kRel32Size;
 // 21 §2.6: TrackerScan's prologue, `push ebp; mov ebp, esp; and esp, -16`.
-constexpr std::array<std::uint8_t, 6> kTrackerScanPrologue = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0};
+constexpr auto kTrackerScanPrologue = x86::kAlignedFramePrologue;
 
 bool registry_confirmed(const GameImage& g, const HandRvas& r) noexcept {
     const std::uint8_t* getter = g.at_rva(r.player_getter);

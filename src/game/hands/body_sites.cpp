@@ -34,8 +34,13 @@ constexpr std::size_t kThunkJumpOffset             = kThunkStart.size();
 static_assert(kCharacterAnimation == 0x3F0, "the thunk's add is the animation component's offset");
 // 21 §2.3: SkinSetPose's prologue, `push ebp; mov ebp, esp; and esp, -16;
 // sub esp, 0x154`.
-constexpr std::array<std::uint8_t, 12> kSkinSetPoseStart = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0,
-                                                            0x81, 0xEC, 0x54, 0x01, 0x00, 0x00};
+constexpr std::uint32_t kSkinSetPoseFrameSize = 0x154;
+constexpr auto kSkinSetPoseStart =
+    x86::concat(x86::concat(x86::kAlignedFramePrologue,
+                            std::array<std::uint8_t, 2>{x86::kGroup1Imm32, x86::kModRmSubEsp}),
+                x86::le32(kSkinSetPoseFrameSize));
+static_assert(kSkinSetPoseStart == std::array<std::uint8_t, 12>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x81,
+                                                                0xEC, 0x54, 0x01, 0x00, 0x00});
 
 bool code_expected(const GameImage& g, const BodyRvas& r) noexcept {
     const std::uint8_t* thunk = g.at_rva(r.final_pose_thunk);

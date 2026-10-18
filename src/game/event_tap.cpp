@@ -15,10 +15,10 @@ namespace omvr::game {
 namespace {
 
 // `mov eax, ecx; ret 4`: the tap's whole body.
-constexpr std::uint8_t kModRmEaxEcx            = 0xC1;
-constexpr std::uint8_t kRetImm16               = 0xC2;
 constexpr std::uint8_t kArgBytes               = 4; // one stack argument, popped by the callee
-constexpr std::array<std::uint8_t, 5> kTapNoOp = {x86::kMovR32Rm32, kModRmEaxEcx, kRetImm16, kArgBytes, 0x00};
+constexpr std::array<std::uint8_t, 5> kTapNoOp = {
+    x86::kMovR32Rm32, x86::modrm_reg(x86::Reg::Eax, x86::Reg::Ecx), x86::kRetImm16, kArgBytes, 0x00};
+static_assert(kTapNoOp == std::array<std::uint8_t, 5>{0x8B, 0xC1, 0xC2, 0x04, 0x00});
 
 // The bounds of the game's image, read once: the main module stays mapped
 // for the life of the process.

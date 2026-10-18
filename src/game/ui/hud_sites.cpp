@@ -45,7 +45,10 @@ constexpr std::array<std::uint8_t, 8> kCrosshairUpdateStart = {0x51, 0x53, 0x56,
                                                                0x6A, 0x00, 0x8B, 0xF9};
 // 23 §2.6: the icon highlight update's first instructions, `push ebp; mov
 // ebp, esp; and esp, -16; push -1`.
-constexpr std::array<std::uint8_t, 8> kIconHighlightStart = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x6A, 0xFF};
+constexpr auto kIconHighlightStart =
+    x86::concat(x86::kAlignedFramePrologue, std::array<std::uint8_t, 2>{x86::kPushImm8, 0xFF});
+static_assert(kIconHighlightStart ==
+              std::array<std::uint8_t, 8>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x6A, 0xFF});
 
 // The scripted HUD entity's method table (22 §2.4): which method each of
 // its six slots holds.

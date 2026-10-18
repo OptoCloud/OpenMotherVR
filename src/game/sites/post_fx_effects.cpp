@@ -35,16 +35,14 @@ constexpr int kSitesPerToggle = 1;
 // ---- The code the toggles expect (24 §1.6, §1.8) ------------------------------
 
 // ModR/M bytes of the register moves before the calls.
-constexpr std::uint8_t kModRmEcxEax = 0xC8; // mov ecx, eax
-constexpr std::uint8_t kModRmEcxEbx = 0xCB; // mov ecx, ebx
-constexpr std::uint8_t kModRmEcxEsi = 0xCE; // mov ecx, esi
+constexpr std::uint8_t kModRmEcxEax = x86::modrm_reg(x86::Reg::Ecx, x86::Reg::Eax); // mov ecx, eax
+constexpr std::uint8_t kModRmEcxEbx = x86::modrm_reg(x86::Reg::Ecx, x86::Reg::Ebx); // mov ecx, ebx
+constexpr std::uint8_t kModRmEcxEsi = x86::modrm_reg(x86::Reg::Ecx, x86::Reg::Esi); // mov ecx, esi
+static_assert(kModRmEcxEax == 0xC8 && kModRmEcxEbx == 0xCB && kModRmEcxEsi == 0xCE);
 // `cmp r/m8, imm8` with [esi + disp32] (group 1, reg field 7).
 constexpr std::uint8_t kModRmCmpEsiDisp32 = 0xBE;
 // `movss xmm1, [esi + disp32]`.
 constexpr std::uint8_t kModRmXmm1EsiDisp32 = 0x8E;
-// `sub esp, imm8` (group 1 with a sign-extended imm8, reg field 5).
-constexpr std::uint8_t kGroup1Imm8Signed = 0x83;
-constexpr std::uint8_t kModRmSubEsp      = 0xEC;
 // `test r/m8, imm8` with [disp32].
 constexpr std::uint8_t kTestRm8Imm8 = 0xF6;
 
@@ -70,9 +68,16 @@ constexpr std::uint8_t byte_of(std::ptrdiff_t value, int index) noexcept {
 // ChromaticAberration's entry, `sub esp, 0x10; movss xmm0, [abs]` (the
 // absolute's low byte, which relocation leaves alone, included), and its
 // read of the flag, `cmp byte ptr [esi+0x1B38], 0`.
-constexpr std::array<std::uint8_t, 8> kAberrationPrologue{kGroup1Imm8Signed, kModRmSubEsp,  0x10,
-                                                          x86::kRepPrefix,   x86::kTwoByte, x86::kMovss,
-                                                          x86::kModAbsolute, 0x14};
+constexpr std::array<std::uint8_t, 8> kAberrationPrologue{x86::kGroup1Imm8Signed,
+                                                          x86::kModRmSubEsp,
+                                                          0x10,
+                                                          x86::kRepPrefix,
+                                                          x86::kTwoByte,
+                                                          x86::kMovss,
+                                                          x86::kModAbsolute,
+                                                          0x14};
+static_assert(kAberrationPrologue ==
+              std::array<std::uint8_t, 8>{0x83, 0xEC, 0x10, 0xF3, 0x0F, 0x10, 0x05, 0x14});
 constexpr std::array<std::uint8_t, 7> kAberrationRead{x86::kGroup1Imm8,
                                                       kModRmCmpEsiDisp32,
                                                       byte_of(stereo::kPostFxChromaticAberration, 0),
@@ -84,8 +89,9 @@ constexpr std::array<std::uint8_t, 7> kAberrationRead{x86::kGroup1Imm8,
 // FilmGrain's entry, `sub esp, 0x30; test byte ptr [abs], ...` (the
 // absolute's low byte included), and its read of the intensity, `movss
 // xmm1, [esi+0x608]`.
-constexpr std::array<std::uint8_t, 6> kFilmGrainPrologue{kGroup1Imm8Signed, kModRmSubEsp,      0x30,
-                                                         kTestRm8Imm8,      x86::kModAbsolute, 0xCC};
+constexpr std::array<std::uint8_t, 6> kFilmGrainPrologue{x86::kGroup1Imm8Signed, x86::kModRmSubEsp, 0x30,
+                                                         kTestRm8Imm8,           x86::kModAbsolute, 0xCC};
+static_assert(kFilmGrainPrologue == std::array<std::uint8_t, 6>{0x83, 0xEC, 0x30, 0xF6, 0x05, 0xCC});
 constexpr std::array<std::uint8_t, 8> kFilmGrainRead{x86::kRepPrefix,
                                                      x86::kTwoByte,
                                                      x86::kMovss,

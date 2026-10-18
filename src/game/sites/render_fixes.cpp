@@ -18,6 +18,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 
 namespace omvr::game::sites {
 
@@ -80,7 +81,7 @@ constexpr std::string_view kAppendFoundLog =
 constexpr std::size_t kGetterRetOffset = x86::kMovEaxImm32Size;
 
 // 08 §3: the AA pass's prologue, `push ebp; mov ebp, esp; and esp, -16`.
-constexpr std::array<std::uint8_t, 6> kAaPassPrologue = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0};
+constexpr auto kAaPassPrologue = x86::kAlignedFramePrologue;
 
 // 08 §2: before the occlusion test's call, `mov eax, [esi+0x5C]; test eax,
 // eax; je +0xF; push eax; push esi; push ebx`: the test takes the context's
@@ -91,7 +92,9 @@ constexpr std::array<std::uint8_t, 10> kOcclusionArgs = {0x8B, 0x46, 0x5C, 0x85,
 
 // 05 §4.4: `lea ecx, [ebx+0x68]`, the manager's mode stack, before the
 // append's call.
-constexpr std::uint8_t kModRmEcxEbxDisp8               = 0x4B;
+constexpr std::uint8_t kModRmEcxEbxDisp8 =
+    x86::modrm(x86::kModDisp8, std::to_underlying(x86::Reg::Ecx), std::to_underlying(x86::Reg::Ebx));
+static_assert(kModRmEcxEbxDisp8 == 0x4B);
 constexpr std::array<std::uint8_t, 3> kLeaEcxModeStack = {
     x86::kLea, kModRmEcxEbxDisp8, static_cast<std::uint8_t>(offsetof(StereoManager, stack_data))};
 
