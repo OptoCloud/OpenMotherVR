@@ -23,7 +23,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ffdec_movie  # noqa: E402
 import pak2  # noqa: E402
-import ui_patch  # noqa: E402
 
 MOVIES = ["DATA/UI/NEWFRONTENDMENU.GFX", "DATA/UI/PAUSEMENU.GFX", "DATA/UI/GAMEOVERMENU.GFX"]
 CLASS = "frontend.GameMenu"
@@ -83,7 +82,7 @@ def main() -> None:
     for name in MOVIES:
         entries[name] = ffdec_movie.rebuild_movie(a.ffdec, CLASS, name, entries[name], a.work, "v2",
                                                   lambda src: splice(src, members), lacks)
-    ui_patch.write_pak(a.out, ui_patch.pak_alignment(a.modded), entries)
+    pak2.write_pak(a.out, pak2.pak_alignment(a.modded), entries)
     print(f"{a.out}: {len(entries)} entries")
 
 

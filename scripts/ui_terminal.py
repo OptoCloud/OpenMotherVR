@@ -35,7 +35,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pak2  # noqa: E402
-import ui_patch  # noqa: E402
 
 ENTRY = "DATA/UI/TERMINALINTERACTION.GFX"
 # The tags src/core/ui/ui_patch.cpp picks by Interaction.TerminalTextScale.
@@ -412,7 +411,7 @@ def main() -> None:
             for t, tag in STEPS:
                 out[f"{name}{SEPARATOR}{tag}"] = variant(data, t)
                 print(f"{name}{SEPARATOR}{tag}: {len(data)} -> {len(out[name + SEPARATOR + tag])} bytes")
-    ui_patch.write_pak(a.out, ui_patch.pak_alignment(a.modded), out)
+    pak2.write_pak(a.out, pak2.pak_alignment(a.modded), out)
     print(f"{a.out}: {len(out)} entries")
 
 

@@ -34,7 +34,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ffdec_movie  # noqa: E402
 import glyph_art  # noqa: E402
 import pak2  # noqa: E402
-import ui_patch  # noqa: E402
 
 # The movies with ImageSubstitution (spec 14 §2.7.1).
 MOVIES = [f"DATA/UI/{m}.GFX" for m in (
@@ -122,7 +121,7 @@ def main() -> None:
             raise SystemExit(f"{a.modded}: already has {name}")
         entries[name] = data
     out = {n: entries[n] for n in sorted(entries)}
-    ui_patch.write_pak(a.out, ui_patch.pak_alignment(a.modded), out)
+    pak2.write_pak(a.out, pak2.pak_alignment(a.modded), out)
     print(f"{a.out}: {len(out)} entries ({len(glyphs)} glyphs added, {len(replaced)} other glyphs replaced)")
 
 

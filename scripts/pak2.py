@@ -22,6 +22,7 @@ import hashlib
 import os
 import struct
 import sys
+from pathlib import Path
 
 
 def read_pak(path):
@@ -40,6 +41,26 @@ def read_pak(path):
         entries[name] = b[start:end]
         start = end
     return entries
+
+
+def pak_alignment(path: Path) -> int:
+    return struct.unpack_from("<4sIII", path.read_bytes(), 0)[3]
+
+
+def write_pak(path: Path, align: int, entries: dict[str, bytes]) -> None:
+    names = b"".join(n.encode("ascii") + b"\0" for n in entries)
+    header = struct.pack("<4sIII", b"PAK2", len(names), len(entries), align) + names
+    table_at = len(header)
+    data_at = table_at + 4 * len(entries)
+    body = bytearray()
+    ends = []
+    pos = data_at
+    for data in entries.values():
+        start = (pos + align - 1) // align * align
+        body += b"\0" * (start - pos) + data
+        pos = start + len(data)
+        ends.append(pos)
+    path.write_bytes(header + struct.pack(f"<{len(ends)}I", *ends) + body)
 
 
 def main(argv):

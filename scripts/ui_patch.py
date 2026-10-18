@@ -33,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pak2  # noqa: E402
+from pak2 import pak_alignment, write_pak  # noqa: E402  (re-exported: they were defined here)
 
 MAGIC = b"MVRUIP01"
 BLOCK = 16
@@ -60,10 +61,6 @@ def edited(entries: dict[str, bytes]) -> dict[str, bytes]:
 def base_name(name: str) -> str:
     """The entry a variant entry replaces; the name itself otherwise."""
     return name.split(VARIANT, 1)[0]
-
-
-def pak_alignment(path: Path) -> int:
-    return struct.unpack_from("<4sIII", path.read_bytes(), 0)[3]
 
 
 def delta(base: bytes, target: bytes) -> list[tuple]:
@@ -166,22 +163,6 @@ def select_variant(entries: dict[str, bytes], tag: str | None) -> dict[str, byte
                 raise SystemExit(f"{name}: no entry before it to replace")
             out[base_name(name)] = data
     return out
-
-
-def write_pak(path: Path, align: int, entries: dict[str, bytes]) -> None:
-    names = b"".join(n.encode("ascii") + b"\0" for n in entries)
-    header = struct.pack("<4sIII", b"PAK2", len(names), len(entries), align) + names
-    table_at = len(header)
-    data_at = table_at + 4 * len(entries)
-    body = bytearray()
-    ends = []
-    pos = data_at
-    for data in entries.values():
-        start = (pos + align - 1) // align * align
-        body += b"\0" * (start - pos) + data
-        pos = start + len(data)
-        ends.append(pos)
-    path.write_bytes(header + struct.pack(f"<{len(ends)}I", *ends) + body)
 
 
 def main() -> None:
