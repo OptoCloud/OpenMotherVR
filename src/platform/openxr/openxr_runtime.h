@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/diag/ports/log.h"
+#include "core/diag/trace.h"
 #include "core/input/ports/controls_sink.h"
 #include "core/ui/ports/game_signals.h"
 #include "core/vr/ports/haptic_source.h"
@@ -24,6 +25,8 @@ struct OpenXrRuntimeDeps {
     // The haptic output (spec 21 §14), asked each frame; null: no vibration
     // action is made and nothing vibrates.
     core::vr::ports::HapticSource* haptics = nullptr;
+    // The profiler of the traced build flavour; none in the release one.
+    core::diag::TracerRef tracer{};
 };
 
 // The stereo device on any OpenXR runtime (Meta / Quest Link, SteamVR, WMR,

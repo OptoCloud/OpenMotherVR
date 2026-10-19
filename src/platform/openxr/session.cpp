@@ -374,8 +374,9 @@ void Session::Impl::end_on_request() noexcept {
 // ---- Session ---------------------------------------------------------------------
 
 Session::Session(core::diag::ports::Log& log, const core::diag::ports::Clock& clock,
-                 core::ui::ports::Dialogs& dialogs, core::vr::RuntimeFailure& failure)
-    : impl_(std::make_unique<Impl>(log, clock, dialogs, failure)) {}
+                 core::ui::ports::Dialogs& dialogs, core::vr::RuntimeFailure& failure,
+                 core::diag::TracerRef tracer)
+    : impl_(std::make_unique<Impl>(log, clock, dialogs, failure, tracer)) {}
 
 Session::~Session() = default;
 

@@ -63,7 +63,8 @@ that each depend only on the ones before them:
   `tuning.h`. Core may include `game/constants.h` and nothing else of the
   game (exception: `core/stereo/stereo_device`, which works on the game's
   `StereoInterface` in place); `platform/` and `game/` may include only
-  `core/**/ports/*.h`, `core/**/types.h` and `core/**/tuning.h`. The two
+  `core/**/ports/*.h`, `core/**/types.h`, `core/**/tuning.h` and
+  `core/diag/trace.h` (the zone macros; standard library only). The two
   VR backends (`platform/openvr`, `platform/openxr`) may also include the
   backend-neutral rules both apply, `core/vr/*.h` and
   `core/input/controller_*.h`: pure functions and self-contained classes,

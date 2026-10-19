@@ -2,6 +2,7 @@
 // The OpenXR frame boundary (09 §5): end the frame the previous call began,
 // then begin the next one. Render thread.
 
+#include "core/diag/trace.h"
 #include "core/vr/pose_hold.h"
 #include "core/vr/tuning.h"
 #include "platform/d3d11/handles.h"
@@ -132,13 +133,17 @@ void Session::Impl::end_frame(IDXGISwapChain* swapchain) {
     // Start the GPU on the copies now: the runtime's xrEndFrame waits for
     // them, and the immediate context would otherwise hold them until the
     // next flush.
-    if (layer) state.context->Flush();
+    if (layer) {
+        OMVR_ZONE(tracer, "flush");
+        state.context->Flush();
+    }
 
     XrFrameEndInfo ei{XR_TYPE_FRAME_END_INFO};
     ei.displayTime          = t;
     ei.environmentBlendMode = state.blend;
     ei.layerCount           = layer ? 1 : 0;
     ei.layers               = layer ? &layer : nullptr;
+    OMVR_ZONE(tracer, "xr_end_frame");
     check_frame(xrEndFrame(state.session.get(), &ei), "xrEndFrame", state.end_result);
 }
 
@@ -244,11 +249,17 @@ void Session::Impl::log_ipd_once() {
 bool Session::Impl::begin_frame() {
     XrFrameWaitInfo wi{XR_TYPE_FRAME_WAIT_INFO};
     XrFrameState fs{XR_TYPE_FRAME_STATE};
-    if (!check_frame(xrWaitFrame(state.session.get(), &wi, &fs), "xrWaitFrame", state.wait_result))
-        return false;
+    {
+        OMVR_ZONE(tracer, "xr_wait_frame");
+        if (!check_frame(xrWaitFrame(state.session.get(), &wi, &fs), "xrWaitFrame", state.wait_result))
+            return false;
+    }
     XrFrameBeginInfo bi{XR_TYPE_FRAME_BEGIN_INFO};
-    if (!check_frame(xrBeginFrame(state.session.get(), &bi), "xrBeginFrame", state.begin_result))
-        return false;
+    {
+        OMVR_ZONE(tracer, "xr_begin_frame");
+        if (!check_frame(xrBeginFrame(state.session.get(), &bi), "xrBeginFrame", state.begin_result))
+            return false;
+    }
     const XrTime t      = fs.predictedDisplayTime;
     state.frame_begun   = true;
     state.should_render = fs.shouldRender != XR_FALSE;
@@ -257,7 +268,11 @@ bool Session::Impl::begin_frame() {
 
     if (state.recenter_pending && do_recenter(t)) state.recenter_pending = false;
 
-    read_hands(t);
+    {
+        OMVR_ZONE(tracer, "input_sync");
+        read_hands(t);
+    }
+    OMVR_ZONE(tracer, "locate");
     locate_views(t);
     locate_head(t);
     locate_floor(t);

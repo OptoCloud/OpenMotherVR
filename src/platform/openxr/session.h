@@ -23,6 +23,7 @@
 
 #include "core/diag/ports/clock.h"
 #include "core/diag/ports/log.h"
+#include "core/diag/trace.h"
 #include "core/stereo/types.h"
 #include "core/ui/ports/dialogs.h"
 #include "core/vr/ports/haptic_source.h"
@@ -107,8 +108,10 @@ struct EyeImages {
 
 class Session final {
 public:
+    // `tracer`: the profiler of the traced build flavour, none otherwise.
     Session(core::diag::ports::Log& log, const core::diag::ports::Clock& clock,
-            core::ui::ports::Dialogs& dialogs, core::vr::RuntimeFailure& failure);
+            core::ui::ports::Dialogs& dialogs, core::vr::RuntimeFailure& failure,
+            core::diag::TracerRef tracer = {});
     ~Session();
     Session(const Session&)            = delete;
     Session& operator=(const Session&) = delete;

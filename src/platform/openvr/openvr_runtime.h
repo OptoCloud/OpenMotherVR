@@ -2,6 +2,7 @@
 
 #include "core/diag/ports/clock.h"
 #include "core/diag/ports/log.h"
+#include "core/diag/trace.h"
 #include "core/input/ports/controls_sink.h"
 #include "core/ui/ports/dialogs.h"
 #include "core/vr/ports/haptic_source.h"
@@ -32,6 +33,8 @@ struct OpenVrRuntimeDeps {
     // The haptic output (spec 21 §14), asked each frame; null: no vibration
     // actions are declared and nothing vibrates.
     core::vr::ports::HapticSource* haptics = nullptr;
+    // The profiler of the traced build flavour; none in the release one.
+    core::diag::TracerRef tracer{};
 };
 
 // MotherVR::OpenVR, the OpenVR runtime behind the stereo device.

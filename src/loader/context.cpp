@@ -31,10 +31,10 @@ std::unique_ptr<core::vr::ports::VrRuntime> make_runtime(Context& c, core::vr::D
     if (chosen == core::vr::DetectResult::Chosen::OpenVR) {
         return platform::openvr::make_openvr_runtime(
             {c.log, c.clock, c.failure, c.archive_files, c.body_controls, c.dialogs,
-             c.runtimes.last_result().openvr_runtime_path, aim_poses, haptics});
+             c.runtimes.last_result().openvr_runtime_path, aim_poses, haptics, c.tracer});
     }
     return platform::openxr::make_openxr_runtime(
-        {c.log, c.xr, c.body_controls, c.headset_audio, c.console, aim_poses, haptics});
+        {c.log, c.xr, c.body_controls, c.headset_audio, c.console, aim_poses, haptics, c.tracer});
 }
 
 } // namespace
@@ -72,7 +72,7 @@ Context::Context(void* self) noexcept
       settings_push(
           {script_vars, display_reset, schemes, settings.current(), runtime_state, play_space_control, log}),
       commands(settings, display_reset, console, play_space_control, post_fx, log),
-      xr(log, clock, dialogs, failure),
+      xr(log, clock, dialogs, failure, tracer),
       openvr_probe(log),
       openxr_probe(xr),
       runtimes(log, settings.current(), launch, openvr_probe, openxr_probe),

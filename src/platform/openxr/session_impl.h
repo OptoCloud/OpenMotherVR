@@ -32,8 +32,14 @@ using win32::ComPtr;
 
 struct Session::Impl {
     Impl(core::diag::ports::Log& log_port, const core::diag::ports::Clock& clock_port,
-         core::ui::ports::Dialogs& dialogs_port, core::vr::RuntimeFailure& failure_port) noexcept
-        : log(log_port), clock(clock_port), dialogs(dialogs_port), failure(failure_port), input(log_port) {}
+         core::ui::ports::Dialogs& dialogs_port, core::vr::RuntimeFailure& failure_port,
+         core::diag::TracerRef tracer_ref) noexcept
+        : log(log_port),
+          clock(clock_port),
+          dialogs(dialogs_port),
+          failure(failure_port),
+          tracer(tracer_ref),
+          input(log_port) {}
 
     // ---- runtime_probe.cpp: discovery and the loader (09 §1)
     std::filesystem::path probe() noexcept;
@@ -94,6 +100,7 @@ struct Session::Impl {
     const core::diag::ports::Clock& clock;
     core::ui::ports::Dialogs& dialogs;
     core::vr::RuntimeFailure& failure;
+    const core::diag::TracerRef tracer; // the traced flavour's profiler, render thread zones
 
     // Everything a teardown resets. The handles are destroyed explicitly in
     // teardown(), in the order 09 §3 needs, before the reset.

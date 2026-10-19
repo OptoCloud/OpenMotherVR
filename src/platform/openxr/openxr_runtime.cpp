@@ -103,7 +103,8 @@ public:
           audio_(deps.audio),
           signals_(deps.signals),
           aim_poses_(deps.aim_poses),
-          haptics_(deps.haptics) {}
+          haptics_(deps.haptics),
+          tracer_(deps.tracer) {}
 
     // Ends the session and destroys the instance. Only reached through the
     // stereo device's explicit teardown, never at process exit.
@@ -241,8 +242,10 @@ public:
             xr_.clear_eye_images();
             xr_.set_screen_image(core::vr::GpuTexture{}, {});
         } else if (const TextureExtent extent = texture_extent(texture); !cinema_ && rendered.valid) {
+            OMVR_ZONE(tracer_, "eye_copy");
             present_eyes(texture, extent, rendered);
         } else {
+            OMVR_ZONE(tracer_, "screen_copy");
             present_screen(texture, extent);
         }
 
@@ -479,6 +482,7 @@ private:
     const bool aim_poses_; // the hands' aim pose action (spec 21 §16)
     // The haptic output (21 §14); null: off.
     core::vr::ports::HapticSource* const haptics_;
+    const core::diag::TracerRef tracer_;
     bool session_       = false;
     bool cinema_        = true;
     bool glyphs_chosen_ = false;

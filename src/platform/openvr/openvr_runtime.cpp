@@ -205,7 +205,8 @@ public:
           runtime_root_(deps.runtime_root),
           api_(deps.log, deps.failure),
           actions_(deps.log, deps.aim_poses, deps.haptics != nullptr),
-          haptics_(deps.haptics) {
+          haptics_(deps.haptics),
+          tracer_(deps.tracer) {
         render_pose_.store(kIdentity34);
         yaw_matrix_.store(kIdentity34);
     }
@@ -308,6 +309,7 @@ private:
     Actions actions_;
     // The haptic output (21 §14); null: off.
     core::vr::ports::HapticSource* const haptics_;
+    const core::diag::TracerRef tracer_;
     bool glyphs_chosen_ = false;
     // Render thread: submit_frame handed the game this frame's controls, so
     // the next poll_input has nothing to do.
@@ -606,18 +608,25 @@ void OpenVrRuntime::submit_frame(core::vr::GpuTexture texture) {
     tex.eColorSpace               = vr::ColorSpace_Gamma;
     tex.mDeviceToAbsoluteTracking = render_pose_.load(); // the pose head_pose gave the game
 
-    if (!cinema_mode_)
-        submit_eyes(tex);
-    else
-        show_screen(side_by_side, tex);
+    {
+        OMVR_ZONE(tracer_, "openvr_submit");
+        if (!cinema_mode_)
+            submit_eyes(tex);
+        else
+            show_screen(side_by_side, tex);
+    }
 
     // Events before the pose wait, a change handed over after it: a pose the
     // game thread reads for the retake is then from a wait that followed
     // the change (03 §6.8).
     poll_events();
-    // Running start: block until the next frame's poses are due (03 §6.3).
-    compositor_->WaitGetPoses(nullptr, 0, nullptr, 0);
+    {
+        // Running start: block until the next frame's poses are due (03 §6.3).
+        OMVR_ZONE(tracer_, "wait_get_poses");
+        compositor_->WaitGetPoses(nullptr, 0, nullptr, 0);
+    }
     space_change_.publish();
+    OMVR_ZONE(tracer_, "input_sync");
     read_hands();
     // The controllers as of this WaitGetPoses go to the game now, before its
     // next simulation step, not at the next BeginFrame (P10, as OpenXR).
