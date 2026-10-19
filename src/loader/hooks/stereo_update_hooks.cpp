@@ -40,7 +40,6 @@ void read_pad(Context& ctx, void* pad, UpdateInput& in) noexcept {
     in.pad          = true;
     in.lb           = stock_pad_button(pad, game::kPadLB);
     in.rb           = stock_pad_button(pad, game::kPadRB);
-    in.r3           = stock_pad_button(pad, game::kPadRStick);
     in.pad_activity = merged_pad_activity(pad);
     // The turn is the player map's analog action; its virtual code follows
     // the map's digital count (0x12C on the shipped map), so it is derived.

@@ -19,7 +19,6 @@ struct UpdateInput {
     bool pad          = false;
     bool lb           = false;
     bool rb           = false;
-    bool r3           = false;
     bool pad_activity = false;
     float turn        = 0.0f; // the turn axis, -1..1
     // The merged movement value (player map analog actions 0 and 1, VR and
@@ -130,7 +129,6 @@ private:
     // Original: StereoManager +0x310..+0x320, noted per field.
     bool loading_blackout_ = false;                     // +0x310
     bool keyboard_mouse_   = false;                     // +0x311  K&M in use: allow game look
-    bool r3_latch_         = false;                     // +0x313
     bool snap_latch_       = false;                     // +0x314
     bool snap_hold_        = false;                     // spec 22 §4.4: no repeat until released
     std::chrono::steady_clock::time_point snap_time_{}; // +0x318 (clock() ms there)

@@ -156,15 +156,10 @@ void StereoUpdate::recenter(const UpdateInput& in, UpdateOutput& out) noexcept {
         recentered_       = true;
         screen_replaced_  = 0;
         handled           = true;
-    } else if (chord) {
-        if (!recentered_) {
-            out.recenter = true;
-            recentered_  = true;
-            handled      = true;
-        } else if (in.r3 && !r3_latch_) {
-            r3_latch_ = true;
-            handled   = true;
-        }
+    } else if (chord && !recentered_) {
+        out.recenter = true;
+        recentered_  = true;
+        handled      = true;
     }
     if (handled) return;
     if (recentered_ && screen_replaced_ < kScreenReplaceFrames) {
@@ -172,7 +167,6 @@ void StereoUpdate::recenter(const UpdateInput& in, UpdateOutput& out) noexcept {
         ++screen_replaced_;
     } else if (!chord) {
         recentered_      = false;
-        r3_latch_        = false;
         screen_replaced_ = 0;
     }
 }

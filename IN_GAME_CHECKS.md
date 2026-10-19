@@ -62,6 +62,10 @@ side of the head and Map hides or shows the HUD (`[diag] hud: ...`).
       up or down still cycles weapons. Log: `[events] "start_interaction"`
       with `interaction true` at the lever, then `stop_interaction` with
       `interaction false`.
+- [ ] **R3 during the recenter chord (05 §9).** On a pad in a menu, hold
+      LB+RB to recenter, then click R3 while still holding them: nothing
+      else happens, and the menu screen settles in front of you as after
+      any recenter. No log line; R3 no longer has a latch of its own.
 
 ## Blackouts and rendering
 
