@@ -10,6 +10,7 @@
 #include "game/ui/hud_objects.h"
 #include "game/ui/hud_sites.h"
 #include "loader/context.h"
+#include "loader/hooks/camera_hooks.h"
 #include "loader/hooks/guard.h"
 
 #include <array>
@@ -39,9 +40,6 @@ constexpr std::string_view kLogInteraction =
 constexpr std::string_view kLogLeversOpen =
     "interaction: Levers by Hand has no effect in this build: how the game marks a junction interaction and "
     "what a lever does on release are not known yet (23 §12 items 2 to 4)";
-constexpr std::string_view kLogTakeoversOpen =
-    "interaction: Camera Takeovers Reduced has no effect in this build: how the game identifies the "
-    "animation of a request and the short device animations are not known yet (23 §12 items 5, 6, 12)";
 constexpr std::string_view kLogDistanceOpen =
     "interaction: Terminal and Rewire Distance have no effect in this build: the game's activation of these "
     "prompts has not been located (23 §5.2, §12 item 1)";
@@ -64,10 +62,9 @@ bool highlight_on     = false;
 bool visibility_on    = false;
 
 // The open features' reasons, each logged once when its key first asks.
-bool levers_noted    = false;
-bool takeovers_noted = false;
-bool distance_noted  = false;
-bool fast_noted      = false;
+bool levers_noted   = false;
+bool distance_noted = false;
+bool fast_noted     = false;
 
 // CrosshairUpdate's run: whether the crosshair is to be hidden in it, for
 // its ShowCrosshairs invoke; and the last state logged. The HUD update's
@@ -209,7 +206,6 @@ void note_open_features(Context& ctx) noexcept {
         ctx.log.line(why);
     };
     note(i.physical_levers, levers_noted, kLogLeversOpen);
-    note(i.camera_takeovers != core::config::CameraTakeovers::Game, takeovers_noted, kLogTakeoversOpen);
     note(i.terminal_distance != 0.0f || i.rewire_distance != 0.0f, distance_noted, kLogDistanceOpen);
     note(i.fast_animations, fast_noted, kLogFastOpen);
 }
@@ -261,6 +257,7 @@ void prepare_hud(const game::GameImage& g) noexcept {
     log_state(ctx);
     note_open_features(ctx);
     ensure_sites(ctx);
+    prepare_camera_takeovers(g); // 23 §4
 }
 
 void hud_on_stereo_update(bool replace) noexcept {
@@ -271,6 +268,7 @@ void hud_on_stereo_update(bool replace) noexcept {
         note_open_features(ctx);
         run_visibility(ctx);
     });
+    camera_takeovers_on_stereo_update(); // 23 §4
 }
 
 core::stereo::Matrix44 hud_panel_for_frame(const std::optional<core::stereo::Matrix44>& view,

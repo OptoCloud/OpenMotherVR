@@ -496,9 +496,39 @@ Controls keys in `mothervr.json`, Dev. Debug Options on.
       sits below the view, level, still for small glances, follows turns
       over about 20 degrees smoothly, and jumps at once on a snap turn or
       recenter.
-- [ ] **Unfinished keys.** `"Interaction": {"PhysicalLevers": true}` or
-      `"CameraTakeovers": "Reduced"`: only a one-time "has no effect"
-      line.
+- [ ] **Unfinished keys.** `"Interaction": {"PhysicalLevers": true}`:
+      only a one-time "has no effect" line.
+
+## Camera takeovers
+
+- [ ] **Reduced** (23 §11 items 5 and 12). `"Interaction":
+      {"CameraTakeovers": "Reduced"}` with Dev. Debug Options on. The start
+      logs `[hook] camera takeovers: in place on 5 sites` and once
+      `interaction: Camera Takeovers Reduced: scripted turns and the
+      re-align to the body are not applied; the view still follows the
+      short device animations in this build ...`; no `[hook] camera
+      takeovers: off` line. Use a terminal, a rewire station and a door
+      button: no yaw snap when each ends (`[diag] camera takeover: camera
+      reset re-align not applied (Reduced)` or `state entry re-align`);
+      the view may still move with the device animation (part (a) is not
+      applied yet). Walk off after a terminal: movement follows the view.
+      A scripted look-at (`StealCamera`, for example the first sight of
+      something in mission 1 or 2) does not turn the world (`StealCamera
+      steer not applied`); a level camera still plays, and when it ends
+      the view does not swing (`level camera exit steer not applied`).
+      Climbing a ladder and entering a vent still move the view along the
+      path. In a cutscene, takeovers are logged `kept (cutscene or fade)`.
+- [ ] **Changed in the pause menu.** Switch to Reduced from the pause menu
+      in a level: `[hook] camera takeovers: in place on 5 sites` appears
+      then, without a crash. Switching during a terminal keeps the rule
+      the terminal started with (`kept (Game)` at its end).
+- [ ] **Game.** `"Game"` (or no key): no `[hook] camera takeovers` line and
+      no `camera takeover` lines; all as v1.
+- [ ] **Options page.** Options > MotherVR > Interaction: `Camera
+      Takeovers` is not greyed, shows `Game` and `Reduced`, and its
+      description reads `Reduced: fewer interactions take the view away
+      from your head`; `Levers by Hand`, `Terminal Distance` and `Rewire
+      Distance` are still greyed with `Not available yet`.
 
 ## Terminal text size
 

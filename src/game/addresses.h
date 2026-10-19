@@ -576,6 +576,62 @@ inline constexpr HudRvas kHudRvas2020 = {};
 inline constexpr PerBuild<HudRvas> kHudRvas{kHudRvas2015, kHudRvas2020};
 static_assert(all_rows_known(kHudRvas2015), "every HUD row has its 2015 RVA");
 
+// Interaction.CameraTakeovers (spec 23 §2.4, §4.2 (b) and (c)). 2015 RVAs,
+// checked in the 2015 AI.exe (timestamp 0x54E3199D); the call sites of the
+// re-align inside the functions 23 §2.4 names were read there. The 2020
+// ones are unknown (23: `?` throughout), so the feature stays off there.
+struct CameraTakeoverRvas {
+    // 23 §2.4: the camera director's behaviour lookup (thiscall, two
+    // names, ret 8), FollowSteer (thiscall, four stack arguments, ret
+    // 0x10) and the follow camera's re-align to the body (thiscall, one
+    // stack argument, ret 4).
+    std::uint32_t follow_lookup;
+    std::uint32_t follow_steer;
+    std::uint32_t follow_realign;
+    // The StealCamera start, its method-table entry and its FollowSteer.
+    std::uint32_t steal_camera_start;
+    std::uint32_t steal_camera_entry;
+    std::uint32_t steal_camera_steer_call;
+    // The CameraResource stop, its method-table entry, its FollowSteer and
+    // the re-align it makes with reset_player_camera_on_exit.
+    std::uint32_t level_camera_stop;
+    std::uint32_t level_camera_stop_entry;
+    std::uint32_t level_camera_stop_steer_call;
+    std::uint32_t level_camera_stop_realign_call;
+    // CameraResetRequest (thiscall, two stack arguments, ret 8): its mode 6
+    // lookup and re-align.
+    std::uint32_t reset_request;
+    std::uint32_t reset_request_lookup_call;
+    std::uint32_t reset_request_realign_call;
+    // The player state entry: its lookup and re-align.
+    std::uint32_t state_entry_lookup_call;
+    std::uint32_t state_entry_realign_call;
+};
+
+inline constexpr CameraTakeoverRvas kCameraTakeoverRvas2015 = {
+    .follow_lookup                  = 0x000293B0,
+    .follow_steer                   = 0x0002DD50,
+    .follow_realign                 = 0x0002C6F0,
+    .steal_camera_start             = 0x0001C620,
+    .steal_camera_entry             = 0x00DC231C,
+    .steal_camera_steer_call        = 0x0001C6E8,
+    .level_camera_stop              = 0x000245F0,
+    .level_camera_stop_entry        = 0x00DC5A78,
+    .level_camera_stop_steer_call   = 0x0002471C,
+    .level_camera_stop_realign_call = 0x00024739,
+    .reset_request                  = 0x00033540,
+    .reset_request_lookup_call      = 0x00033579,
+    .reset_request_realign_call     = 0x00033588,
+    .state_entry_lookup_call        = 0x00281132,
+    .state_entry_realign_call       = 0x00281141,
+};
+
+inline constexpr CameraTakeoverRvas kCameraTakeoverRvas2020 = {};
+
+inline constexpr PerBuild<CameraTakeoverRvas> kCameraTakeoverRvas{kCameraTakeoverRvas2015,
+                                                                  kCameraTakeoverRvas2020};
+static_assert(all_rows_known(kCameraTakeoverRvas2015), "every camera takeover row has its 2015 RVA");
+
 // The selected per-build table, rebased onto the running AI.exe.
 class AddressMap {
 public:

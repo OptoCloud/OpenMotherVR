@@ -220,9 +220,17 @@ Playing
     Size 100% to 175%) makes the text of terminal documents larger; long
     documents still scroll to the end. Entry titles and folder names grow
     as far as their boxes allow. Applies at the next launch.
-  - "PhysicalLevers", "CameraTakeovers", "TerminalDistance" and
-    "RewireDistance" are saved but do nothing in this version; their
-    items are greyed with "Not available yet".
+  - "CameraTakeovers": "Game" (default) or "Reduced" (Camera Takeovers):
+    scripted moments that point your view at something, and the snap of
+    the view back to your body at the end of a terminal, a lever or a
+    level camera, no longer turn the world around you. Level cameras,
+    ladders, vents, grabs and cutscenes keep the game's camera. In this
+    version the view still follows the head of the short animations at a
+    terminal or rewire box. An interaction in progress keeps the setting
+    it started with.
+  - "PhysicalLevers", "TerminalDistance" and "RewireDistance" are saved
+    but do nothing in this version; their items are greyed with "Not
+    available yet".
 - Graphics (preview; Options > MotherVR > Graphics), in a "Graphics"
   object under "Settings". The engine settings apply at the next launch;
   the three effects in the headset at once:

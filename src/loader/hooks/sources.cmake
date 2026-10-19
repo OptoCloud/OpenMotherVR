@@ -7,6 +7,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/audio_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/body_hooks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/body_hooks.h
+    ${CMAKE_CURRENT_LIST_DIR}/camera_hooks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/camera_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/crash_hook.cpp
     ${CMAKE_CURRENT_LIST_DIR}/crash_hook.h
     ${CMAKE_CURRENT_LIST_DIR}/d3d11_hooks.cpp

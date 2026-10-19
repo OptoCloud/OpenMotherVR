@@ -1,11 +1,12 @@
 // core/ui: every mvr_* command rule, the command runner's order (save, then
 // quit), the display reset, the settings push, the runtime menu, PAK2 and
-// the UI patch.
+// the UI patch, the camera takeover rule.
 
 #include "core/config/settings_store.h"
 #include "core/config/tuning.h"
 #include "core/input/control_scheme.h"
 #include "core/input/glyphs.h"
+#include "core/ui/camera_takeovers.h"
 #include "core/ui/commands.h"
 #include "core/ui/display_reset.h"
 #include "core/ui/pak2.h"
@@ -695,6 +696,48 @@ TEST_CASE("the UI patch reports a temporary file it cannot create") {
     p.text("y");
     CHECK_FALSE(build_ui_archive(files, log, L"UI.PAK", p.out, L"MOTHER.PAK"));
     CHECK(log.contains("ui patch: cannot create MOTHER.PAK.tmp err=0x00000005"));
+}
+
+// Spec 23 §4.2 to §4.4 and §8: with "Reduced" the steer and re-align are not
+// applied, except during a cutscene or level fade; "Game" keeps every
+// takeover; an interaction in progress keeps the rule it started with.
+TEST_CASE("camera takeovers: Game keeps all, Reduced skips outside cutscenes") {
+    using omvr::core::config::CameraTakeovers;
+    CameraTakeoverRule rule;
+    CHECK_FALSE(rule.suppress({.setting = CameraTakeovers::Game}));
+    CHECK_FALSE(rule.suppress({.setting = CameraTakeovers::Game, .in_interaction = true}));
+    CHECK(rule.suppress({.setting = CameraTakeovers::Reduced}));
+    CHECK(rule.suppress({.setting = CameraTakeovers::Reduced, .in_interaction = true}));
+    CHECK_FALSE(rule.suppress({.setting = CameraTakeovers::Reduced, .cutscene_or_fade = true}));
+    CHECK_FALSE(rule.suppress(
+        {.setting = CameraTakeovers::Reduced, .in_interaction = true, .cutscene_or_fade = true}));
+}
+
+TEST_CASE("camera takeovers: an interaction keeps the rule it started with") {
+    using omvr::core::config::CameraTakeovers;
+    CameraTakeoverRule rule;
+    // Started under "Game", "Reduced" chosen in the pause menu: the
+    // interaction's end re-align stays the game's.
+    rule.observe({.setting = CameraTakeovers::Game, .in_interaction = true});
+    CHECK_FALSE(rule.suppress({.setting = CameraTakeovers::Reduced, .in_interaction = true}));
+    CHECK(rule.rule({.setting = CameraTakeovers::Reduced, .in_interaction = true}) == CameraTakeovers::Game);
+    // It ends: the new setting applies from then on.
+    rule.observe({.setting = CameraTakeovers::Reduced});
+    CHECK(rule.suppress({.setting = CameraTakeovers::Reduced}));
+    // Started under "Reduced", back to "Game" during it: still reduced.
+    rule.observe({.setting = CameraTakeovers::Reduced, .in_interaction = true});
+    CHECK(rule.suppress({.setting = CameraTakeovers::Game, .in_interaction = true}));
+    rule.observe({.setting = CameraTakeovers::Game});
+    CHECK_FALSE(rule.suppress({.setting = CameraTakeovers::Game}));
+}
+
+TEST_CASE("camera takeovers: the first decision of an interaction takes its rule") {
+    using omvr::core::config::CameraTakeovers;
+    CameraTakeoverRule rule;
+    CHECK(rule.suppress({.setting = CameraTakeovers::Reduced, .in_interaction = true}));
+    CHECK(rule.suppress({.setting = CameraTakeovers::Game, .in_interaction = true}));
+    CHECK(takeover_name(Takeover::StealCameraSteer) == "StealCamera steer");
+    CHECK(takeover_name(Takeover::ResetRealign) == "camera reset re-align");
 }
 
 } // namespace

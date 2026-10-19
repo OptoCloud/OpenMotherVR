@@ -3,6 +3,8 @@
 target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/area_log.cpp
     ${CMAKE_CURRENT_LIST_DIR}/area_log.h
+    ${CMAKE_CURRENT_LIST_DIR}/camera_takeovers.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/camera_takeovers.h
     ${CMAKE_CURRENT_LIST_DIR}/controls.cpp
     ${CMAKE_CURRENT_LIST_DIR}/controls.h
     ${CMAKE_CURRENT_LIST_DIR}/engine_settings.cpp

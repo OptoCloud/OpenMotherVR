@@ -36,6 +36,7 @@
 #include "core/stereo/stereo_update.h"
 #include "core/stereo/virtual_screen_policy.h"
 #include "core/stereo/vr_off_hotkey.h"
+#include "core/ui/camera_takeovers.h"
 #include "core/ui/commands.h"
 #include "core/ui/display_reset.h"
 #include "core/ui/play_state.h"
@@ -50,6 +51,7 @@
 #include "game/addresses.h"
 #include "game/input/input_manager.h"
 #include "game/layout.h"
+#include "game/sites/camera_takeovers.h"
 #include "game/stereo/follow_camera.h"
 #include "game/stereo/post_fx_effects.h"
 #include "game/ui/console.h"
@@ -151,6 +153,10 @@ struct Context {
     core::ui::HudPlacer hud_placer;
     core::ui::HudToggleSink hud_toggle;
     game::ui::HudTargets hud_targets{};
+    // Interaction.CameraTakeovers (23 §4): the rule its replacements ask,
+    // and the game functions they call when a takeover is kept. Game thread.
+    core::ui::CameraTakeoverRule camera_takeovers;
+    game::sites::CameraTakeoverTargets camera_targets{};
     // body (21 §10 to §12): body visibility (game thread to the final-pose
     // jobs), real crouch and the control hand-back (game thread), and real
     // crouch's presses in front of `hud_toggle` (render thread).

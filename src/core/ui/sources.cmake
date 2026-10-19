@@ -1,6 +1,8 @@
 # OpenMotherVR-Provenance: clean
 # Sources of src/core/ui/; each directory lists its own files.
 target_sources(omvr_core PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/camera_takeovers.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/camera_takeovers.h
     ${CMAKE_CURRENT_LIST_DIR}/commands.cpp
     ${CMAKE_CURRENT_LIST_DIR}/commands.h
     ${CMAKE_CURRENT_LIST_DIR}/compat_messages.cpp
