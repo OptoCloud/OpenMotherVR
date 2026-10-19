@@ -42,11 +42,6 @@ public:
     // frame for nothing.
     bool wants_bones(config::BodyVisible v, bool running, const PlayerSkeleton& s,
                      TimePoint now) const noexcept;
-    // The same with the device taken as running. For a caller that does not
-    // pass `running` yet; the BodyHider hook moves to the overload above.
-    bool wants_bones(config::BodyVisible v, const PlayerSkeleton& s, TimePoint now) const noexcept {
-        return wants_bones(v, true, s, now);
-    }
 
     // Game thread, each frame. `running`: the stereo device runs (20 §1.2:
     // nothing hidden otherwise). `bones` as read for `s.skeleton` when

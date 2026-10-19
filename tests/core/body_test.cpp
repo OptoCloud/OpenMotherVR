@@ -260,11 +260,11 @@ TEST_CASE("body hider: publishes a plan only while something is hidden and the d
     const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "FEMALEFP"};
     const TimePoint t{std::chrono::seconds(100)};
 
-    CHECK_FALSE(hider.wants_bones(BodyVisible::Full, player, t)); // the default reads nothing
+    CHECK_FALSE(hider.wants_bones(BodyVisible::Full, true, player, t)); // the default reads nothing
     hider.update(BodyVisible::Full, true, player, nullptr, t);
     CHECK(hider.current() == nullptr);
 
-    REQUIRE(hider.wants_bones(BodyVisible::HandsOnly, player, t));
+    REQUIRE(hider.wants_bones(BodyVisible::HandsOnly, true, player, t));
     hider.update(BodyVisible::HandsOnly, true, player, &bones, t);
     const HiddenPose* p = hider.current();
     REQUIRE(p != nullptr);
@@ -275,7 +275,7 @@ TEST_CASE("body hider: publishes a plan only while something is hidden and the d
     CHECK(log.contains("[body] visibility HandsOnly"));
 
     // The same skeleton and value: no new read, the same plan, also later.
-    CHECK_FALSE(hider.wants_bones(BodyVisible::HandsOnly, player, t + 10s));
+    CHECK_FALSE(hider.wants_bones(BodyVisible::HandsOnly, true, player, t + 10s));
     hider.update(BodyVisible::HandsOnly, true, player, nullptr, t + 10s);
     CHECK(hider.current() == p);
 
@@ -308,7 +308,7 @@ TEST_CASE("body hider: a skeleton without the bones is drawn whole and logged on
     CHECK(log.contains("no bone Spine by name"));
     const auto lines = log.lines.size();
     // Read and found lacking: not read again (it will not gain the bones).
-    CHECK_FALSE(hider.wants_bones(BodyVisible::None, player, t + 5s));
+    CHECK_FALSE(hider.wants_bones(BodyVisible::None, true, player, t + 5s));
     hider.update(BodyVisible::None, true, player, &bones, t + 5s);
     CHECK(log.lines.size() == lines);
 }
@@ -325,7 +325,7 @@ TEST_CASE("body hider: an unreadable skeleton is read again every second until i
     const TimePoint t{std::chrono::seconds(100)};
     const SkeletonReadFault unnamed{SkeletonFault::UnnamedBone, 70, 0};
 
-    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t));
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, true, player, t));
     hider.update(BodyVisible::ArmsAndHands, true, player, nullptr, t, unnamed);
     CHECK(hider.current() == nullptr);
     CHECK(
@@ -335,20 +335,20 @@ TEST_CASE("body hider: an unreadable skeleton is read again every second until i
 
     // Not before the second is up; then again, and the same fault is not
     // logged again.
-    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t + 500ms));
+    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, true, player, t + 500ms));
     hider.update(BodyVisible::ArmsAndHands, true, player, nullptr, t + 500ms);
-    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t + 1s));
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, true, player, t + 1s));
     hider.update(BodyVisible::ArmsAndHands, true, player, nullptr, t + 1s, unnamed);
     CHECK(hider.current() == nullptr);
     CHECK(log.lines.size() == lines);
 
     // Readable at last: the plan is made and published, with the usual lines.
-    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t + 2s));
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, true, player, t + 2s));
     hider.update(BodyVisible::ArmsAndHands, true, player, &bones, t + 2s);
     REQUIRE(hider.current() != nullptr);
     CHECK(log.contains("[body] visibility ArmsAndHands"));
     // And then not read again.
-    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, player, t + 10s));
+    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, true, player, t + 10s));
 }
 
 TEST_CASE("body hider: an unreadable skeleton is logged once per change") {
@@ -376,19 +376,19 @@ TEST_CASE("body hider: an unreadable skeleton is logged once per change") {
     hider.update(BodyVisible::HandsOnly, true, menu, nullptr, t + 6s, no_arrays);
     CHECK(warnings() == 2);
     // A new value: a new read at once, said once.
-    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, menu, t + 6s));
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, true, menu, t + 6s));
     hider.update(BodyVisible::ArmsAndHands, true, menu, nullptr, t + 6s, no_arrays);
     CHECK(warnings() == 3);
     // No player (a level load): nothing read, nothing said.
     const PlayerSkeleton loading{};
-    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, loading, t + 20s));
+    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, true, loading, t + 20s));
     hider.update(BodyVisible::ArmsAndHands, true, loading, nullptr, t + 20s);
     CHECK(warnings() == 3);
     // The level's player: a new pose and skeleton, read at once.
     const auto s     = female_fp();
     const auto bones = s.bones();
     const PlayerSkeleton level{0x5000, 0x6000, 0x7000, "FEMALEFP"};
-    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, level, t + 20s));
+    REQUIRE(hider.wants_bones(BodyVisible::ArmsAndHands, true, level, t + 20s));
     hider.update(BodyVisible::ArmsAndHands, true, level, &bones, t + 20s);
     CHECK(hider.current() != nullptr);
     CHECK(warnings() == 3);
