@@ -17,8 +17,12 @@ TargetSettings target_settings(const config::Settings& cfg) noexcept {
     return {cfg.rendering.pixel_scale, cfg.rendering.mirror_view_type, cfg.rendering.symmetric_mirror_view};
 }
 
+void DisplayReset::seed(const config::Settings& cfg) noexcept {
+    if (!built_) built_ = target_settings(cfg);
+}
+
 void DisplayReset::reset_if_changed(const config::Settings& cfg) noexcept {
-    if (!built_) built_ = target_settings(cfg); // first call: what the targets were made with
+    seed(cfg); // first call: what the targets were made with
     TargetSettings& built    = *built_;
     const TargetSettings now = target_settings(cfg);
     if (now == built) return;

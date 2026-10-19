@@ -477,6 +477,36 @@ TEST_CASE("display reset: only on a change, only with VR") {
     CHECK(signals.resets == 2);
 }
 
+TEST_CASE("display reset: a command before any push still rebuilds the targets") {
+    MemoryFileStore files;
+    RecordingLog log;
+    omvr::core::config::SettingsStore store(files, log);
+    store.initialize(L"C:\\game");
+    FakeGameSignals signals;
+    FakeRuntimeState state;
+    DisplayReset reset(signals, state, log);
+    FakePlaySpaceControl play_space;
+    omvr::core::render::PostFxEffects post_fx;
+    Commands commands(store, reset, signals, play_space, post_fx, log);
+    char scale[] = "mvr_pixelscale 1.5";
+    commands.run(scale);
+    CHECK(signals.resets == 1);
+    CHECK(log.contains("[script_bridge] display reset raised; changed: Rendering.PixelScale"));
+}
+
+TEST_CASE("display reset: seeded at attach, the first push compares with it") {
+    FakeGameSignals signals;
+    FakeRuntimeState state;
+    RecordingLog log;
+    DisplayReset reset(signals, state, log);
+    Settings s;
+    reset.seed(s);
+    s.rendering.pixel_scale = 1.5f;
+    reset.seed(s); // already seeded: kept
+    reset.reset_if_changed(s);
+    CHECK(signals.resets == 1);
+}
+
 TEST_CASE("the command runner saves, then quits, after mvr_vrruntime") {
     std::vector<std::string> events;
     MemoryFileStore files;

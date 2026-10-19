@@ -140,6 +140,10 @@ void Commands::run(char* cmd) noexcept {
         if (!name) return;
         const char* val = strtok_s(nullptr, kTokenSeparators, &rest);
 
+        // Before the command changes it: a hand-typed command can come
+        // before any settings push has seeded the record, and would
+        // otherwise seed it with its own new value and rebuild nothing.
+        display_reset_.seed(store_.current());
         const CommandOutcome outcome = apply_command(store_.current(), name, val);
         if (outcome.kind == Kind::Unknown) {
             diag::ports::logf(log_, "[script_bridge] unknown command {} ignored", name);

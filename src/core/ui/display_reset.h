@@ -30,7 +30,13 @@ public:
     DisplayReset(ports::GameSignals& signals, ports::RuntimeState& runtime, diag::ports::Log& log) noexcept
         : signals_(signals), runtime_(runtime), log_(log) {}
 
-    // The first call records what the targets were made with.
+    // Records `cfg` as what the targets were made with, unless something is
+    // recorded already. At attach (the settings loaded), and by a command
+    // before it changes a setting, so that change is seen as one.
+    void seed(const config::Settings& cfg) noexcept;
+
+    // The first call, when nothing was seeded, records what the targets
+    // were made with.
     void reset_if_changed(const config::Settings& cfg) noexcept;
 
     // VR was turned off by the hotkey (22 §13): the game rebuilds its
