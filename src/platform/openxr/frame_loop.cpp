@@ -115,10 +115,18 @@ void Session::Impl::end_frame(IDXGISwapChain* swapchain) {
     state.frame_begun = false;
     const XrTime t    = state.frame_time;
 
+    // Only the projection layer needs this frame's views valid: it declares
+    // them. A screen frame's quad is placed in the seated space without them,
+    // so menus, videos and a head-tracked frame sent to the screen for its
+    // invalid views (09 §5.2) still show during an orientation loss and
+    // before the first located views.
     FrameLayers layers;
     const XrCompositionLayerBaseHeader* layer = nullptr;
-    if (state.should_render && state.views.valid) {
-        layer = state.eye_images_set ? projection_layer(layers) : screen_layer(layers, swapchain);
+    if (state.should_render) {
+        if (!state.eye_images_set)
+            layer = screen_layer(layers, swapchain);
+        else if (state.views.valid)
+            layer = projection_layer(layers);
     }
 
     // Start the GPU on the copies now: the runtime's xrEndFrame waits for
