@@ -107,7 +107,7 @@ Holsters::Result Holsters::update(bool enabled, const Input& in) noexcept {
             const Holster zone = hand.position ? holster_zone(h, *hand.position) : Holster::None;
             if (zone != Holster::None) {
                 const bool fire = !in.blocked && in.open;
-                r.event         = Event{.hand = h, .zone = zone, .fired = fire};
+                r.events[h]     = Event{.hand = h, .zone = zone, .fired = fire};
                 if (fire) {
                     held_[h]     = zone;
                     consumed_[h] = true;
@@ -241,13 +241,16 @@ void Gestures::apply_holsters(const Controls& c, const ports::GameContext& game,
         out.torch |= z == Holster::LeftHip;
         out.tracker |= z == Holster::Chest;
     }
-    if (!r.event) return;
-    const auto& e = *r.event;
-    if (e.fired) {
-        diag::ports::logf(deps_.log, kLogHolster, zone_name(e.zone), hand_name(e.hand), action_name(e.zone));
-    } else if (deps_.log.debug_enabled()) {
-        const std::string_view why = !open ? kReasonFocus : game.menu ? kReasonMenu : kReasonInteraction;
-        diag::ports::logf(deps_.log, kLogHolsterSuppressed, zone_name(e.zone), hand_name(e.hand), why);
+    for (const auto& event : r.events) {
+        if (!event) continue;
+        const auto& e = *event;
+        if (e.fired) {
+            diag::ports::logf(deps_.log, kLogHolster, zone_name(e.zone), hand_name(e.hand),
+                              action_name(e.zone));
+        } else if (deps_.log.debug_enabled()) {
+            const std::string_view why = !open ? kReasonFocus : game.menu ? kReasonMenu : kReasonInteraction;
+            diag::ports::logf(deps_.log, kLogHolsterSuppressed, zone_name(e.zone), hand_name(e.hand), why);
+        }
     }
 }
 

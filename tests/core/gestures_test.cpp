@@ -225,15 +225,16 @@ TEST_CASE("holsters: a grip press that begins in a zone holds the action until r
     Holsters::Input in{.open = true};
     in.hands[kRightHand] = {.grip = true, .position = Vec3{0.15f, -0.1f, 0.15f}};
     auto r               = h.update(true, in);
-    REQUIRE(r.event.has_value());
-    CHECK(r.event->fired);
+    REQUIRE(r.events[kRightHand].has_value());
+    CHECK(r.events[kRightHand]->fired);
+    CHECK_FALSE(r.events[kLeftHand].has_value());
     CHECK(r.held[kRightHand] == Holster::RightShoulder);
     CHECK(r.consumed[kRightHand]);
     // Held while the hand moves away.
     in.hands[kRightHand].position = Vec3{0.2f, -0.4f, -0.3f};
     r                             = h.update(true, in);
     CHECK(r.held[kRightHand] == Holster::RightShoulder);
-    CHECK_FALSE(r.event.has_value());
+    CHECK_FALSE(r.events[kRightHand].has_value());
     in.hands[kRightHand].grip = false;
     r                         = h.update(true, in);
     CHECK(r.held[kRightHand] == Holster::None);
@@ -249,13 +250,31 @@ TEST_CASE("holsters: a grip press that begins in a zone holds the action until r
     CHECK(r.held[kRightHand] == Holster::None);
 }
 
+TEST_CASE("holsters: both hands pressing in a zone in the same write give an event each") {
+    Holsters h;
+    Holsters::Input in{.open = true};
+    in.hands[kRightHand] = {.grip = true, .position = Vec3{0.15f, -0.1f, 0.15f}};  // right shoulder
+    in.hands[kLeftHand]  = {.grip = true, .position = Vec3{-0.25f, -0.65f, 0.0f}}; // left hip
+    const auto r         = h.update(true, in);
+    REQUIRE(r.events[kRightHand].has_value());
+    REQUIRE(r.events[kLeftHand].has_value());
+    CHECK(r.events[kRightHand]->hand == kRightHand);
+    CHECK(r.events[kRightHand]->zone == Holster::RightShoulder);
+    CHECK(r.events[kRightHand]->fired);
+    CHECK(r.events[kLeftHand]->hand == kLeftHand);
+    CHECK(r.events[kLeftHand]->zone == Holster::LeftHip);
+    CHECK(r.events[kLeftHand]->fired);
+    CHECK(r.held[kRightHand] == Holster::RightShoulder);
+    CHECK(r.held[kLeftHand] == Holster::LeftHip);
+}
+
 TEST_CASE("holsters: off during interactions and menus") {
     Holsters h;
     Holsters::Input in{.blocked = true, .open = true};
     in.hands[kLeftHand] = {.grip = true, .position = Vec3{-0.25f, -0.65f, 0.0f}};
     auto r              = h.update(true, in);
-    REQUIRE(r.event.has_value());
-    CHECK_FALSE(r.event->fired);
+    REQUIRE(r.events[kLeftHand].has_value());
+    CHECK_FALSE(r.events[kLeftHand]->fired);
     CHECK_FALSE(r.consumed[kLeftHand]);
 
     // An interaction beginning during a hold lets the action go; the grip
@@ -388,6 +407,22 @@ TEST_CASE("control mapper: with every gesture off the grips are v1's") {
     rig.settle(c);
     CHECK(rig.player().digital[pa::kAim] == 1);
     CHECK(rig.player().digital[pa::kNextWeapon] == 0);
+}
+
+// core-input#2: both hands pressing in a zone in one write are each logged.
+TEST_CASE("control mapper: two holster presses in one write log a line each") {
+    Rig rig;
+    rig.controls.holster_gestures = true;
+    Controls c;
+    c.poses = standing();
+    place(c.poses, kRightHand, {0.15f, -0.1f, 0.15f}); // the right shoulder
+    place(c.poses, kLeftHand, {-0.25f, -0.65f, 0.0f}); // the left hip
+    rig.settle(c);                                     // no grip yet
+    c.grip_r = true;
+    c.grip_l = true;
+    rig.mapper.write(c, false);
+    CHECK(rig.log.contains("holster right shoulder (right hand)"));
+    CHECK(rig.log.contains("holster left hip (left hand)"));
 }
 
 TEST_CASE("control mapper: a holster press drives its action, not Aim") {

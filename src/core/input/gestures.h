@@ -75,7 +75,9 @@ public:
     struct Result {
         std::array<Holster, 2> held{};  // the zone each hand holds (None: not holding)
         std::array<bool, 2> consumed{}; // the grip belongs to a holster until released
-        std::optional<Event> event;     // a press that began in a zone this write
+        // Per hand: a press that began in a zone this write (both hands can
+        // press in the same write, and each is logged).
+        std::array<std::optional<Event>, 2> events{};
     };
 
     // `enabled`: Controls.HolsterGestures.
