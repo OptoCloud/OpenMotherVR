@@ -337,6 +337,32 @@ TEST_CASE("scene tracker keeps the scene visible through a cutscene") {
     CHECK_FALSE(t.update(true, StereoMode::World).has_value());
 }
 
+TEST_CASE("scene tracker: a finish before the camera returns does not end the next fade early") {
+    const SceneMessages names{1, 2, 3, 4};
+    SceneTracker t;
+    t.on_message(1, names);                                     // cutscene starts
+    CHECK(t.update(false, StereoMode::World) == kSceneVisible); // took the camera
+    t.on_message(2, names);                                     // finish, camera not yet back
+    CHECK_FALSE(t.update(true, StereoMode::World).has_value());
+
+    t.on_message(3, names); // level fade, the camera stays with the player
+    CHECK(t.update(true, StereoMode::World) == kSceneVisible);
+    CHECK(t.update(true, StereoMode::World) == kSceneVisible); // still fading
+    CHECK(t.cutscene_or_fade());
+    t.on_message(4, names);
+    CHECK_FALSE(t.cutscene_or_fade());
+}
+
+TEST_CASE("scene tracker: a new start forgets a camera taken before it") {
+    const SceneMessages names{1, 2, 3, 4};
+    SceneTracker t;
+    t.on_message(1, names);
+    CHECK(t.update(false, StereoMode::World) == kSceneVisible);
+    t.on_message(3, names); // a fade starts while the cutscene still holds the camera
+    CHECK(t.update(true, StereoMode::World) == kSceneVisible);
+    CHECK(t.cutscene_or_fade()); // not ended by the earlier inactive update
+}
+
 TEST_CASE("head-clip fade waits out the grace period in stereo") {
     FakeClock clock;
     HeadClipDelay delay(clock);
