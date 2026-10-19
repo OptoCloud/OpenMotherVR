@@ -165,6 +165,7 @@ void ArmPoser::publish(const PlayerSkeleton& s, const CameraPose& camera, const 
 
 void ArmPoser::publish_none() noexcept {
     limb_ik_off_.store(0, std::memory_order_release);
+    item_follows_at_.store(0, std::memory_order_release);
     if (!any_active(frame_)) return;
     // The jobs, and the game thread after the pass, see no active side from
     // now on.
@@ -248,9 +249,14 @@ std::optional<std::int16_t> ArmPoser::head_check_due() const noexcept {
 
 void ArmPoser::after_pass(const std::optional<Vec3>& head_world, const CameraPose& camera, bool item_follows,
                           TimePoint now) noexcept {
-    const ArmReport r = report_.load();
-    if (r.generation != frame_.generation || !any_active(frame_)) return;
-    if (item_follows) item_follows_at_.store(util::stamp_ticks(now), std::memory_order_release);
+    const ArmReport r     = report_.load();
+    const bool this_frame = r.generation == frame_.generation && any_active(frame_);
+    // Set on a frame whose edited right hand the item was placed on, cleared
+    // on any other: the aim stops reading the weapon's transform as soon as
+    // the game's animation poses the weapon again, not kStaleAfter later.
+    item_follows_at_.store(this_frame && item_follows ? util::stamp_ticks(now) : 0,
+                           std::memory_order_release);
+    if (!this_frame) return;
     log_report(r, camera, head_world, item_follows);
 }
 

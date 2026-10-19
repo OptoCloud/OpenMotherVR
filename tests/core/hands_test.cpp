@@ -1189,12 +1189,19 @@ TEST_CASE("ArmPoser: the job edits once per frame from the published targets; th
     CHECK(log.contains("hands: the held item follows the moved right hand"));
     CHECK(arms.weapon_in_moved_hand(now));
     CHECK_FALSE(arms.weapon_in_moved_hand(now + std::chrono::seconds(1)));
+    // A later pass whose right hand did not carry the item: not in the
+    // moved hand from that frame on, not kStaleAfter later.
+    arms.after_pass(std::nullopt, camera, false, now + std::chrono::milliseconds(11));
+    CHECK_FALSE(arms.weapon_in_moved_hand(now + std::chrono::milliseconds(11)));
+    arms.after_pass(std::nullopt, camera, true, now + std::chrono::milliseconds(22));
+    CHECK(arms.weapon_in_moved_hand(now + std::chrono::milliseconds(22)));
     // The left arm was not edited: no drawn left hand for the tracker.
     CHECK_FALSE(arms.drawn_left(now).has_value());
 
     // Hands off (nothing published): the limb IK runs again, no frame.
     arms.publish_none();
     CHECK_FALSE(arms.limb_ik_off(player.skeleton));
+    CHECK_FALSE(arms.weapon_in_moved_hand(now + std::chrono::milliseconds(22)));
     CHECK(arms.pending() == nullptr);
 }
 
