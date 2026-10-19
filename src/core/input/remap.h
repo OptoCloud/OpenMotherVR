@@ -97,7 +97,9 @@ template <BoundAction Action>
 void append_pad_binding(ActionTier& t, Action& act, int n, std::int16_t virtual_code,
                         RemapKind kind) noexcept {
     t.stock_code[static_cast<std::size_t>(n)] = kNoPadControl16;
-    if (act.count >= kMaxBindings) return; // a seventh record would overwrite the entry (04 §2.4)
+    // A seventh record would overwrite the entry (04 §2.4); a negative count
+    // (a corrupt or unexpected record) would write before it.
+    if (act.count < 0 || act.count >= kMaxBindings) return;
     auto& bind  = act.bindings[act.count++];
     bind.code   = virtual_code;
     bind.device = game::kBindingDevicePad;

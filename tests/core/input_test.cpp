@@ -220,6 +220,25 @@ TEST_CASE("remap binds every action to its virtual code") {
     CHECK(t.stock_code[0] == game::kPadA);
 }
 
+TEST_CASE("remap appends nothing to an action whose binding count is negative") {
+    FakeMap map{};
+    map.num_digital = 2;
+    // Action 0: six records, none for the pad; its count sits just before
+    // action 1's records, where a record at index -1 would land.
+    for (auto& b : map.digital[0].bindings) b = {0x20, kKeyboard, 0};
+    map.digital[0].count = game::kMaxBindings;
+    map.digital[1].count = -1;
+
+    ActionTiers tiers = make_tiers();
+    ActionTier& t     = tiers[0];
+    remap(t, map);
+
+    CHECK(map.digital[0].count == game::kMaxBindings);
+    CHECK(map.digital[1].count == -1);
+    CHECK(map.digital[1].bindings[0].code == 0);
+    CHECK(t.stock_code[1] == game::kNoPadControl);
+}
+
 TEST_CASE("the pad merge rules") {
     Glyphs glyphs;
     RecordingLog log;
