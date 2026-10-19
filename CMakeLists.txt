@@ -158,6 +158,12 @@ foreach(_dir IN LISTS MOTHERVR_SOURCE_DIRS)
     include("${CMAKE_CURRENT_SOURCE_DIR}/src/${_dir}/sources.cmake")
 endforeach()
 
+# resources.rc embeds these as BINARY resources. Ninja and Makefile builds
+# track only the files an .rc #includes, so without this a regenerated
+# payload would not rebuild resources.res and the DLL would keep the old one.
+set_source_files_properties(src/loader/resources.rc PROPERTIES OBJECT_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/res/openvr_api.dll;${CMAKE_CURRENT_SOURCE_DIR}/res/ui_patch.bin")
+
 if(MSVC)
     # Release builds also write d3d11.pdb, kept with each release (not in
     # the player zip) so a crash offset inside the proxy from the log can be
