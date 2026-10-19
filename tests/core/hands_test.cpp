@@ -19,6 +19,7 @@
 #include "core/vr/pose_convert.h"
 #include "fakes/fakes.h"
 #include "game/hands/skeleton_names.h"
+#include "support/approx.h"
 #include "util/math/pose.h"
 #include "util/math/quat.h"
 
@@ -36,12 +37,12 @@ namespace {
 using namespace omvr::core::hands;
 using omvr::game::WeaponType;
 namespace pose_flag = omvr::game::pose_flag;
+using omvr::tests::check_near;
+using omvr::tests::kEps;
 using omvr::util::Matrix34;
 using omvr::util::Quat;
 using omvr::util::Vec3;
 using Raw = float[3][4];
-
-constexpr float kEps = 1e-4f;
 
 // A runtime-convention pose (right-handed, +Y up, -Z forward): a rotation
 // by `angle` about the unit `axis`, at `p`.
@@ -81,12 +82,6 @@ SpecResult spec_mapping(const Raw& h, const Raw& g, float s, const CameraPose& c
             omvr::util::rotate(cam.orientation, rrel)};
 }
 
-void check_close(Vec3 a, Vec3 b) {
-    CHECK(a.x == doctest::Approx(b.x).epsilon(kEps));
-    CHECK(a.y == doctest::Approx(b.y).epsilon(kEps));
-    CHECK(a.z == doctest::Approx(b.z).epsilon(kEps));
-}
-
 Quat yaw(float angle) { return {0, std::sin(angle / 2), 0, std::cos(angle / 2)}; }
 
 // The code's result for runtime poses, through the game convention the
@@ -104,9 +99,9 @@ TEST_CASE("hand mapping: a hand ahead of a level head is ahead of the camera") {
     const CameraPose cam{};
     const WorldPose w = code_mapping(h, g, 1.0f, cam);
     // d = (0.2, -0.2, -0.5): right, below, ahead; d' = (0.2, -0.2, 0.5).
-    check_close(w.position, {0.2f, -0.2f, 0.5f});
+    check_near(w.position, {0.2f, -0.2f, 0.5f});
     // The grip's -Z (where the fist points) is the camera's +Z (ahead).
-    check_close(pointing(w), {0, 0, 1});
+    check_near(pointing(w), {0, 0, 1});
 }
 
 TEST_CASE("hand mapping: only the hand relative to the head counts; scale and camera apply") {
@@ -119,8 +114,8 @@ TEST_CASE("hand mapping: only the hand relative to the head counts; scale and ca
     const CameraPose cam{yaw(0.3f), {10, 2, -4}};
     const WorldPose w = code_mapping(h, g, 2.0f, cam);
     // d' = (0, 0, 0.5) * 2, along the camera's forward.
-    check_close(w.position, omvr::util::add(cam.position, omvr::util::rotate(cam.orientation, {0, 0, 1})));
-    check_close(pointing(w), omvr::util::rotate(cam.orientation, {0, 0, 1}));
+    check_near(w.position, omvr::util::add(cam.position, omvr::util::rotate(cam.orientation, {0, 0, 1})));
+    check_near(pointing(w), omvr::util::rotate(cam.orientation, {0, 0, 1}));
 }
 
 TEST_CASE("hand mapping matches 21 §3.1 for general poses") {
@@ -133,8 +128,8 @@ TEST_CASE("hand mapping matches 21 §3.1 for general poses") {
     const WorldPose w = code_mapping(h, g, s, cam);
     for (const Vec3 v : {Vec3{1, 0, 0}, Vec3{0, 1, 0}, Vec3{0, 0, 1}}) {
         const SpecResult e = spec_mapping(h, g, s, cam, v);
-        check_close(w.position, e.position);
-        check_close(omvr::util::rotate(w.orientation, v), e.rotated);
+        check_near(w.position, e.position);
+        check_near(omvr::util::rotate(w.orientation, v), e.rotated);
     }
 }
 
@@ -289,21 +284,21 @@ TEST_CASE("the hand's aim ray keeps the game's range; weight blends from the hea
     // The hand at (0.3, 1.2, 0.4) pointing along world +X.
     const WorldPose hand{{0.3f, 1.2f, 0.4f}, yaw(std::numbers::pi_v<float> / 2)};
     const AimRay r = hand_aim_ray(game, hand, 1.0f, 0.0f);
-    check_close(r.start, hand.position);
-    check_close(r.direction, {1, 0, 0});
-    check_close(r.end, {50.3f, 1.2f, 0.4f});
+    check_near(r.start, hand.position);
+    check_near(r.direction, {1, 0, 0});
+    check_near(r.end, {50.3f, 1.2f, 0.4f});
 
     const AimRay off = hand_aim_ray(game, hand, 0.0f, 0.0f);
-    check_close(off.start, game.start);
-    check_close(off.direction, game.direction);
-    check_close(off.end, game.end);
+    check_near(off.start, game.start);
+    check_near(off.direction, game.direction);
+    check_near(off.end, game.end);
 
     const AimRay half = hand_aim_ray(game, hand, 0.5f, 0.0f);
     CHECK(omvr::util::length(half.direction) == doctest::Approx(1.0f));
     CHECK(omvr::util::length(omvr::util::sub(half.end, half.start)) == doctest::Approx(50.0f));
 
     const AimRay ahead = hand_aim_ray(game, hand, 1.0f, 0.25f);
-    check_close(ahead.start, {0.55f, 1.2f, 0.4f});
+    check_near(ahead.start, {0.55f, 1.2f, 0.4f});
 
     CHECK(fire_gate_threshold(true, 0.75f) < 0.0f);
     CHECK(fire_gate_threshold(false, 0.75f) == 0.75f);
@@ -384,9 +379,9 @@ TEST_CASE("Hands: off by default; on, the right hand aims and the left faces the
     const auto r = rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now);
     REQUIRE(r.ray.has_value());
     CHECK(r.hand_aiming);
-    check_close(r.ray->start, {5.5f, 0, 5});
-    check_close(r.ray->direction, {1, 0, 0});
-    check_close(r.ray->end, {25.5f, 0, 5});
+    check_near(r.ray->start, {5.5f, 0, 5});
+    check_near(r.ray->direction, {1, 0, 0});
+    check_near(r.ray->end, {25.5f, 0, 5});
 
     // Contact weapons keep the game's ray; so does Aim from Hand off.
     CHECK_FALSE(rig.hands.aim(game, cam, {WeaponType::Melee}, rig.now).ray.has_value());
@@ -417,7 +412,7 @@ TEST_CASE("Hands: a long update gap restarts the smoothing filter") {
     const CameraPose cam{yaw(std::numbers::pi_v<float> / 2), {5, 0, 5}}; // looking along world +X
     auto r = rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now);
     REQUIRE(r.ray.has_value());
-    check_close(r.ray->start, {5.5f, 0, 5});
+    check_near(r.ray->start, {5.5f, 0, 5});
 
     // Two seconds later the hands are 0.3 m ahead instead of 0.5 m.
     Raw g;
@@ -428,7 +423,7 @@ TEST_CASE("Hands: a long update gap restarts the smoothing filter") {
     (void)rig.hands.update(moved, HandsRig::active(), {}, rig.now, 1.0f);
     r = rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now);
     REQUIRE(r.ray.has_value());
-    check_close(r.ray->start, {5.3f, 0, 5});
+    check_near(r.ray->start, {5.3f, 0, 5});
 }
 
 TEST_CASE("Hands: a cutscene hands the aim back to the head over the blend") {
@@ -463,11 +458,11 @@ TEST_CASE("aim source: the revolver, shotgun and flamethrower from the drawn wea
 TEST_CASE("weapon barrel: origin and barrel column; identity, NaN and degenerate are not used") {
     const auto line = weapon_barrel(weapon_along_x(), 0.0f);
     REQUIRE(line.has_value());
-    check_close(line->start, {2, 1, 3});
-    check_close(line->direction, {1, 0, 0});
+    check_near(line->start, {2, 1, 3});
+    check_near(line->direction, {1, 0, 0});
     const auto ahead = weapon_barrel(weapon_along_x(), 0.5f);
     REQUIRE(ahead.has_value());
-    check_close(ahead->start, {2.5f, 1, 3});
+    check_near(ahead->start, {2.5f, 1, 3});
 
     CHECK_FALSE(weapon_barrel(Matrix34{{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}}}, 0.0f).has_value());
     Matrix34 nan = weapon_along_x();
@@ -486,9 +481,9 @@ TEST_CASE("Hands: a weapon drawn in the moved hand aims along its barrel; otherw
     const auto barrel = rig.hands.aim(game, cam, {WeaponType::Shotgun, weapon_along_x(), true}, rig.now);
     REQUIRE(barrel.ray.has_value());
     CHECK(barrel.hand_aiming);
-    check_close(barrel.ray->start, {2, 1, 3});
-    check_close(barrel.ray->direction, {1, 0, 0});
-    check_close(barrel.ray->end, {22, 1, 3});
+    check_near(barrel.ray->start, {2, 1, 3});
+    check_near(barrel.ray->direction, {1, 0, 0});
+    check_near(barrel.ray->end, {22, 1, 3});
 
     // The bolt gun, a weapon the game's animation placed, and a transform
     // that cannot be used all aim from the aim pose: 0.5 m ahead of the
@@ -500,8 +495,8 @@ TEST_CASE("Hands: a weapon drawn in the moved hand aims along its barrel; otherw
           WeaponSample{WeaponType::Flamethrower, std::nullopt, true}}) {
         const auto r = rig.hands.aim(game, cam, w, rig.now);
         REQUIRE(r.ray.has_value());
-        check_close(r.ray->start, {5.5f, 0, 5});
-        check_close(r.ray->direction, {1, 0, 0});
+        check_near(r.ray->start, {5.5f, 0, 5});
+        check_near(r.ray->direction, {1, 0, 0});
     }
 }
 
@@ -652,9 +647,9 @@ TEST_CASE(
 
 TEST_CASE("throw velocity: rotated into the world, horizontal part times the strength, vertical kept") {
     const CameraPose cam{yaw(std::numbers::pi_v<float> / 2), {5, 0, 5}}; // looking along world +X
-    check_close(throw_velocity(cam, {0, 1, 2}, 1.0f), {2, 1, 0});
-    check_close(throw_velocity(cam, {0, 1, 2}, 2.0f), {4, 1, 0});
-    check_close(throw_velocity(cam, {0, -1, 2}, 0.5f), {1, -1, 0});
+    check_near(throw_velocity(cam, {0, 1, 2}, 1.0f), {2, 1, 0});
+    check_near(throw_velocity(cam, {0, 1, 2}, 2.0f), {4, 1, 0});
+    check_near(throw_velocity(cam, {0, -1, 2}, 0.5f), {1, -1, 0});
 }
 
 TEST_CASE("player action episode: ends on an item taken up, the camera back 0.5 s, or after 5 s") {
@@ -772,7 +767,7 @@ TEST_CASE("Hands: a melee start hands the right arm to the game; the left hand s
     CHECK(rig.log.contains("[diag] hands: melee: the right arm is back on the controller"));
     const auto back = rig.hands.aim(game, cam, {std::nullopt}, rig.now);
     REQUIRE(back.ray.has_value());
-    check_close(back.ray->direction, {1, 0, 0});
+    check_near(back.ray->direction, {1, 0, 0});
 }
 
 TEST_CASE("Hands: a player action makes an episode until it ends, logged with debug options") {
@@ -817,7 +812,7 @@ TEST_CASE("grip frame: from the finger bones, the wrist about 9 cm from the grip
     // sqrt(0.09^2 + 0.025^2) = 0.09341 m.
     const auto right = grip_frame(fingers(1.0f), kRightHand);
     REQUIRE(right.has_value());
-    check_close(right->in_hand.translation, {0.09f, -0.025f, 0.0f});
+    check_near(right->in_hand.translation, {0.09f, -0.025f, 0.0f});
     CHECK(right->wrist_distance_m == doctest::Approx(0.093408f).epsilon(1e-4));
     // The grip's local +Z (its -Z in the runtime's axes) runs along the
     // knuckles; +X is the palm normal the runtime gives the right hand (into
@@ -825,19 +820,19 @@ TEST_CASE("grip frame: from the finger bones, the wrist about 9 cm from the grip
     // knuckles back to the wrist, as the runtime's grip +Y does for a hand
     // around a handle (OpenXR's right-hand rule; 21 §3.1).
     const Quat r = right->in_hand.rotation;
-    check_close(omvr::util::rotate(r, {0, 0, 1}), {0, 0, 1});
-    check_close(omvr::util::rotate(r, {1, 0, 0}), {0, 1, 0});
-    check_close(omvr::util::rotate(r, {0, 1, 0}), {-1, 0, 0});
+    check_near(omvr::util::rotate(r, {0, 0, 1}), {0, 0, 1});
+    check_near(omvr::util::rotate(r, {1, 0, 0}), {0, 1, 0});
+    check_near(omvr::util::rotate(r, {0, 1, 0}), {-1, 0, 0});
 
     // The left hand, mirrored (fingers along -x): its +X out of the palm
     // (down), +Y again from the knuckles to the wrist.
     const auto left = grip_frame(fingers(-1.0f), kLeftHand);
     REQUIRE(left.has_value());
-    check_close(left->in_hand.translation, {-0.09f, -0.025f, 0.0f});
+    check_near(left->in_hand.translation, {-0.09f, -0.025f, 0.0f});
     const Quat l = left->in_hand.rotation;
-    check_close(omvr::util::rotate(l, {0, 0, 1}), {0, 0, 1});
-    check_close(omvr::util::rotate(l, {1, 0, 0}), {0, -1, 0});
-    check_close(omvr::util::rotate(l, {0, 1, 0}), {1, 0, 0});
+    check_near(omvr::util::rotate(l, {0, 0, 1}), {0, 0, 1});
+    check_near(omvr::util::rotate(l, {1, 0, 0}), {0, -1, 0});
+    check_near(omvr::util::rotate(l, {0, 1, 0}), {1, 0, 0});
 
     // Degenerate bones (the knuckles on one point) span no hand.
     CHECK_FALSE(grip_frame({{0.09f, 0, 0}, {0.09f, 0, 0}, {0.09f, 0, 0}, {0.09f, 0, 0}, {}}, kRightHand));
@@ -850,12 +845,12 @@ TEST_CASE("grip to hand bone: the bone is placed so its grip frame is on the tar
     // down (-y), the back of the hand to +x, and the wrist sits above the
     // grip: target + (0.025, 0.09, 0).
     const RigidTransform hand = hand_for_grip({{1, 2, 3}, {}}, *grip);
-    check_close(hand.translation, {1.025f, 2.09f, 3.0f});
-    check_close(omvr::util::rotate(hand.rotation, {1, 0, 0}), {0, -1, 0});
+    check_near(hand.translation, {1.025f, 2.09f, 3.0f});
+    check_near(omvr::util::rotate(hand.rotation, {1, 0, 0}), {0, -1, 0});
     // The grip frame put back on the bone lands on the target.
     const Vec3 origin =
         omvr::util::add(hand.translation, omvr::util::rotate(hand.rotation, grip->in_hand.translation));
-    check_close(origin, {1, 2, 3});
+    check_near(origin, {1, 2, 3});
 }
 
 TEST_CASE("two-bone reach: a 0.3 m and 0.4 m arm reaches 0.5 m with a right angle at the elbow") {
@@ -864,13 +859,13 @@ TEST_CASE("two-bone reach: a 0.3 m and 0.4 m arm reaches 0.5 m with a right angl
     const Vec3 root{0, 0, 0}, elbow{0, 0, 0.3f}, wrist{0, 0, 0.7f};
     const auto s = solve_two_bone(root, elbow, wrist, {0.5f, 0, 0}, {0, -1, 0});
     CHECK(s.in_reach);
-    check_close(s.elbow, {0.18f, -0.24f, 0});
-    check_close(s.wrist, {0.5f, 0, 0});
+    check_near(s.elbow, {0.18f, -0.24f, 0});
+    check_near(s.wrist, {0.5f, 0, 0});
     // The rotations carry the bones there: the upper arm about the root, the
     // forearm about the new elbow.
-    check_close(omvr::util::rotate(s.upper, elbow), s.elbow);
+    check_near(omvr::util::rotate(s.upper, elbow), s.elbow);
     const Vec3 fore_after = omvr::util::rotate(s.upper, omvr::util::sub(wrist, elbow));
-    check_close(omvr::util::add(s.elbow, omvr::util::rotate(s.fore, fore_after)), s.wrist);
+    check_near(omvr::util::add(s.elbow, omvr::util::rotate(s.fore, fore_after)), s.wrist);
 }
 
 TEST_CASE("two-bone reach: out of reach the arm is straight towards the target (21 §4.2 item 2)") {
@@ -901,16 +896,16 @@ TEST_CASE("shoulder turn: none within 0.9 of the reach, at most 15 degrees beyon
 TEST_CASE("model to world: T + rotate(Q, S * model) and back (21 §2.3, r9)") {
     // Q a quarter turn about +y takes +x to -z (the quaternion's rotation).
     const ModelToWorld w{{1, 2, 3}, yaw(std::numbers::pi_v<float> / 2), {2, 2, 2}};
-    check_close(to_world_point(w, {1, 0, 0}), {1, 2, 1});
-    check_close(to_model_point(w, {1, 2, 1}), {1, 0, 0});
-    check_close(to_model_direction(w, {0, 0, -1}), {1, 0, 0});
+    check_near(to_world_point(w, {1, 0, 0}), {1, 2, 1});
+    check_near(to_model_point(w, {1, 2, 1}), {1, 0, 0});
+    check_near(to_model_direction(w, {0, 0, -1}), {1, 0, 0});
     const RigidTransform m = to_model(w, {{1, 2, 1}, yaw(std::numbers::pi_v<float> / 2)});
-    check_close(m.translation, {1, 0, 0});
+    check_near(m.translation, {1, 0, 0});
     CHECK(rotation_gap(m.rotation, {}) < 1e-3f);
     // A record whose scale is not set is taken as unscaled.
     const ModelToWorld unset{{1, 2, 3}, {}, {0, 0, 0}};
-    check_close(to_world_point(unset, {1, 0, 0}), {2, 2, 3});
-    check_close(to_model_point(unset, {2, 2, 3}), {1, 0, 0});
+    check_near(to_world_point(unset, {1, 0, 0}), {2, 2, 3});
+    check_near(to_model_point(unset, {2, 2, 3}), {1, 0, 0});
 }
 
 TEST_CASE("twist about an axis; drift follows the body (21 §4.2 items 3, 10)") {
@@ -922,7 +917,7 @@ TEST_CASE("twist about an axis; drift follows the body (21 §4.2 items 3, 10)") 
           doctest::Approx(-0.5f).epsilon(0.05));
     // 21 §4.2 item 10: a target placed while the body was at (1, 0, 0) and
     // drawn with it at (1.05, 0, 0.02) moves by the body's 5 cm and 2 cm.
-    check_close(follow_body({2, 1, 3}, {1, 0, 0}, {1.05f, 0, 0.02f}), {2.05f, 1, 3.02f});
+    check_near(follow_body({2, 1, 3}, {1, 0, 0}, {1.05f, 0, 0.02f}), {2.05f, 1, 3.02f});
 }
 
 // A small two-armed skeleton with the bone names of 21 §2.3: the root, the
@@ -999,7 +994,7 @@ struct TestSkeleton {
     void check_consistent() const {
         for (std::size_t i = 1; i < kCount; ++i) {
             const BoneTransform m = compose(model[static_cast<std::size_t>(parents[i])], local[i]);
-            check_close(rigid_of(m).translation, rigid_of(model[i]).translation);
+            check_near(rigid_of(m).translation, rigid_of(model[i]).translation);
             CHECK(rotation_gap(rigid_of(m).rotation, rigid_of(model[i]).rotation) < 1e-3f);
             CHECK((flags[i] & (pose_flag::kLocalStale | pose_flag::kModelStale)) == 0);
         }
@@ -1059,8 +1054,8 @@ TEST_CASE("pose edit: the hand reaches its goal, the arm keeps its lengths, the 
           1e-3f);
     // The shoulder and the upper arm's root stay; the bones keep their
     // lengths; the elbow bends down (the hint).
-    check_close(s.position(right.shoulder), {0.1f, 1.4f, 0});
-    check_close(s.position(right.arm), {0.2f, 1.4f, 0});
+    check_near(s.position(right.shoulder), {0.1f, 1.4f, 0});
+    check_near(s.position(right.arm), {0.2f, 1.4f, 0});
     CHECK(omvr::util::distance(s.position(right.forearm), s.position(right.arm)) == doctest::Approx(0.3f));
     CHECK(omvr::util::distance(s.position(right.hand), s.position(right.forearm)) == doctest::Approx(0.25f));
     CHECK(s.position(right.forearm).y < 1.4f);
@@ -1081,7 +1076,7 @@ TEST_CASE("pose edit: the hand reaches its goal, the arm keeps its lengths, the 
     // 21 §4.2 item 9: local and model transforms agree; the other arm is
     // untouched.
     s.check_consistent();
-    check_close(s.position(r.rig->sides[kLeftHand].hand), {-0.75f, 1.4f, 0});
+    check_near(s.position(r.rig->sides[kLeftHand].hand), {-0.75f, 1.4f, 0});
 }
 
 TEST_CASE("pose edit: out of reach straight at the target; a weight blends from the game's hand") {
@@ -1104,7 +1099,7 @@ TEST_CASE("pose edit: out of reach straight at the target; a weight blends from 
     REQUIRE(prepare_arms(q, *r.rig) == PoseFault::None);
     const ArmOutcome half = pose_arm(q, right, {{{0.55f, 1.2f, 0}, {}}, 0.5f, {0, -1, 0}});
     refresh_arms(q, *r.rig);
-    check_close(half.goal.translation, {0.65f, 1.3f, 0});
+    check_near(half.goal.translation, {0.65f, 1.3f, 0});
     CHECK(omvr::util::distance(t.position(right.hand), {0.65f, 1.3f, 0}) < 1e-3f);
     // 0 is no edit.
     CHECK_FALSE(pose_arm(q, right, {{{0.3f, 1.0f, 0}, {}}, 0.0f, {0, -1, 0}}).edited);
@@ -1176,7 +1171,7 @@ TEST_CASE("ArmPoser: the job edits once per frame from the published targets; th
     const auto drawn   = rigid_of(s.model[hand]);
     const Vec3 at_grip = omvr::util::add(omvr::util::add(drawn.translation, w.translation),
                                          omvr::util::rotate(drawn.rotation, grip->in_hand.translation));
-    check_close(at_grip, {0.47f, 1.1f, 0.25f});
+    check_near(at_grip, {0.47f, 1.1f, 0.25f});
 
     REQUIRE(arms.head_check_due().has_value());
     CHECK(*arms.head_check_due() == 1);
@@ -1273,7 +1268,7 @@ TEST_CASE("Hands: arm targets are the tracked grips in the world, weighted; none
     REQUIRE(t[kRightHand].has_value());
     REQUIRE(t[kLeftHand].has_value());
     // 0.5 m ahead of a camera at (5, 0, 5) looking along +x.
-    check_close(t[kRightHand]->grip.position, {5.5f, 0, 5});
+    check_near(t[kRightHand]->grip.position, {5.5f, 0, 5});
     CHECK(t[kRightHand]->weight == doctest::Approx(1.0f));
     // Stale (no update for a second): none.
     CHECK_FALSE(rig.hands.arm_targets(cam, rig.now + std::chrono::seconds(1))[kLeftHand].has_value());

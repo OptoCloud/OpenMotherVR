@@ -7,6 +7,7 @@
 #include "core/hands/hand_aim.h"
 #include "core/hands/haptics.h"
 #include "fakes/fakes.h"
+#include "support/approx.h"
 
 #include <doctest/doctest.h>
 
@@ -22,9 +23,9 @@ using namespace omvr::core::hands;
 using omvr::core::input::Interaction;
 using omvr::core::vr::ports::HapticFrame;
 using omvr::game::WeaponType;
+using omvr::tests::kEps;
 using namespace std::chrono_literals;
 
-constexpr float kEps = 1e-4f;
 constexpr std::array<bool, 2> kBoth{true, true};
 
 struct Rig {
