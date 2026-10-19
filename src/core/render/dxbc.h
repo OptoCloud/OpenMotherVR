@@ -67,6 +67,25 @@ std::optional<ProgramChunk> find_program(std::span<const std::uint8_t> in) noexc
 // The program chunk's tokens. `chunk` is one find_program returned for `in`.
 std::vector<std::uint32_t> program_tokens(std::span<const std::uint8_t> in, const ProgramChunk& chunk);
 
+// The cheap test each fix makes before the checksum: `in` starts with the
+// DXBC magic and holds `pattern` somewhere. Most shaders fail it, and
+// skipping them avoids an MD5 of each (about 20 us a shader on the thread
+// that creates it).
+bool may_hold(std::span<const std::uint8_t> in, std::span<const std::uint8_t> pattern) noexcept;
+
+// The program of a container a fix has opened: its chunk, its tokens and
+// where its instructions end (its declared length).
+struct ShaderProgram {
+    ProgramChunk chunk;
+    std::vector<std::uint32_t> tokens;
+    std::size_t end = 0;
+};
+
+// The program chunk of `in` (find_program) and its tokens, when the program
+// is of `type` (kPixelShaderProgram, ...) and its declared length lies
+// inside the chunk; otherwise nothing.
+std::optional<ShaderProgram> open_program(std::span<const std::uint8_t> in, std::uint32_t type);
+
 // The data of the one chunk `fourcc` of a container, or nothing when it has
 // none, more than one, or one that does not fit.
 std::optional<std::span<const std::uint8_t>> find_chunk(std::span<const std::uint8_t> in,

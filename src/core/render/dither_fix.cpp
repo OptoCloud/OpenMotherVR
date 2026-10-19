@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <array>
 #include <bit>
-#include <cstring>
 #include <optional>
 #include <span>
 
@@ -322,24 +321,17 @@ consteval std::array<std::uint8_t, 2 * kTokenBytes> two_thousandths() {
 constexpr auto kTwoThousandths = two_thousandths();
 
 void patch(std::span<const std::uint8_t> in, DitherPatch& result) {
-    if (in.size() < kContainerHeaderSize || std::memcmp(in.data(), kDxbcMagic.data(), kDxbcMagicBytes) != 0)
-        return;
-    // Cheap pre-filter: most shaders have no site, and skipping them avoids
-    // an MD5 of each (about 20 us a shader on the game thread, half the cost
-    // of creating it).
-    if (std::ranges::search(in, kTwoThousandths).empty()) return;
+    // Most shaders have no site (the pre-filter costs about half of what
+    // creating the shader does).
+    if (!may_hold(in, kTwoThousandths)) return;
     result.has_constants = true;
 
-    const auto chunk = find_program(in);
-    if (!chunk) return;
-    std::vector<std::uint32_t> t = program_tokens(in, *chunk);
-    if (((t[0] >> kProgramTypeShift) & kProgramTypeMask) != kPixelShaderProgram) return;
-    if (t[1] < kProgramHeaderTokens || t[1] > t.size()) return;
-
-    const auto found = find_sites(t, t[1]);
+    auto program = open_program(in, kPixelShaderProgram);
+    if (!program) return;
+    const auto found = find_sites(program->tokens, program->end);
     if (!found) return;
-    const auto prog = rewrite(t, *found);
-    result.blob     = reassemble(in, *chunk, prog);
+    const auto prog = rewrite(program->tokens, *found);
+    result.blob     = reassemble(in, program->chunk, prog);
     result.sites    = static_cast<int>(found->found.size());
 }
 

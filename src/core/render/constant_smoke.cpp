@@ -199,22 +199,15 @@ std::vector<std::uint32_t> rewrite(const std::vector<std::uint32_t>& t, const Sa
 }
 
 std::vector<std::uint8_t> patch(std::span<const std::uint8_t> in, float brightness) {
-    if (in.size() < kContainerHeaderSize || std::memcmp(in.data(), kDxbcMagic.data(), kDxbcMagicBytes) != 0)
-        return {};
-    // Cheap pre-filter (24 §15.4): the atlas's name, terminated, as the
-    // resource binding holds it; most shaders do not have it, and skipping
-    // them avoids a checksum of each.
-    if (std::ranges::search(in, kAtlasName).empty()) return {};
+    // The pre-filter (24 §15.4): the atlas's name, terminated, as the
+    // resource binding holds it; most shaders do not have it.
+    if (!may_hold(in, kAtlasName)) return {};
 
-    const auto chunk = find_program(in);
-    if (!chunk || !binds_atlas(in)) return {};
-    const std::vector<std::uint32_t> t = program_tokens(in, *chunk);
-    if (((t[0] >> kProgramTypeShift) & kProgramTypeMask) != kPixelShaderProgram) return {};
-    if (t[1] < kProgramHeaderTokens || t[1] > t.size()) return {};
-
-    const auto sample = find_sample(t, t[1]);
+    const auto program = open_program(in, kPixelShaderProgram);
+    if (!program || !binds_atlas(in)) return {};
+    const auto sample = find_sample(program->tokens, program->end);
     if (!sample) return {};
-    return reassemble(in, *chunk, rewrite(t, *sample, brightness));
+    return reassemble(in, program->chunk, rewrite(program->tokens, *sample, brightness));
 }
 
 } // namespace

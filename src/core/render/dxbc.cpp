@@ -4,6 +4,7 @@
 #include "core/render/dxbc_tokens.h"
 #include "util/hash/md5_block.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace omvr::core::render {
@@ -158,6 +159,24 @@ std::vector<std::uint32_t> program_tokens(std::span<const std::uint8_t> in, cons
     std::vector<std::uint32_t> t(chunk.bytes / kTokenBytes);
     std::memcpy(t.data(), in.data() + chunk.offset + kChunkHeaderSize, chunk.bytes);
     return t;
+}
+
+bool may_hold(std::span<const std::uint8_t> in, std::span<const std::uint8_t> pattern) noexcept {
+    if (in.size() < kContainerHeaderSize || std::memcmp(in.data(), kDxbcMagic.data(), kDxbcMagicBytes) != 0)
+        return false;
+    return !std::ranges::search(in, pattern).empty();
+}
+
+std::optional<ShaderProgram> open_program(std::span<const std::uint8_t> in, std::uint32_t type) {
+    const auto chunk = find_program(in);
+    if (!chunk) return std::nullopt;
+    ShaderProgram p{*chunk, program_tokens(in, *chunk), 0};
+    // find_program leaves at least the header's two tokens.
+    const std::vector<std::uint32_t>& t = p.tokens;
+    if (program_type(t[0]) != type) return std::nullopt;
+    if (t[1] < kProgramHeaderTokens || t[1] > t.size()) return std::nullopt;
+    p.end = t[1];
+    return p;
 }
 
 std::optional<std::span<const std::uint8_t>> find_chunk(std::span<const std::uint8_t> in,

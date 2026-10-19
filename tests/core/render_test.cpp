@@ -568,6 +568,28 @@ TEST_CASE("the container walk refuses chunk sizes and counts that wrap") {
     CHECK_FALSE(find_chunk(many, "SHEX").has_value());
 }
 
+TEST_CASE("the pre-filter and open_program take only a matching DXBC program") {
+    const std::vector<std::uint8_t> in = container(dither_program());
+    const std::array<std::uint8_t, 4> ret{0x3E, 0x00, 0x00, 0x01};
+    const std::array<std::uint8_t, 4> absent{0x12, 0x34, 0x56, 0x78};
+    CHECK(may_hold(in, ret));
+    CHECK_FALSE(may_hold(in, absent));
+    std::vector<std::uint8_t> not_dxbc = in;
+    not_dxbc[0]                        = 'X';
+    CHECK_FALSE(may_hold(not_dxbc, ret));
+    CHECK_FALSE(may_hold(std::span(in).first(31), ret)); // shorter than the header
+
+    const auto ps = open_program(in, 0);
+    REQUIRE(ps.has_value());
+    CHECK(ps->end == 37u);
+    CHECK(ps->tokens.size() == 37u);
+    CHECK(ps->chunk.offset == 36u);
+    CHECK_FALSE(open_program(in, 1).has_value()); // not a vertex shader
+    // A declared length past the chunk, or shorter than the header.
+    CHECK_FALSE(open_program(with_word(in, 44 + 4, 38), 0).has_value());
+    CHECK_FALSE(open_program(with_word(in, 44 + 4, 1), 0).has_value());
+}
+
 TEST_CASE("the dither event counts the shaders left unchanged") {
     omvr::tests::RecordingLog log;
     ShaderFixStats stats{log};

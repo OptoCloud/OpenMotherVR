@@ -9,7 +9,6 @@
 #include <array>
 #include <bit>
 #include <cmath>
-#include <cstring>
 #include <initializer_list>
 #include <optional>
 #include <span>
@@ -379,21 +378,15 @@ consteval std::array<std::uint8_t, 3 * kTokenBytes> projection_x_operand() {
 constexpr auto kProjectionX = projection_x_operand();
 
 std::vector<std::uint8_t> patch(std::span<const std::uint8_t> in, int& sites) {
-    if (in.size() < kContainerHeaderSize || std::memcmp(in.data(), kDxbcMagic.data(), kDxbcMagicBytes) != 0)
-        return {};
     // Most shaders have no sprite corner: skip them before the checksum.
-    if (std::ranges::search(in, kProjectionX).empty()) return {};
+    if (!may_hold(in, kProjectionX)) return {};
 
-    const auto chunk = find_program(in);
-    if (!chunk) return {};
-    const std::vector<std::uint32_t> t = program_tokens(in, *chunk);
-    if (((t[0] >> kProgramTypeShift) & kProgramTypeMask) != kVertexShaderProgram) return {};
-    if (t[1] < kProgramHeaderTokens || t[1] > t.size()) return {};
-
-    const auto site = find_site(t, t[1]);
+    const auto program = open_program(in, kVertexShaderProgram);
+    if (!program) return {};
+    const auto site = find_site(program->tokens, program->end);
     if (!site) return {};
-    const auto prog = rewrite(t, *site);
-    auto out        = reassemble(in, *chunk, prog);
+    const auto prog = rewrite(program->tokens, *site);
+    auto out        = reassemble(in, program->chunk, prog);
     sites           = 1;
     return out;
 }

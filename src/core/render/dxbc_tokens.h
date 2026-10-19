@@ -120,6 +120,8 @@ inline constexpr std::uint32_t kNegateModifier = 0x41;
 // 0.001f as a 32-bit immediate.
 inline constexpr std::uint32_t kPoint001 = 0x3A83126F;
 
+// The program type of a version token (kPixelShaderProgram, ...).
+inline std::uint32_t program_type(std::uint32_t tok) { return (tok >> kProgramTypeShift) & kProgramTypeMask; }
 inline std::uint32_t opcode(std::uint32_t tok) { return tok & kOpcodeMask; }
 inline std::uint32_t inst_length(std::uint32_t tok) { return (tok >> kLengthShift) & kLengthMask; }
 inline std::uint32_t op_type(std::uint32_t tok) { return (tok >> kTypeShift) & kTypeMask; }
