@@ -2,6 +2,7 @@
 #include "core/stereo/comfort_view.h"
 
 #include "core/stereo/tuning.h"
+#include "util/math/angle.h"
 
 #include <algorithm>
 #include <cmath>
@@ -13,7 +14,8 @@ namespace {
 
 using Seconds = std::chrono::duration<float>;
 
-constexpr float kDegToRad = std::numbers::pi_v<float> / 180.0f;
+using util::kDegToRad;
+
 // Radii no pixel reaches: a pixel's angle from the forward axis is below
 // 90 degrees.
 constexpr float kUnreachableRad = std::numbers::pi_v<float>;

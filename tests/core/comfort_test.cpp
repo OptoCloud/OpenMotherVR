@@ -10,12 +10,12 @@
 #include "core/stereo/turn_block.h"
 #include "core/update_input.h"
 #include "fakes/fakes.h"
+#include "util/math/angle.h"
 
 #include <doctest/doctest.h>
 
 #include <chrono>
 #include <cmath>
-#include <numbers>
 
 namespace {
 
@@ -27,7 +27,7 @@ using omvr::tests::RecordingLog;
 using namespace std::chrono_literals;
 using Time = std::chrono::steady_clock::time_point;
 
-constexpr float kDeg = std::numbers::pi_v<float> / 180.0f;
+constexpr float kDeg = omvr::util::kDegToRad;
 
 } // namespace
 
