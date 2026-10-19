@@ -32,8 +32,16 @@ check_commits() {
     local base=$1 head=$2
     local types='feat|fix|perf|refactor|docs|build|ci|test|chore|revert'
     local re="^($types)(\([a-z0-9-]+\))?!?: [^ ].*[^. ]$"
-    local sha subject
+    local sha subject commits
+    # Listed first, not read from a process substitution: that one's exit
+    # status is ignored even under set -e, so an unreachable base (a
+    # force-push) would pass with no commit checked.
+    if ! commits=$(git rev-list --no-merges "$base..$head"); then
+        err "cannot list the commits in $base..$head"
+        return
+    fi
     while read -r sha; do
+        [[ -n "$sha" ]] || continue
         subject=$(git log -1 --format=%s "$sha")
         if ! [[ "$subject" =~ $re ]]; then
             err "${sha:0:7}: not a Conventional Commits subject: $subject"
@@ -41,7 +49,7 @@ check_commits() {
         if (( ${#subject} > 72 )); then
             err "${sha:0:7}: subject is ${#subject} characters (max 72): $subject"
         fi
-    done < <(git rev-list --no-merges "$base..$head")
+    done <<< "$commits"
 }
 
 case "${1:-}" in
