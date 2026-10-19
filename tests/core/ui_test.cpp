@@ -790,6 +790,19 @@ struct RecordingDialogs final : ports::Dialogs {
     void wait_posted() noexcept override {}
 };
 
+TEST_CASE("runtime failure texts name an unknown error when the runtime gave none") {
+    using omvr::core::vr::DetectResult;
+    for (const int code : {117, 108}) { // 117: SteamVR's Desktop Game Theatre held the headset
+        CAPTURE(code);
+        const std::string text = init_failure_text(DetectResult::Chosen::OpenVR, "", code);
+        CHECK(text.find("[unknown error | " + std::to_string(code) + "]") != std::string::npos);
+    }
+    CHECK(init_failure_text(DetectResult::Chosen::OpenVR, "", 117).find("Desktop Game Theatre") !=
+          std::string::npos);
+    CHECK(init_failure_text(DetectResult::Chosen::OpenVR, "Not found", 117).find("[Not found | 117]") !=
+          std::string::npos);
+}
+
 TEST_CASE("runtime failure: the init report waits, the late one does not") {
     using omvr::core::vr::DetectResult;
     const omvr::core::vr::InitFailure failure{"no session", -2};

@@ -25,7 +25,7 @@ std::string openvr_theatre_text(std::string_view what, int code) {
         "To use MotherVR with SteamVR, you need to uncheck 'Use Desktop Game Theatre while "
         "SteamVR is active' in the Steam Properties for Alien: Isolation, and make sure that "
         "VR Game Theatre isn't running when you start the game.\n\n{}",
-        what, code, kDisabled);
+        or_unknown(what), code, kDisabled);
 }
 
 std::string openvr_text(std::string_view what, int code) {
