@@ -27,6 +27,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <numbers>
 #include <span>
@@ -253,11 +254,16 @@ TEST_CASE("pose maths: yaw and the 3x4 matrix") {
     CHECK(m[0][3] == 1.0f);
     CHECK(m[1][3] == 2.0f);
     CHECK(m[2][3] == 3.0f);
+
+    // The Matrix34 form holds the same values.
+    const util::Matrix34 r = util::pose_matrix({q, {1, 2, 3}});
+    util::pose_matrix({q, {1, 2, 3}}, m);
+    CHECK(std::memcmp(r.m, m, sizeof(m)) == 0);
 }
 
 TEST_CASE("4x4 identity and the camera position of a rigid view matrix") {
     std::array<float, 16> v{};
-    util::identity(v.data());
+    util::identity(v);
     CHECK(v[0] == 1.0f);
     CHECK(v[5] == 1.0f);
     CHECK(v[1] == 0.0f);
@@ -267,7 +273,7 @@ TEST_CASE("4x4 identity and the camera position of a rigid view matrix") {
     v[12]                = 2.0f;
     v[13]                = -3.0f;
     v[14]                = 4.0f;
-    const util::Vec3 cam = util::camera_position(v.data());
+    const util::Vec3 cam = util::camera_position(v);
     CHECK(cam.x == -2.0f);
     CHECK(cam.y == 3.0f);
     CHECK(cam.z == -4.0f);
@@ -288,7 +294,12 @@ TEST_CASE("all_finite: any infinity or NaN fails") {
     CHECK_FALSE(util::all_finite(m));
     const float v[] = {0.0f, std::numeric_limits<float>::infinity()};
     CHECK_FALSE(util::all_finite(v));
-    CHECK(util::all_finite({}));
+    CHECK(util::all_finite(std::span<const float>{}));
+
+    util::Matrix34 p = util::pose_matrix({util::Quat{}, {1, 2, 3}});
+    CHECK(util::all_finite(p));
+    p.m[2][3] = std::numeric_limits<float>::infinity();
+    CHECK_FALSE(util::all_finite(p));
 }
 
 TEST_CASE("4x4 rows and columns, 3x4 translation") {

@@ -26,8 +26,8 @@ using util::Vec3;
 // The camera's forward axis flattened onto the ground plane (x, z), as a
 // unit vector; +Z when the camera looks straight up or down.
 Vec3 level_forward(const Matrix44& v) noexcept {
-    float fx        = util::element4(v.data(), 0, kForwardAxis);
-    float fz        = util::element4(v.data(), 2, kForwardAxis);
+    float fx        = util::element4(v, 0, kForwardAxis);
+    float fz        = util::element4(v, 2, kForwardAxis);
     const float len = std::sqrt(fx * fx + fz * fz);
     if (len > kMinViewForwardLength) {
         fx /= len;
@@ -49,7 +49,7 @@ Matrix44 virtual_screen_quad(const std::optional<Matrix44>& view, float inv_aspe
     set_row3(out, kRightAxis, {fwd.z, 0.0f, -fwd.x});
     set_row3(out, kUpAxis, {0.0f, inv_aspect, 0.0f});
     set_row3(out, kForwardAxis, fwd);
-    const Vec3 cam = util::camera_position(view->data());
+    const Vec3 cam = util::camera_position(*view);
     set_row3(out, kTranslationRow,
              {cam.x + fwd.x * kMenuScreenDistance, cam.y, cam.z + fwd.z * kMenuScreenDistance});
     return out;
@@ -65,7 +65,7 @@ Matrix44 hud_panel_quad(const std::optional<Matrix44>& view, float inv_aspect) n
              {up.x * kHudPanelWidth * inv_aspect, up.y * kHudPanelWidth * inv_aspect,
               up.z * kHudPanelWidth * inv_aspect});
     set_row3(out, kForwardAxis, fwd);
-    const Vec3 cam = util::camera_position(view->data());
+    const Vec3 cam = util::camera_position(*view);
     set_row3(out, kTranslationRow, {fwd.x + cam.x, fwd.y + cam.y, fwd.z + cam.z});
     return out;
 }

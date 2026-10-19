@@ -47,9 +47,10 @@ void* eye_owner(const ReflectionTargets& targets) noexcept { return *targets.ren
 void derive_from_projection(const ReflectionTargets& targets, std::uint8_t* pov) noexcept {
     const FrustumFn frustum = CodeAddress{targets.update_frustum};
     frustum(pov, nullptr);
-    const float* proj             = &field<float>(pov, kPovProj);
-    const float x_scale           = util::element4(proj, 0, 0);
-    const float y_scale           = util::element4(proj, 1, 1);
+    const float* proj = &field<float>(pov, kPovProj);
+    const util::Matrix44View m{proj, util::kMatrix44Floats};
+    const float x_scale           = util::element4(m, 0, 0);
+    const float y_scale           = util::element4(m, 1, 1);
     field<float>(pov, kPovAspect) = y_scale / x_scale;
     field<float>(pov, kPovFov)    = 2.0f * std::atan(1.0f / y_scale);
     std::memcpy(pov + kPovProjCopy, proj, kMatrixBytes);

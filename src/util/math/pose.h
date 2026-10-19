@@ -1,6 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
+#include "util/math/matrix.h"
 #include "util/math/vec.h"
 
 #include <cmath>
@@ -28,6 +29,13 @@ inline void pose_matrix(const Pose& p, float (&m)[3][4]) noexcept {
     m[0][3]       = p.position.x;
     m[1][3]       = p.position.y;
     m[2][3]       = p.position.z;
+}
+
+// The same as a Matrix34.
+inline Matrix34 pose_matrix(const Pose& p) noexcept {
+    Matrix34 out{};
+    pose_matrix(p, out.m);
+    return out;
 }
 
 // The heading of `q` about +Y.

@@ -248,7 +248,7 @@ TEST_CASE("virtual screen and HUD quads follow the view") {
     CHECK(virtual_screen_quad(std::nullopt, 0.5f)[0] == 1.0f); // identity without a view
 
     Matrix44 identity{};
-    omvr::util::identity(identity.data());
+    omvr::util::identity(identity);
     const Matrix44 screen = virtual_screen_quad(identity, kMenuScreenInvAspect);
     CHECK(screen[0] == 1.0f);                                  // right
     CHECK(screen[5] == doctest::Approx(kMenuScreenInvAspect)); // up scaled
@@ -265,7 +265,7 @@ TEST_CASE("virtual screen and HUD quads follow the view") {
 
     // Looking straight down: the screen faces +Z.
     Matrix44 down{};
-    omvr::util::identity(down.data());
+    omvr::util::identity(down);
     down[2]          = 0.0f;
     down[10]         = 0.0f;
     down[6]          = -1.0f;
