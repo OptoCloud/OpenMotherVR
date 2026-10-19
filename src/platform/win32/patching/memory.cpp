@@ -88,4 +88,8 @@ void seal_code(std::uint8_t* code, std::size_t size) noexcept {
     ::FlushInstructionCache(::GetCurrentProcess(), code, size);
 }
 
+void free_code(std::uint8_t* code) noexcept {
+    if (code) ::VirtualFree(code, 0, MEM_RELEASE);
+}
+
 } // namespace omvr::platform::win32

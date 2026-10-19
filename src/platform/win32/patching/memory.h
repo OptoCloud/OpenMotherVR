@@ -45,5 +45,8 @@ bool replace_pointer(void** slot, void* replacement, std::atomic<void*>& origina
 // never written again (no page stays writable and executable).
 std::uint8_t* allocate_code(std::size_t size) noexcept;
 void seal_code(std::uint8_t* code, std::size_t size) noexcept;
+// Releases what allocate_code returned, for code that was never installed
+// (nothing may still point into it). Null does nothing.
+void free_code(std::uint8_t* code) noexcept;
 
 } // namespace omvr::platform::win32
