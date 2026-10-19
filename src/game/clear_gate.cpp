@@ -18,6 +18,8 @@ namespace omvr::game {
 namespace {
 
 constexpr std::string_view kUnexpectedLog = "[stereo] clear gate: unexpected code, reflections stay mono";
+constexpr std::string_view kNoMemoryLog =
+    "[stereo] clear gate: no executable memory for the gate, reflections stay mono";
 
 // The clear's prologue: `push ebp; mov ebp, esp; sub esp, 0x10`. It does
 // not depend on where it runs, so the gate runs a copy of it.
@@ -83,7 +85,10 @@ bool install_clear_gate(std::uint8_t* clear, core::diag::ports::Log& log) noexce
         return false;
     }
     std::uint8_t* stub = platform::win32::allocate_code(kStubSize);
-    if (!stub) return false;
+    if (!stub) {
+        log.line(kNoMemoryLog);
+        return false;
+    }
     write_gate(stub, clear);
     platform::win32::seal_code(stub, kStubSize); // written once; no page stays writable and executable
 
