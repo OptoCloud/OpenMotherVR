@@ -55,12 +55,15 @@ std::uint32_t type_bit(std::optional<game::WeaponType> type) noexcept {
     return 1U << static_cast<unsigned>(*type);
 }
 
-// Seconds between two updates, 0 for the first and clamped to
-// kMaxUpdateGap, so a menu or a hitch neither blends nor filters across it.
-float seconds_since(const std::optional<TimePoint>& last, TimePoint now) noexcept {
-    if (!last) return 0.0f;
+// Seconds between two updates; nullopt for the first, for a gap longer than
+// kMaxUpdateGap (a menu, a loading screen, a hitch) and for a clock that
+// went back: the filters and timers then restart instead of filtering or
+// blending across it (tuning.h).
+std::optional<float> seconds_since(const std::optional<TimePoint>& last, TimePoint now) noexcept {
+    if (!last) return std::nullopt;
     const float dt = util::seconds_between(*last, now).count();
-    return std::clamp(dt, 0.0f, kMaxUpdateGap.count());
+    if (dt < 0.0f || dt > kMaxUpdateGap.count()) return std::nullopt;
+    return dt;
 }
 
 } // namespace
@@ -109,9 +112,16 @@ HandsOutput Hands::update(const HandFrame& frame, const ActivityInput& in, const
         }
         return {};
     }
-    off_noted_       = false;
-    const float dt_s = seconds_since(last_update_, now);
-    last_update_     = now;
+    off_noted_     = false;
+    const auto gap = seconds_since(last_update_, now);
+    last_update_   = now;
+    if (!gap) {
+        // A restart: the next sample starts each filter afresh, and no
+        // time passes for the blends and the lost-hand timers.
+        for (auto& f : grip_filter_) f.reset();
+        for (auto& f : aim_filter_) f.reset();
+    }
+    const float dt_s = gap.value_or(0.0f);
     const Activity a = activity(in);
     note_activity(a);
     for (std::size_t h = 0; h < kHandCount; ++h) update_hand(h, frame, dt_s, world_scale);

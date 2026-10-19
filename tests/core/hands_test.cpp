@@ -405,6 +405,31 @@ TEST_CASE("Hands: off by default; on, the right hand aims and the left faces the
         rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now + std::chrono::seconds(1)).ray.has_value());
 }
 
+// tuning.h kMaxUpdateGap: a gap longer than 0.25 s (a pause menu) restarts
+// the filters, so the first sample after it is taken as it is.
+TEST_CASE("Hands: a long update gap restarts the smoothing filter") {
+    HandsRig rig;
+    rig.settings.enabled   = true;
+    rig.settings.smoothing = 1.0f;
+    rig.run(std::chrono::milliseconds(11), 30, HandsRig::active());
+    const AimRay game{{0, 0, 0}, {0, 0, 1}, {0, 0, 20}};
+    const CameraPose cam{yaw(std::numbers::pi_v<float> / 2), {5, 0, 5}}; // looking along world +X
+    auto r = rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now);
+    REQUIRE(r.ray.has_value());
+    check_close(r.ray->start, {5.5f, 0, 5});
+
+    // Two seconds later the hands are 0.3 m ahead instead of 0.5 m.
+    Raw g;
+    raw_pose(g, {0, 1, 0}, 0, {0, 0, -0.3f});
+    HandFrame moved = HandsRig::frame();
+    for (auto& h : moved.hands) h.grip = h.aim = omvr::core::vr::to_game_pose(g, 1.0f);
+    rig.now += std::chrono::seconds(2);
+    (void)rig.hands.update(moved, HandsRig::active(), {}, rig.now, 1.0f);
+    r = rig.hands.aim(game, cam, {WeaponType::Pistol}, rig.now);
+    REQUIRE(r.ray.has_value());
+    check_close(r.ray->start, {5.3f, 0, 5});
+}
+
 TEST_CASE("Hands: a cutscene hands the aim back to the head over the blend") {
     HandsRig rig;
     rig.settings.enabled = true;
