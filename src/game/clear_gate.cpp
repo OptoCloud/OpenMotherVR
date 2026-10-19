@@ -96,7 +96,12 @@ bool install_clear_gate(std::uint8_t* clear, core::diag::ports::Log& log) noexce
     const auto entry = x86::concat(x86::jmp_rel32(rel32(clear + x86::kJmpRel32Size, stub)), x86::nops<1>());
     static_assert(std::tuple_size_v<decltype(entry)> == kClearPrologue.size());
     Patcher patcher{log};
-    return patcher.write(clear, entry).has_value();
+    if (!patcher.write(clear, entry)) {
+        // The entry is unchanged, so nothing jumps to the gate.
+        platform::win32::free_code(stub);
+        return false;
+    }
+    return true;
 }
 
 void set_skip_clears(bool skip) noexcept {
