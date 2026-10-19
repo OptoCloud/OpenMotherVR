@@ -178,11 +178,10 @@ void CrashRecorder::install(Filter ours) noexcept { previous_ = ::SetUnhandledEx
 void CrashRecorder::reassert(Filter ours) noexcept {
     // reassert runs at a few points on different threads; the chain's
     // writers take turns. on_crash only reads it.
-    while (reassert_busy_.test_and_set(std::memory_order_acquire)) reassert_busy_.wait(true);
-    const util::ScopeExit done{[this] {
-        reassert_busy_.clear(std::memory_order_release);
-        reassert_busy_.notify_one();
-    }};
+    // A yield, not atomic_flag::wait: that imports WaitOnAddress from an
+    // API set outside the DLL's import allow list (check_dll.ps1).
+    while (reassert_busy_.test_and_set(std::memory_order_acquire)) ::SwitchToThread();
+    const util::ScopeExit done{[this] { reassert_busy_.clear(std::memory_order_release); }};
     const Filter current = ::SetUnhandledExceptionFilter(ours);
     if (current == ours || (current && is_foreign(current))) return;
     if (current) add_foreign(current);
