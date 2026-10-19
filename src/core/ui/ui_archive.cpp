@@ -54,8 +54,7 @@ bool UiArchiveDeployer::reuse_or_build(const ArchivePaths& paths, const ports::F
     // Built from the player's own UI.PAK and the embedded patch; no game
     // files ship with the mod.
     files_.remove(sidecar);
-    if (!build_ui_archive(files_, log_, stock, files_.payload(ports::ResourceId::UiPatch), target, variant))
-        return false;
+    if (!build_ui_archive(files_, log_, stock, files_.ui_patch(), target, variant)) return false;
     files_.stamp(target, build_stamp);
     files_.write_sidecar(sidecar, source);
     return true;

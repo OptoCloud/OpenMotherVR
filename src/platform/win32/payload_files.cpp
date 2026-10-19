@@ -153,10 +153,7 @@ core::ui::ports::LockState ArchiveFiles::lock(std::wstring_view name,
 
 void ArchiveFiles::unlock() noexcept { mutex_.unlock(); }
 
-std::span<const std::byte> ArchiveFiles::payload(core::ui::ports::ResourceId id) noexcept {
-    return resource_bytes(module_,
-                          id == core::ui::ports::ResourceId::OpenVrApi ? openvr_api_id_ : ui_patch_id_);
-}
+std::span<const std::byte> ArchiveFiles::ui_patch() noexcept { return resource_bytes(module_, ui_patch_id_); }
 
 bool ArchiveFiles::deploy_openvr_api() noexcept {
     const FileTime build_stamp = this_module_build_filetime();

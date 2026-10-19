@@ -35,7 +35,7 @@ public:
     core::ui::ports::LockState lock(std::wstring_view name,
                                     std::chrono::milliseconds timeout) noexcept override;
     void unlock() noexcept override;
-    std::span<const std::byte> payload(core::ui::ports::ResourceId id) noexcept override;
+    std::span<const std::byte> ui_patch() noexcept override;
 
     // Same scheme for the embedded openvr_api.dll 1.0.10, written next to
     // this DLL. The original does this in DllMain when the configured runtime

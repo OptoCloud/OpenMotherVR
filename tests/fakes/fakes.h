@@ -217,7 +217,7 @@ public:
         return {true, false};
     }
     void unlock() noexcept override {}
-    std::span<const std::byte> payload(core::ui::ports::ResourceId) noexcept override { return {}; }
+    std::span<const std::byte> ui_patch() noexcept override { return {}; }
 
     std::map<std::filesystem::path, Bytes> files;
     bool fail_create = false;

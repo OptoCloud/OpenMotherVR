@@ -23,9 +23,6 @@ struct FileIdentity {
 // A FILETIME: 100-ns intervals since 1601-01-01 UTC.
 using FileTime = std::int64_t;
 
-// The payloads embedded in the DLL.
-enum class ResourceId { OpenVrApi, UiPatch };
-
 // The outcome of taking the build lock: whether it is held, and whether a
 // lock exists at all (without one, a build goes ahead as before).
 struct LockState {
@@ -53,7 +50,8 @@ public:
     // A lock shared between the processes of one game launch.
     virtual LockState lock(std::wstring_view name, std::chrono::milliseconds timeout) noexcept = 0;
     virtual void unlock() noexcept                                                             = 0;
-    virtual std::span<const std::byte> payload(ResourceId id) noexcept                         = 0;
+    // The UI patch embedded in the DLL; empty when the resource is missing.
+    virtual std::span<const std::byte> ui_patch() noexcept = 0;
 
 protected:
     ~ArchiveFiles() = default;
