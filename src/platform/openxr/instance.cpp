@@ -21,12 +21,15 @@ using core::diag::ports::logf;
 constexpr std::string_view kLogRuntime = "openxr: runtime {} {}.{}.{}";
 constexpr std::string_view kLogSystem  = "openxr: {} per eye {}x{}, FOV {}";
 
-// The instance extensions the runtime offers.
+// The instance extensions the runtime offers; none when the query fails
+// (then only the required D3D11 one is asked for, and instance creation
+// reports a runtime without it).
 std::vector<XrExtensionProperties> offered_extensions() {
-    std::uint32_t n = 0;
-    xrEnumerateInstanceExtensionProperties(nullptr, 0, &n, nullptr);
-    std::vector<XrExtensionProperties> props(n, {XR_TYPE_EXTENSION_PROPERTIES});
-    xrEnumerateInstanceExtensionProperties(nullptr, n, &n, props.data());
+    std::vector<XrExtensionProperties> props;
+    enumerate(props, XrExtensionProperties{XR_TYPE_EXTENSION_PROPERTIES},
+              [](std::uint32_t cap, std::uint32_t* n, XrExtensionProperties* data) {
+                  return xrEnumerateInstanceExtensionProperties(nullptr, cap, n, data);
+              });
     return props;
 }
 

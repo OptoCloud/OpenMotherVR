@@ -255,11 +255,11 @@ bool Session::Impl::create_spaces() {
 // LOCAL_FLOOR (XR_EXT_local_floor). Optional: without either, play is
 // seated.
 void Session::Impl::create_floor_space() {
-    std::uint32_t n = 0;
-    xrEnumerateReferenceSpaces(state.session.get(), 0, &n, nullptr);
-    std::vector<XrReferenceSpaceType> types(n);
-    if (n == 0 || XR_FAILED(xrEnumerateReferenceSpaces(state.session.get(), n, &n, types.data())))
-        types.clear();
+    // A failed enumeration leaves no types: no floor, seated play.
+    std::vector<XrReferenceSpaceType> types;
+    enumerate(types, XR_REFERENCE_SPACE_TYPE_VIEW, [this](std::uint32_t cap, std::uint32_t* n, auto* data) {
+        return xrEnumerateReferenceSpaces(state.session.get(), cap, n, data);
+    });
     const auto has = [&types](XrReferenceSpaceType t) { return std::ranges::find(types, t) != types.end(); };
     XrReferenceSpaceType type = XR_REFERENCE_SPACE_TYPE_STAGE;
     const char* name          = "STAGE";
@@ -295,12 +295,23 @@ bool Session::Impl::init(ID3D11Device* device) noexcept {
         return false;
     }
 
-    std::uint32_t n = 0;
-    xrEnumerateEnvironmentBlendModes(state.instance.get(), state.system,
-                                     XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 1, &n, &state.blend);
-    xrEnumerateSwapchainFormats(state.session.get(), 0, &n, nullptr);
-    state.formats.resize(n);
-    xrEnumerateSwapchainFormats(state.session.get(), n, &n, state.formats.data());
+    // 09 §2.2: the runtime's first (preferred) blend mode, or opaque when it
+    // reports none or the query fails.
+    std::vector<XrEnvironmentBlendMode> blends;
+    check(enumerate(blends, XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
+                    [this](std::uint32_t cap, std::uint32_t* n, auto* data) {
+                        return xrEnumerateEnvironmentBlendModes(state.instance.get(), state.system,
+                                                                XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+                                                                cap, n, data);
+                    }),
+          "xrEnumerateEnvironmentBlendModes");
+    state.blend = blends.empty() ? XR_ENVIRONMENT_BLEND_MODE_OPAQUE : blends.front();
+    // A failure is logged here; every layer then finds no format (09 §7).
+    check(enumerate(state.formats, std::int64_t{0},
+                    [this](std::uint32_t cap, std::uint32_t* n, auto* data) {
+                        return xrEnumerateSwapchainFormats(state.session.get(), cap, n, data);
+                    }),
+          "xrEnumerateSwapchainFormats");
 
     if (!input.create(state.instance.get(), state.session.get())) log.line(kLogNoInput);
 

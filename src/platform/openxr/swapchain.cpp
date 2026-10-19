@@ -81,19 +81,23 @@ bool Session::Impl::create_chain(Swapchain& sc, DXGI_FORMAT format, std::uint32_
         return false;
     }
 
-    std::uint32_t n = 0;
-    xrEnumerateSwapchainImages(sc.handle.get(), 0, &n, nullptr);
-    sc.images.assign(n, {XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR});
-    if (!check_frame(
-            xrEnumerateSwapchainImages(sc.handle.get(), n, &n,
-                                       reinterpret_cast<XrSwapchainImageBaseHeader*>(sc.images.data())),
-            "xrEnumerateSwapchainImages", sc.results.images)) {
+    XrResult r =
+        enumerate(sc.images, XrSwapchainImageD3D11KHR{XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR},
+                  [&sc](std::uint32_t cap, std::uint32_t* n, XrSwapchainImageD3D11KHR* data) {
+                      return xrEnumerateSwapchainImages(sc.handle.get(), cap, n,
+                                                        reinterpret_cast<XrSwapchainImageBaseHeader*>(data));
+                  });
+    // A chain without images would have copy_into index an empty vector
+    // with the index the runtime acquires.
+    if (XR_SUCCEEDED(r) && sc.images.empty()) r = XR_ERROR_RUNTIME_FAILURE;
+    if (!check_frame(r, "xrEnumerateSwapchainImages", sc.results.images)) {
         destroy_chain(sc);
         return false;
     }
-    sc.width  = w;
-    sc.height = h;
-    sc.format = format;
+    const auto n = sc.images.size();
+    sc.width     = w;
+    sc.height    = h;
+    sc.format    = format;
     logf(log, kLogCreated, w, h, static_cast<int>(format), n);
     return true;
 }
@@ -130,7 +134,9 @@ bool Session::Impl::copy_into(Swapchain& sc, ID3D11Texture2D* src, D3D11_BOX box
     wi.timeout        = XR_INFINITE_DURATION;
     const XrResult wr = xrWaitSwapchainImage(sc.handle.get(), &wi);
     // A timeout is a success code but leaves the image unwritten.
-    const bool waited = check_frame(wr, "xrWaitSwapchainImage", sc.results.wait) && wr != XR_TIMEOUT_EXPIRED;
+    // An index past the images the runtime listed is not written either.
+    const bool waited = check_frame(wr, "xrWaitSwapchainImage", sc.results.wait) &&
+                        wr != XR_TIMEOUT_EXPIRED && index < sc.images.size();
     if (waited) state.context->CopySubresourceRegion(sc.images[index].texture, 0, 0, 0, 0, src, 0, &box);
     XrSwapchainImageReleaseInfo ri{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
     const bool released = check_frame(xrReleaseSwapchainImage(sc.handle.get(), &ri),

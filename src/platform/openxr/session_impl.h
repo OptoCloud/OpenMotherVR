@@ -190,4 +190,24 @@ bool locate(XrSpace space, XrSpace base, XrTime t, Pose& out);
 
 bool all_finite(const Pose& p) noexcept;
 
+// The API's two-call idiom: `call(capacity, &count, data)` once for the
+// count and once to fill, each element starting as `proto` (its type tag).
+// The first failing result, with `out` empty; else XR_SUCCESS with `out`
+// holding what the runtime wrote, which may be nothing. Allocates: set-up
+// only, never per frame.
+template <class T, class Call>
+XrResult enumerate(std::vector<T>& out, const T& proto, Call call) {
+    out.clear();
+    std::uint32_t n = 0;
+    if (const XrResult r = call(std::uint32_t{0}, &n, static_cast<T*>(nullptr)); XR_FAILED(r)) return r;
+    if (n == 0) return XR_SUCCESS;
+    out.assign(n, proto);
+    if (const XrResult r = call(n, &n, out.data()); XR_FAILED(r)) {
+        out.clear();
+        return r;
+    }
+    if (n < out.size()) out.resize(n);
+    return XR_SUCCESS;
+}
+
 } // namespace omvr::platform::openxr
