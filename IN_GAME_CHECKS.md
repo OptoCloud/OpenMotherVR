@@ -62,6 +62,18 @@ side of the head and Map hides or shows the HUD (`[diag] hud: ...`).
       up or down still cycles weapons. Log: `[events] "start_interaction"`
       with `interaction true` at the lever, then `stop_interaction` with
       `interaction false`.
+- [ ] **Scheme and near-head rules from core (04 §5.5, §5.10).** Both
+      backends now take these from `core/input/controller_rules`. On
+      OpenVR with Index controllers (`openvr: right hand controller:
+      knuckles`), Options > MotherVR > Input > View Controls shows the
+      Index entries (pause on the left trackpad); on OpenXR (`openxr
+      input: controller profile /interaction_profiles/valve/index_controller`)
+      the thumbstick entries (pause on the menu button); Vive wands get
+      the touchpad entries on both. On both runtimes Interact with the
+      right hand at your face toggles the flashlight, and with the hand
+      at arm's length it does not. On OpenVR, cover the headset's
+      sensors (tracking lost) and hold the right hand near where the head
+      was: no flashlight.
 - [ ] **R3 during the recenter chord (05 §9).** On a pad in a menu, hold
       LB+RB to recenter, then click R3 while still holding them: nothing
       else happens, and the menu screen settles in front of you as after
