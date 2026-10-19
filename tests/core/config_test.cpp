@@ -443,14 +443,14 @@ TEST_CASE("enum names round trip") {
     CHECK(to_string(VRRuntime::Oculus) == "Oculus");
     CHECK(to_string(MirrorViewType::LeftEye) == "LeftEye");
     CHECK(to_string(StereoAA::Off) == "Off");
-    CHECK(parse_vr_runtime("OpenVR") == VRRuntime::OpenVR);
-    CHECK_FALSE(parse_vr_runtime("openvr").has_value());
-    CHECK(parse_mirror_view_type("BothEyes") == MirrorViewType::BothEyes);
-    CHECK(parse_stereo_aa("Auto") == StereoAA::Auto);
-    CHECK(parse_vr_runtime("Disabled") == VRRuntime::None);
-    CHECK(parse_body_visible("None") == BodyVisible::None);
-    CHECK(parse_hud_placement("Follow") == HudPlacement::Follow);
-    CHECK_FALSE(parse_crosshair_mode("").has_value());
+    CHECK(parse_enum<VRRuntime>("OpenVR") == VRRuntime::OpenVR);
+    CHECK_FALSE(parse_enum<VRRuntime>("openvr").has_value());
+    CHECK(parse_enum<MirrorViewType>("BothEyes") == MirrorViewType::BothEyes);
+    CHECK(parse_enum<StereoAA>("Auto") == StereoAA::Auto);
+    CHECK(parse_enum<VRRuntime>("Disabled") == VRRuntime::None);
+    CHECK(parse_enum<BodyVisible>("None") == BodyVisible::None);
+    CHECK(parse_enum<HudPlacement>("Follow") == HudPlacement::Follow);
+    CHECK_FALSE(parse_enum<CrosshairMode>("").has_value());
     CHECK(to_string(BodyVisible::HandsOnly) == "HandsOnly");
     CHECK(to_string(CameraTakeovers::Reduced) == "Reduced");
     // A value outside the enum (an integer cast from the game) has a name.

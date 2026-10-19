@@ -196,32 +196,4 @@ constexpr std::optional<E> parse_enum(std::string_view s) noexcept {
     return std::nullopt;
 }
 
-inline std::optional<VRRuntime> parse_vr_runtime(std::string_view s) noexcept {
-    return parse_enum<VRRuntime>(s);
-}
-inline std::optional<MirrorViewType> parse_mirror_view_type(std::string_view s) noexcept {
-    return parse_enum<MirrorViewType>(s);
-}
-inline std::optional<StereoAA> parse_stereo_aa(std::string_view s) noexcept {
-    return parse_enum<StereoAA>(s);
-}
-inline std::optional<PlayMode> parse_play_mode(std::string_view s) noexcept {
-    return parse_enum<PlayMode>(s);
-}
-inline std::optional<FlashlightAim> parse_flashlight_aim(std::string_view s) noexcept {
-    return parse_enum<FlashlightAim>(s);
-}
-inline std::optional<BodyVisible> parse_body_visible(std::string_view s) noexcept {
-    return parse_enum<BodyVisible>(s);
-}
-inline std::optional<CameraTakeovers> parse_camera_takeovers(std::string_view s) noexcept {
-    return parse_enum<CameraTakeovers>(s);
-}
-inline std::optional<CrosshairMode> parse_crosshair_mode(std::string_view s) noexcept {
-    return parse_enum<CrosshairMode>(s);
-}
-inline std::optional<HudPlacement> parse_hud_placement(std::string_view s) noexcept {
-    return parse_enum<HudPlacement>(s);
-}
-
 } // namespace omvr::core::config
