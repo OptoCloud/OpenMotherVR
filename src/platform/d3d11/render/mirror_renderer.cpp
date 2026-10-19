@@ -22,7 +22,10 @@ using win32::release_one;
 #include "platform/d3d11/render/shaders/mirror_shaders.inc"
 
 constexpr std::string_view kNoOutputLog =
-    "[stereo] desktop mirror: the game has no output bound at end of frame";
+    "[stereo] desktop mirror: the game has no output bound at end of frame; binding the back buffer";
+constexpr std::string_view kNoBackBufferLog =
+    "[stereo] desktop mirror: the game has no output bound at end of frame and the back buffer's view "
+    "could not be made; the window keeps its last picture";
 constexpr std::string_view kCreateFailedLog =
     "[stereo] desktop mirror off: creating its {} failed (0x{:08X}); the window shows black, VR not affected";
 
@@ -111,15 +114,46 @@ void MirrorRenderer::create(core::vr::GpuDevice gpu_device, const MirrorConstant
     }
 }
 
+void MirrorRenderer::use_swapchain(IDXGISwapChain* swapchain) noexcept {
+    if (swapchain == swapchain_) return;
+    release_back_buffer();
+    swapchain_ = swapchain;
+}
+
+void MirrorRenderer::release_back_buffer() noexcept {
+    release_one(back_buffer_rtv_);
+    back_buffer_failed_ = false;
+}
+
+ID3D11RenderTargetView* MirrorRenderer::back_buffer_view(ID3D11DeviceContext* ctx) noexcept {
+    if (back_buffer_rtv_ || back_buffer_failed_ || !swapchain_) return back_buffer_rtv_;
+    back_buffer_failed_      = true; // until the view below is made
+    ID3D11Texture2D* raw_buf = nullptr;
+    if (FAILED(swapchain_->GetBuffer(0, IID_PPV_ARGS(&raw_buf)))) return nullptr;
+    const auto buffer        = ComPtr<ID3D11Texture2D>::adopt(raw_buf);
+    ID3D11Device* raw_device = nullptr;
+    ctx->GetDevice(&raw_device);
+    const auto device = ComPtr<ID3D11Device>::adopt(raw_device);
+    if (!device || FAILED(device->CreateRenderTargetView(buffer.get(), nullptr, &back_buffer_rtv_))) {
+        back_buffer_rtv_ = nullptr;
+        return nullptr;
+    }
+    back_buffer_failed_ = false;
+    return back_buffer_rtv_;
+}
+
 void MirrorRenderer::draw(core::vr::GpuContext context, bool head_tracked) noexcept {
     ID3D11DeviceContext* ctx        = to_d3d(context);
     ID3D11RenderTargetView* raw_rtv = nullptr;
     ctx->OMGetRenderTargets(1, &raw_rtv, nullptr);
-    const auto rtv = ComPtr<ID3D11RenderTargetView>::adopt(raw_rtv);
-    if (!rtv) {
-        // Nothing to draw into; the window keeps its last picture.
-        if (no_output_logged_.first()) log_.line(kNoOutputLog);
-        return;
+    auto rtv              = ComPtr<ID3D11RenderTargetView>::adopt(raw_rtv);
+    const bool own_target = !rtv;
+    if (own_target) {
+        // Nothing bound for output: the back buffer itself, through the kept
+        // view, so the window never shows a stale picture (03 §8.3).
+        rtv = ComPtr<ID3D11RenderTargetView>::share(back_buffer_view(ctx));
+        if (no_output_logged_.first()) log_.line(rtv ? kNoOutputLog : kNoBackBufferLog);
+        if (!rtv) return;
     }
     if (!ready()) {
         ctx->ClearRenderTargetView(rtv.get(), core::stereo::kMirrorOffColour.data());
@@ -133,6 +167,11 @@ void MirrorRenderer::draw(core::vr::GpuContext context, bool head_tracked) noexc
     ctx->RSSetState(nullptr);
     ctx->IASetInputLayout(nullptr);
     ctx->VSSetShader(objects_.vs, nullptr, 0);
+    // Whatever geometry or tessellation stage the game left would take the
+    // strip (or, a hull shader with a non-patch topology, drop the draw).
+    ctx->GSSetShader(nullptr, nullptr, 0);
+    ctx->HSSetShader(nullptr, nullptr, 0);
+    ctx->DSSetShader(nullptr, nullptr, 0);
     ctx->PSSetShader(objects_.ps, nullptr, 0);
     ctx->PSSetShaderResources(kSourceSlot, 1, source_);
     // The eyes while the game tracks the head, else the virtual screen's
@@ -141,6 +180,10 @@ void MirrorRenderer::draw(core::vr::GpuContext context, bool head_tracked) noexc
     ctx->PSSetSamplers(kSamplerSlot, 1, &objects_.sampler);
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     ctx->Draw(kStripVertices, 0);
+    // Leave nothing of ours bound: a ResizeBuffers may follow before the
+    // game binds its own outputs, and a bound view is a reference that
+    // makes it fail.
+    if (own_target) ctx->OMSetRenderTargets(0, nullptr, nullptr);
     // rtv releases the reference OMGetRenderTargets added (the original
     // leaked it every frame).
 }
