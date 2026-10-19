@@ -44,7 +44,8 @@ inline constexpr int kAttachPoseSelector = 6;
 // The ABIs of the functions whose calls are redirected (21 §20).
 // The final-pose pass: cdecl, the stage's character list and its count.
 using FinalPosePassFn = std::uintptr_t(__cdecl*)(void* list, std::uint32_t count);
-// BoneWorldTransform: __thiscall (component; bone, selector, out), ret 0xC.
+// BoneWorldTransform: __thiscall (component; bone, selector, out), ret 0xC;
+// `out` receives a 0x40-byte 4x4 matrix, 16-byte aligned.
 using BoneWorldTransformFn = void*(__fastcall*)(void* self, void* edx, int bone, int selector, void* out);
 // The limb IK: stdcall, four arguments (its setup, two the game's, the
 // pose third), ret 0x10.

@@ -5,6 +5,8 @@
 #include "game/field.h"
 #include "game/hands/body_objects.h"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 
 namespace omvr::game::hands {
@@ -27,6 +29,19 @@ Vec3 read_vec3(const void* object, std::ptrdiff_t offset) noexcept {
 }
 
 bool aligned(const void* p) noexcept { return (address_of(p) % kTransformAlignment) == 0; }
+
+// BoneWorldTransform's output (21 §2.3): not the 0x30-byte transform it
+// computes but that transform as a 4x4 matrix, written as four aligned
+// 16-byte rows (its last step, 0xA99330), rotation and scale in rows 0 to 2
+// and the translation in row 3. The game's own caller at 0x3B4E06 copies
+// all 0x40 bytes. A 0x30-byte buffer here let the last row overwrite the
+// caller's stack.
+struct BoneWorldMatrix {
+    std::array<std::array<float, 4>, 4> rows{};
+};
+constexpr std::size_t kBoneWorldMatrixSize = 0x40;
+constexpr std::size_t kTranslationRow      = 3;
+static_assert(sizeof(BoneWorldMatrix) == kBoneWorldMatrixSize);
 
 } // namespace
 
@@ -91,9 +106,10 @@ void call_equipment_update(const ArmTargets& t, void* component) noexcept {
 std::optional<Vec3> bone_world_position(const ArmTargets& t, void* animation, int bone,
                                         int selector) noexcept {
     if (!t.bone_world_transform || !animation || bone < 0) return std::nullopt;
-    alignas(kTransformAlignment) BoneTransform out{};
+    alignas(kTransformAlignment) BoneWorldMatrix out{};
     call_bone_world_transform(t, animation, bone, selector, &out);
-    return Vec3{out.translation[0], out.translation[1], out.translation[2]};
+    const auto& translation = out.rows[kTranslationRow];
+    return Vec3{translation[0], translation[1], translation[2]};
 }
 
 } // namespace omvr::game::hands
