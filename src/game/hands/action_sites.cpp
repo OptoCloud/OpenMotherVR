@@ -4,6 +4,7 @@
 #include "game/addresses.h"
 #include "game/code_address.h"
 #include "game/detour.h"
+#include "game/x86.h"
 
 #include <algorithm>
 #include <array>
@@ -23,11 +24,16 @@ constexpr std::string_view kLogNoAddress =
 constexpr std::string_view kLogCode = "[hook] hands, {}: off; unexpected code at {} (RVA {:08X})";
 constexpr std::string_view kLogOn   = "[hook] hands, {}: in place ({} sites)";
 
-// 21 §2.11: the first bytes of each start method.
+// 21 §2.11: the first bytes of each start method. The melee kill start,
+// the play request and its counterpart open with an exception frame whose
+// `push imm32` holds their handler's VA: those four bytes are 0 here and
+// filled in from the table for this image (see with_handler), since the
+// loader rebases them.
 constexpr std::array<std::uint8_t, 12> kMeleeStart          = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0,
                                                                0x81, 0xEC, 0xB4, 0x00, 0x00, 0x00};
-constexpr std::array<std::uint8_t, 12> kMeleeKillStart      = {0x6A, 0xFF, 0x68, 0x78, 0x6A, 0x12,
-                                                               0x01, 0x64, 0xA1, 0x00, 0x00, 0x00};
+constexpr std::array<std::uint8_t, 12> kMeleeKillStart      = {0x6A, 0xFF, 0x68, 0x00, 0x00, 0x00,
+                                                               0x00, 0x64, 0xA1, 0x00, 0x00, 0x00};
+constexpr std::size_t kMeleeKillHandlerAt                   = 3;
 constexpr std::array<std::uint8_t, 12> kTrapBreakStart      = {0x83, 0xEC, 0x54, 0x53, 0x55, 0x56,
                                                                0x8B, 0xF1, 0x8B, 0x4E, 0x04, 0x57};
 constexpr std::array<std::uint8_t, 12> kMeleeInterceptStart = {0x83, 0xEC, 0x54, 0x53, 0x56, 0x57,
@@ -36,11 +42,24 @@ constexpr std::array<std::uint8_t, 12> kImpactStandingStart = {0x55, 0x8B, 0xEC,
                                                                0x83, 0xEC, 0x64, 0x53, 0x56, 0x8B};
 constexpr std::array<std::uint8_t, 12> kTrapVictimStart     = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0,
                                                                0x81, 0xEC, 0xD4, 0x00, 0x00, 0x00};
-// 21 §2.11: the play request and its counterpart.
-constexpr std::array<std::uint8_t, 12> kPlayRequestStart     = {0x64, 0xA1, 0x00, 0x00, 0x00, 0x00,
-                                                                0x6A, 0xFF, 0x68, 0xE0, 0x26, 0x12};
-constexpr std::array<std::uint8_t, 12> kPlayCounterpartStart = {0x6A, 0xFF, 0x64, 0xA1, 0x00, 0x00,
-                                                                0x00, 0x00, 0x68, 0xA8, 0x10, 0x12};
+// 21 §2.11: the play request and its counterpart, up to the end of the
+// handler's `push imm32`.
+constexpr std::array<std::uint8_t, 13> kPlayRequestStart     = {0x64, 0xA1, 0x00, 0x00, 0x00, 0x00, 0x6A,
+                                                                0xFF, 0x68, 0x00, 0x00, 0x00, 0x00};
+constexpr std::array<std::uint8_t, 13> kPlayCounterpartStart = {0x6A, 0xFF, 0x64, 0xA1, 0x00, 0x00, 0x00,
+                                                                0x00, 0x68, 0x00, 0x00, 0x00, 0x00};
+constexpr std::size_t kPlayHandlerAt                         = 9;
+static_assert(kMeleeKillStart[kMeleeKillHandlerAt - 1] == x86::kPushImm32 &&
+              kPlayRequestStart[kPlayHandlerAt - 1] == x86::kPushImm32 &&
+              kPlayCounterpartStart[kPlayHandlerAt - 1] == x86::kPushImm32);
+
+// `start` with the handler this image's `push imm32` should hold: 0 (no
+// match) when the build has no handler address.
+template <std::size_t At, std::size_t N>
+std::array<std::uint8_t, N> with_handler(const GameImage& g, const std::array<std::uint8_t, N>& start,
+                                         std::uint32_t handler_rva) noexcept {
+    return x86::with_imm32<At>(start, handler_rva != 0 ? address_of(g.at_rva(handler_rva)) : 0);
+}
 // 21 §2.7: SetBodyVelocities, `push ebp; mov ebp, esp; and esp, -16; sub
 // esp, 0x3C`.
 constexpr std::array<std::uint8_t, 9> kSetBodyVelocitiesStart = {0x55, 0x8B, 0xEC, 0x83, 0xE4,
@@ -108,8 +127,9 @@ bool install_melee(const GameImage& g, Patcher& p, const ActionRvas& r, const Ac
 
 bool install_actions(const GameImage& g, Patcher& p, const ActionRvas& r, const ActionSiteFns& h,
                      ActionSiteFns& out) noexcept {
+    const auto melee_kill = with_handler<kMeleeKillHandlerAt>(g, kMeleeKillStart, r.melee_kill_eh_handler);
     const std::array<Site<ActionStartFn>, 5> sites{{
-        {r.melee_kill_start, kMeleeKillStart, h.melee_kill, &out.melee_kill, "ACT_PLAYER_MELEE_KILL start"},
+        {r.melee_kill_start, melee_kill, h.melee_kill, &out.melee_kill, "ACT_PLAYER_MELEE_KILL start"},
         {r.trap_break_start, kTrapBreakStart, h.trap_break, &out.trap_break, "ACT_PLAYER_TRAP_BREAK start"},
         {r.melee_intercept_start, kMeleeInterceptStart, h.melee_intercept, &out.melee_intercept,
          "ACT_PLAYER_MELEE_INTERCEPT start"},
@@ -123,9 +143,12 @@ bool install_actions(const GameImage& g, Patcher& p, const ActionRvas& r, const 
 
 bool install_play_animation(const GameImage& g, Patcher& p, const ActionRvas& r, const ActionSiteFns& h,
                             ActionSiteFns& out) noexcept {
+    const auto request = with_handler<kPlayHandlerAt>(g, kPlayRequestStart, r.play_request_eh_handler);
+    const auto counterpart =
+        with_handler<kPlayHandlerAt>(g, kPlayCounterpartStart, r.play_counterpart_eh_handler);
     const std::array<Site<PlayAnimationFn>, 2> sites{{
-        {r.play_animation_request, kPlayRequestStart, h.play_request, &out.play_request, "the play request"},
-        {r.play_animation_counterpart, kPlayCounterpartStart, h.play_counterpart, &out.play_counterpart,
+        {r.play_animation_request, request, h.play_request, &out.play_request, "the play request"},
+        {r.play_animation_counterpart, counterpart, h.play_counterpart, &out.play_counterpart,
          "the play request's counterpart"},
     }};
     const bool slots =

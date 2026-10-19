@@ -184,6 +184,18 @@ constexpr std::array<std::uint8_t, kRel32Size> le32(std::uint32_t value) noexcep
     return out;
 }
 
+// `bytes` with the 32-bit operand at byte `At` set to `value`: the
+// expected bytes of code whose operand is an absolute address, which the
+// loader rebases with the image.
+template <std::size_t At, std::size_t N>
+    requires(At + kRel32Size <= N)
+constexpr std::array<std::uint8_t, N> with_imm32(std::array<std::uint8_t, N> bytes,
+                                                 std::uint32_t value) noexcept {
+    const auto d = le32(value);
+    for (std::size_t i = 0; i < kRel32Size; ++i) bytes[At + i] = d[i];
+    return bytes;
+}
+
 // `jmp rel32`.
 constexpr std::array<std::uint8_t, kJmpRel32Size> jmp_rel32(std::uint32_t rel) noexcept {
     const auto d = le32(rel);

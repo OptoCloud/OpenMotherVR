@@ -3,6 +3,7 @@
 // sites as they were before the restructure (1d908cf).
 
 #include "game/addresses.h"
+#include "game/x86.h"
 
 #include <doctest/doctest.h>
 
@@ -171,6 +172,25 @@ TEST_CASE("a per-build table picks the running build's rows") {
     CHECK(omvr::game::kReconRvas[GameBuild::Patched2020].reflection_render_call == 0u);
     CHECK(omvr::game::kInlineSites[GameBuild::Patched2020].left_stick_prompt_call_2 == 0x0043E2DCu);
     CHECK(omvr::game::kInlineSites[GameBuild::Original2015].left_stick_prompt_call_2 == 0x0042D18Cu);
+}
+
+// The melee kill start's first bytes in the 2015 AI.exe (RVA 0x0026DC20):
+// `push -1; push 0x01126A78; mov eax, fs:[0]`, the pushed VA being its
+// exception handler at RVA 0x00D26A78 with the file's base 0x400000.
+TEST_CASE("an exception-frame prologue is expected at this image's handler address") {
+    constexpr std::array<std::uint8_t, 12> kTemplate = {0x6A, 0xFF, 0x68, 0x00, 0x00, 0x00,
+                                                        0x00, 0x64, 0xA1, 0x00, 0x00, 0x00};
+    constexpr std::uint32_t kHandler                 = omvr::game::kActionRvas2015.melee_kill_eh_handler;
+    CHECK(
+        omvr::game::x86::with_imm32<3>(kTemplate, 0x00400000u + kHandler) ==
+        std::array<std::uint8_t, 12>{0x6A, 0xFF, 0x68, 0x78, 0x6A, 0x12, 0x01, 0x64, 0xA1, 0x00, 0x00, 0x00});
+    // Rebased to 0x00AC0000, as logged on a real launch: the loader moves
+    // the operand by the same delta.
+    CHECK(
+        omvr::game::x86::with_imm32<3>(kTemplate, 0x00AC0000u + kHandler) ==
+        std::array<std::uint8_t, 12>{0x6A, 0xFF, 0x68, 0x78, 0x6A, 0x7E, 0x01, 0x64, 0xA1, 0x00, 0x00, 0x00});
+    CHECK(omvr::game::kActionRvas2015.play_request_eh_handler == 0x00D226E0u);
+    CHECK(omvr::game::kActionRvas2015.play_counterpart_eh_handler == 0x00D210A8u);
 }
 
 } // namespace

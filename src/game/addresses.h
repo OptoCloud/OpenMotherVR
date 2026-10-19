@@ -336,25 +336,36 @@ struct ActionRvas {
     std::uint32_t play_animation_request;
     std::uint32_t play_animation_counterpart;
     std::uint32_t play_animation_table;
+    // The exception handlers that the melee kill start, the play request
+    // and its counterpart push in their prologues (`push imm32` of the
+    // handler's VA). The loader rebases that operand (AI.exe is
+    // DYNAMIC_BASE, 01 §3.3), so the start check expects this image's
+    // address of the handler rather than the file's bytes.
+    std::uint32_t melee_kill_eh_handler;
+    std::uint32_t play_request_eh_handler;
+    std::uint32_t play_counterpart_eh_handler;
     // 21 §2.7: SetBodyVelocities (cdecl: physics object, linear and
     // angular velocity pointers).
     std::uint32_t set_body_velocities;
 };
 
 inline constexpr ActionRvas kActionRvas2015 = {
-    .melee_start_a              = 0x00268670,
-    .melee_vtable_a             = 0x00EAC528,
-    .melee_start_b              = 0x00268AF0,
-    .melee_vtable_b             = 0x00EAC5E8,
-    .melee_kill_start           = 0x0026DC20,
-    .trap_break_start           = 0x0026E3F0,
-    .melee_intercept_start      = 0x002702C0,
-    .impact_standing_start      = 0x002737E0,
-    .trap_victim_start          = 0x00275560,
-    .play_animation_request     = 0x00130A70,
-    .play_animation_counterpart = 0x00130CE0,
-    .play_animation_table       = 0x00E34960,
-    .set_body_velocities        = 0x003EF590,
+    .melee_start_a               = 0x00268670,
+    .melee_vtable_a              = 0x00EAC528,
+    .melee_start_b               = 0x00268AF0,
+    .melee_vtable_b              = 0x00EAC5E8,
+    .melee_kill_start            = 0x0026DC20,
+    .trap_break_start            = 0x0026E3F0,
+    .melee_intercept_start       = 0x002702C0,
+    .impact_standing_start       = 0x002737E0,
+    .trap_victim_start           = 0x00275560,
+    .play_animation_request      = 0x00130A70,
+    .play_animation_counterpart  = 0x00130CE0,
+    .play_animation_table        = 0x00E34960,
+    .melee_kill_eh_handler       = 0x00D26A78,
+    .play_request_eh_handler     = 0x00D226E0,
+    .play_counterpart_eh_handler = 0x00D210A8,
+    .set_body_velocities         = 0x003EF590,
 };
 
 inline constexpr ActionRvas kActionRvas2020 = {};
