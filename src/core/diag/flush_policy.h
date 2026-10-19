@@ -2,6 +2,7 @@
 #pragma once
 
 #include "core/diag/thread_roles.h"
+#include "util/time/steady.h"
 
 #include <chrono>
 #include <optional>
@@ -33,8 +34,7 @@ FlushAction flush_action(ThreadRole writer, bool problem) noexcept;
 // flushes: nothing when the last flush was kLogFlushInterval or more ago
 // (or there was none), else the rest of that interval, so it flushes at
 // most once per interval.
-std::chrono::milliseconds flush_delay(
-    std::chrono::steady_clock::time_point now,
-    std::optional<std::chrono::steady_clock::time_point> last_flush) noexcept;
+std::chrono::milliseconds flush_delay(util::TimePoint now,
+                                      std::optional<util::TimePoint> last_flush) noexcept;
 
 } // namespace omvr::core::diag

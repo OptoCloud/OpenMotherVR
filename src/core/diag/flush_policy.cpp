@@ -33,9 +33,8 @@ FlushAction flush_action(ThreadRole writer, bool problem) noexcept {
     return writer == ThreadRole::Main && problem ? FlushAction::Now : FlushAction::Deferred;
 }
 
-std::chrono::milliseconds flush_delay(
-    std::chrono::steady_clock::time_point now,
-    std::optional<std::chrono::steady_clock::time_point> last_flush) noexcept {
+std::chrono::milliseconds flush_delay(util::TimePoint now,
+                                      std::optional<util::TimePoint> last_flush) noexcept {
     if (!last_flush) return std::chrono::milliseconds{0};
     const auto since = std::chrono::duration_cast<std::chrono::milliseconds>(now - *last_flush);
     return since >= kLogFlushInterval ? std::chrono::milliseconds{0} : kLogFlushInterval - since;

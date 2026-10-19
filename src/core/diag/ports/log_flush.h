@@ -1,6 +1,8 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
+#include "util/time/steady.h"
+
 #include <chrono>
 #include <cstdint>
 
@@ -24,7 +26,7 @@ protected:
 // thread's id once, and before each flush how long to wait. Mod thread.
 class FlushSchedule {
 public:
-    using TimePoint = std::chrono::steady_clock::time_point;
+    using TimePoint = util::TimePoint;
 
     // The flush thread runs; `id` is its system id (11 §1.4: `mod`).
     virtual void thread_started(std::uint32_t id) noexcept = 0;

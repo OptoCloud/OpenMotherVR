@@ -1,7 +1,8 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
-#include <chrono>
+#include "util/time/steady.h"
+
 #include <cstdint>
 
 namespace omvr::core::diag::ports {
@@ -15,8 +16,8 @@ struct LocalTime {
 // Time, injected so core logic can be driven by tests. Any thread.
 class Clock {
 public:
-    virtual std::chrono::steady_clock::time_point now() const noexcept = 0;
-    virtual LocalTime local_time() const noexcept                      = 0;
+    virtual util::TimePoint now() const noexcept  = 0;
+    virtual LocalTime local_time() const noexcept = 0;
 
 protected:
     ~Clock() = default;

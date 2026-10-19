@@ -3,6 +3,7 @@
 
 #include "core/stereo/tuning.h"
 #include "util/math/angle.h"
+#include "util/time/steady.h"
 
 #include <algorithm>
 #include <cmath>
@@ -12,9 +13,8 @@ namespace omvr::core::stereo {
 
 namespace {
 
-using Seconds = std::chrono::duration<float>;
-
 using util::kDegToRad;
+using util::Seconds;
 
 // Radii no pixel reaches: a pixel's angle from the forward axis is below
 // 90 degrees.
