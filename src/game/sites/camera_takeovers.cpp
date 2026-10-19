@@ -30,7 +30,12 @@ constexpr std::array<std::uint8_t, 8> kFollowRealignStart = {0x8B, 0x41, 0x34, 0
 constexpr std::array<std::uint8_t, 8> kStealCameraStart = {0x83, 0xEC, 0x40, 0x56, 0x57, 0x8B, 0x7C, 0x24};
 // 23 §2.4: CameraResetRequest's first instructions, `push ebp; mov ebp,
 // esp; and esp, -64; sub esp, ...`.
-constexpr std::array<std::uint8_t, 8> kResetRequestStart = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xC0, 0x83, 0xEC};
+constexpr auto kResetRequestStart =
+    x86::concat(x86::kFramePrologue,
+                std::array<std::uint8_t, 5>{x86::kGroup1Imm8Signed, x86::kModRmAndEsp, x86::kAlign64Imm8,
+                                            x86::kGroup1Imm8Signed, x86::kModRmSubEsp});
+static_assert(kResetRequestStart ==
+              std::array<std::uint8_t, 8>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xC0, 0x83, 0xEC});
 
 struct Check {
     const GameImage& g;

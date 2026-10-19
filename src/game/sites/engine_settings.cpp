@@ -29,8 +29,7 @@ constexpr std::uint8_t kLoadFlag                = 1;
 constexpr std::uint8_t kParserOffset            = 0x38;
 constexpr std::array<std::uint8_t, 7> kLoadArgs = {x86::kPushImm8,   kLoadFlag,    x86::kPushEax, x86::kLea,
                                                    x86::kModRmClSib, x86::kSibEsp, kParserOffset};
-constexpr std::size_t kMovEaxMoffsSize          = x86::kImm32Offset + x86::kRel32Size;
-constexpr std::size_t kCallOffset               = kMovEaxMoffsSize + kLoadArgs.size();
+constexpr std::size_t kCallOffset               = x86::kMovEaxMoffsSize + kLoadArgs.size();
 
 // The game's path is a short relative file name (MAX_PATH bounds it).
 constexpr std::size_t kMaxPath = 260;
@@ -42,7 +41,7 @@ std::string_view engine_settings_path(const GameImage& g, ports::Log& log) noexc
     if (!known_or_off(log, r.load_site, kEngineSettingsArea)) return {};
     const std::uint8_t* site = g.at_rva(r.load_site);
     if (site[0] != x86::kMovEaxMoffs || !holds_address(site + x86::kImm32Offset, g.at_rva(r.path_pointer)) ||
-        !x86::matches(site + kMovEaxMoffsSize, kLoadArgs) ||
+        !x86::matches(site + x86::kMovEaxMoffsSize, kLoadArgs) ||
         !calls(site + kCallOffset, g.at_rva(r.xml_load))) {
         ports::logf(log, kCodeLog, r.load_site);
         return {};

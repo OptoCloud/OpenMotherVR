@@ -6,7 +6,6 @@
 #include "game/x86.h"
 #include "platform/win32/patching/memory.h"
 
-#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstring>
@@ -31,9 +30,10 @@ static_assert(kClearPrologue == std::array<std::uint8_t, 6>{0x55, 0x8B, 0xEC, 0x
 
 // The gate's machine code: room for it, and the displacement of its `jne`
 // over the prologue copy and the jump back.
-constexpr std::size_t kStubSize     = 64;
-constexpr std::uint8_t kSkipRel     = static_cast<std::uint8_t>(kClearPrologue.size() + x86::kJmpRel32Size);
-constexpr std::uint8_t kModRmCmpAbs = 0x3D; // 80 /7, [disp32]
+constexpr std::size_t kStubSize = 64;
+constexpr std::uint8_t kSkipRel = static_cast<std::uint8_t>(kClearPrologue.size() + x86::kJmpRel32Size);
+// The value of skip_clears that lets the clear run.
+constexpr std::uint8_t kSkipClearsOff = 0;
 
 // Read by the gate's machine code (`cmp byte ptr [skip_clears], 0`), so it
 // must be one byte at a fixed address. Written and read on the render
@@ -66,9 +66,9 @@ private:
 void write_gate(std::uint8_t* stub, std::uint8_t* clear) noexcept {
     CodeWriter w{stub};
     w.put(x86::kGroup1Imm8);
-    w.put(kModRmCmpAbs);
+    w.put(x86::kModRmCmpAbs);
     w.put_u32(address_of(&skip_clears));
-    w.put(0x00);
+    w.put(kSkipClearsOff);
     w.put(x86::kJneRel8);
     w.put(kSkipRel);
     w.put(kClearPrologue);
@@ -93,10 +93,8 @@ bool install_clear_gate(std::uint8_t* clear, core::diag::ports::Log& log) noexce
     platform::win32::seal_code(stub, kStubSize); // written once; no page stays writable and executable
 
     // jmp stub; nop (the sixth byte of the prologue it replaces)
-    std::array<std::uint8_t, kClearPrologue.size()> entry = x86::nops<kClearPrologue.size()>();
-    entry[0]                                              = x86::kJmpRel32;
-    const auto rel = x86::le32(rel32(clear + x86::kJmpRel32Size, stub));
-    std::copy(rel.begin(), rel.end(), entry.begin() + x86::kCallOperandOffset);
+    const auto entry = x86::concat(x86::jmp_rel32(rel32(clear + x86::kJmpRel32Size, stub)), x86::nops<1>());
+    static_assert(std::tuple_size_v<decltype(entry)> == kClearPrologue.size());
     Patcher patcher{log};
     return patcher.write(clear, entry).has_value();
 }

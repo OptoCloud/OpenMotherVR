@@ -36,7 +36,7 @@ constexpr std::string_view kLogTrackerOn =
 // 21 §2.2: PlayerGetter starts `mov eax, [CharacterRegistry]; mov eax,
 // [eax+8]`.
 constexpr std::array<std::uint8_t, 3> kLoadCharacterList = {x86::kMovR32Rm32, 0x40, 0x08};
-constexpr std::size_t kGetterListOffset                  = x86::kImm32Offset + x86::kRel32Size;
+constexpr std::size_t kGetterListOffset                  = x86::kMovEaxMoffsSize;
 // 21 §2.5: AimRayUpdate's prologue, `push ebp; mov ebp, esp; and esp, -16;
 // sub esp, 0x54`.
 constexpr std::uint8_t kAimRayFrameSize = 0x54;
@@ -46,7 +46,13 @@ constexpr auto kAimRayUpdatePrologue =
 static_assert(kAimRayUpdatePrologue ==
               std::array<std::uint8_t, 9>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x83, 0xEC, 0x54});
 // 21 §2.5: CurrentItem's first instruction, `cmp byte [ecx+0x1510], 0`.
-constexpr std::array<std::uint8_t, 7> kCurrentItemStart = {0x80, 0xB9, 0x10, 0x15, 0x00, 0x00, 0x00};
+constexpr std::uint32_t kCurrentItemFlag = 0x1510;
+constexpr auto kCurrentItemStart         = x86::concat(
+    x86::concat(
+        std::array<std::uint8_t, 2>{x86::kGroup1Imm8, x86::modrm_disp32(x86::kGroup1Cmp, x86::Reg::Ecx)},
+        x86::le32(kCurrentItemFlag)),
+    std::array<std::uint8_t, 1>{0});
+static_assert(kCurrentItemStart == std::array<std::uint8_t, 7>{0x80, 0xB9, 0x10, 0x15, 0x00, 0x00, 0x00});
 // 21 §2.5: the fire alignment test, `comiss xmm0, [threshold]` (the
 // operand is the threshold's address) followed by `jbe +0x11`.
 constexpr std::array<std::uint8_t, 3> kComissXmm0Abs = {x86::kTwoByte, x86::kComiss, x86::kModAbsolute};
@@ -54,8 +60,16 @@ constexpr std::array<std::uint8_t, 2> kJbeShort11    = {x86::kJbeRel8, 0x11};
 constexpr std::size_t kGateJbeOffset                 = x86::kComissDispOffset + x86::kRel32Size;
 // 21 §2.5 (r11): WeaponTransform's first instructions, `push ecx; push
 // esi; push edi; push ecx; mov esi, ecx; cmp dword [esi+0xCC], 0`.
-constexpr std::array<std::uint8_t, 12> kWeaponTransformStart = {0x51, 0x56, 0x57, 0x51, 0x8B, 0xF1,
-                                                                0x83, 0xBE, 0xCC, 0x00, 0x00, 0x00};
+constexpr std::uint32_t kWeaponTransformField = 0xCC;
+constexpr auto kWeaponTransformStart          = x86::concat(
+    x86::concat(std::array<std::uint8_t, 8>{x86::kPushEcx, x86::kPushEsi, x86::kPushEdi, x86::kPushEcx,
+                                            x86::kMovR32Rm32, x86::modrm_reg(x86::Reg::Esi, x86::Reg::Ecx),
+                                            x86::kGroup1Imm8Signed,
+                                            x86::modrm_disp32(x86::kGroup1Cmp, x86::Reg::Esi)},
+                std::array<std::uint8_t, 1>{static_cast<std::uint8_t>(kWeaponTransformField)}),
+    std::array<std::uint8_t, 3>{0, 0, 0});
+static_assert(kWeaponTransformStart == std::array<std::uint8_t, 12>{0x51, 0x56, 0x57, 0x51, 0x8B, 0xF1, 0x83,
+                                                                    0xBE, 0xCC, 0x00, 0x00, 0x00});
 // 21 §2.6: TrackerScan's prologue, `push ebp; mov ebp, esp; and esp, -16`.
 constexpr auto kTrackerScanPrologue = x86::kAlignedFramePrologue;
 

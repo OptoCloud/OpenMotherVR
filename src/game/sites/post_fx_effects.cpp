@@ -38,11 +38,10 @@ constexpr std::uint8_t kModRmEcxEbx = x86::modrm_reg(x86::Reg::Ecx, x86::Reg::Eb
 constexpr std::uint8_t kModRmEcxEsi = x86::modrm_reg(x86::Reg::Ecx, x86::Reg::Esi); // mov ecx, esi
 static_assert(kModRmEcxEax == 0xC8 && kModRmEcxEbx == 0xCB && kModRmEcxEsi == 0xCE);
 // `cmp r/m8, imm8` with [esi + disp32] (group 1, reg field 7).
-constexpr std::uint8_t kModRmCmpEsiDisp32 = 0xBE;
-// `movss xmm1, [esi + disp32]`.
-constexpr std::uint8_t kModRmXmm1EsiDisp32 = 0x8E;
-// `test r/m8, imm8` with [disp32].
-constexpr std::uint8_t kTestRm8Imm8 = 0xF6;
+constexpr std::uint8_t kModRmCmpEsiDisp32 = x86::modrm_disp32(x86::kGroup1Cmp, x86::Reg::Esi);
+// `movss xmm1, [esi + disp32]` (xmm1 is register number 1).
+constexpr std::uint8_t kModRmXmm1EsiDisp32 = x86::modrm_disp32(x86::Reg::Ecx, x86::Reg::Esi);
+static_assert(kModRmCmpEsiDisp32 == 0xBE && kModRmXmm1EsiDisp32 == 0x8E);
 
 // The lens flare draw's pass in the post-processing render.
 constexpr std::uint8_t kPostProcessingPass = 1;
@@ -59,10 +58,6 @@ constexpr std::size_t kLensFlareDrawCall = kLensFlareMove + kMovEcxEax.size();
 constexpr std::array<std::uint8_t, 2> kMovEcxEbx{x86::kMovR32Rm32, kModRmEcxEbx};
 constexpr std::array<std::uint8_t, 2> kMovEcxEsi{x86::kMovR32Rm32, kModRmEcxEsi};
 
-constexpr std::uint8_t byte_of(std::ptrdiff_t value, int index) noexcept {
-    return static_cast<std::uint8_t>(static_cast<std::uint32_t>(value) >> (index * 8));
-}
-
 // ChromaticAberration's entry, `sub esp, 0x10; movss xmm0, [abs]` (the
 // absolute's low byte, which relocation leaves alone, included), and its
 // read of the flag, `cmp byte ptr [esi+0x1B38], 0`.
@@ -76,28 +71,22 @@ constexpr std::array<std::uint8_t, 8> kAberrationPrologue{x86::kGroup1Imm8Signed
                                                           0x14};
 static_assert(kAberrationPrologue ==
               std::array<std::uint8_t, 8>{0x83, 0xEC, 0x10, 0xF3, 0x0F, 0x10, 0x05, 0x14});
-constexpr std::array<std::uint8_t, 7> kAberrationRead{x86::kGroup1Imm8,
-                                                      kModRmCmpEsiDisp32,
-                                                      byte_of(stereo::kPostFxChromaticAberration, 0),
-                                                      byte_of(stereo::kPostFxChromaticAberration, 1),
-                                                      byte_of(stereo::kPostFxChromaticAberration, 2),
-                                                      byte_of(stereo::kPostFxChromaticAberration, 3),
-                                                      0x00};
+constexpr auto kAberrationRead =
+    x86::concat(x86::concat(std::array<std::uint8_t, 2>{x86::kGroup1Imm8, kModRmCmpEsiDisp32},
+                            x86::le32(static_cast<std::uint32_t>(stereo::kPostFxChromaticAberration))),
+                std::array<std::uint8_t, 1>{0});
+static_assert(kAberrationRead == std::array<std::uint8_t, 7>{0x80, 0xBE, 0x38, 0x1B, 0x00, 0x00, 0x00});
 
 // FilmGrain's entry, `sub esp, 0x30; test byte ptr [abs], ...` (the
 // absolute's low byte included), and its read of the intensity, `movss
 // xmm1, [esi+0x608]`.
 constexpr std::array<std::uint8_t, 6> kFilmGrainPrologue{x86::kGroup1Imm8Signed, x86::kModRmSubEsp, 0x30,
-                                                         kTestRm8Imm8,           x86::kModAbsolute, 0xCC};
+                                                         x86::kTestRm8Imm8,      x86::kModAbsolute, 0xCC};
 static_assert(kFilmGrainPrologue == std::array<std::uint8_t, 6>{0x83, 0xEC, 0x30, 0xF6, 0x05, 0xCC});
-constexpr std::array<std::uint8_t, 8> kFilmGrainRead{x86::kRepPrefix,
-                                                     x86::kTwoByte,
-                                                     x86::kMovss,
-                                                     kModRmXmm1EsiDisp32,
-                                                     byte_of(stereo::kPostFxFilmGrain, 0),
-                                                     byte_of(stereo::kPostFxFilmGrain, 1),
-                                                     byte_of(stereo::kPostFxFilmGrain, 2),
-                                                     byte_of(stereo::kPostFxFilmGrain, 3)};
+constexpr auto kFilmGrainRead =
+    x86::concat(std::array<std::uint8_t, 4>{x86::kRepPrefix, x86::kTwoByte, x86::kMovss, kModRmXmm1EsiDisp32},
+                x86::le32(static_cast<std::uint32_t>(stereo::kPostFxFilmGrain)));
+static_assert(kFilmGrainRead == std::array<std::uint8_t, 8>{0xF3, 0x0F, 0x10, 0x8E, 0x08, 0x06, 0x00, 0x00});
 
 // ---- One function per toggle ----------------------------------------------------
 

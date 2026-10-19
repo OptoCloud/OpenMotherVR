@@ -6,7 +6,6 @@
 #include "game/detour.h"
 #include "game/x86.h"
 
-#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -29,26 +28,68 @@ constexpr std::string_view kLogOn   = "[hook] hands, {}: in place ({} sites)";
 // `push imm32` holds their handler's VA: those four bytes are 0 here and
 // filled in from the table for this image (see with_handler), since the
 // loader rebases them.
-constexpr std::array<std::uint8_t, 12> kMeleeStart          = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0,
-                                                               0x81, 0xEC, 0xB4, 0x00, 0x00, 0x00};
-constexpr std::array<std::uint8_t, 12> kMeleeKillStart      = {0x6A, 0xFF, 0x68, 0x00, 0x00, 0x00,
-                                                               0x00, 0x64, 0xA1, 0x00, 0x00, 0x00};
-constexpr std::size_t kMeleeKillHandlerAt                   = 3;
-constexpr std::array<std::uint8_t, 12> kTrapBreakStart      = {0x83, 0xEC, 0x54, 0x53, 0x55, 0x56,
-                                                               0x8B, 0xF1, 0x8B, 0x4E, 0x04, 0x57};
-constexpr std::array<std::uint8_t, 12> kMeleeInterceptStart = {0x83, 0xEC, 0x54, 0x53, 0x56, 0x57,
-                                                               0x83, 0xEC, 0x10, 0x89, 0x64, 0x24};
-constexpr std::array<std::uint8_t, 12> kImpactStandingStart = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0,
-                                                               0x83, 0xEC, 0x64, 0x53, 0x56, 0x8B};
-constexpr std::array<std::uint8_t, 12> kTrapVictimStart     = {0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0,
-                                                               0x81, 0xEC, 0xD4, 0x00, 0x00, 0x00};
+//
+// The SEH frame's pieces: `push -1` (the frame's state), `push <handler>`
+// and `mov eax, fs:[0]` (the thread's handler chain).
+constexpr std::uint8_t kSehStateNone                = 0xFF; // -1 as a sign-extended imm8
+constexpr std::array<std::uint8_t, 2> kPushSehState = {x86::kPushImm8, kSehStateNone};
+constexpr std::array<std::uint8_t, 5> kPushHandler  = {x86::kPushImm32, 0, 0, 0, 0};
+constexpr std::array<std::uint8_t, 6> kLoadSehChain = {x86::kFsPrefix, x86::kMovEaxMoffs, 0, 0, 0, 0};
+constexpr auto kSubEsp54                            = x86::sub_esp_imm8(0x54);
+constexpr std::array<std::uint8_t, 2> kMovEsiEcx    = {x86::kMovR32Rm32,
+                                                       x86::modrm_reg(x86::Reg::Esi, x86::Reg::Ecx)};
+
+// `push ebp; mov ebp, esp; and esp, -16; sub esp, 0xB4`.
+constexpr auto kMeleeStart = x86::concat(x86::kAlignedFramePrologue, x86::sub_esp_imm32(0xB4));
+static_assert(kMeleeStart == std::array<std::uint8_t, 12>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x81, 0xEC,
+                                                          0xB4, 0x00, 0x00, 0x00});
+// `push -1; push <handler>; mov eax, fs:[0]` (its first five bytes).
+constexpr auto kMeleeKillStart = x86::concat(x86::concat(kPushSehState, kPushHandler),
+                                             std::array<std::uint8_t, 5>{x86::kFsPrefix, x86::kMovEaxMoffs});
+static_assert(kMeleeKillStart == std::array<std::uint8_t, 12>{0x6A, 0xFF, 0x68, 0x00, 0x00, 0x00, 0x00, 0x64,
+                                                              0xA1, 0x00, 0x00, 0x00});
+constexpr std::size_t kMeleeKillHandlerAt = kPushSehState.size() + x86::kImm32Offset;
+// `sub esp, 0x54; push ebx; push ebp; push esi; mov esi, ecx; mov ecx,
+// [esi+4]; push edi`.
+constexpr auto kTrapBreakStart = x86::concat(
+    x86::concat(
+        x86::concat(kSubEsp54, std::array<std::uint8_t, 3>{x86::kPushEbx, x86::kPushEbp, x86::kPushEsi}),
+        kMovEsiEcx),
+    std::array<std::uint8_t, 4>{x86::kMovR32Rm32, x86::modrm_disp8(x86::Reg::Ecx, x86::Reg::Esi), 0x04,
+                                x86::kPushEdi});
+static_assert(kTrapBreakStart == std::array<std::uint8_t, 12>{0x83, 0xEC, 0x54, 0x53, 0x55, 0x56, 0x8B, 0xF1,
+                                                              0x8B, 0x4E, 0x04, 0x57});
+// `sub esp, 0x54; push ebx; push esi; push edi; sub esp, 0x10; mov
+// [esp+...], esp` (up to its SIB byte).
+constexpr auto kMeleeInterceptStart = x86::concat(
+    x86::concat(
+        x86::concat(kSubEsp54, std::array<std::uint8_t, 3>{x86::kPushEbx, x86::kPushEsi, x86::kPushEdi}),
+        x86::sub_esp_imm8(0x10)),
+    std::array<std::uint8_t, 3>{x86::kMovRm32R32, x86::modrm_disp8(x86::Reg::Esp, x86::Reg::Esp),
+                                x86::kSibEsp});
+static_assert(kMeleeInterceptStart == std::array<std::uint8_t, 12>{0x83, 0xEC, 0x54, 0x53, 0x56, 0x57, 0x83,
+                                                                   0xEC, 0x10, 0x89, 0x64, 0x24});
+// `push ebp; mov ebp, esp; and esp, -16; sub esp, 0x64; push ebx; push
+// esi; mov ...` (the move's opcode).
+constexpr auto kImpactStandingStart =
+    x86::concat(x86::concat(x86::kAlignedFramePrologue, x86::sub_esp_imm8(0x64)),
+                std::array<std::uint8_t, 3>{x86::kPushEbx, x86::kPushEsi, x86::kMovR32Rm32});
+static_assert(kImpactStandingStart == std::array<std::uint8_t, 12>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x83,
+                                                                   0xEC, 0x64, 0x53, 0x56, 0x8B});
+// `push ebp; mov ebp, esp; and esp, -16; sub esp, 0xD4`.
+constexpr auto kTrapVictimStart = x86::concat(x86::kAlignedFramePrologue, x86::sub_esp_imm32(0xD4));
+static_assert(kTrapVictimStart == std::array<std::uint8_t, 12>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x81, 0xEC,
+                                                               0xD4, 0x00, 0x00, 0x00});
 // 21 §2.11: the play request and its counterpart, up to the end of the
-// handler's `push imm32`.
-constexpr std::array<std::uint8_t, 13> kPlayRequestStart     = {0x64, 0xA1, 0x00, 0x00, 0x00, 0x00, 0x6A,
-                                                                0xFF, 0x68, 0x00, 0x00, 0x00, 0x00};
-constexpr std::array<std::uint8_t, 13> kPlayCounterpartStart = {0x6A, 0xFF, 0x64, 0xA1, 0x00, 0x00, 0x00,
-                                                                0x00, 0x68, 0x00, 0x00, 0x00, 0x00};
-constexpr std::size_t kPlayHandlerAt                         = 9;
+// handler's `push imm32`: `mov eax, fs:[0]; push -1; push <handler>` and
+// `push -1; mov eax, fs:[0]; push <handler>`.
+constexpr auto kPlayRequestStart = x86::concat(x86::concat(kLoadSehChain, kPushSehState), kPushHandler);
+static_assert(kPlayRequestStart == std::array<std::uint8_t, 13>{0x64, 0xA1, 0x00, 0x00, 0x00, 0x00, 0x6A,
+                                                                0xFF, 0x68, 0x00, 0x00, 0x00, 0x00});
+constexpr auto kPlayCounterpartStart = x86::concat(x86::concat(kPushSehState, kLoadSehChain), kPushHandler);
+static_assert(kPlayCounterpartStart == std::array<std::uint8_t, 13>{0x6A, 0xFF, 0x64, 0xA1, 0x00, 0x00, 0x00,
+                                                                    0x00, 0x68, 0x00, 0x00, 0x00, 0x00});
+constexpr std::size_t kPlayHandlerAt = kLoadSehChain.size() + kPushSehState.size() + x86::kImm32Offset;
 static_assert(kMeleeKillStart[kMeleeKillHandlerAt - 1] == x86::kPushImm32 &&
               kPlayRequestStart[kPlayHandlerAt - 1] == x86::kPushImm32 &&
               kPlayCounterpartStart[kPlayHandlerAt - 1] == x86::kPushImm32);
@@ -62,8 +103,9 @@ std::array<std::uint8_t, N> with_handler(const GameImage& g, const std::array<st
 }
 // 21 §2.7: SetBodyVelocities, `push ebp; mov ebp, esp; and esp, -16; sub
 // esp, 0x3C`.
-constexpr std::array<std::uint8_t, 9> kSetBodyVelocitiesStart = {0x55, 0x8B, 0xEC, 0x83, 0xE4,
-                                                                 0xF0, 0x83, 0xEC, 0x3C};
+constexpr auto kSetBodyVelocitiesStart = x86::concat(x86::kAlignedFramePrologue, x86::sub_esp_imm8(0x3C));
+static_assert(kSetBodyVelocitiesStart ==
+              std::array<std::uint8_t, 9>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x83, 0xEC, 0x3C});
 
 // 21 §2.11: the melee starts are slot 24 of their vtables; the play
 // request and its counterpart slots +0x3D0 and +0x3D4 of their table.
@@ -84,7 +126,7 @@ struct Site {
 
 template <class Fn>
 bool site_expected(const GameImage& g, const Site<Fn>& s) noexcept {
-    return s.rva != 0 && s.hook && std::ranges::equal(s.start, std::span{g.at_rva(s.rva), s.start.size()});
+    return s.rva != 0 && s.hook && x86::matches(g.at_rva(s.rva), s.start);
 }
 
 // Verifies every site, then detours them in order. A detour that fails

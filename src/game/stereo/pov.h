@@ -73,11 +73,8 @@ inline constexpr std::size_t kFloat4Floats           = 4;
 inline constexpr std::uint8_t kViewportFrameSize = 0x18;
 inline constexpr std::uint8_t kSecondArgDisp     = 0x0C; // [ebp+0xC]
 inline constexpr std::uint8_t kFirstArgDisp      = 0x08; // [ebp+8]
-inline constexpr std::uint8_t kModRmEaxEbpDisp8 =
-    x86::modrm(x86::kModDisp8, std::to_underlying(x86::Reg::Eax), std::to_underlying(x86::Reg::Ebp));
-inline constexpr std::uint8_t kModRmEsiEbpDisp8 =
-    x86::modrm(x86::kModDisp8, std::to_underlying(x86::Reg::Esi), std::to_underlying(x86::Reg::Ebp));
-inline constexpr std::uint8_t kPushEdi = x86::kPushEax + std::to_underlying(x86::Reg::Edi);
+inline constexpr std::uint8_t kModRmEaxEbpDisp8  = x86::modrm_disp8(x86::Reg::Eax, x86::Reg::Ebp);
+inline constexpr std::uint8_t kModRmEsiEbpDisp8  = x86::modrm_disp8(x86::Reg::Esi, x86::Reg::Ebp);
 
 inline constexpr auto kViewportSetterPrologue = x86::concat(
     x86::concat(x86::kFramePrologue,
@@ -87,8 +84,8 @@ static_assert(kViewportSetterPrologue ==
               std::array<std::uint8_t, 9>{0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x18, 0x8B, 0x45, 0x0C});
 
 inline constexpr auto kVsConstantWriterPrologue = x86::concat(
-    x86::kFramePrologue,
-    std::array<std::uint8_t, 5>{x86::kPushEsi, x86::kMovR32Rm32, kModRmEsiEbpDisp8, kFirstArgDisp, kPushEdi});
+    x86::kFramePrologue, std::array<std::uint8_t, 5>{x86::kPushEsi, x86::kMovR32Rm32, kModRmEsiEbpDisp8,
+                                                     kFirstArgDisp, x86::kPushEdi});
 static_assert(kVsConstantWriterPrologue ==
               std::array<std::uint8_t, 8>{0x55, 0x8B, 0xEC, 0x56, 0x8B, 0x75, 0x08, 0x57});
 

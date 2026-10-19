@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <span>
 #include <utility>
 
 // The x86 (IA-32) encodings the patches check and write. Instruction-set
@@ -30,6 +31,7 @@ inline constexpr std::uint8_t kPushEcx          = 0x51;
 inline constexpr std::uint8_t kPushEbx          = 0x53;
 inline constexpr std::uint8_t kPushEax          = 0x50;
 inline constexpr std::uint8_t kPushEsi          = 0x56;
+inline constexpr std::uint8_t kPushEdi          = 0x57;
 inline constexpr std::uint8_t kMovEaxImm32      = 0xB8; // mov eax, imm32
 inline constexpr std::uint8_t kMovClImm8        = 0xB1; // mov cl, imm8
 inline constexpr std::uint8_t kMovRm8R8         = 0x88; // mov r/m8, r8
@@ -40,6 +42,8 @@ inline constexpr std::uint8_t kMovR32Rm32       = 0x8B; // mov r32, r/m32
 inline constexpr std::uint8_t kCmpR32Rm32       = 0x3B; // cmp r32, r/m32
 inline constexpr std::uint8_t kCmpRm32R32       = 0x39; // cmp r/m32, r32
 inline constexpr std::uint8_t kLea              = 0x8D; // lea r32, m
+inline constexpr std::uint8_t kTestRm32R32      = 0x85; // test r/m32, r32
+inline constexpr std::uint8_t kTestRm8Imm8      = 0xF6; // test r/m8, imm8 (group 3, reg field 0)
 inline constexpr std::uint8_t kGroup1Imm8       = 0x80; // cmp/add/... r/m8, imm8 (reg field selects)
 inline constexpr std::uint8_t kGroup1Imm32      = 0x81; // sub/add/... r/m32, imm32 (reg field selects)
 inline constexpr std::uint8_t kGroup1Imm8Signed = 0x83; // sub/add/... r/m32, sign-extended imm8
@@ -53,6 +57,7 @@ inline constexpr std::uint8_t kComiss   = 0x2F; // comiss xmm, xmm/m32
 inline constexpr std::uint8_t kMovss    = 0x10; // movss xmm, xmm/m32 (after kRepPrefix)
 
 inline constexpr std::uint8_t kRepPrefix = 0xF3; // selects movss over movups
+inline constexpr std::uint8_t kFsPrefix  = 0x64; // fs: segment override (the thread's SEH chain at fs:[0])
 
 // Opcode extensions in the reg field of the group 1 opcodes.
 inline constexpr std::uint8_t kGroup1And = 4;
@@ -99,6 +104,24 @@ inline constexpr std::uint8_t kModRmCl = modrm_reg(Reg::Eax, Reg::Ecx);
 inline constexpr std::uint8_t kModRmSubEsp = modrm(kModRegister, kGroup1Sub, std::to_underlying(Reg::Esp));
 inline constexpr std::uint8_t kModRmAndEsp = modrm(kModRegister, kGroup1And, std::to_underlying(Reg::Esp));
 static_assert(kModRmEaxEax == 0xC0 && kModRmCl == 0xC1 && kModRmSubEsp == 0xEC && kModRmAndEsp == 0xE4);
+// `cmp r/m8, imm8` (group 1) on [disp32].
+inline constexpr std::uint8_t kModRmCmpAbs = modrm(0, kGroup1Cmp, kModAbsolute);
+static_assert(kModRmCmpAbs == 0x3D);
+
+// The [reg + disp8] and [reg + disp32] forms: `reg` is a register number or
+// an opcode extension, `base` the address register.
+constexpr std::uint8_t modrm_disp8(std::uint8_t reg, Reg base) noexcept {
+    return modrm(kModDisp8, reg, std::to_underlying(base));
+}
+constexpr std::uint8_t modrm_disp32(std::uint8_t reg, Reg base) noexcept {
+    return modrm(kModDisp32, reg, std::to_underlying(base));
+}
+constexpr std::uint8_t modrm_disp8(Reg reg, Reg base) noexcept {
+    return modrm_disp8(std::to_underlying(reg), base);
+}
+constexpr std::uint8_t modrm_disp32(Reg reg, Reg base) noexcept {
+    return modrm_disp32(std::to_underlying(reg), base);
+}
 
 // ---- Instruction sizes -----------------------------------------------------
 
@@ -107,6 +130,7 @@ inline constexpr std::size_t kJmpRel32Size     = 5; // E9 rel32
 inline constexpr std::size_t kJbeRel32Size     = 6; // 0F 86 rel32
 inline constexpr std::size_t kJmpRel8Size      = 2; // EB rel8
 inline constexpr std::size_t kMovEaxImm32Size  = 5; // B8 imm32
+inline constexpr std::size_t kMovEaxMoffsSize  = 5; // A1 moffs32
 inline constexpr std::size_t kMovEcxAbsSize    = 6; // 8B 0D disp32
 inline constexpr std::size_t kPushImm8Size     = 2; // 6A imm8
 inline constexpr std::size_t kMovRm8Disp32Size = 6; // 88 modrm disp32
@@ -130,6 +154,8 @@ inline constexpr std::size_t kMovRmDispOffset = 2;
 // the value at byte 6.
 inline constexpr std::size_t kMovAbsDispOffset = 2;
 
+static_assert(kMovEaxMoffsSize == kImm32Offset + kRel32Size);
+
 // The farthest a `jmp short` reaches forward.
 inline constexpr std::size_t kMaxRel8 = 0x7F;
 
@@ -151,6 +177,7 @@ inline constexpr std::array<std::uint8_t, 3> kFramePrologue = {kPushEbp, kMovR32
 
 // `and esp, -16` after it: a frame with the stack aligned for SSE.
 inline constexpr std::uint8_t kAlign16Imm8 = 0xF0; // -16 as a sign-extended imm8
+inline constexpr std::uint8_t kAlign64Imm8 = 0xC0; // -64 as a sign-extended imm8
 inline constexpr auto kAlignedFramePrologue =
     concat(kFramePrologue, std::array<std::uint8_t, 3>{kGroup1Imm8Signed, kModRmAndEsp, kAlign16Imm8});
 static_assert(kAlignedFramePrologue == std::array<std::uint8_t, 6>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0});
@@ -177,6 +204,10 @@ bool matches(const std::uint8_t* site, const Pattern<N>& p) noexcept {
 template <std::size_t N>
 bool matches(const std::uint8_t* site, const std::array<std::uint8_t, N>& bytes) noexcept {
     return std::memcmp(site, bytes.data(), N) == 0;
+}
+
+inline bool matches(const std::uint8_t* site, std::span<const std::uint8_t> bytes) noexcept {
+    return std::memcmp(site, bytes.data(), bytes.size()) == 0;
 }
 
 // ---- Replacement code ------------------------------------------------------
@@ -231,5 +262,18 @@ constexpr std::array<std::uint8_t, N> jump_over() noexcept {
     out[1]   = static_cast<std::uint8_t>(N - kJmpRel8Size);
     return out;
 }
+
+// ---- Frames ----------------------------------------------------------------
+
+// `sub esp, n`: a function's locals, with a sign-extended imm8 (n below
+// 0x80) or an imm32.
+constexpr std::array<std::uint8_t, 3> sub_esp_imm8(std::uint8_t n) noexcept {
+    return {kGroup1Imm8Signed, kModRmSubEsp, n};
+}
+constexpr std::array<std::uint8_t, 6> sub_esp_imm32(std::uint32_t n) noexcept {
+    return concat(std::array<std::uint8_t, 2>{kGroup1Imm32, kModRmSubEsp}, le32(n));
+}
+static_assert(sub_esp_imm8(0x10) == std::array<std::uint8_t, 3>{0x83, 0xEC, 0x10});
+static_assert(sub_esp_imm32(0x154) == std::array<std::uint8_t, 6>{0x81, 0xEC, 0x54, 0x01, 0x00, 0x00});
 
 } // namespace omvr::game::x86

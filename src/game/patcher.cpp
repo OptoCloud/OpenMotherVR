@@ -8,8 +8,6 @@
 #include "game/x86.h"
 #include "platform/win32/patching/memory.h"
 
-#include <array>
-#include <cstring>
 #include <expected>
 
 namespace omvr::game {
@@ -26,9 +24,7 @@ util::Result<void> Patcher::write_bytes(std::uint8_t* dst, std::span<const std::
 }
 
 util::Result<void> Patcher::write_u32(std::uint8_t* dst, std::uint32_t value) noexcept {
-    std::array<std::uint8_t, sizeof(value)> bytes{};
-    std::memcpy(bytes.data(), &value, sizeof(value));
-    return write_bytes(dst, bytes);
+    return write_bytes(dst, x86::le32(value));
 }
 
 util::Result<void> Patcher::redirect_call(std::uint8_t* site, const void* fn,

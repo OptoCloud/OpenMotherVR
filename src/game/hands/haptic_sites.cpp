@@ -32,7 +32,11 @@ constexpr std::string_view kLogTrackerOff =
 
 // 21 §2.9: RumbleSetMotors' first instruction, `movss xmm0, [esp+4]` (the
 // low-frequency level).
-constexpr std::array<std::uint8_t, 6> kRumbleSetMotorsStart = {0xF3, 0x0F, 0x10, 0x44, 0x24, 0x04};
+constexpr std::uint8_t kFirstStackArg                       = 4; // [esp+4]
+constexpr std::array<std::uint8_t, 6> kRumbleSetMotorsStart = {
+    x86::kRepPrefix, x86::kTwoByte, x86::kMovss, x86::modrm_disp8(x86::Reg::Eax, x86::Reg::Esp),
+    x86::kSibEsp,    kFirstStackArg};
+static_assert(kRumbleSetMotorsStart == std::array<std::uint8_t, 6>{0xF3, 0x0F, 0x10, 0x44, 0x24, 0x04});
 
 // 21 §2.9: the rumble object's vtable holds RumbleSetMotors in slot 0, so
 // the function is the one the game calls for every pad rumble.

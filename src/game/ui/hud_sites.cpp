@@ -28,25 +28,45 @@ constexpr std::string_view kHighlightArea  = "item highlight";
 
 // 22 §2.4: UiFindObject's first instructions, `sub esp, 8; push ebx; push
 // ebp; push esi; mov esi, ecx`.
-constexpr std::array<std::uint8_t, 8> kFindObjectStart = {0x83, 0xEC, 0x08, 0x53, 0x55, 0x56, 0x8B, 0xF1};
+constexpr auto kFindObjectStart =
+    x86::concat(x86::sub_esp_imm8(0x08),
+                std::array<std::uint8_t, 5>{x86::kPushEbx, x86::kPushEbp, x86::kPushEsi, x86::kMovR32Rm32,
+                                            x86::modrm_reg(x86::Reg::Esi, x86::Reg::Ecx)});
+static_assert(kFindObjectStart ==
+              std::array<std::uint8_t, 8>{0x83, 0xEC, 0x08, 0x53, 0x55, 0x56, 0x8B, 0xF1});
 // 22 §2.4: UiInvoke's SEH prologue, `push -1; push <handler>; mov eax,
 // fs:[0]`; the handler's address is masked.
-constexpr x86::Pattern<13> kInvokeStart{
-    {0x6A, 0xFF, x86::kPushImm32, 0, 0, 0, 0, 0x64, 0xA1, 0x00, 0x00, 0x00, 0x00},
-    {0xFF, 0xFF, 0xFF, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
+constexpr std::uint8_t kSehStateNone = 0xFF; // -1 as a sign-extended imm8
+constexpr x86::Pattern<13> kInvokeStart{{x86::kPushImm8, kSehStateNone, x86::kPushImm32, 0, 0, 0, 0,
+                                         x86::kFsPrefix, x86::kMovEaxMoffs, 0x00, 0x00, 0x00, 0x00},
+                                        {0xFF, 0xFF, 0xFF, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
+static_assert(kInvokeStart.bytes ==
+              std::array<std::uint8_t, 13>{0x6A, 0xFF, 0x68, 0, 0, 0, 0, 0x64, 0xA1, 0x00, 0x00, 0x00, 0x00});
 // 22 §2.4: WeaponHudHide and Show begin `push esi; mov esi, ecx; cmp dword
 // ptr [esi+0x68], 0; je`, then push the function name they invoke.
-constexpr std::array<std::uint8_t, 7> kWeaponHudStart = {0x56, 0x8B, 0xF1, 0x83, 0x7E, 0x68, 0x00};
-constexpr std::size_t kWeaponHudPush                  = 9;
+constexpr std::uint8_t kWeaponHudMovie                = 0x68; // [esi+0x68]
+constexpr std::array<std::uint8_t, 7> kWeaponHudStart = {x86::kPushEsi,
+                                                         x86::kMovR32Rm32,
+                                                         x86::modrm_reg(x86::Reg::Esi, x86::Reg::Ecx),
+                                                         x86::kGroup1Imm8Signed,
+                                                         x86::modrm_disp8(x86::kGroup1Cmp, x86::Reg::Esi),
+                                                         kWeaponHudMovie,
+                                                         0x00};
+static_assert(kWeaponHudStart == std::array<std::uint8_t, 7>{0x56, 0x8B, 0xF1, 0x83, 0x7E, 0x68, 0x00});
+constexpr std::size_t kWeaponHudPush = 9;
 // 22 §2.4: PickupHudHide and Show begin `push esi; push <name>`.
 constexpr std::size_t kPickupHudPush = 1;
-// 23 §2.7: CrosshairUpdate's first instructions.
-constexpr std::array<std::uint8_t, 8> kCrosshairUpdateStart = {0x51, 0x53, 0x56, 0x57,
-                                                               0x6A, 0x00, 0x8B, 0xF9};
+// 23 §2.7: CrosshairUpdate's first instructions, `push ecx; push ebx;
+// push esi; push edi; push 0; mov edi, ecx`.
+constexpr std::array<std::uint8_t, 8> kCrosshairUpdateStart = {
+    x86::kPushEcx,  x86::kPushEbx, x86::kPushEsi,    x86::kPushEdi,
+    x86::kPushImm8, 0x00,          x86::kMovR32Rm32, x86::modrm_reg(x86::Reg::Edi, x86::Reg::Ecx)};
+static_assert(kCrosshairUpdateStart ==
+              std::array<std::uint8_t, 8>{0x51, 0x53, 0x56, 0x57, 0x6A, 0x00, 0x8B, 0xF9});
 // 23 §2.6: the icon highlight update's first instructions, `push ebp; mov
 // ebp, esp; and esp, -16; push -1`.
 constexpr auto kIconHighlightStart =
-    x86::concat(x86::kAlignedFramePrologue, std::array<std::uint8_t, 2>{x86::kPushImm8, 0xFF});
+    x86::concat(x86::kAlignedFramePrologue, std::array<std::uint8_t, 2>{x86::kPushImm8, kSehStateNone});
 static_assert(kIconHighlightStart ==
               std::array<std::uint8_t, 8>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x6A, 0xFF});
 

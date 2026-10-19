@@ -73,8 +73,16 @@ constexpr auto kAaPassPrologue = x86::kAlignedFramePrologue;
 // eax; je +0xF; push eax; push esi; push ebx`: the test takes the context's
 // occlusion buffer, which only the main POV has, so the replacement needs
 // no phase check.
-constexpr std::array<std::uint8_t, 10> kOcclusionArgs = {0x8B, 0x46, 0x5C, 0x85, 0xC0,
-                                                         0x74, 0x0F, 0x50, 0x56, 0x53};
+constexpr std::uint8_t kOcclusionBufferDisp           = 0x5C; // [esi+0x5C]
+constexpr std::uint8_t kNoBufferSkip                  = 0x0F; // je over the call
+constexpr std::array<std::uint8_t, 10> kOcclusionArgs = {
+    x86::kMovR32Rm32,     x86::modrm_disp8(x86::Reg::Eax, x86::Reg::Esi),
+    kOcclusionBufferDisp, x86::kTestRm32R32,
+    x86::kModRmEaxEax,    x86::kJeRel8,
+    kNoBufferSkip,        x86::kPushEax,
+    x86::kPushEsi,        x86::kPushEbx};
+static_assert(kOcclusionArgs ==
+              std::array<std::uint8_t, 10>{0x8B, 0x46, 0x5C, 0x85, 0xC0, 0x74, 0x0F, 0x50, 0x56, 0x53});
 
 bool postfx_getter_is_expected(const std::uint8_t* getter) noexcept {
     return getter[0] == x86::kMovEaxImm32 && getter[kGetterRetOffset] == x86::kRet;
