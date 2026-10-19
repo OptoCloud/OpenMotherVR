@@ -49,6 +49,25 @@ std::optional<Operand> parse_operand(const std::uint32_t* t, std::size_t end, st
     return o;
 }
 
+std::optional<std::vector<Instruction>> instructions(std::span<const std::uint32_t> t, std::size_t end) {
+    std::vector<Instruction> out;
+    for (std::size_t i = kProgramHeaderTokens; i < end;) {
+        const std::uint32_t tok = t[i];
+        const std::uint32_t op  = opcode(tok);
+        std::size_t len         = inst_length(tok);
+        if (op == kOpCustomData) {
+            if (i + 1 >= end) return std::nullopt; // no room for its length
+            len = t[i + 1];
+        }
+        // Not `i + len > end`: a customData length near 2^32 wraps size_t
+        // on Win32 and would walk backwards forever.
+        if (len == 0 || len > end - i) return std::nullopt;
+        out.push_back({i, len, op, op_extended(tok)});
+        i += len;
+    }
+    return out;
+}
+
 bool is_immediate4(const std::uint32_t* t, const Operand& o, std::uint32_t x, std::uint32_t y,
                    std::uint32_t z, std::uint32_t w) {
     if (o.type != kTypeImmediate32 || o.size != 1 + kImmediateValues4) return false;

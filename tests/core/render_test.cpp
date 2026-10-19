@@ -502,6 +502,52 @@ TEST_CASE("parse_operand refuses an index past the instruction's end") {
     CHECK(o->size == 2u);
 }
 
+TEST_CASE("the instruction walk steps over customData by its own length") {
+    // ps_5_0, dcl_temps 1, a customData block of 3 tokens, an extended
+    // opcode token of 2 tokens, ret.
+    const std::vector<std::uint32_t> t = {0x00000050, 10,         0x02000068, 1,          0x00000035,
+                                          3,          0xDEADBEEF, 0x82000045, 0x00000000, 0x0100003E};
+    const auto insts                   = instructions(t, t.size());
+    REQUIRE(insts.has_value());
+    REQUIRE(insts->size() == 4);
+    CHECK((*insts)[0].at == 2u);
+    CHECK((*insts)[0].len == 2u);
+    CHECK((*insts)[0].op == 0x68u);
+    CHECK_FALSE((*insts)[0].extended);
+    CHECK((*insts)[1].at == 4u);
+    CHECK((*insts)[1].len == 3u);
+    CHECK((*insts)[1].op == 0x35u);
+    CHECK((*insts)[2].at == 7u);
+    CHECK((*insts)[2].extended);
+    CHECK((*insts)[3].at == 9u);
+    CHECK((*insts)[3].op == 0x3Eu);
+    // Only up to `end`: the last instruction left out.
+    REQUIRE(instructions(t, 9).has_value());
+    CHECK(instructions(t, 9)->size() == 3);
+    // A header alone has no instructions.
+    REQUIRE(instructions(t, 2).has_value());
+    CHECK(instructions(t, 2)->empty());
+}
+
+TEST_CASE("the instruction walk refuses lengths that are zero, too long or wrap") {
+    // An opcode of length 0.
+    const std::vector<std::uint32_t> zero = {0x00000050, 3, 0x0000003E};
+    CHECK_FALSE(instructions(zero, zero.size()).has_value());
+    // A customData block of length 0.
+    const std::vector<std::uint32_t> empty_block = {0x00000050, 4, 0x00000035, 0};
+    CHECK_FALSE(instructions(empty_block, empty_block.size()).has_value());
+    // An instruction that runs past `end`.
+    const std::vector<std::uint32_t> long_op = {0x00000050, 4, 0x0300003E, 0};
+    CHECK_FALSE(instructions(long_op, long_op.size()).has_value());
+    // customData as the last token: no room for its length.
+    const std::vector<std::uint32_t> no_length = {0x00000050, 3, 0x00000035};
+    CHECK_FALSE(instructions(no_length, no_length.size()).has_value());
+    // A customData length that, added to its position, wraps a 32-bit size_t.
+    const std::vector<std::uint32_t> wrap = {0x00000050, 5, 0x0100003E, 0x00000035, 0u - 1u};
+    CHECK_FALSE(instructions(wrap, wrap.size()).has_value());
+    CHECK_FALSE(instructions(with_wrapping_custom_data(dither_program()), 39).has_value());
+}
+
 // `blob` with the word at `at` replaced and the checksum stored again.
 std::vector<std::uint8_t> with_word(std::vector<std::uint8_t> blob, std::size_t at, std::uint32_t v) {
     std::memcpy(blob.data() + at, &v, sizeof(v));

@@ -193,32 +193,9 @@ bool match_dp2(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s) 
 
 // ---- The program -----------------------------------------------------------------
 
-// The program's instructions (token index of each opcode), or nothing when
-// one does not fit.
-std::optional<std::vector<std::size_t>> instructions(const std::vector<std::uint32_t>& t, std::size_t end) {
-    std::vector<std::size_t> at;
-    for (std::size_t i = kProgramHeaderTokens; i < end;) {
-        std::size_t len = inst_length(t[i]);
-        if (opcode(t[i]) == kOpCustomData) {
-            if (i + 1 >= end) return std::nullopt;
-            len = t[i + 1];
-        }
-        // Not `i + len > end`: a customData length near 2^32 wraps
-        // size_t on Win32 and would walk backwards forever.
-        if (len == 0 || len > end - i) return std::nullopt;
-        at.push_back(i);
-        i += len;
-    }
-    return at;
-}
-
-std::size_t length_at(const std::vector<std::uint32_t>& t, std::size_t i) {
-    return opcode(t[i]) == kOpCustomData ? t[i + 1] : inst_length(t[i]);
-}
-
-bool is_cb2_declaration(const std::vector<std::uint32_t>& t, std::size_t i) {
-    return opcode(t[i]) == kOpDclConstantBuffer && length_at(t, i) == kDclCbLength &&
-           op_type(t[i + 1]) == kTypeConstantBuffer && t[i + kDclCbIndex] == kResolutionBuffer;
+bool is_cb2_declaration(const std::vector<std::uint32_t>& t, const Instruction& in) {
+    return in.op == kOpDclConstantBuffer && in.len == kDclCbLength &&
+           op_type(t[in.at + 1]) == kTypeConstantBuffer && t[in.at + kDclCbIndex] == kResolutionBuffer;
 }
 
 // The program's dither sites and its cb2 declaration (token index), or
@@ -229,20 +206,19 @@ struct Sites {
 };
 
 std::optional<Sites> find_sites(const std::vector<std::uint32_t>& t, std::size_t end) {
-    const auto at = instructions(t, end);
-    if (!at) return std::nullopt;
+    const auto insts = instructions(t, end);
+    if (!insts) return std::nullopt;
     Sites s;
-    const std::size_t n = at->size();
+    const std::size_t n = insts->size();
     for (std::size_t k = 0; k < n; ++k) {
-        const std::size_t i = (*at)[k];
-        if (is_cb2_declaration(t, i)) s.cb2_decl = i;
+        const Instruction& i = (*insts)[k];
+        if (is_cb2_declaration(t, i)) s.cb2_decl = i.at;
         if (k + 2 >= n) continue;
-        const std::size_t j = (*at)[k + 1], l = (*at)[k + 2];
+        const Instruction &j = (*insts)[k + 1], &l = (*insts)[k + 2];
         Site site;
         std::uint32_t position = 0;
-        if (match_mul(t.data(), i, length_at(t, i), site, position) &&
-            match_mad(t.data(), j, length_at(t, j), site, position) &&
-            match_dp2(t.data(), l, length_at(t, l), site))
+        if (match_mul(t.data(), i.at, i.len, site, position) &&
+            match_mad(t.data(), j.at, j.len, site, position) && match_dp2(t.data(), l.at, l.len, site))
             s.found.push_back(site);
     }
     if (s.found.empty()) return std::nullopt;

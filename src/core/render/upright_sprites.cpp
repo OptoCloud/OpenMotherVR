@@ -95,16 +95,9 @@ std::optional<CbRef> cb_ref(const std::uint32_t* t, const Operand& o) {
 
 // ---- The instructions ------------------------------------------------------------
 
-struct Inst {
-    std::size_t at;
-    std::size_t len;
-    std::uint32_t op;
-    bool extended;
-};
-
 // The operands of an instruction, in order, or nothing when one cannot be
 // parsed or they do not fill it exactly.
-std::optional<std::array<Operand, 4>> operands4(const std::uint32_t* t, const Inst& in) {
+std::optional<std::array<Operand, 4>> operands4(const std::uint32_t* t, const Instruction& in) {
     std::array<Operand, 4> ops{};
     std::size_t p = in.at + 1;
     for (auto& o : ops) {
@@ -128,7 +121,7 @@ struct Corner {
     TempComponent clip{};
 };
 
-std::optional<Corner> match_corner(const std::uint32_t* t, const Inst& in, std::size_t index,
+std::optional<Corner> match_corner(const std::uint32_t* t, const Instruction& in, std::size_t index,
                                    std::uint32_t component) {
     if (in.op != kOpMad || in.extended) return std::nullopt;
     const auto ops = operands4(t, in);
@@ -153,7 +146,7 @@ std::optional<Corner> match_corner(const std::uint32_t* t, const Inst& in, std::
 // The shader model 4 declarations, which write no temporary.
 constexpr std::uint32_t kOpFirstDeclaration = 0x58, kOpLastDeclaration = 0x6A;
 
-bool writes(const std::uint32_t* t, const Inst& in, std::uint32_t reg, std::uint32_t c) {
+bool writes(const std::uint32_t* t, const Instruction& in, std::uint32_t reg, std::uint32_t c) {
     constexpr std::uint32_t kOpImul = 0x26, kOpSincos = 0x4D, kOpUdiv = 0x4E, kOpUmul = 0x51, kOpUaddc = 0x84,
                             kOpUsubb = 0x85, kOpSwapc = 0x8E;
     if (in.len == 1) return false; // no operands (ret, nop, flags)
@@ -179,10 +172,10 @@ bool writes(const std::uint32_t* t, const Inst& in, std::uint32_t reg, std::uint
 // The clip coordinate a corner adds to was last written, before `corner`, by
 // `dp4 rC.c', ..., cb0[R]` with R = `component` of ViewProj or
 // SecondaryViewProj.
-bool clip_from_view_proj(const std::uint32_t* t, const std::vector<Inst>& insts, const Corner& corner,
+bool clip_from_view_proj(const std::uint32_t* t, const std::vector<Instruction>& insts, const Corner& corner,
                          std::uint32_t component) {
     for (std::size_t k = corner.inst; k-- > 0;) {
-        const Inst& in = insts[k];
+        const Instruction& in = insts[k];
         if (in.op == kOpCustomData || (in.op >= kOpFirstDeclaration && in.op <= kOpLastDeclaration)) continue;
         if (!writes(t, in, corner.clip.reg, corner.clip.component)) continue;
         if (in.op != kOpDp4 || in.extended) return false;
@@ -211,27 +204,15 @@ struct Site {
 };
 
 std::optional<Site> find_site(const std::vector<std::uint32_t>& t, std::size_t end) {
-    std::vector<Inst> insts;
-    for (std::size_t i = kProgramHeaderTokens; i < end;) {
-        const std::uint32_t tok = t[i];
-        const std::uint32_t op  = opcode(tok);
-        std::size_t len         = inst_length(tok);
-        if (op == kOpCustomData) {
-            if (i + 1 >= end) return std::nullopt;
-            len = t[i + 1];
-        }
-        // Not `i + len > end`: a customData length near 2^32 wraps
-        // size_t on Win32 and would walk backwards forever.
-        if (len == 0 || len > end - i) return std::nullopt;
-        insts.push_back({i, len, op, op_extended(tok)});
-        i += len;
-    }
+    const auto found = instructions(t, end);
+    if (!found) return std::nullopt;
+    const std::vector<Instruction>& insts = *found;
 
     Site s;
     std::size_t cb0_registers = 0;
     std::optional<Corner> cx, cy;
     for (std::size_t k = 0; k < insts.size(); ++k) {
-        const Inst& in = insts[k];
+        const Instruction& in = insts[k];
         if (in.op == kOpDclTemps && in.len == 2) {
             s.temps_decl = in.at;
             s.temps      = t[in.at + 1];

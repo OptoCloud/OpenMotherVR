@@ -25,6 +25,21 @@ struct Operand {
 // forms these shaders use (immediate indices).
 std::optional<Operand> parse_operand(const std::uint32_t* t, std::size_t end, std::size_t i);
 
+// One instruction of a program: where its opcode token lies, its length in
+// tokens (a customData block's from the token after it), its opcode and
+// whether its opcode token is extended.
+struct Instruction {
+    std::size_t at   = 0;
+    std::size_t len  = 0;
+    std::uint32_t op = 0;
+    bool extended    = false;
+};
+
+// The instructions of the program `t` from after its header up to `end`
+// (at most t.size()), in order, or nothing when one has no length or does
+// not fit before `end`.
+std::optional<std::vector<Instruction>> instructions(std::span<const std::uint32_t> t, std::size_t end);
+
 // Whether operand `o` is the 4-component immediate (x, y, z, w).
 bool is_immediate4(const std::uint32_t* t, const Operand& o, std::uint32_t x, std::uint32_t y,
                    std::uint32_t z, std::uint32_t w);

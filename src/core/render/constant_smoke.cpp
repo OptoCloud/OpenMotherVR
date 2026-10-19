@@ -165,28 +165,18 @@ struct Sample {
 };
 
 std::optional<Sample> find_sample(const std::vector<std::uint32_t>& t, std::size_t end) {
+    const auto insts = instructions(t, end);
+    if (!insts) return std::nullopt;
     std::optional<Sample> found;
-    for (std::size_t i = kProgramHeaderTokens; i < end;) {
-        const std::uint32_t op = opcode(t[i]);
-        std::size_t len        = inst_length(t[i]);
-        if (op == kOpCustomData) {
-            if (i + 1 >= end) return std::nullopt;
-            len = t[i + 1];
-        }
-        // Not `i + len > end`: a customData length near 2^32 wraps
-        // size_t on Win32 and would walk backwards forever.
-        if (len == 0 || len > end - i) return std::nullopt;
-        if (op != kOpCustomData && !is_declaration(op)) {
-            bool reads_atlas = false;
-            for (std::size_t p = i + 1; p + 1 < i + len; ++p)
-                reads_atlas = reads_atlas || is_atlas_operand(t, p);
-            if (reads_atlas) {
-                const auto dst = match_sample(t, i, len);
-                if (found || !dst) return std::nullopt;
-                found = Sample{i, len, *dst};
-            }
-        }
-        i += len;
+    for (const Instruction& in : *insts) {
+        if (in.op == kOpCustomData || is_declaration(in.op)) continue;
+        bool reads_atlas = false;
+        for (std::size_t p = in.at + 1; p + 1 < in.at + in.len; ++p)
+            reads_atlas = reads_atlas || is_atlas_operand(t, p);
+        if (!reads_atlas) continue;
+        const auto dst = match_sample(t, in.at, in.len);
+        if (found || !dst) return std::nullopt;
+        found = Sample{in.at, in.len, *dst};
     }
     return found;
 }
