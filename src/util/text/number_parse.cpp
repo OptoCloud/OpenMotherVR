@@ -3,9 +3,11 @@
 
 #include <array>
 #include <charconv>
+#include <cmath>
 #include <cstddef>
-#include <cstring>
+#include <string_view>
 #include <system_error>
+#include <type_traits>
 
 namespace omvr::util {
 
@@ -18,26 +20,43 @@ constexpr std::size_t kMaxDecimalChars = 64;
 // decimal number, and narrowing it would change it.
 constexpr wchar_t kLastAscii = 0x7F;
 
+// The one grammar of every number here: an optional '+' or '-' (one sign
+// only), then digits (with a '.' for a decimal), and nothing after it in
+// the token. from_chars refuses a '+' itself, so it is skipped here; a '-'
+// after it would be a second sign.
+template <class T>
+std::optional<T> parse_whole(std::string_view s) noexcept {
+    if (!s.empty() && s.front() == '+') {
+        s.remove_prefix(1);
+        if (!s.empty() && s.front() == '-') return std::nullopt;
+    }
+    if (s.empty()) return std::nullopt;
+    T v = 0;
+    std::from_chars_result r{};
+    if constexpr (std::is_floating_point_v<T>) {
+        // Fixed: no exponent; and only finite values ("nan", "inf" are not
+        // numbers to a player).
+        r = std::from_chars(s.data(), s.data() + s.size(), v, std::chars_format::fixed);
+    } else {
+        r = std::from_chars(s.data(), s.data() + s.size(), v);
+    }
+    if (r.ec != std::errc{} || r.ptr != s.data() + s.size()) return std::nullopt;
+    if constexpr (std::is_floating_point_v<T>) {
+        if (!std::isfinite(v)) return std::nullopt;
+    }
+    return v;
+}
+
 } // namespace
 
 std::optional<int> parse_int(const char* s) noexcept {
     if (!s) return std::nullopt;
-    if (*s == '+') ++s;
-    const char* end    = s + std::strlen(s);
-    int v              = 0;
-    const auto [p, ec] = std::from_chars(s, end, v);
-    if (ec != std::errc{} || p != end || p == s) return std::nullopt;
-    return v;
+    return parse_whole<int>(s);
 }
 
 std::optional<float> parse_float(const char* s) noexcept {
     if (!s) return std::nullopt;
-    if (*s == '+') ++s;
-    const char* end    = s + std::strlen(s);
-    float v            = 0.0f;
-    const auto [p, ec] = std::from_chars(s, end, v, std::chars_format::fixed);
-    if (ec != std::errc{} || p != end || p == s) return std::nullopt;
-    return v;
+    return parse_whole<float>(s);
 }
 
 std::optional<bool> parse_switch(const char* s) noexcept {
@@ -47,16 +66,14 @@ std::optional<bool> parse_switch(const char* s) noexcept {
 }
 
 std::optional<float> parse_decimal(const wchar_t* arg) noexcept {
+    if (!arg) return std::nullopt;
     std::array<char, kMaxDecimalChars> buf{};
     std::size_t n = 0;
     for (; arg[n] != L'\0'; ++n) {
         if (n == buf.size() || arg[n] > kLastAscii) return std::nullopt;
         buf[n] = static_cast<char>(arg[n]);
     }
-    float value          = 0.0f;
-    const auto [end, ec] = std::from_chars(buf.data(), buf.data() + n, value);
-    if (n == 0 || ec != std::errc{} || end != buf.data() + n) return std::nullopt;
-    return value;
+    return parse_whole<float>(std::string_view(buf.data(), n));
 }
 
 } // namespace omvr::util

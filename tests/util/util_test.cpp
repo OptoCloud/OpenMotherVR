@@ -31,6 +31,7 @@
 #include <numbers>
 #include <span>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -89,6 +90,38 @@ TEST_CASE("parse_decimal reads an ASCII wide argument") {
     CHECK_FALSE(util::parse_decimal(L"").has_value());
     CHECK_FALSE(util::parse_decimal(L"1,5").has_value());
     CHECK_FALSE(util::parse_decimal(L"0.5é").has_value());
+}
+
+TEST_CASE("the number parsers take one sign only") {
+    CHECK_FALSE(util::parse_int("+-5").has_value());
+    CHECK_FALSE(util::parse_int("-+5").has_value());
+    CHECK_FALSE(util::parse_int("--5").has_value());
+    CHECK_FALSE(util::parse_int("++5").has_value());
+    CHECK_FALSE(util::parse_float("+-0.5").has_value());
+    CHECK_FALSE(util::parse_float("--0.5").has_value());
+    CHECK_FALSE(util::parse_decimal(L"+-0.8").has_value());
+    CHECK(util::parse_float("-0.5") == -0.5f);
+}
+
+TEST_CASE("the decimal parsers refuse values that are not finite") {
+    for (const char* s : {"nan", "inf", "-inf", "infinity", "+nan", "NAN", "Inf"})
+        CHECK_FALSE(util::parse_float(s).has_value());
+    for (const wchar_t* s : {L"nan", L"inf", L"-infinity", L"+inf"})
+        CHECK_FALSE(util::parse_decimal(s).has_value());
+    // Too large for a float: out of range, not infinity.
+    CHECK_FALSE(util::parse_float("1000000000000000000000000000000000000000000.0").has_value());
+}
+
+TEST_CASE("parse_decimal reads the same grammar as parse_float") {
+    for (const auto& [narrow, wide] :
+         {std::pair{"0.8", L"0.8"}, std::pair{"+0.8", L"+0.8"}, std::pair{"-1.5", L"-1.5"},
+          std::pair{"2", L"2"}, std::pair{"1e0", L"1e0"}, std::pair{".5", L".5"}, std::pair{"1.", L"1."},
+          std::pair{" 1", L" 1"}}) {
+        CAPTURE(narrow);
+        CHECK(util::parse_decimal(wide) == util::parse_float(narrow));
+    }
+    CHECK_FALSE(util::parse_decimal(L"1e0").has_value()); // no exponent (06 §2: a decimal number)
+    CHECK_FALSE(util::parse_decimal(nullptr).has_value());
 }
 
 TEST_CASE("split_command_line splits on spaces and tabs and honours quotes") {
