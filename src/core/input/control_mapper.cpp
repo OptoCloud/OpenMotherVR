@@ -209,14 +209,11 @@ void ControlMapper::write(const Controls& in, bool near_head) noexcept {
     Controls c = apply_dpad(in);
     // 22 §8: the gestures see the controls as read; a grip a holster took
     // drives neither Aim nor the tracker, nor counts for ToggleGrips.
-    GestureResult gestures;
     // Run with every gesture off too, so each one's state resets (v1: no
     // effect).
-    if (deps_.gestures) {
-        gestures = deps_.gestures->update(c, deps_.clock.now());
-        if (gestures.grip_consumed[kLeftHand]) c.grip_l = false;
-        if (gestures.grip_consumed[kRightHand]) c.grip_r = false;
-    }
+    const GestureResult gestures = deps_.gestures.update(c, deps_.clock.now());
+    if (gestures.grip_consumed[kLeftHand]) c.grip_l = false;
+    if (gestures.grip_consumed[kRightHand]) c.grip_r = false;
     const bool toggle = deps_.input.toggle_grips;
     grips_.update(c.grip_r, c.grip_l, toggle);
     const bool aim      = toggle ? grips_.aim() : c.grip_r;

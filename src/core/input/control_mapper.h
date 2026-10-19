@@ -25,7 +25,7 @@ struct ControlMapperDeps {
     const InteractionState& interactions;     // look Y and weapon cycling (04 §5.8.5)
     const diag::ports::Clock& clock;          // the d-pad modifier's hold
     diag::ports::Log& log;                    // the d-pad's changes, with DebugOptions
-    Gestures* gestures = nullptr;             // the body gestures of 22 §8, §9; none: v1
+    Gestures& gestures;                       // the body gestures of 22 §8, §9 (v1: each off)
 };
 
 // VR controls into the gamepad action tiers (04 §5.8.5).

@@ -62,7 +62,7 @@ Context::Context(void* self) noexcept
       gesture_context(manager, interactions),
       gestures({settings.current().controls, gesture_context, log}),
       controls({pad, schemes, settings.current().input, settings.current().controls, stick_context,
-                interactions, clock, log, &gestures}),
+                interactions, clock, log, gestures}),
       interactions(log),
       hands(settings.current().hands, log),
       haptics(settings.current().hands.haptics, clock, log),

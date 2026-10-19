@@ -31,7 +31,7 @@ struct MapperRig {
     FakeGestureContext context;
     core::input::Gestures gestures{{controls, context, log}};
     core::input::ControlMapper mapper{
-        {pad, schemes, input, controls, stick, interactions, clock, log, &gestures}};
+        {pad, schemes, input, controls, stick, interactions, clock, log, gestures}};
 
     const core::input::ActionTier& player() { return pad.tiers()[game::kPlayerMap]; }
 };
