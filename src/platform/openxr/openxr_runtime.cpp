@@ -230,15 +230,21 @@ public:
     }
 
     void submit_frame(core::vr::GpuTexture texture) override {
-        if (!session_ || texture == core::vr::GpuTexture{}) return;
-        const TextureExtent extent = texture_extent(texture);
-
+        if (!session_) return;
         const FrameViews rendered = render_views_.load();
         head_read_.store(false, std::memory_order_relaxed);
-        if (!cinema_ && rendered.valid)
+        if (texture == core::vr::GpuTexture{}) {
+            // No stereo texture to show: the boundary still runs, ending the
+            // frame with no layer, so the runtime keeps pacing, the views
+            // stay current and the controllers are synced and handed over
+            // below, as OpenVR's BeginFrame read does (04 §5.12).
+            xr_.clear_eye_images();
+            xr_.set_screen_image(core::vr::GpuTexture{}, {});
+        } else if (const TextureExtent extent = texture_extent(texture); !cinema_ && rendered.valid) {
             present_eyes(texture, extent, rendered);
-        else
+        } else {
             present_screen(texture, extent);
+        }
 
         // Ends this frame (copies, flush, xrEndFrame), then blocks until the
         // runtime wants the next one and begins it: a running start, as
