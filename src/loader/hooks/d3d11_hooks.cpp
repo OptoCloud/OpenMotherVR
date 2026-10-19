@@ -7,8 +7,7 @@
 
 #include "loader/hooks/d3d11_hooks.h"
 
-#include "core/render/constant_smoke.h"
-#include "core/render/dither_fix.h"
+#include "core/render/pixel_shader_fixes.h"
 #include "loader/context.h"
 #include "loader/hooks/crash_hook.h"
 #include "loader/hooks/render_sprite_hooks.h"
@@ -23,6 +22,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <span>
 #include <string_view>
 #include <type_traits>
 
@@ -140,41 +140,30 @@ HRESULT __stdcall hook_resize_buffers(void* self, UINT buffer_count, UINT width,
 // patches only rewrite the game's own dither pattern and atlas sample, so
 // another device's shaders pass through unchanged.
 
+// The system's CreatePixelShader of one call, as the fix chain calls it.
+class DevicePixelShader final : public core::render::PixelShaderDevice {
+public:
+    DevicePixelShader(CreatePixelShaderFn create, void* self, void* linkage, void** out) noexcept
+        : create_(create), self_(self), linkage_(linkage), out_(out) {}
+
+    long create(std::span<const std::uint8_t> blob) noexcept override {
+        return create_(self_, blob.data(), blob.size(), linkage_, out_);
+    }
+
+private:
+    CreatePixelShaderFn create_;
+    void* self_;
+    void* linkage_;
+    void** out_;
+};
+
 HRESULT __stdcall hook_create_pixel_shader(void* self, const void* code, SIZE_T size, void* linkage,
                                            void** out) noexcept {
-    auto& ctx         = context();
-    const auto create = system_method<CreatePixelShaderFn>(ctx.targets.create_pixel_shader);
-    auto& stats       = ctx.shader_fixes;
-    const int total   = stats.count_created();
-    const auto dither = core::render::patch_position_dither(code, size);
-    if (dither.blob.empty() && dither.has_constants) stats.count_unchanged(total);
-    const void* fixed       = dither.blob.empty() ? code : dither.blob.data();
-    const SIZE_T fixed_size = dither.blob.empty() ? size : dither.blob.size();
-
-    // 24 §15: on top of the dither fix, which changes other instructions.
-    if (const auto brightness = ctx.constant_smoke.brightness()) {
-        auto& smoke_stats     = ctx.constant_smoke.stats();
-        const int smoke_total = smoke_stats.count_created();
-        const auto smoke      = core::render::patch_constant_smoke(fixed, fixed_size, *brightness);
-        if (!smoke.empty()) {
-            const HRESULT hr = create(self, smoke.data(), smoke.size(), linkage, out);
-            if (SUCCEEDED(hr)) {
-                smoke_stats.count_fixed(smoke_total);
-                if (!dither.blob.empty()) stats.count_fixed(total);
-                return hr;
-            }
-            smoke_stats.count_rejected(hr);
-        }
-    }
-    if (!dither.blob.empty()) {
-        const HRESULT hr = create(self, dither.blob.data(), dither.blob.size(), linkage, out);
-        if (SUCCEEDED(hr)) {
-            stats.count_fixed(total);
-            return hr;
-        }
-        stats.count_rejected(hr);
-    }
-    return create(self, code, size, linkage, out);
+    auto& ctx = context();
+    DevicePixelShader device{system_method<CreatePixelShaderFn>(ctx.targets.create_pixel_shader), self,
+                             linkage, out};
+    return core::render::create_fixed_pixel_shader({static_cast<const std::uint8_t*>(code), size},
+                                                   ctx.shader_fixes, ctx.constant_smoke, device);
 }
 
 static_assert(std::is_convertible_v<decltype(&hook_present), PresentFn>);

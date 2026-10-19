@@ -9,6 +9,7 @@
 #include "core/render/constant_smoke.h"
 #include "core/render/dither_fix.h"
 #include "core/render/dxbc.h"
+#include "core/render/pixel_shader_fixes.h"
 #include "core/render/shader_fix_stats.h"
 #include "fakes/fakes.h"
 
@@ -904,8 +905,8 @@ TEST_CASE("constant smoke: only the atlas, bound by its name at t9, in a pixel s
     CHECK(patch_constant_smoke(kMirrorPS, sizeof(kMirrorPS), kB).empty());
 }
 
-TEST_CASE("constant smoke: on top of the dither fix, both changes are kept") {
-    // The dither program of 08 §1.1, then the sampler and the atlas sample.
+// The dither program of 08 §1.1, then the sampler and the atlas sample.
+std::vector<std::uint32_t> dither_and_smoke_program() {
     std::vector<std::uint32_t> t = dither_program();
     t.pop_back(); // ret
     t.insert(t.end(), {0x0300005A, 0x00106000, 9});
@@ -913,8 +914,11 @@ TEST_CASE("constant smoke: on top of the dither fix, both changes are kept") {
     t.insert(t.end(), sample.begin(), sample.end());
     t.push_back(0x0100003E);
     t[1] = static_cast<std::uint32_t>(t.size());
+    return t;
+}
 
-    const std::vector<std::uint8_t> in = lit_container(t);
+TEST_CASE("constant smoke: on top of the dither fix, both changes are kept") {
+    const std::vector<std::uint8_t> in = lit_container(dither_and_smoke_program());
     const DitherPatch dither           = patch_position_dither(in.data(), in.size());
     REQUIRE(dither.sites == 1);
     const std::vector<std::uint8_t> out = patch_constant_smoke(dither.blob.data(), dither.blob.size(), kB);
@@ -957,6 +961,156 @@ TEST_CASE("constant smoke: on at device creation logs the brightness, and its ev
     CHECK(log.lines[2] ==
           "proxy: constant smoke lighting pixel shader refused by the device "
           "(hr=0x80070057), using the original");
+}
+
+// ---- The pixel shader fixes together (08 §1, 24 §15) ---------------------------
+
+// A device that answers each CreatePixelShader with the next of `answers`
+// (then S_OK) and keeps the blobs it was given.
+class ScriptedDevice final : public PixelShaderDevice {
+public:
+    explicit ScriptedDevice(std::vector<long> answers = {}) : answers_(std::move(answers)) {}
+
+    long create(std::span<const std::uint8_t> blob) noexcept override {
+        blobs.emplace_back(blob.begin(), blob.end());
+        if (next_ < answers_.size()) return answers_[next_++];
+        return 0;
+    }
+
+    std::vector<std::vector<std::uint8_t>> blobs;
+
+private:
+    std::vector<long> answers_;
+    std::size_t next_ = 0;
+};
+
+constexpr long kInvalidArg = static_cast<long>(0x80070057u);
+constexpr long kSFalse     = 1; // a success other than S_OK
+
+struct ShaderFixRig {
+    omvr::tests::RecordingLog log;
+    ShaderFixStats dither{log, ShaderFix::Dither};
+    ConstantSmoke smoke{log};
+
+    long create(const std::vector<std::uint8_t>& code, ScriptedDevice& device) {
+        return create_fixed_pixel_shader(code, dither, smoke, device);
+    }
+};
+
+TEST_CASE("pixel shader fixes: a shader without a fix is created as it is") {
+    ShaderFixRig rig;
+    ScriptedDevice device{{kSFalse}};
+    const std::vector<std::uint8_t> mirror(kMirrorPS, kMirrorPS + sizeof(kMirrorPS));
+    CHECK(rig.create(mirror, device) == kSFalse);
+    REQUIRE(device.blobs.size() == 1);
+    CHECK(device.blobs[0] == mirror);
+    CHECK(rig.log.lines.empty());
+}
+
+TEST_CASE("pixel shader fixes: the dithered shader first, the original when it is refused") {
+    const auto in     = container(dither_program());
+    const auto dither = patch_position_dither(in.data(), in.size());
+    {
+        ShaderFixRig rig;
+        ScriptedDevice device;
+        CHECK(rig.create(in, device) == 0);
+        REQUIRE(device.blobs.size() == 1);
+        CHECK(device.blobs[0] == dither.blob);
+        REQUIRE(rig.log.lines.size() == 1);
+        CHECK(rig.log.lines[0] ==
+              "proxy: Dither fix: 1 of 1 pixel shaders changed so far; 0 with the dither's "
+              "constants left unchanged; 0 refused by the device");
+    }
+    ShaderFixRig rig;
+    ScriptedDevice device{{kInvalidArg, kSFalse}};
+    CHECK(rig.create(in, device) == kSFalse);
+    REQUIRE(device.blobs.size() == 2);
+    CHECK(device.blobs[0] == dither.blob);
+    CHECK(device.blobs[1] == in);
+    REQUIRE(rig.log.lines.size() == 1);
+    CHECK(rig.log.lines[0] == "proxy: patched pixel shader rejected (hr=0x80070057), using the original");
+}
+
+TEST_CASE("pixel shader fixes: a dither left unchanged is counted and the original created") {
+    Program p;
+    p.dcl_cb2(40);
+    p.op(kMul, {dst(3, 0b0110), input(0, swz(kX, kX, kY, kX)), imm(0, K, K, 0)});
+    p.op(kAdd, {dst(7, 0b0001), temp(7, swz(kX, kX, kX, kX)), temp(7, swz(kX, kX, kX, kX))});
+    p.op(kMad,
+         {dst(1, 0b0011), input(0, swz(kX, kY, kX, kX)), imm(K, K, 0, 0), neg_input(1, swz(kX, kX, kX, kX))});
+    const auto in = container(p.done());
+    ShaderFixRig rig;
+    ScriptedDevice device;
+    CHECK(rig.create(in, device) == 0);
+    REQUIRE(device.blobs.size() == 1);
+    CHECK(device.blobs[0] == in);
+    REQUIRE(rig.log.lines.size() == 1);
+    CHECK(rig.log.lines[0] ==
+          "proxy: Dither fix: 0 of 1 pixel shaders changed so far; 1 with the dither's "
+          "constants left unchanged; 0 refused by the device");
+}
+
+TEST_CASE("pixel shader fixes: constant smoke over the dither, then the dither, then the original") {
+    const auto in     = lit_container(dither_and_smoke_program());
+    const auto dither = patch_position_dither(in.data(), in.size());
+    REQUIRE(dither.sites == 1);
+    const auto both = patch_constant_smoke(dither.blob.data(), dither.blob.size(), kB);
+    REQUIRE_FALSE(both.empty());
+    {
+        // Smoke off: the dither alone.
+        ShaderFixRig rig;
+        ScriptedDevice device;
+        CHECK(rig.create(in, device) == 0);
+        REQUIRE(device.blobs.size() == 1);
+        CHECK(device.blobs[0] == dither.blob);
+    }
+    {
+        // Both accepted: both counted.
+        ShaderFixRig rig;
+        rig.smoke.start(true, kB);
+        ScriptedDevice device;
+        CHECK(rig.create(in, device) == 0);
+        REQUIRE(device.blobs.size() == 1);
+        CHECK(device.blobs[0] == both);
+        CHECK(rig.log.contains("Constant smoke lighting: 1 of 1 pixel shaders changed so far"));
+        CHECK(rig.log.contains("Dither fix: 1 of 1 pixel shaders changed so far"));
+    }
+    {
+        // Smoke refused: the dither alone, counted as a dither fix only.
+        ShaderFixRig rig;
+        rig.smoke.start(true, kB);
+        ScriptedDevice device{{kInvalidArg}};
+        CHECK(rig.create(in, device) == 0);
+        REQUIRE(device.blobs.size() == 2);
+        CHECK(device.blobs[0] == both);
+        CHECK(device.blobs[1] == dither.blob);
+        CHECK(rig.log.contains("constant smoke lighting pixel shader refused by the device (hr=0x80070057)"));
+        CHECK(rig.log.contains("Dither fix: 1 of 1 pixel shaders changed so far"));
+        CHECK_FALSE(rig.log.contains("Constant smoke lighting: 1 of"));
+    }
+    // Everything refused: the original last.
+    ShaderFixRig rig;
+    rig.smoke.start(true, kB);
+    ScriptedDevice device{{kInvalidArg, kInvalidArg, kSFalse}};
+    CHECK(rig.create(in, device) == kSFalse);
+    REQUIRE(device.blobs.size() == 3);
+    CHECK(device.blobs[0] == both);
+    CHECK(device.blobs[1] == dither.blob);
+    CHECK(device.blobs[2] == in);
+    CHECK(rig.log.contains("patched pixel shader rejected (hr=0x80070057)"));
+}
+
+TEST_CASE("pixel shader fixes: constant smoke alone falls back to the original") {
+    const auto in    = lit_container(lit_program(atlas_sample(kDstXyz, kAtlasXyzw)));
+    const auto smoke = patch_constant_smoke(in.data(), in.size(), kB);
+    ShaderFixRig rig;
+    rig.smoke.start(true, kB);
+    ScriptedDevice device{{kInvalidArg}};
+    CHECK(rig.create(in, device) == 0);
+    REQUIRE(device.blobs.size() == 2);
+    CHECK(device.blobs[0] == smoke);
+    CHECK(device.blobs[1] == in);
+    CHECK_FALSE(rig.log.contains("Dither fix"));
 }
 
 } // namespace
