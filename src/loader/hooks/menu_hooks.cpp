@@ -70,7 +70,7 @@ int __fastcall follow_on_activate(void* self, void*, void* arg) noexcept {
 // after this (05 §6.1).
 int __fastcall follow_on_deactivate(void* self, void*, void* arg) noexcept {
     auto& ctx = context();
-    ctx.follow.on_deactivate_begin();
+    ctx.follow.on_deactivate_begin(self);
     const FollowFn deactivate = game::CodeAddress{ctx.targets.game_side.follow_on_deactivate};
     const int r               = deactivate(self, nullptr, arg);
     ctx.follow.on_deactivate_end(self);
