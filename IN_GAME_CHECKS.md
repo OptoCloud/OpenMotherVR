@@ -550,22 +550,22 @@ Controls keys in `mothervr.json`, Dev. Debug Options on.
       HUD and crosshair as in v1.
 - [ ] **Crosshair off.** `"Hud": {"Crosshair": "Off"}`: raise the revolver,
       no crosshair, ammo count shown. Log: `[hook] hud crosshair: in place
-      (3 sites)`, `hud: crosshair hidden (Crosshair Off)`. Back to On
+      on 3 sites`, `hud: crosshair hidden (Crosshair Off)`. Back to On
       (`mvr_crosshair 0`): the crosshair returns at the next raise.
       `"Auto"` with hand aiming: no crosshair while aiming from the hand.
       Watch for a crash when the setting is changed in play: the sites are
       written while the game runs.
 - [ ] **HUD hidden.** `"Hidden": true`, restart: no health, ammo or
-      prompts, subtitles shown. Log: `[hook] hud visibility: in place (6
-      sites)`, `hud: HUD hidden (Hud.Hidden)`.
+      prompts, subtitles shown. Log: `[hook] hud visibility: in place on
+      6 sites`, `hud: HUD hidden (Hud.Hidden)`.
 - [ ] **HUD toggle gesture.** `"Controls": {"HudToggleGesture": true}`:
       left hand at the head, press Map: the HUD flips and the map stays
       shut (`hud: toggle gesture fired`). In a scene where the game hides
       the HUD the gesture does not show it; after the scene a HUD the
       player hid stays hidden.
 - [ ] **Item highlight off.** `"ItemHighlight": false`: nearby items do not
-      glow, prompts still work (`[hook] hud highlight: in place (2
-      sites)`). Note whether the glow goes at once or after a reload.
+      glow, prompts still work (`[hook] hud highlight: in place on
+      2 sites`). Note whether the glow goes at once or after a reload.
 - [ ] **Follow placement.** `"Placement": "Follow", "Pitch": -15`: the HUD
       sits below the view, level, still for small glances, follows turns
       over about 20 degrees smoothly, and jumps at once on a snap turn or

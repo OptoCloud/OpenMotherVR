@@ -25,7 +25,7 @@ using CrosshairUpdateFn = void(__fastcall*)(void* self, void* edx);
 using IconHighlightFn   = void(__fastcall*)(void* manager, void* edx, void* record);
 
 // The game's functions and data the HUD options use, set by the installer
-// once their checks passed (game/ui/hud_sites.h).
+// once their checks passed (game/sites/hud.h).
 struct HudTargets {
     // 22 §2.4.
     std::uint8_t* ui_manager_ptr = nullptr;

@@ -7,8 +7,8 @@
 #include "core/ui/crosshair_gate.h"
 #include "core/ui/hud_placement.h"
 #include "game/patcher.h"
+#include "game/sites/hud.h"
 #include "game/ui/hud_objects.h"
-#include "game/ui/hud_sites.h"
 #include "loader/context.h"
 #include "loader/hooks/camera_hooks.h"
 #include "loader/hooks/guard.h"
@@ -23,7 +23,8 @@ namespace omvr::loader::hooks {
 
 namespace {
 
-namespace gui = game::ui;
+namespace gui   = game::ui;
+namespace sites = game::sites;
 using core::diag::ports::logf;
 using core::ui::HudAction;
 using core::ui::HudMovie;
@@ -172,8 +173,8 @@ static_assert(std::is_convertible_v<decltype(&show_crosshairs), gui::UiInvokeFn>
 static_assert(std::is_convertible_v<decltype(&hide_crosshairs), gui::UiInvokeFn>);
 static_assert(std::is_convertible_v<decltype(&icon_highlight), gui::IconHighlightFn>);
 
-constexpr gui::HudHooks kHooks{entity_hide,       entity_hide_alt,  entity_show,      entity_show_alt,
-                               &crosshair_update, &show_crosshairs, &hide_crosshairs, &icon_highlight};
+constexpr sites::HudHooks kHooks{entity_hide,       entity_hide_alt,  entity_show,      entity_show_alt,
+                                 &crosshair_update, &show_crosshairs, &hide_crosshairs, &icon_highlight};
 
 // ---- Installing, as the keys ask -----------------------------------------------
 
@@ -183,16 +184,16 @@ void ensure_sites(Context& ctx) noexcept {
     game::Patcher patcher{ctx.log};
     if (!visibility_tried && (s.hud.hidden || s.controls.hud_toggle_gesture)) {
         visibility_tried = true;
-        visibility_on    = gui::install_hud_visibility_sites(*image, patcher, kHooks, ctx.hud_targets);
+        visibility_on    = sites::install_hud_visibility_sites(*image, patcher, kHooks, ctx.hud_targets);
         ctx.hud_visibility.set_available(visibility_on);
     }
     if (!crosshair_tried && s.hud.crosshair != core::config::CrosshairMode::On) {
         crosshair_tried = true;
-        (void)gui::install_crosshair_sites(*image, patcher, kHooks, ctx.hud_targets);
+        (void)sites::install_crosshair_sites(*image, patcher, kHooks, ctx.hud_targets);
     }
     if (!highlight_tried && !s.hud.item_highlight) {
         highlight_tried = true;
-        (void)gui::install_highlight_sites(*image, patcher, kHooks, ctx.hud_targets);
+        (void)sites::install_highlight_sites(*image, patcher, kHooks, ctx.hud_targets);
     }
 }
 

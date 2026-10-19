@@ -4,6 +4,7 @@
 #include "game/addresses.h"
 #include "game/code_address.h"
 #include "game/sites/area_log.h"
+#include "game/sites/site_check.h"
 #include "game/x86.h"
 
 #include <array>
@@ -14,10 +15,7 @@ namespace omvr::game::sites {
 
 namespace {
 
-namespace ports = core::diag::ports;
-
-constexpr std::string_view kArea    = "camera takeovers";
-constexpr std::string_view kLogCode = "[hook] {}: off; unexpected code at {} (RVA {:08X})";
+constexpr std::string_view kArea = "camera takeovers";
 
 // 23 §2.4: FollowSteer's first instructions, `push esi; mov esi, ecx; mov
 // eax, [esi+0x34]; movss ...`.
@@ -36,28 +34,6 @@ constexpr auto kResetRequestStart =
                                             x86::kGroup1Imm8Signed, x86::kModRmSubEsp});
 static_assert(kResetRequestStart ==
               std::array<std::uint8_t, 8>{0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xC0, 0x83, 0xEC});
-
-struct Check {
-    const GameImage& g;
-    Patcher& p;
-
-    bool fail(std::string_view what, std::uint32_t rva) const noexcept {
-        ports::logf(p.log(), kLogCode, kArea, what, rva);
-        return false;
-    }
-    template <std::size_t N>
-    bool code(std::uint32_t rva, std::string_view what,
-              const std::array<std::uint8_t, N>& bytes) const noexcept {
-        return x86::matches(g.at_rva(rva), bytes) || fail(what, rva);
-    }
-    bool call(std::uint32_t site, std::uint32_t target, std::string_view what) const noexcept {
-        return calls(g.at_rva(site), g.at_rva(target)) || fail(what, site);
-    }
-    // The method-table entry at `slot` holds the function at `rva`.
-    bool entry(std::uint32_t slot, std::uint32_t rva, std::string_view what) const noexcept {
-        return holds_address(g.at_rva(slot), g.at_rva(rva)) || fail(what, slot);
-    }
-};
 
 bool expected(const Check& c, const CameraTakeoverRvas& r) noexcept {
     return c.code(r.follow_steer, "FollowSteer", kFollowSteerStart) &&
@@ -81,7 +57,7 @@ bool install_camera_takeover_sites(const GameImage& g, Patcher& p, const CameraT
                                    CameraTakeoverTargets& out) noexcept {
     const CameraTakeoverRvas& r = kCameraTakeoverRvas[g.version];
     if (!known_or_off(p.log(), r.follow_steer, kArea)) return false;
-    if (!expected(Check{g, p}, r)) return false;
+    if (!expected(Check{g, p, kArea}, r)) return false;
     out.steer   = CodeAddress{g.at_rva(r.follow_steer)};
     out.realign = CodeAddress{g.at_rva(r.follow_realign)};
     const std::array calls{

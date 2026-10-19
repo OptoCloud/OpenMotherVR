@@ -1,30 +1,27 @@
 // OpenMotherVR-Provenance: clean
-#include "game/ui/hud_sites.h"
+#include "game/sites/hud.h"
 
 #include "game/addresses.h"
 #include "game/code_address.h"
+#include "game/sites/area_log.h"
+#include "game/sites/site_check.h"
 #include "game/x86.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <string_view>
 
-namespace omvr::game::ui {
+namespace omvr::game::sites {
 
 namespace {
 
-namespace ports = core::diag::ports;
+using ui::HudEntityMethodFn;
+using ui::HudTargets;
 
-constexpr std::string_view kLogNoAddress =
-    "[hook] {}: off; this build has no addresses for its game sites (23)";
-constexpr std::string_view kLogCode = "[hook] {}: off; unexpected code or data at {} (RVA {:08X})";
-constexpr std::string_view kLogOn   = "[hook] {}: in place ({} sites)";
-
-constexpr std::string_view kVisibilityArea = "HUD hide and show";
-constexpr std::string_view kCrosshairArea  = "crosshair";
-constexpr std::string_view kHighlightArea  = "item highlight";
+constexpr std::string_view kVisibilityArea = "hud visibility";
+constexpr std::string_view kCrosshairArea  = "hud crosshair";
+constexpr std::string_view kHighlightArea  = "hud highlight";
 
 // 22 §2.4: UiFindObject's first instructions, `sub esp, 8; push ebx; push
 // ebp; push esi; mov esi, ecx`.
@@ -77,36 +74,8 @@ constexpr std::array<EntityMethod, 6> kEntitySlots = {EntityMethod::Hide,    Ent
                                                       EntityMethod::Hide,    EntityMethod::ShowAlt,
                                                       EntityMethod::HideAlt, EntityMethod::Show};
 
-// A site check: what failed, for the log line.
-struct Check {
-    const GameImage& g;
-    Patcher& p;
-    std::string_view area;
-
-    bool fail(std::string_view what, std::uint32_t rva) const noexcept {
-        ports::logf(p.log(), kLogCode, area, what, rva);
-        return false;
-    }
-    bool code(std::uint32_t rva, std::string_view what, auto expected) const noexcept {
-        return x86::matches(g.at_rva(rva), expected) || fail(what, rva);
-    }
-    bool string(std::uint32_t rva, std::string_view what, std::string_view text) const noexcept {
-        const auto* s = g.at_rva(rva);
-        return (std::memcmp(s, text.data(), text.size()) == 0 && s[text.size()] == 0) || fail(what, rva);
-    }
-    // `push imm32` at `rva` naming the string at `string_rva`.
-    bool push_of(std::uint32_t rva, std::uint32_t string_rva, std::string_view what) const noexcept {
-        return pushes(g.at_rva(rva), g.at_rva(string_rva)) || fail(what, rva);
-    }
-    bool call(std::uint32_t site, std::uint32_t target, std::string_view what) const noexcept {
-        return calls(g.at_rva(site), g.at_rva(target)) || fail(what, site);
-    }
-};
-
 bool known(const GameImage& g, Patcher& p, std::string_view area) noexcept {
-    if (kHudRvas[g.version].ui_find_object != 0) return true;
-    ports::logf(p.log(), kLogNoAddress, area);
-    return false;
+    return known_or_off(p.log(), kHudRvas[g.version].ui_find_object, area);
 }
 
 // The lookup and the invoke both groups that call the game need.
@@ -163,8 +132,7 @@ bool visibility_expected(const Check& c, const HudRvas& r) noexcept {
     if (*c.g.at_rva(r.pickup_hud_show) != x86::kPushEsi) return c.fail("PickupHudShow", r.pickup_hud_show);
     for (std::size_t i = 0; i < kEntitySlots.size(); ++i) {
         const std::uint32_t slot = r.hud_entity_methods + slot_offset(static_cast<std::uint32_t>(i));
-        if (!holds_address(c.g.at_rva(slot), c.g.at_rva(entity_rva(r, kEntitySlots[i]))))
-            return c.fail("the HUD entity's method table", slot);
+        if (!c.entry(slot, entity_rva(r, kEntitySlots[i]), "the HUD entity's method table")) return false;
     }
     return true;
 }
@@ -194,7 +162,7 @@ bool install_hud_visibility_sites(const GameImage& g, Patcher& p, const HudHooks
             return c.fail("the HUD entity's method table (write)", g.rva_of(slot));
         }
     }
-    ports::logf(p.log(), kLogOn, kVisibilityArea, kEntitySlots.size());
+    area_on(p.log(), kVisibilityArea, static_cast<int>(kEntitySlots.size()));
     return true;
 }
 
@@ -228,7 +196,7 @@ bool install_crosshair_sites(const GameImage& g, Patcher& p, const HudHooks& hoo
                      "CrosshairUpdate"}};
     static_assert(calls.size() == 3);
     if (!redirect_all(p, calls)) return false;
-    ports::logf(p.log(), kLogOn, kCrosshairArea, calls.size());
+    area_on(p.log(), kCrosshairArea, static_cast<int>(calls.size()));
     return true;
 }
 
@@ -247,8 +215,8 @@ bool install_highlight_sites(const GameImage& g, Patcher& p, const HudHooks& hoo
         CallRedirect{g.at_rva(r.icon_highlight_call_b), code_pointer(hooks.icon_highlight), "IconHighlight"}};
     static_assert(calls.size() == 2);
     if (!redirect_all(p, calls)) return false;
-    ports::logf(p.log(), kLogOn, kHighlightArea, calls.size());
+    area_on(p.log(), kHighlightArea, static_cast<int>(calls.size()));
     return true;
 }
 
-} // namespace omvr::game::ui
+} // namespace omvr::game::sites
