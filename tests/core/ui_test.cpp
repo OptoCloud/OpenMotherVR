@@ -8,12 +8,14 @@
 #include "core/input/glyphs.h"
 #include "core/ui/camera_takeovers.h"
 #include "core/ui/commands.h"
+#include "core/ui/compat_messages.h"
 #include "core/ui/display_reset.h"
 #include "core/ui/pak2.h"
 #include "core/ui/runtime_menu.h"
 #include "core/ui/settings_push.h"
 #include "core/ui/ui_contract.h"
 #include "core/ui/ui_patch.h"
+#include "core/vr/runtime_failure.h"
 #include "fakes/fakes.h"
 #include "util/hash/crc32.h"
 
@@ -738,6 +740,39 @@ TEST_CASE("camera takeovers: the first decision of an interaction takes its rule
     CHECK(rule.suppress({.setting = CameraTakeovers::Game, .in_interaction = true}));
     CHECK(takeover_name(Takeover::StealCameraSteer) == "StealCamera steer");
     CHECK(takeover_name(Takeover::ResetRealign) == "camera reset re-align");
+}
+
+// Records which way each box was shown.
+struct RecordingDialogs final : ports::Dialogs {
+    std::vector<std::string> waited;
+    std::vector<std::string> async;
+    void post(std::string text, ports::DialogKind, std::move_only_function<void()>,
+              std::string_view) noexcept override {
+        async.push_back(std::move(text));
+    }
+    void show_async(std::string text, ports::DialogKind, std::string_view) noexcept override {
+        async.push_back(std::move(text));
+    }
+    int show_now(std::string_view text, ports::DialogKind, std::string_view) noexcept override {
+        waited.emplace_back(text);
+        return 1;
+    }
+    void wait_posted() noexcept override {}
+};
+
+TEST_CASE("runtime failure: the init report waits, the late one does not") {
+    using omvr::core::vr::DetectResult;
+    const omvr::core::vr::InitFailure failure{"no session", -2};
+    RecordingDialogs init;
+    report_init_failure(init, DetectResult::Chosen::OpenXR, failure, ReportWait::UntilClosed);
+    REQUIRE(init.waited.size() == 1);
+    CHECK(init.async.empty());
+
+    RecordingDialogs late;
+    report_init_failure(late, DetectResult::Chosen::OpenXR, failure, ReportWait::No);
+    CHECK(late.waited.empty());
+    REQUIRE(late.async.size() == 1);
+    CHECK(late.async[0] == init.waited[0]); // the same message either way
 }
 
 } // namespace

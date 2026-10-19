@@ -3,6 +3,8 @@
 #include "core/ui/tuning.h"
 
 #include <format>
+#include <string>
+#include <utility>
 
 namespace omvr::core::ui {
 
@@ -83,9 +85,19 @@ std::string init_failure_text(vr::DetectResult::Chosen runtime, std::string_view
 }
 
 void report_init_failure(ports::Dialogs& dialogs, vr::DetectResult::Chosen runtime,
-                         const vr::InitFailure& failure) noexcept {
-    dialogs.show_now(init_failure_text(runtime, failure.what, failure.code), ports::DialogKind::Error,
-                     "runtime failed");
+                         const vr::InitFailure& failure, ReportWait wait) noexcept {
+    constexpr std::string_view kLabel = "runtime failed";
+    try {
+        std::string text = init_failure_text(runtime, failure.what, failure.code);
+        if (wait == ReportWait::UntilClosed) {
+            dialogs.show_now(text, ports::DialogKind::Error, kLabel);
+        } else {
+            dialogs.show_async(std::move(text), ports::DialogKind::Error, kLabel);
+        }
+    } catch (...) {
+        // Only std::format's bad_alloc: no text to show, and the failure is
+        // already in the log.
+    }
 }
 
 } // namespace omvr::core::ui

@@ -31,9 +31,18 @@ std::string audio_failed(unsigned hr);
 // From: the dialogs in FUN_100068b0 (OpenVR) and FUN_100037b0 (Oculus).
 std::string init_failure_text(vr::DetectResult::Chosen runtime, std::string_view what, int code);
 
-// Shows init_failure_text for `failure` and waits for the player to close
-// it. The thread that creates the stereo device.
+// How report_init_failure shows its box.
+enum class ReportWait {
+    // Wait for the player to close it: the game thread that creates the
+    // stereo device, before the game runs on.
+    UntilClosed,
+    // Return at once: a late failure on the render thread, which must not
+    // wait on the player (02 §7.4 only asks that the box is shown once).
+    No,
+};
+
+// Shows init_failure_text for `failure`, waiting as `wait` says.
 void report_init_failure(ports::Dialogs& dialogs, vr::DetectResult::Chosen runtime,
-                         const vr::InitFailure& failure) noexcept;
+                         const vr::InitFailure& failure, ReportWait wait) noexcept;
 
 } // namespace omvr::core::ui

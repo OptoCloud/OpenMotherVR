@@ -178,7 +178,9 @@ void StereoDevice::fail_runtime(StereoInterface& si, Chosen chosen, bool late) n
     detach(si);
     if (!late) runtime_.reset();
     runtime_failed_ = true;
-    ui::report_init_failure(dialogs_, chosen, failure_.last());
+    // The render thread must not wait on the player (a late failure).
+    ui::report_init_failure(dialogs_, chosen, failure_.last(),
+                            late ? ui::ReportWait::No : ui::ReportWait::UntilClosed);
 }
 
 // 22 §13: the order of 02 §7.4. State and pointer are cleared before the
