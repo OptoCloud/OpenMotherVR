@@ -50,7 +50,9 @@ bool Session::Impl::create_instance(const std::vector<const char*>& extensions) 
     ci.applicationInfo.apiVersion         = XR_API_VERSION_1_0;
     ci.enabledExtensionCount              = static_cast<std::uint32_t>(extensions.size());
     ci.enabledExtensionNames              = extensions.data();
-    return check(xrCreateInstance(&ci, state.instance.put()), "xrCreateInstance");
+    if (check(xrCreateInstance(&ci, state.instance.put()), "xrCreateInstance")) return true;
+    state.instance.release(); // nothing was created
+    return false;
 }
 
 // The runtime's name and version for the log, and the headset's audio

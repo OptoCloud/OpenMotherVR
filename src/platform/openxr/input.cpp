@@ -58,7 +58,10 @@ bool Input::make_action(XrAction& out, XrActionType type, const char* name, cons
     ci.countSubactionPaths = static_cast<std::uint32_t>(hand_path_.size());
     ci.subactionPaths      = hand_path_.data();
     const XrResult r       = xrCreateAction(set_.get(), &ci, &out);
-    if (XR_FAILED(r)) logf(log_, kLogCreateActionFailed, name, static_cast<int>(r));
+    if (XR_FAILED(r)) {
+        out = XR_NULL_HANDLE; // what a failed create left is not a handle
+        logf(log_, kLogCreateActionFailed, name, static_cast<int>(r));
+    }
     return XR_SUCCEEDED(r);
 }
 
@@ -196,8 +199,10 @@ XrSpace Input::make_action_space(XrAction action, XrPath hand) noexcept {
     ci.subactionPath     = hand;
     ci.poseInActionSpace = kIdentityPose;
     XrSpace s            = XR_NULL_HANDLE;
-    if (const XrResult r = xrCreateActionSpace(session_, &ci, &s); XR_FAILED(r))
+    if (const XrResult r = xrCreateActionSpace(session_, &ci, &s); XR_FAILED(r)) {
         logf(log_, kLogActionSpaceFailed, static_cast<int>(r));
+        return XR_NULL_HANDLE; // what a failed create left is not a handle
+    }
     return s;
 }
 
@@ -302,6 +307,7 @@ bool Input::create(XrInstance instance, XrSession session) noexcept {
     strncpy_s(si.actionSetName, kActionSetName, _TRUNCATE);
     strncpy_s(si.localizedActionSetName, kActionSetLocalizedName, _TRUNCATE);
     if (XR_FAILED(xrCreateActionSet(instance_, &si, set_.put()))) {
+        set_.release(); // nothing was created
         log_.line(kLogActionSetFailed);
         return false;
     }

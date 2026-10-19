@@ -90,7 +90,10 @@ XrSpace Session::Impl::make_reference_space(XrReferenceSpaceType type, const XrP
     ci.referenceSpaceType   = type;
     ci.poseInReferenceSpace = pose;
     XrSpace s               = XR_NULL_HANDLE;
-    check(xrCreateReferenceSpace(state.session.get(), &ci, &s), "xrCreateReferenceSpace");
+    // What a failed create left is not a handle: null, so it is never
+    // destroyed.
+    if (!check(xrCreateReferenceSpace(state.session.get(), &ci, &s), "xrCreateReferenceSpace"))
+        return XR_NULL_HANDLE;
     return s;
 }
 
@@ -238,7 +241,10 @@ bool Session::Impl::create_session(ID3D11Device* device) {
     XrSessionCreateInfo sci{XR_TYPE_SESSION_CREATE_INFO};
     sci.next     = &binding;
     sci.systemId = state.system;
-    return check(xrCreateSession(state.instance.get(), &sci, state.session.put()), "xrCreateSession");
+    if (check(xrCreateSession(state.instance.get(), &sci, state.session.put()), "xrCreateSession"))
+        return true;
+    state.session.release(); // nothing was created
+    return false;
 }
 
 // Nothing can be located or submitted without the three spaces.
