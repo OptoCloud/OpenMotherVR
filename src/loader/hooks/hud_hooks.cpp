@@ -51,14 +51,14 @@ constexpr std::string_view kLogGameHud   = "[diag] hud: the game {} its HUD";
 constexpr std::string_view kLogCrosshair = "hud: crosshair {} (Crosshair {})";
 
 // The game image as the installer saw it, for an install once a key asks
-// for a group in play; and which groups were tried and went in. Game
+// for a group in play; which groups were tried, and whether visibility went
+// in (crosshair and highlight need no outcome: their hooks run only from the
+// sites they redirect, and the installer logs a refusal). Game
 // thread (attach runs before the game's threads).
 std::optional<game::GameImage> image;
 bool visibility_tried = false;
 bool crosshair_tried  = false;
 bool highlight_tried  = false;
-bool crosshair_on     = false;
-bool highlight_on     = false;
 bool visibility_on    = false;
 
 // The open features' reasons, each logged once when its key first asks.
@@ -188,11 +188,11 @@ void ensure_sites(Context& ctx) noexcept {
     }
     if (!crosshair_tried && s.hud.crosshair != core::config::CrosshairMode::On) {
         crosshair_tried = true;
-        crosshair_on    = gui::install_crosshair_sites(*image, patcher, kHooks, ctx.hud_targets);
+        (void)gui::install_crosshair_sites(*image, patcher, kHooks, ctx.hud_targets);
     }
     if (!highlight_tried && !s.hud.item_highlight) {
         highlight_tried = true;
-        highlight_on    = gui::install_highlight_sites(*image, patcher, kHooks, ctx.hud_targets);
+        (void)gui::install_highlight_sites(*image, patcher, kHooks, ctx.hud_targets);
     }
 }
 
