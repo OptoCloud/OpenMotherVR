@@ -809,12 +809,16 @@ void OpenVrRuntime::write_controls() {
         note_controller(i, index[i]);
     }
 
-    // The right hand near the head turns Interact into the flashlight.
+    // The right hand near the head turns Interact into the flashlight. Both
+    // poses valid: a headset that lost tracking can report a stale or zeroed
+    // matrix, which a hand near the origin would then read as "near".
     bool near_head = false;
     if (index[1] != vr::k_unTrackedDeviceIndexInvalid && index[1] < vr::k_unMaxTrackedDeviceCount) {
-        const auto& head = poses[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking.m;
+        const auto& hmd  = poses[vr::k_unTrackedDeviceIndex_Hmd];
+        const auto& head = hmd.mDeviceToAbsoluteTracking.m;
         const auto& hand = poses[index[1]].mDeviceToAbsoluteTracking.m;
-        near_head = poses[index[1]].bPoseIsValid && input::near_head(translation(hand), translation(head));
+        near_head        = hmd.bPoseIsValid && poses[index[1]].bPoseIsValid &&
+                           input::near_head(translation(hand), translation(head));
     }
 
     Controls c = actions_.ready() ? actions_.poll() : legacy_controls(index);
