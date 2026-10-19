@@ -119,11 +119,12 @@
          this.motherV2Slider(page,"SeatedEyeRaise","Seated Eye Raise","mvr_seatedeyeraise",this.motherV2Steps(-50,5,21,100,0),"Raises (positive) or lowers the view when seated, in metres");
          this.motherV2Toggle(page,"RealCrouch","Real Crouch","mvr_realcrouch","Crouch for real to crouch in the game. Needs Standing play and a calibration");
 
-         // Spec 23 §8. Levers by Hand, Camera Takeovers and the two distances
-         // have no effect in this build (23 §12), so they are shown greyed.
+         // Spec 23 §8. Levers by Hand and the two distances have no effect in
+         // this build (23 §12), so they are shown greyed; Camera Takeovers is
+         // not (r8: Reduced applies 23 §4.2 (b) and (c)).
          page = this._motherInteractionItem.page;
          this.motherV2Toggle(page,"PhysicalLevers","Levers by Hand","mvr_physicallevers","Not available yet");
-         this.motherV2List(page,"CameraTakeovers","Camera Takeovers","mvr_cameratakeovers",[0,1],["Game","Reduced"],"Not available yet");
+         this.motherV2List(page,"CameraTakeovers","Camera Takeovers","mvr_cameratakeovers",[0,1],["Game","Reduced"],"Reduced: fewer interactions take the view away from your head");
          this.motherV2List(page,"TerminalDistance","Terminal Distance","mvr_terminaldistance",this.motherV2Steps(0,1,16,10,6),this.motherV2Tenths(this.motherV2Steps(0,1,16,10,6)," m"),"Not available yet");
          this.motherV2List(page,"RewireDistance","Rewire Distance","mvr_rewiredistance",this.motherV2Steps(0,1,16,10,6),this.motherV2Tenths(this.motherV2Steps(0,1,16,10,6)," m"),"Not available yet");
          this.motherV2List(page,"TerminalTextScale","Terminal Text Size","mvr_terminaltextscale",[1,1.25,1.5,1.75],["100%","125%","150%","175%"],"Requires restart! Larger text on terminal screens");
@@ -393,7 +394,6 @@
          this.motherV2Enable("HidingLean",false);
          this.motherV2Enable("HoldBreathGesture",false);
          this.motherV2Enable("PhysicalLevers",false);
-         this.motherV2Enable("CameraTakeovers",false);
          this.motherV2Enable("TerminalDistance",false);
          this.motherV2Enable("RewireDistance",false);
          engine = this.motherV2On("EngineSettingsOverride");
