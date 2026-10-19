@@ -49,12 +49,6 @@ consteval std::array<std::uint8_t, kAlphaLightResourceName.size() + 1> atlas_nam
 }
 constexpr auto kAtlasName = atlas_name();
 
-std::uint32_t u32_at(std::span<const std::uint8_t> b, std::size_t at) {
-    std::uint32_t v = 0;
-    std::memcpy(&v, b.data() + at, sizeof(v));
-    return v;
-}
-
 // The null-terminated name at `at`, or empty when it runs past the chunk.
 std::string_view name_at(std::span<const std::uint8_t> chunk, std::size_t at) {
     if (at >= chunk.size()) return {};
@@ -68,19 +62,20 @@ std::string_view name_at(std::span<const std::uint8_t> chunk, std::size_t at) {
 bool binds_atlas(std::span<const std::uint8_t> in) {
     const auto rdef = find_chunk(in, kRdefChunk);
     if (!rdef || rdef->size() < kRdefHeaderBytes) return false;
-    const std::uint32_t version = u32_at(*rdef, kRdefVersion);
+    const std::uint32_t version = read_u32(*rdef, kRdefVersion);
     const std::uint32_t major   = (version >> kMajorShift) & kVersionByte;
     const std::uint32_t minor   = version & kVersionByte;
     const std::size_t stride    = (major > 5 || (major == 5 && minor >= 1)) ? kBindingBytes51 : kBindingBytes;
-    const std::uint32_t count   = u32_at(*rdef, kRdefBindCount);
-    const std::uint32_t offset  = u32_at(*rdef, kRdefBindOffset);
+    const std::uint32_t count   = read_u32(*rdef, kRdefBindCount);
+    const std::uint32_t offset  = read_u32(*rdef, kRdefBindOffset);
     if (offset > rdef->size() || count > (rdef->size() - offset) / stride) return false;
     bool found = false;
     for (std::uint32_t i = 0; i < count; ++i) {
         const std::size_t at = offset + std::size_t(i) * stride;
-        if (name_at(*rdef, u32_at(*rdef, at)) != kAlphaLightResourceName) continue;
-        if (found || u32_at(*rdef, at + kBindingType) != kInputTexture ||
-            u32_at(*rdef, at + kBindingPoint) != kAlphaLightSlot || u32_at(*rdef, at + kBindingCount) != 1)
+        if (name_at(*rdef, read_u32(*rdef, at)) != kAlphaLightResourceName) continue;
+        if (found || read_u32(*rdef, at + kBindingType) != kInputTexture ||
+            read_u32(*rdef, at + kBindingPoint) != kAlphaLightSlot ||
+            read_u32(*rdef, at + kBindingCount) != 1)
             return false;
         found = true;
     }
@@ -95,9 +90,6 @@ bool is_atlas_operand(const std::vector<std::uint32_t>& t, std::size_t p) {
     return op_type(tok) == kTypeResource && index_dim(tok) == kIndex1D &&
            index_rep(tok, 0) == kIndexImmediate32 && t[p + 1] == kAlphaLightSlot;
 }
-
-std::uint32_t mask_of(std::uint32_t tok) { return (tok >> kComponentShift) & kWriteMaskBits; }
-std::uint32_t swizzle_of(std::uint32_t tok) { return (tok >> kComponentShift) & 0xFF; }
 
 constexpr std::uint32_t kMaskXyz = 0x7, kMaskYzw = 0xE;
 
@@ -137,15 +129,14 @@ std::optional<std::size_t> match_sample(const std::vector<std::uint32_t>& t, std
 
     const std::uint32_t d = t[dst->at];
     if (dst->type != kTypeTemp || dst->size != 2 || op_extended(d) || index_dim(d) != kIndex1D ||
-        (d & kComponentCountMask) != kFourComponents || selection_mode(d) != kSelectMask)
+        !is_masked(d))
         return std::nullopt;
     const std::uint32_t r = t[res->at];
-    if (res->size != 2 || op_extended(r) || !is_atlas_operand(t, res->at) ||
-        (r & kComponentCountMask) != kFourComponents || selection_mode(r) != kSelectSwizzle)
+    if (res->size != 2 || op_extended(r) || !is_atlas_operand(t, res->at) || !is_swizzled(r))
         return std::nullopt;
     if (smp->type != kTypeSampler || smp->size != 2) return std::nullopt;
-    const bool xyz = mask_of(d) == kMaskXyz && swizzle_of(r) == swizzle(kX, kY, kZ, kW);
-    const bool yzw = mask_of(d) == kMaskYzw && swizzle_of(r) == swizzle(kW, kX, kY, kZ);
+    const bool xyz = write_mask(d) == kMaskXyz && swizzle_of(r) == swizzle(kX, kY, kZ, kW);
+    const bool yzw = write_mask(d) == kMaskYzw && swizzle_of(r) == swizzle(kW, kX, kY, kZ);
     if (!xyz && !yzw) return std::nullopt;
     return dst->at;
 }
@@ -187,7 +178,7 @@ std::vector<std::uint32_t> rewrite(const std::vector<std::uint32_t>& t, const Sa
     prog.push_back(opcode_token(kOpMov, kMovLength));
     prog.push_back(t[s.dst]);
     prog.push_back(t[s.dst + 1]);
-    prog.insert(prog.end(), {kFourComponents | (kTypeImmediate32 << kTypeShift), b, b, b, b});
+    prog.insert(prog.end(), {kImmediate4Token, b, b, b, b});
     prog.insert(prog.end(), t.begin() + static_cast<std::ptrdiff_t>(s.at + s.len), t.end());
     prog[1] = static_cast<std::uint32_t>(prog.size() - (t.size() - t[1]));
     return prog;

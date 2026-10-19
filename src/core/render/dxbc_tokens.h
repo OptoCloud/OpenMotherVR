@@ -87,6 +87,7 @@ inline constexpr std::uint32_t kComponentShift     = 4;
 inline constexpr std::uint32_t kWriteMaskBits      = 0xF;
 inline constexpr std::uint32_t kSwizzleBits        = 2; // per component
 inline constexpr std::uint32_t kSwizzleMask        = 0x3;
+inline constexpr std::uint32_t kSwizzleFieldMask   = 0xFF; // all four components
 inline constexpr std::uint32_t kTypeShift          = 12;
 inline constexpr std::uint32_t kTypeMask           = 0xFF;
 inline constexpr std::uint32_t kIndexDimShift      = 20;
@@ -135,6 +136,27 @@ inline bool op_extended(std::uint32_t tok) { return (tok & kExtendedFlag) != 0; 
 inline std::uint32_t selection_mode(std::uint32_t tok) {
     return (tok >> kSelectionShift) & kSelectionMaskBits;
 }
+// A 4-component operand followed by a write mask, a swizzle or one
+// selected component.
+inline bool is_masked(std::uint32_t tok) {
+    return (tok & kComponentCountMask) == kFourComponents && selection_mode(tok) == kSelectMask;
+}
+inline bool is_swizzled(std::uint32_t tok) {
+    return (tok & kComponentCountMask) == kFourComponents && selection_mode(tok) == kSelectSwizzle;
+}
+inline bool is_select1(std::uint32_t tok) {
+    return (tok & kComponentCountMask) == kFourComponents && selection_mode(tok) == kSelect1;
+}
+// The write mask of a masked operand.
+inline std::uint32_t write_mask(std::uint32_t tok) { return (tok >> kComponentShift) & kWriteMaskBits; }
+// The whole swizzle of a swizzled operand, and the component it reads in
+// component `c`.
+inline std::uint32_t swizzle_of(std::uint32_t tok) { return (tok >> kComponentShift) & kSwizzleFieldMask; }
+inline std::uint32_t swizzle_component(std::uint32_t tok, std::uint32_t c) {
+    return (tok >> (kComponentShift + kSwizzleBits * c)) & kSwizzleMask;
+}
+// The component a select-1 operand reads.
+inline std::uint32_t selected_component(std::uint32_t tok) { return (tok >> kComponentShift) & kSwizzleMask; }
 inline std::uint32_t index_rep(std::uint32_t tok, std::uint32_t dim) {
     return (tok >> (kIndexRepShift + kIndexRepBits * dim)) & kIndexRepMask;
 }
@@ -163,6 +185,11 @@ inline std::uint32_t with_length(std::uint32_t tok, std::uint32_t length) {
 inline std::uint32_t with_type(std::uint32_t tok, std::uint32_t type) {
     return (tok & ~(kTypeMask << kTypeShift)) | (type << kTypeShift);
 }
+
+// The operand token of an immediate of four components or of one; the
+// values follow it.
+inline constexpr std::uint32_t kImmediate4Token = kFourComponents | (kTypeImmediate32 << kTypeShift);
+inline constexpr std::uint32_t kImmediate1Token = kOneComponent | (kTypeImmediate32 << kTypeShift);
 
 // A 4-component swizzle.
 constexpr std::uint32_t swizzle(std::uint32_t x, std::uint32_t y, std::uint32_t z, std::uint32_t w) {

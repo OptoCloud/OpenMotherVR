@@ -102,13 +102,13 @@ DxbcChecksum dxbc_checksum(std::span<const std::uint8_t> blob) noexcept {
     return state;
 }
 
-namespace {
-
 std::uint32_t read_u32(std::span<const std::uint8_t> in, std::size_t at) noexcept {
     std::uint32_t v = 0;
     std::memcpy(&v, in.data() + at, sizeof(v));
     return v;
 }
+
+namespace {
 
 // The bounds checks compare against what is left rather than summing: the
 // counts, offsets and sizes are untrusted 32-bit values, and a sum wraps

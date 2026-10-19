@@ -49,14 +49,6 @@ namespace {
 
 // ---- Operands --------------------------------------------------------------------
 
-std::uint32_t mask_of(std::uint32_t tok) { return (tok >> kComponentShift) & kWriteMaskBits; }
-std::uint32_t selected_component(std::uint32_t tok) { return (tok >> kComponentShift) & kSwizzleMask; }
-bool is_select1(std::uint32_t tok) {
-    return (tok & kComponentCountMask) == kFourComponents && selection_mode(tok) == kSelect1;
-}
-bool is_masked(std::uint32_t tok) {
-    return (tok & kComponentCountMask) == kFourComponents && selection_mode(tok) == kSelectMask;
-}
 std::uint32_t bit_of(std::uint32_t component) { return 1u << component; }
 
 // One component of a temporary, as a source: `rN.c` or `-rN.c`. Its tokens
@@ -94,21 +86,6 @@ std::optional<CbRef> cb_ref(const std::uint32_t* t, const Operand& o) {
 
 // ---- The instructions ------------------------------------------------------------
 
-// The operands of an instruction, in order, or nothing when one cannot be
-// parsed or they do not fill it exactly.
-std::optional<std::array<Operand, 4>> operands4(const std::uint32_t* t, const Instruction& in) {
-    std::array<Operand, 4> ops{};
-    std::size_t p = in.at + 1;
-    for (auto& o : ops) {
-        const auto parsed = parse_operand(t, in.at + in.len, p);
-        if (!parsed) return std::nullopt;
-        o = *parsed;
-        p = o.at + o.size;
-    }
-    if (p != in.at + in.len) return std::nullopt;
-    return ops;
-}
-
 // A sprite corner instruction (24 §14.2): `mad rD.<c>, [-]rA.a, cb1[c].<c>,
 // rC.c'` with c = x (register 0) or y (register 1).
 struct Corner {
@@ -123,11 +100,11 @@ struct Corner {
 std::optional<Corner> match_corner(const std::uint32_t* t, const Instruction& in, std::size_t index,
                                    std::uint32_t component) {
     if (in.op != kOpMad || in.extended) return std::nullopt;
-    const auto ops = operands4(t, in);
+    const auto ops = operands<4>(t, in);
     if (!ops) return std::nullopt;
     const auto& [dst, src0, src1, src2] = *ops;
     if (dst.type != kTypeTemp || dst.size != 2 || !is_masked(t[dst.at]) ||
-        mask_of(t[dst.at]) != bit_of(component))
+        write_mask(t[dst.at]) != bit_of(component))
         return std::nullopt;
     const auto proj = cb_ref(t, src1);
     if (!proj || proj->buffer != kSpriteProjectionBuffer || proj->reg != component ||
@@ -155,7 +132,7 @@ bool writes(const std::uint32_t* t, const Instruction& in, std::uint32_t reg, st
         const auto o = parse_operand(t, in.at + in.len, p);
         if (!o) return true; // unknown: assume it does
         if (o->type == kTypeTemp && index_dim(t[o->at]) == kIndex1D && o->reg == reg &&
-            (!is_masked(t[o->at]) || (mask_of(t[o->at]) & bit_of(c)) != 0))
+            (!is_masked(t[o->at]) || (write_mask(t[o->at]) & bit_of(c)) != 0))
             return true;
         p = o->at + o->size;
     }
@@ -174,14 +151,10 @@ bool clip_from_view_proj(const std::uint32_t* t, const std::vector<Instruction>&
         if (in.op == kOpCustomData || is_sm4_declaration(in.op)) continue;
         if (!writes(t, in, corner.clip.reg, corner.clip.component)) continue;
         if (in.op != kOpDp4 || in.extended) return false;
-        std::size_t p = in.at + 1;
-        std::optional<Operand> o;
-        for (int n = 0; n < 3; ++n) {
-            o = parse_operand(t, in.at + in.len, p);
-            if (!o) return false;
-            p = o->at + o->size;
-        }
-        const auto cb = cb_ref(t, *o);
+        // dp4 dst, src, cb0[R]: the third operand.
+        const auto ops = leading_operands<3>(t, in);
+        if (!ops) return false;
+        const auto cb = cb_ref(t, (*ops)[2]);
         return cb && cb->buffer == kSpriteCameraBuffer &&
                (cb->reg == kViewProjRegister + component ||
                 cb->reg == kSecondaryViewProjRegister + component);
@@ -310,9 +283,9 @@ private:
     static Tokens cb0(std::uint32_t reg) {
         return {selected_source(kY, kTypeConstantBuffer, kIndex2D), kSpriteCameraBuffer, reg};
     }
-    static Tokens imm(std::uint32_t v) { return {kOneComponent | (kTypeImmediate32 << kTypeShift), v}; }
+    static Tokens imm(std::uint32_t v) { return {kImmediate1Token, v}; }
     static Tokens imm4(std::uint32_t x, std::uint32_t y, std::uint32_t z, std::uint32_t w) {
-        return {kFourComponents | (kTypeImmediate32 << kTypeShift), x, y, z, w};
+        return {kImmediate4Token, x, y, z, w};
     }
     static Tokens neg(Tokens o) {
         o[0] |= kExtendedFlag;

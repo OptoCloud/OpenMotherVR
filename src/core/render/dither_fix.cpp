@@ -37,16 +37,6 @@ constexpr auto kFrcLength   = static_cast<std::uint32_t>(1 + 2 * kRegisterOperan
 // 1/1024 as an immediate: the wrapped position's scale (08 §1.4 r7).
 constexpr std::uint32_t kWrapScale = std::bit_cast<std::uint32_t>(1.0f / kDitherWrapPixels);
 
-std::uint32_t mask_of(std::uint32_t tok) { return (tok >> kComponentShift) & kWriteMaskBits; }
-bool mask_mode(std::uint32_t tok) {
-    return (tok & kComponentCountMask) == kFourComponents && selection_mode(tok) == kSelectMask;
-}
-bool swizzle_mode(std::uint32_t tok) {
-    return (tok & kComponentCountMask) == kFourComponents && selection_mode(tok) == kSelectSwizzle;
-}
-std::uint32_t selector(std::uint32_t tok, std::uint32_t c) {
-    return (tok >> (kComponentShift + kSwizzleBits * c)) & kSwizzleMask;
-}
 // The opcode token is `op` with no flags (no saturate, no extension).
 bool plain(std::uint32_t tok, std::uint32_t op) { return (tok & ~(kLengthMask << kLengthShift)) == op; }
 
@@ -82,21 +72,6 @@ std::array<std::uint32_t, kComponents> immediate_in(Pair p, std::uint32_t value)
 
 // ---- The dither sequence (08 §1.1) ----------------------------------------------
 
-// The N operands of the instruction at t[i], which must end at its end.
-template <std::size_t N>
-std::optional<std::array<Operand, N>> operands(const std::uint32_t* t, std::size_t i, std::size_t len) {
-    std::array<Operand, N> ops{};
-    std::size_t at = i + 1;
-    for (Operand& o : ops) {
-        const auto parsed = parse_operand(t, i + len, at);
-        if (!parsed) return std::nullopt;
-        o  = *parsed;
-        at = o.at + o.size;
-    }
-    if (at != i + len) return std::nullopt;
-    return ops;
-}
-
 // One written pair: the temporary and its two components.
 struct Written {
     std::uint32_t reg = 0;
@@ -105,16 +80,16 @@ struct Written {
 
 // A temporary written in exactly two components, without modifiers.
 std::optional<Written> two_component_temp(const std::uint32_t* t, const Operand& o) {
-    if (o.type != kTypeTemp || o.size != kRegisterOperandSize || !mask_mode(t[o.at])) return std::nullopt;
-    const auto p = pair_of(mask_of(t[o.at]));
+    if (o.type != kTypeTemp || o.size != kRegisterOperandSize || !is_masked(t[o.at])) return std::nullopt;
+    const auto p = pair_of(write_mask(t[o.at]));
     if (!p) return std::nullopt;
     return Written{o.reg, *p};
 }
 
 // `vP` read with vP.x in component p.first and vP.y in p.second.
 bool reads_position(const std::uint32_t* t, const Operand& o, Pair p) {
-    return o.type == kTypeInput && o.size == kRegisterOperandSize && swizzle_mode(t[o.at]) &&
-           selector(t[o.at], p.first) == kX && selector(t[o.at], p.second) == kY;
+    return o.type == kTypeInput && o.size == kRegisterOperandSize && is_swizzled(t[o.at]) &&
+           swizzle_component(t[o.at], p.first) == kX && swizzle_component(t[o.at], p.second) == kY;
 }
 
 // The immediate holds 0.001 in exactly the components of `p`, 0 elsewhere.
@@ -125,8 +100,9 @@ bool thousandths_in(const std::uint32_t* t, const Operand& o, Pair p) {
 
 // A source reading the written pair `w` in its first two components.
 bool reads_pair(const std::uint32_t* t, const Operand& o, const Written& w) {
-    return o.type == kTypeTemp && o.size == kRegisterOperandSize && swizzle_mode(t[o.at]) && o.reg == w.reg &&
-           selector(t[o.at], kX) == w.comps.first && selector(t[o.at], kY) == w.comps.second;
+    return o.type == kTypeTemp && o.size == kRegisterOperandSize && is_swizzled(t[o.at]) && o.reg == w.reg &&
+           swizzle_component(t[o.at], kX) == w.comps.first &&
+           swizzle_component(t[o.at], kY) == w.comps.second;
 }
 
 // A matched site: instruction 1 (`mul`), instruction 2 (`mad`) right after
@@ -141,14 +117,14 @@ struct Site {
 };
 
 // Instruction 1: `mul rA.<p>, vP.<x, y in p>, l(0.001 in p)`.
-bool match_mul(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s, std::uint32_t& position) {
-    if (!plain(t[i], kOpMul)) return false;
-    const auto ops = operands<3>(t, i, len);
+bool match_mul(const std::uint32_t* t, const Instruction& in, Site& s, std::uint32_t& position) {
+    if (!plain(t[in.at], kOpMul)) return false;
+    const auto ops = operands<3>(t, in);
     if (!ops) return false;
     const auto& [dst, vp, imm] = *ops;
     const auto a               = two_component_temp(t, dst);
     if (!a || !reads_position(t, vp, a->comps) || !thousandths_in(t, imm, a->comps)) return false;
-    s.mul    = i;
+    s.mul    = in.at;
     s.a      = *a;
     position = vp.reg;
     return true;
@@ -156,20 +132,20 @@ bool match_mul(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s, 
 
 // Instruction 2: `mad rB.<p>, vP.<x, y in p>, l(0.001 in p), -vT.<one
 // component in p>`, the same vP, and nothing instruction 1 wrote.
-bool match_mad(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s, std::uint32_t position) {
-    if (!plain(t[i], kOpMad)) return false;
-    const auto ops = operands<4>(t, i, len);
+bool match_mad(const std::uint32_t* t, const Instruction& in, Site& s, std::uint32_t position) {
+    if (!plain(t[in.at], kOpMad)) return false;
+    const auto ops = operands<4>(t, in);
     if (!ops) return false;
     const auto& [dst, vp, imm, tex] = *ops;
     const auto b                    = two_component_temp(t, dst);
     if (!b || vp.reg != position || !reads_position(t, vp, b->comps) || !thousandths_in(t, imm, b->comps))
         return false;
     if (tex.type != kTypeInput || tex.size != kNegatedOperandSize || t[tex.at + 1] != kNegateModifier ||
-        !swizzle_mode(t[tex.at]) ||
-        selector(t[tex.at], b->comps.first) != selector(t[tex.at], b->comps.second))
+        !is_swizzled(t[tex.at]) ||
+        swizzle_component(t[tex.at], b->comps.first) != swizzle_component(t[tex.at], b->comps.second))
         return false;
     if (b->reg == s.a.reg && (b->comps.mask() & s.a.comps.mask()) != 0) return false;
-    s.mad  = i;
+    s.mad  = in.at;
     s.vpos = vp.at;
     s.b    = *b;
     return true;
@@ -177,16 +153,16 @@ bool match_mad(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s, 
 
 // Instruction 3: `dp2` of the two written pairs, in written order, either
 // source first.
-bool match_dp2(const std::uint32_t* t, std::size_t i, std::size_t len, Site& s) {
-    if (!plain(t[i], kOpDp2)) return false;
-    const auto ops = operands<3>(t, i, len);
+bool match_dp2(const std::uint32_t* t, const Instruction& in, Site& s) {
+    if (!plain(t[in.at], kOpDp2)) return false;
+    const auto ops = operands<3>(t, in);
     if (!ops) return false;
     const auto& [dst, x, y] = *ops;
-    if (dst.type != kTypeTemp || dst.size != kRegisterOperandSize || !mask_mode(t[dst.at])) return false;
+    if (dst.type != kTypeTemp || dst.size != kRegisterOperandSize || !is_masked(t[dst.at])) return false;
     if (!(reads_pair(t, x, s.a) && reads_pair(t, y, s.b)) &&
         !(reads_pair(t, x, s.b) && reads_pair(t, y, s.a)))
         return false;
-    s.dp2 = i;
+    s.dp2 = in.at;
     return true;
 }
 
@@ -216,8 +192,8 @@ std::optional<Sites> find_sites(const std::vector<std::uint32_t>& t, std::size_t
         const Instruction &j = (*insts)[k + 1], &l = (*insts)[k + 2];
         Site site;
         std::uint32_t position = 0;
-        if (match_mul(t.data(), i.at, i.len, site, position) &&
-            match_mad(t.data(), j.at, j.len, site, position) && match_dp2(t.data(), l.at, l.len, site))
+        if (match_mul(t.data(), i, site, position) && match_mad(t.data(), j, site, position) &&
+            match_dp2(t.data(), l, site))
             s.found.push_back(site);
     }
     if (s.found.empty()) return std::nullopt;
@@ -248,7 +224,7 @@ public:
         push(a.reg);
     }
     void immediate(Pair p, std::uint32_t value) {
-        push(kFourComponents | (kTypeImmediate32 << kTypeShift));
+        push(kImmediate4Token);
         for (const std::uint32_t v : immediate_in(p, value)) push(v);
     }
 

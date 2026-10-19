@@ -40,9 +40,35 @@ struct Instruction {
 // not fit before `end`.
 std::optional<std::vector<Instruction>> instructions(std::span<const std::uint32_t> t, std::size_t end);
 
+// The first N operands of instruction `in` (no extended opcode token), or
+// nothing when one cannot be parsed.
+template <std::size_t N>
+std::optional<std::array<Operand, N>> leading_operands(const std::uint32_t* t, const Instruction& in) {
+    std::array<Operand, N> ops{};
+    std::size_t at = in.at + 1;
+    for (Operand& o : ops) {
+        const auto parsed = parse_operand(t, in.at + in.len, at);
+        if (!parsed) return std::nullopt;
+        o  = *parsed;
+        at = o.at + o.size;
+    }
+    return ops;
+}
+
+// The N operands of instruction `in`, which must fill it exactly.
+template <std::size_t N>
+std::optional<std::array<Operand, N>> operands(const std::uint32_t* t, const Instruction& in) {
+    const auto ops = leading_operands<N>(t, in);
+    if (!ops || (*ops)[N - 1].at + (*ops)[N - 1].size != in.at + in.len) return std::nullopt;
+    return ops;
+}
+
 // Whether operand `o` is the 4-component immediate (x, y, z, w).
 bool is_immediate4(const std::uint32_t* t, const Operand& o, std::uint32_t x, std::uint32_t y,
                    std::uint32_t z, std::uint32_t w);
+
+// The little-endian 32-bit word at byte `at` of `in`, which must hold it.
+std::uint32_t read_u32(std::span<const std::uint8_t> in, std::size_t at) noexcept;
 
 // The DXBC checksum of a whole container: MD5's compression with DXBC's own
 // final block, over everything after the stored checksum and version. It is

@@ -548,6 +548,24 @@ TEST_CASE("the instruction walk refuses lengths that are zero, too long or wrap"
     CHECK_FALSE(instructions(with_wrapping_custom_data(dither_program()), 39).has_value());
 }
 
+TEST_CASE("operands must fill the instruction; leading operands need not") {
+    const std::vector<std::uint32_t> t = dither_program();
+    const Instruction mul{6, 10, 0x38, false}; // mul r0.xy, v0.xyxx, l(0.001, 0.001, 0, 0)
+    const auto all = operands<3>(t.data(), mul);
+    REQUIRE(all.has_value());
+    CHECK((*all)[0].at == 7u);
+    CHECK((*all)[1].at == 9u);
+    CHECK((*all)[1].reg == 0u);
+    CHECK((*all)[2].at == 11u);
+    CHECK((*all)[2].size == 5u);
+    CHECK(is_immediate4(t.data(), (*all)[2], kPoint001, kPoint001, 0, 0));
+    CHECK_FALSE(operands<2>(t.data(), mul).has_value());
+    const auto first_two = leading_operands<2>(t.data(), mul);
+    REQUIRE(first_two.has_value());
+    CHECK((*first_two)[1].at == 9u);
+    CHECK_FALSE(leading_operands<4>(t.data(), mul).has_value()); // a fourth lies past the end
+}
+
 // `blob` with the word at `at` replaced and the checksum stored again.
 std::vector<std::uint8_t> with_word(std::vector<std::uint8_t> blob, std::size_t at, std::uint32_t v) {
     std::memcpy(blob.data() + at, &v, sizeof(v));
