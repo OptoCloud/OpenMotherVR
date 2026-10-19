@@ -4,10 +4,13 @@
 #include "loader/d3d11_forwarders.h"
 #include "loader/hooks/crash_hook.h"
 #include "loader/hooks/d3d11_hooks.h"
+#include "platform/win32/module.h"
 
 #include <windows.h>
 #include <dxgi.h>
+#include <intrin.h>
 
+#include <cstdint>
 #include <mutex>
 #include <string_view>
 
@@ -16,6 +19,8 @@ namespace {
 constexpr std::string_view kNoRealFunctionLog = "proxy: forward attempted with NULL real ptr";
 constexpr std::string_view kForcedWindowedLog = "proxy: VR active, swapchain forced windowed";
 constexpr std::string_view kMirrorBufferLog   = "proxy: mirror back buffer {}x{}";
+constexpr std::string_view kForeignCallerLog =
+    "proxy: D3D11CreateDeviceAndSwapChain from outside AI.exe (return address 0x{:08X}) passed through";
 
 // With a headset attached the back buffer is both eyes side by side at the
 // headset's resolution, far past any display mode: keep the game windowed
@@ -79,7 +84,17 @@ extern "C" __declspec(dllexport) HRESULT WINAPI D3D11CreateDeviceAndSwapChain(
     // preflight or install) the game is unmodded: no swapchain change and no
     // wrapper on the device or the swapchain (no shader fix, no window
     // changes). The install ran at attach, before the game creates a device.
-    if (!entry::full_patch_set()) {
+    // Every d3d11 import in the process binds to this export: an overlay or
+    // capture tool creating its own device and swapchain through it is
+    // passed through too, so it neither gets the VR swapchain changes nor
+    // becomes the game's swapchain.
+    const void* caller = _ReturnAddress();
+    const bool game    = omvr::platform::win32::in_main_executable(caller);
+    if (!game && entry::full_patch_set()) {
+        omvr::core::diag::ports::logf(entry::log(), kForeignCallerLog,
+                                      reinterpret_cast<std::uintptr_t>(caller));
+    }
+    if (!game || !entry::full_patch_set()) {
         return real(adapter, driver_type, software, flags, feature_levels, feature_level_count, sdk_version,
                     swapchain_desc, swapchain, device, feature_level, immediate_context);
     }

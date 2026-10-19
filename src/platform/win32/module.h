@@ -19,6 +19,10 @@ std::string version_string(void* module);
 // the main executable), or null when it is not loaded.
 void* module_handle(const char* name) noexcept;
 
+// True when `address` lies in the main executable's image (AI.exe), for
+// telling the game's own calls from those of other modules in the process.
+bool in_main_executable(const void* address) noexcept;
+
 // GetProcAddress: the export `name` of `module` (an HMODULE), or null.
 void* proc_address(void* module, const char* name) noexcept;
 

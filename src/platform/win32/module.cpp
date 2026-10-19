@@ -70,6 +70,15 @@ std::string version_string(void* module) {
 
 void* module_handle(const char* name) noexcept { return ::GetModuleHandleA(name); }
 
+bool in_main_executable(const void* address) noexcept {
+    HMODULE owner = nullptr;
+    if (!address || !::GetModuleHandleExW(
+                        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                        static_cast<LPCWSTR>(address), &owner))
+        return false;
+    return owner == ::GetModuleHandleW(nullptr);
+}
+
 void* proc_address(void* module, const char* name) noexcept {
     return reinterpret_cast<void*>(::GetProcAddress(static_cast<HMODULE>(module), name));
 }
