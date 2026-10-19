@@ -94,7 +94,6 @@ std::optional<float> view_heading(const Matrix44& view) noexcept {
 
 Matrix44 HudPlacer::place(const std::optional<Matrix44>& view, float inv_aspect, const HudPanel& p,
                           TimePoint now) noexcept {
-    const bool replace = replace_.exchange(false, std::memory_order_acq_rel);
     if (p.placement != config::HudPlacement::Follow || !view) {
         // Re-placed at the head's heading when Follow is chosen again.
         heading_.reset();
@@ -102,6 +101,10 @@ Matrix44 HudPlacer::place(const std::optional<Matrix44>& view, float inv_aspect,
         return head_locked_quad(view, inv_aspect, p);
     }
     const auto head = view_heading(*view);
+    // A re-place request is taken only on a frame that can act on it: one
+    // that comes while looking straight up or down waits for a heading,
+    // and is not lost to a 300 ms glide (05 §3.2c, e).
+    const bool replace = head && replace_.exchange(false, std::memory_order_acq_rel);
     if (head && (!heading_ || replace)) {
         heading_ = *head;
         move_.reset();

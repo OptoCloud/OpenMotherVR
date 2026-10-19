@@ -457,6 +457,22 @@ TEST_SUITE("HUD placement") {
         CHECK(panel_heading(q) == doctest::Approx(90.0f * kDeg));
         for (float v : q) CHECK(std::isfinite(v));
     }
+
+    TEST_CASE("follow: a re-place requested while looking straight down waits for a heading") {
+        HudPlacer placer;
+        HudPanel p;
+        p.placement = HudPlacement::Follow;
+        const Clock::time_point t0{10s};
+        placer.place(view_towards(0.0f), 0.5f, p, t0);
+        Matrix44 down{};
+        omvr::util::identity(down.data());
+        down[10] = 0.0f;
+        down[6]  = -1.0f;
+        placer.request_replace();
+        placer.place(down, 0.5f, p, t0 + 10ms); // no heading: the request is kept
+        const Matrix44 q = placer.place(view_towards(90.0f * kDeg), 0.5f, p, t0 + 20ms);
+        CHECK(panel_heading(q) == doctest::Approx(90.0f * kDeg)); // at once, no glide
+    }
 }
 
 TEST_SUITE("UI patch variants") {
