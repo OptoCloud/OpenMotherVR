@@ -184,6 +184,9 @@ void Presence::run() noexcept {
                 if (!conn.write(kOpFrame, set_activity(now, ++nonce)) || !await_reply(conn, error)) {
                     log_->line("discord: connection lost");
                     conn.close();
+                    // As every other failure: a client that keeps dropping
+                    // the connection here would otherwise spin the worker.
+                    std::this_thread::sleep_for(kRetryPeriod);
                     continue;
                 }
                 if (error.empty())
