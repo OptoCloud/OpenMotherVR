@@ -123,8 +123,11 @@ HRESULT __stdcall hook_resize_buffers(void* self, UINT buffer_count, UINT width,
     const HRESULT hr = system_method<ResizeBuffersFn>(ctx.targets.resize_buffers)(
         self, buffer_count, width, height, format, swapchain_flags);
     if (SUCCEEDED(hr) && is_game_swapchain(self)) {
-        platform::d3d11::fit_game_window(static_cast<IDXGISwapChain*>(self), ctx.window.headset_attached(),
-                                         ctx.log);
+        auto* sc = static_cast<IDXGISwapChain*>(self);
+        // The fit is posted to the window's procedure (spec 03 §9.3): a
+        // headset attached since the swapchain was created subclasses it now.
+        if (void* hwnd = platform::d3d11::output_window(sc)) keep_focus_while_vr(hwnd);
+        platform::d3d11::fit_game_window(sc, ctx.window.headset_attached(), ctx.log);
     }
     return hr;
 }
@@ -210,11 +213,12 @@ void install_swapchain_hooks(void* swapchain) noexcept {
     auto* sc      = static_cast<IDXGISwapChain*>(swapchain);
     const bool vr = ctx.window.headset_attached();
     platform::d3d11::log_swapchain_desc(sc, ctx.log);
+    // Subclassed first: a fit from a thread other than the window's is
+    // posted to its procedure (spec 03 §9.3).
+    void* hwnd = platform::d3d11::output_window(sc);
+    if (hwnd) keep_focus_while_vr(hwnd);
     platform::d3d11::fit_game_window(sc, vr, ctx.log);
-    if (void* hwnd = platform::d3d11::output_window(sc)) {
-        keep_focus_while_vr(hwnd);
-        platform::d3d11::no_alt_enter_while_vr(sc, hwnd, ctx.window.headset_attached(), ctx.log);
-    }
+    if (hwnd) platform::d3d11::no_alt_enter_while_vr(sc, hwnd, ctx.window.headset_attached(), ctx.log);
 
     // Each replacement goes in on its own: one that cannot be installed is
     // logged and the others still are. The stereo frame depends on none of

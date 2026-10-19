@@ -22,6 +22,17 @@ constexpr std::string_view kMadeBorderlessLog =
     "proxy: mirror window {}x{} did not fit the monitor, now borderless {}x{}";
 constexpr std::string_view kFocusTakenLog = "proxy: focus taken by process {} ({}), game kept running";
 constexpr std::string_view kSubclassedLog = "proxy: focus loss no longer pauses the game";
+constexpr std::string_view kFitNotPostedLog =
+    "proxy: cannot post the mirror window fit to the game thread: error {}, window left as it is";
+
+// The private message a fit asked for on another thread is posted as. A
+// registered one: the game may use the WM_APP range itself.
+constexpr const char* kFitMessageName = "OpenMotherVR.FitWindow";
+
+UINT fit_message() noexcept {
+    static const UINT message = ::RegisterWindowMessageA(kFitMessageName);
+    return message;
+}
 
 // The frame parts a borderless window drops.
 constexpr LONG kFrameStyles = WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
@@ -37,7 +48,14 @@ bool fits(const RECT& window, const RECT& area) noexcept {
 
 void fit_window(void* wnd, ports::Log& log) noexcept {
     const auto hwnd = static_cast<HWND>(wnd);
-    if (!hwnd || ::IsZoomed(hwnd) || ::IsIconic(hwnd)) return;
+    if (!hwnd) return;
+    if (::GetWindowThreadProcessId(hwnd, nullptr) != ::GetCurrentThreadId()) {
+        const UINT message = fit_message();
+        if (message == 0 || !::PostMessageA(hwnd, message, 0, 0))
+            ports::logf(log, kFitNotPostedLog, ::GetLastError());
+        return;
+    }
+    if (::IsZoomed(hwnd) || ::IsIconic(hwnd)) return;
     RECT window{};
     if (!::GetWindowRect(hwnd, &window)) return;
     MONITORINFO mi{sizeof(mi)};
@@ -48,13 +66,19 @@ void fit_window(void* wnd, ports::Log& log) noexcept {
     if (fits(window, framed ? mi.rcWork : mi.rcMonitor)) return;
 
     const RECT& mon = mi.rcMonitor;
-    // The game's window class is ANSI: the A functions keep it so.
+    // The game's window class is ANSI: the A functions keep it so. On the
+    // window's own thread, so neither call waits on another.
     ::SetWindowLongA(hwnd, GWL_STYLE, style & ~kFrameStyles);
-    // Asynchronous: the window belongs to the game thread, which may be
-    // waiting on this one.
     ::SetWindowPos(hwnd, nullptr, mon.left, mon.top, width(mon), height(mon),
-                   SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS);
+                   SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     ports::logf(log, kMadeBorderlessLog, width(window), height(window), width(mon), height(mon));
+}
+
+bool handle_fit_message(HWND__* hwnd, unsigned int msg, ports::Log& log) noexcept {
+    const UINT message = fit_message();
+    if (message == 0 || msg != message) return false;
+    fit_window(hwnd, log);
+    return true;
 }
 
 void log_focus_loss(ports::Log& log) noexcept {

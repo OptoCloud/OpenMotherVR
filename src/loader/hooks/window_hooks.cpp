@@ -15,6 +15,8 @@ namespace {
 // The game's window procedure while a headset is attached. Game thread.
 LRESULT CALLBACK game_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) noexcept {
     auto& ctx = context();
+    // A mirror window fit asked for on the render thread (spec 03 §9.3).
+    if (platform::win32::handle_fit_message(hwnd, msg, ctx.log)) return 0;
     if (msg == WM_KILLFOCUS && ctx.window.headset_attached()) {
         platform::win32::log_focus_loss(ctx.log);
         return 0;

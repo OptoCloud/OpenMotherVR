@@ -23,8 +23,18 @@ using WindowProc = long(__stdcall*)(HWND__* hwnd, unsigned int msg, unsigned int
 // it instead left a client area smaller than the size the game kept (it
 // ignores WM_SIZE in its fullscreen mode), which put the UI and the cursor
 // off. A window that already fits is left alone, so a size the player
-// picks stays. Render thread (swapchain creation and ResizeBuffers).
+// picks stays.
+//
+// Any thread (swapchain creation and ResizeBuffers, on the render thread).
+// The style change sends messages to the window's thread and waits for
+// them (spec 03 §9.3: it must not wait for the game thread, which may be
+// waiting on this one), so on any other thread the fit is posted to the
+// window, whose subclassed procedure hands it to handle_fit_message.
 void fit_window(void* wnd, core::diag::ports::Log& log) noexcept;
+
+// The window procedure's part of fit_window: true, after fitting the window,
+// when `msg` is the fit posted from another thread. Game thread.
+bool handle_fit_message(HWND__* hwnd, unsigned int msg, core::diag::ports::Log& log) noexcept;
 
 // The process that took the keyboard focus, for the log. Game thread.
 void log_focus_loss(core::diag::ports::Log& log) noexcept;
