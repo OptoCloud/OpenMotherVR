@@ -1,6 +1,8 @@
 // OpenMotherVR-Provenance: clean
 #include "platform/win32/crash_filter.h"
 
+#include "util/base/scope_exit.h"
+
 #include <windows.h>
 
 #include <cstdint>
@@ -103,14 +105,39 @@ void CrashRecorder::write_stack(const EXCEPTION_POINTERS& info) noexcept {
 }
 
 long CrashRecorder::chain(EXCEPTION_POINTERS* info) noexcept {
-    const DWORD self = ::GetCurrentThreadId();
-    if (const auto game = game_filter_.load(); game && chaining_thread_.load() != self) {
-        chaining_thread_.store(self);
-        const LONG result = game(info);
-        chaining_thread_.store(0);
+    const DWORD self    = ::GetCurrentThreadId();
+    const bool nested   = chaining_thread_.load() == self;
+    const std::size_t n = foreign_count_.load(std::memory_order_acquire);
+    const std::size_t i = nested ? chain_entered_.load() : 0;
+    if (i < n) {
+        if (!nested) chaining_thread_.store(self);
+        chain_entered_.store(i + 1);
+        const Filter next = foreign_[n - 1 - i].load(); // newest first
+        const LONG result = next ? next(info) : EXCEPTION_CONTINUE_SEARCH;
+        if (!nested) {
+            chain_entered_.store(0);
+            chaining_thread_.store(0);
+        }
         return result;
     }
     return previous_ ? previous_(info) : EXCEPTION_CONTINUE_SEARCH;
+}
+
+bool CrashRecorder::is_foreign(Filter filter) const noexcept {
+    const std::size_t n = foreign_count_.load(std::memory_order_acquire);
+    for (std::size_t i = 0; i < n; ++i)
+        if (foreign_[i].load() == filter) return true;
+    return false;
+}
+
+void CrashRecorder::add_foreign(Filter filter) noexcept {
+    const std::size_t n = foreign_count_.load(std::memory_order_acquire);
+    if (n == kMaxForeignFilters) {
+        foreign_[n - 1].store(filter);
+        return;
+    }
+    foreign_[n].store(filter);
+    foreign_count_.store(n + 1, std::memory_order_release);
 }
 
 // 22 §14: the state event, then the flush, each on its own so a fault in
@@ -149,9 +176,16 @@ void CrashRecorder::enable_crash_safe(StateRenderer render, core::diag::ports::L
 void CrashRecorder::install(Filter ours) noexcept { previous_ = ::SetUnhandledExceptionFilter(ours); }
 
 void CrashRecorder::reassert(Filter ours) noexcept {
+    // reassert runs at a few points on different threads; the chain's
+    // writers take turns. on_crash only reads it.
+    while (reassert_busy_.test_and_set(std::memory_order_acquire)) reassert_busy_.wait(true);
+    const util::ScopeExit done{[this] {
+        reassert_busy_.clear(std::memory_order_release);
+        reassert_busy_.notify_one();
+    }};
     const Filter current = ::SetUnhandledExceptionFilter(ours);
-    if (current == ours || (current && current == game_filter_.load())) return;
-    if (current) game_filter_.store(current);
+    if (current == ours || (current && is_foreign(current))) return;
+    if (current) add_foreign(current);
     // Logged once per change: a filter replaced again later is reported
     // again. Local buffers: the member ones belong to a crash on another
     // thread.
