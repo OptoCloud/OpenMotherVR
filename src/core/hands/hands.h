@@ -5,6 +5,7 @@
 #include "core/diag/ports/log.h"
 #include "core/diag/tuning.h"
 #include "core/hands/action_episode.h"
+#include "core/hands/arm_poser.h"
 #include "core/hands/activity.h"
 #include "core/hands/hand_track.h"
 #include "core/hands/pose_filter.h"
@@ -49,7 +50,18 @@ struct HandsOutput {
 class Hands final {
 public:
     Hands(const config::HandsSettings& settings, diag::ports::Log& log) noexcept
-        : settings_(settings), log_(log) {}
+        : settings_(settings), log_(log), arms_(log) {}
+
+    // The arm pose edit (21 §4.2): the targets the arms reach, the edit on
+    // the final-pose job and what it drew.
+    ArmPoser& arms() noexcept { return arms_; }
+    const ArmPoser& arms() const noexcept { return arms_; }
+
+    // 21 §3.1, §4.2: each tracked hand's grip target in the world through
+    // `camera` (the active camera now) and its weight (21 §3.3 times the
+    // activity, and the melee hand-off for the right arm), for a hand whose
+    // weight is above 0 in a recent update. Game thread.
+    ArmTargets arm_targets(const CameraPose& camera, TimePoint now) const noexcept;
 
     // Game thread, at each head pose the game asks for: `frame` is that pose
     // and both hands of its prediction, `world_scale` the head's scale.
@@ -177,6 +189,8 @@ private:
 
     // The tracker scan's thread.
     TrackerFacing tracker_;
+
+    ArmPoser arms_;
 };
 
 } // namespace omvr::core::hands

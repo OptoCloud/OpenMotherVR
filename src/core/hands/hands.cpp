@@ -203,6 +203,18 @@ std::optional<Hands::View> Hands::fresh_view(TimePoint now) const noexcept {
     return v;
 }
 
+ArmTargets Hands::arm_targets(const CameraPose& camera, TimePoint now) const noexcept {
+    ArmTargets out;
+    if (!settings_.enabled) return out;
+    const auto view = fresh_view(now);
+    if (!view) return out;
+    for (std::size_t h = 0; h < kHandCount; ++h) {
+        const HandView& v = view->hands[h];
+        if (v.has_grip && v.weight > 0.0f) out[h] = ArmTarget{to_world(camera, v.grip), v.weight};
+    }
+    return out;
+}
+
 bool Hands::aim_wanted(TimePoint now) const noexcept {
     if (!settings_.enabled || !settings_.aim_from_hand) return false;
     const auto view = fresh_view(now);

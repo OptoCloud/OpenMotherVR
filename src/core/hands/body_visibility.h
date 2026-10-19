@@ -2,6 +2,7 @@
 #pragma once
 
 #include "core/config/settings.h"
+#include "core/hands/types.h"
 
 #include <array>
 #include <cstddef>
@@ -29,16 +30,6 @@ inline constexpr std::size_t kMaxCollapseAnchors = 4;
 // (`LeftWeaponBone`, `RightWeaponBone`, listed with the fingers) are their
 // own group: held items hang there and are always drawn (21 §10.2).
 enum class BoneGroup : std::uint8_t { Body, Shoulder, Arm, Hand, Weapon };
-
-// A bone transform of the game's pose (21 §2.3): translation, rotation
-// quaternion (x, y, z, w) and scale, four floats each.
-struct BoneTransform {
-    std::array<float, 4> translation{};
-    std::array<float, 4> rotation{};
-    std::array<float, 4> scale{};
-};
-inline constexpr std::size_t kBoneTransformSize = 0x30;
-static_assert(sizeof(BoneTransform) == kBoneTransformSize);
 
 // The skeleton as read from the game: each bone's name and its parent's
 // index (-1 for a root), in bone order. The names are the skeleton's own,

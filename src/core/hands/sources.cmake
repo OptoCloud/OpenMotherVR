@@ -5,6 +5,10 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/action_episode.h
     ${CMAKE_CURRENT_LIST_DIR}/activity.cpp
     ${CMAKE_CURRENT_LIST_DIR}/activity.h
+    ${CMAKE_CURRENT_LIST_DIR}/arm_pose.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/arm_pose.h
+    ${CMAKE_CURRENT_LIST_DIR}/arm_poser.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/arm_poser.h
     ${CMAKE_CURRENT_LIST_DIR}/body_controls.cpp
     ${CMAKE_CURRENT_LIST_DIR}/body_controls.h
     ${CMAKE_CURRENT_LIST_DIR}/body_hider.cpp

@@ -1,12 +1,15 @@
 // OpenMotherVR-Provenance: clean
 // core/hands: the hand mapping (spec 21 §3.1), smoothing (§3.2), a lost
 // controller (§3.3), when hands are active (§4.4), aiming from the hand
-// (§5.2, §5.3) and the tracker's facing (§6.2). Expected values follow
+// (§5.2, §5.3), the tracker's facing (§6.2) and the arm pose edit (§3.5,
+// §4.2). Expected values follow
 // from the spec's formulas, computed here independently of the code.
 
 #include "core/config/settings.h"
 #include "core/hands/action_episode.h"
 #include "core/hands/activity.h"
+#include "core/hands/arm_pose.h"
+#include "core/hands/arm_poser.h"
 #include "core/hands/hand_aim.h"
 #include "core/hands/hand_track.h"
 #include "core/hands/hands.h"
@@ -15,15 +18,18 @@
 #include "core/hands/tuning.h"
 #include "core/vr/pose_convert.h"
 #include "fakes/fakes.h"
+#include "game/hands/skeleton_names.h"
 #include "util/math/pose.h"
 #include "util/math/quat.h"
 
 #include <doctest/doctest.h>
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <numbers>
 #include <optional>
+#include <utility>
 
 namespace {
 
@@ -732,6 +738,490 @@ TEST_CASE("Hands: a player action makes an episode until it ends, logged with de
     CHECK_FALSE(rig.hands.player_action(9, true, rig.now + milliseconds(100)));
     CHECK(rig.log.contains("[diag] hands: player action episode (player action) ended: an item taken up"));
     CHECK_FALSE(rig.hands.player_action_wanted());
+}
+
+// ---- The arm pose edit (21 §2.3, §3.5, §4.2) ---------------------------------------
+
+using omvr::util::angle_between;
+
+// The angle in radians between two unit quaternions' rotations.
+float rotation_gap(const Quat& a, const Quat& b) { return angle_between(a, b); }
+
+Quat about(Vec3 axis, float angle) { return axis_angle(axis, angle); }
+
+// Synthetic finger bases in the hand bone's frame (21 §3.5): the fingers
+// along `forward`'s sign of x, the palm facing -y, the knuckles from the
+// little finger (z -0.03) to the index (z +0.03), the thumb below the palm
+// on the index side. In the game's left-handed axes this is the hand whose
+// fingers point along +x (right) or -x (left) with the palm down.
+FingerBases fingers(float forward) {
+    return {{0.09f * forward, 0, 0.03f},
+            {0.09f * forward, 0, 0.01f},
+            {0.09f * forward, 0, -0.01f},
+            {0.09f * forward, 0, -0.03f},
+            {0.03f * forward, -0.03f, 0.02f}};
+}
+
+TEST_CASE("grip frame: from the finger bones, the wrist about 9 cm from the grip (21 §3.5)") {
+    // Expected from the spec's construction: a = unit(I - P) = +z; n on the
+    // thumb's side = -y (the palm); the origin is the knuckles' mean
+    // (0.09, 0, 0) moved 0.025 m along n; wrist to grip
+    // sqrt(0.09^2 + 0.025^2) = 0.09341 m.
+    const auto right = grip_frame(fingers(1.0f), kRightHand);
+    REQUIRE(right.has_value());
+    check_close(right->in_hand.translation, {0.09f, -0.025f, 0.0f});
+    CHECK(right->wrist_distance_m == doctest::Approx(0.093408f).epsilon(1e-4));
+    // The grip's local +Z (its -Z in the runtime's axes) runs along the
+    // knuckles; +X is the palm normal the runtime gives the right hand (into
+    // the palm: up out of the back of the hand); +Y then points from the
+    // knuckles back to the wrist, as the runtime's grip +Y does for a hand
+    // around a handle (OpenXR's right-hand rule; 21 §3.1).
+    const Quat r = right->in_hand.rotation;
+    check_close(omvr::util::rotate(r, {0, 0, 1}), {0, 0, 1});
+    check_close(omvr::util::rotate(r, {1, 0, 0}), {0, 1, 0});
+    check_close(omvr::util::rotate(r, {0, 1, 0}), {-1, 0, 0});
+
+    // The left hand, mirrored (fingers along -x): its +X out of the palm
+    // (down), +Y again from the knuckles to the wrist.
+    const auto left = grip_frame(fingers(-1.0f), kLeftHand);
+    REQUIRE(left.has_value());
+    check_close(left->in_hand.translation, {-0.09f, -0.025f, 0.0f});
+    const Quat l = left->in_hand.rotation;
+    check_close(omvr::util::rotate(l, {0, 0, 1}), {0, 0, 1});
+    check_close(omvr::util::rotate(l, {1, 0, 0}), {0, -1, 0});
+    check_close(omvr::util::rotate(l, {0, 1, 0}), {1, 0, 0});
+
+    // Degenerate bones (the knuckles on one point) span no hand.
+    CHECK_FALSE(grip_frame({{0.09f, 0, 0}, {0.09f, 0, 0}, {0.09f, 0, 0}, {0.09f, 0, 0}, {}}, kRightHand));
+}
+
+TEST_CASE("grip to hand bone: the bone is placed so its grip frame is on the target (21 §3.5)") {
+    const auto grip = grip_frame(fingers(1.0f), kRightHand);
+    REQUIRE(grip.has_value());
+    // A grip held level, its handle along the world's +z: the fingers point
+    // down (-y), the back of the hand to +x, and the wrist sits above the
+    // grip: target + (0.025, 0.09, 0).
+    const RigidTransform hand = hand_for_grip({{1, 2, 3}, {}}, *grip);
+    check_close(hand.translation, {1.025f, 2.09f, 3.0f});
+    check_close(omvr::util::rotate(hand.rotation, {1, 0, 0}), {0, -1, 0});
+    // The grip frame put back on the bone lands on the target.
+    const Vec3 origin =
+        omvr::util::add(hand.translation, omvr::util::rotate(hand.rotation, grip->in_hand.translation));
+    check_close(origin, {1, 2, 3});
+}
+
+TEST_CASE("two-bone reach: a 0.3 m and 0.4 m arm reaches 0.5 m with a right angle at the elbow") {
+    // 3-4-5: along = (0.09 - 0.16 + 0.25) / 1.0 = 0.18, height
+    // sqrt(0.09 - 0.0324) = 0.24, the elbow bent towards the hint (-y).
+    const Vec3 root{0, 0, 0}, elbow{0, 0, 0.3f}, wrist{0, 0, 0.7f};
+    const auto s = solve_two_bone(root, elbow, wrist, {0.5f, 0, 0}, {0, -1, 0});
+    CHECK(s.in_reach);
+    check_close(s.elbow, {0.18f, -0.24f, 0});
+    check_close(s.wrist, {0.5f, 0, 0});
+    // The rotations carry the bones there: the upper arm about the root, the
+    // forearm about the new elbow.
+    check_close(omvr::util::rotate(s.upper, elbow), s.elbow);
+    const Vec3 fore_after = omvr::util::rotate(s.upper, omvr::util::sub(wrist, elbow));
+    check_close(omvr::util::add(s.elbow, omvr::util::rotate(s.fore, fore_after)), s.wrist);
+}
+
+TEST_CASE("two-bone reach: out of reach the arm is straight towards the target (21 §4.2 item 2)") {
+    const auto s = solve_two_bone({0, 0, 0}, {0, 0, 0.3f}, {0, 0, 0.7f}, {2, 0, 0}, {0, -1, 0});
+    CHECK_FALSE(s.in_reach);
+    CHECK(s.wrist.x == doctest::Approx(0.7f).epsilon(1e-3));
+    CHECK(s.elbow.x == doctest::Approx(0.3f).epsilon(1e-3));
+    // Within a degree of straight (5 mm off the line over 0.3 m): the
+    // slack keeps the solve off the singular straight line.
+    CHECK(std::fabs(s.elbow.y) < 0.3f * std::sin(std::numbers::pi_v<float> / 180));
+    CHECK(std::fabs(s.wrist.y) < kEps);
+}
+
+TEST_CASE("shoulder turn: none within 0.9 of the reach, at most 15 degrees beyond it (21 §4.2 item 3)") {
+    const Vec3 shoulder{0, 0, 0}, root{0.1f, 0, 0};
+    const Quat none = shoulder_turn(shoulder, root, 0.55f, {0.1f, 0.4f, 0});
+    CHECK(none.w == doctest::Approx(1.0f));
+    // Far above: the full 15 degrees about +z, towards the target.
+    const Quat full = shoulder_turn(shoulder, root, 0.55f, {0.1f, 2.0f, 0});
+    CHECK(rotation_gap(full, {}) == doctest::Approx(15.0f * std::numbers::pi_v<float> / 180).epsilon(1e-3));
+    CHECK(omvr::util::rotate(full, root).y > 0.0f);
+    // Halfway between 0.9 and 1.0 of the reach: half the turn.
+    const float half_way = 0.55f * 0.95f;
+    const Quat half      = shoulder_turn(shoulder, root, 0.55f, {0.1f, half_way, 0});
+    CHECK(rotation_gap(half, {}) == doctest::Approx(7.5f * std::numbers::pi_v<float> / 180).epsilon(1e-2));
+}
+
+TEST_CASE("model to world: T + rotate(Q, S * model) and back (21 §2.3, r9)") {
+    // Q a quarter turn about +y takes +x to -z (the quaternion's rotation).
+    const ModelToWorld w{{1, 2, 3}, yaw(std::numbers::pi_v<float> / 2), {2, 2, 2}};
+    check_close(to_world_point(w, {1, 0, 0}), {1, 2, 1});
+    check_close(to_model_point(w, {1, 2, 1}), {1, 0, 0});
+    check_close(to_model_direction(w, {0, 0, -1}), {1, 0, 0});
+    const RigidTransform m = to_model(w, {{1, 2, 1}, yaw(std::numbers::pi_v<float> / 2)});
+    check_close(m.translation, {1, 0, 0});
+    CHECK(rotation_gap(m.rotation, {}) < 1e-3f);
+    // A record whose scale is not set is taken as unscaled.
+    const ModelToWorld unset{{1, 2, 3}, {}, {0, 0, 0}};
+    check_close(to_world_point(unset, {1, 0, 0}), {2, 2, 3});
+    check_close(to_model_point(unset, {2, 2, 3}), {1, 0, 0});
+}
+
+TEST_CASE("twist about an axis; drift follows the body (21 §4.2 items 3, 10)") {
+    const Vec3 x{1, 0, 0};
+    CHECK(twist_angle(about(x, 0.9f), x) == doctest::Approx(0.9f));
+    // A swing about another axis adds no twist.
+    CHECK(twist_angle(about({0, 1, 0}, 0.7f), x) == doctest::Approx(0.0f));
+    CHECK(twist_angle(omvr::util::multiply(about({0, 0, 1}, 0.3f), about(x, -0.5f)), x) ==
+          doctest::Approx(-0.5f).epsilon(0.05));
+    // 21 §4.2 item 10: a target placed while the body was at (1, 0, 0) and
+    // drawn with it at (1.05, 0, 0.02) moves by the body's 5 cm and 2 cm.
+    check_close(follow_body({2, 1, 3}, {1, 0, 0}, {1.05f, 0, 0.02f}), {2.05f, 1, 3.02f});
+}
+
+// A small two-armed skeleton with the bone names of 21 §2.3: the root, the
+// head, then each side's shoulder, arm, forearm, its two roll bones, the
+// hand and the five finger bases. Every bone unrotated; the arms reach out
+// sideways (the left along -x) at shoulder height.
+struct TestSkeleton {
+    static constexpr std::size_t kSide  = 12; // bones per side
+    static constexpr std::size_t kCount = 2 + 2 * kSide;
+    std::array<std::string_view, kCount> names{};
+    std::array<std::int16_t, kCount> parents{};
+    std::array<BoneTransform, kCount> local{};
+    std::array<BoneTransform, kCount> model{};
+    std::array<std::uint32_t, kCount> flags{};
+
+    TestSkeleton() {
+        static constexpr std::array<std::array<std::string_view, kSide>, 2> kNames{{
+            {"LeftShoulder", "LeftArm", "LeftForeArm", "LeftForeArmRoll", "LeftForeArmRoll1", "LeftHand",
+             "LeftHandIndex1", "LeftHandMiddle1", "LeftHandRing1", "LeftHandPinky1", "LeftHandThumb1",
+             "LeftWeaponBone"},
+            {"RightShoulder", "RightArm", "RightForeArm", "RightForeArmRoll", "RightForeArmRoll1",
+             "RightHand", "RightHandIndex1", "RightHandMiddle1", "RightHandRing1", "RightHandPinky1",
+             "RightHandThumb1", "RightWeaponBone"},
+        }};
+        names[0]   = "";
+        names[1]   = "Head";
+        parents[0] = -1;
+        parents[1] = 0;
+        set(0, {0, 0, 0});
+        set(1, {0, 1.5f, 0});
+        for (std::size_t h = 0; h < 2; ++h) {
+            const float s       = h == 0 ? -1.0f : 1.0f;
+            const auto b        = [&](std::size_t k) { return static_cast<std::int16_t>(2 + h * kSide + k); };
+            const FingerBases f = fingers(s);
+            const std::array<std::pair<std::int16_t, Vec3>, kSide> bones{{
+                {1, {0.1f * s, -0.1f, 0}}, // shoulder: from the head
+                {b(0), {0.1f * s, 0, 0}},  // arm: 0.3 m upper arm
+                {b(1), {0.3f * s, 0, 0}},  // forearm: 0.25 m
+                {b(2), {0.1f * s, 0, 0}},  // roll
+                {b(2), {0.2f * s, 0, 0}},  // roll1
+                {b(2), {0.25f * s, 0, 0}}, // hand
+                {b(5), f.index},
+                {b(5), f.middle},
+                {b(5), f.ring},
+                {b(5), f.pinky},
+                {b(5), f.thumb},
+                {b(5), {0.05f * s, -0.03f, 0}}, // weapon bone
+            }};
+            for (std::size_t k = 0; k < kSide; ++k) {
+                names[b(k)]   = kNames[h][k];
+                parents[b(k)] = bones[k].first;
+                set(static_cast<std::size_t>(b(k)), bones[k].second);
+            }
+        }
+        for (std::size_t i = 0; i < kCount; ++i)
+            model[i] =
+                parents[i] < 0 ? local[i] : compose(model[static_cast<std::size_t>(parents[i])], local[i]);
+    }
+
+    void set(std::size_t i, Vec3 t) {
+        local[i]             = {};
+        local[i].translation = {t.x, t.y, t.z, 0};
+        local[i].rotation    = {0, 0, 0, 1};
+        local[i].scale       = {1, 1, 1, 1};
+    }
+
+    SkeletonBones bones(bool from_table = false) const { return {names, parents, from_table}; }
+    PoseArrays arrays() { return {local, model, flags, parents}; }
+    Vec3 position(std::int16_t bone) const {
+        return rigid_of(model[static_cast<std::size_t>(bone)]).translation;
+    }
+
+    // Every model transform is its parent's composed with its local one.
+    void check_consistent() const {
+        for (std::size_t i = 1; i < kCount; ++i) {
+            const BoneTransform m = compose(model[static_cast<std::size_t>(parents[i])], local[i]);
+            check_close(rigid_of(m).translation, rigid_of(model[i]).translation);
+            CHECK(rotation_gap(rigid_of(m).rotation, rigid_of(model[i]).rotation) < 1e-3f);
+            CHECK((flags[i] & (kBoneLocalStale | kBoneModelStale)) == 0);
+        }
+    }
+};
+
+TEST_CASE("arm rig: the bones by name, in the first-person table at hands 9 and 32 (21 §2.3)") {
+    const omvr::core::hands::SkeletonBones table{omvr::game::hands::kFirstPersonBoneNames,
+                                                 omvr::game::hands::kFirstPersonBoneParents, true};
+    const RigResult r = find_arm_rig(table);
+    REQUIRE(r.rig.has_value());
+    const ArmSideBones& l  = r.rig->sides[kLeftHand];
+    const ArmSideBones& rr = r.rig->sides[kRightHand];
+    CHECK(l.shoulder == 3);
+    CHECK(l.arm == 4);
+    CHECK(l.forearm == 6);
+    CHECK(l.roll == 7);
+    CHECK(l.roll1 == 8);
+    CHECK(l.hand == 9);
+    CHECK(l.middle == 13);
+    CHECK(rr.shoulder == 26);
+    CHECK(rr.arm == 27);
+    CHECK(rr.forearm == 29);
+    CHECK(rr.hand == 32);
+    CHECK(rr.thumb == 45);
+    CHECK(r.rig->head == 1);
+    CHECK(r.rig->first_person);
+
+    // A skeleton without a finger base by name is not used for the arms.
+    TestSkeleton s;
+    s.names[2 + 6]          = "LeftHandIndex";
+    const RigResult missing = find_arm_rig(s.bones());
+    CHECK_FALSE(missing.rig.has_value());
+    CHECK(missing.fault == RigFault::MissingBone);
+    CHECK(missing.bone == "HandIndex1");
+}
+
+TEST_CASE("pose edit: the hand reaches its goal, the arm keeps its lengths, the pose agrees (21 §4.2)") {
+    TestSkeleton s;
+    const RigResult r = find_arm_rig(s.bones());
+    REQUIRE(r.rig.has_value());
+    const ArmSideBones& right = r.rig->sides[kRightHand];
+    PoseArrays p              = s.arrays();
+    REQUIRE(prepare_arms(p, *r.rig) == PoseFault::None);
+
+    // In reach of the 0.55 m arm from (0.2, 1.4, 0), twisted about the
+    // forearm's axis.
+    const RigidTransform goal{{0.5f, 1.2f, 0.3f}, about({1, 0, 0}, 1.2f)};
+    const Vec3 finger_before = s.position(right.index);
+    const ArmOutcome o       = pose_arm(p, right, {goal, 1.0f, {0, -1, 0}});
+    refresh_arms(p, *r.rig);
+    CHECK(o.edited);
+    CHECK(o.in_reach);
+    // 21 §4.2 item 1: within 5 mm and 2 degrees (here exact up to float).
+    CHECK(omvr::util::distance(s.position(right.hand), goal.translation) < kHandPrecisionM / 10);
+    CHECK(rotation_gap(rigid_of(s.model[static_cast<std::size_t>(right.hand)]).rotation, goal.rotation) <
+          1e-3f);
+    // The shoulder and the upper arm's root stay; the bones keep their
+    // lengths; the elbow bends down (the hint).
+    check_close(s.position(right.shoulder), {0.1f, 1.4f, 0});
+    check_close(s.position(right.arm), {0.2f, 1.4f, 0});
+    CHECK(omvr::util::distance(s.position(right.forearm), s.position(right.arm)) == doctest::Approx(0.3f));
+    CHECK(omvr::util::distance(s.position(right.hand), s.position(right.forearm)) == doctest::Approx(0.25f));
+    CHECK(s.position(right.forearm).y < 1.4f);
+    // 21 §4.2 item 5: the fingers keep their pose in the hand; they moved
+    // with it.
+    CHECK(omvr::util::distance(s.position(right.index), finger_before) > 0.1f);
+    CHECK(omvr::util::distance(s.position(right.index), s.position(right.hand)) ==
+          doctest::Approx(omvr::util::length(fingers(1.0f).index)));
+    // 21 §4.2 item 3 (r11): the rolls take a third and two thirds of the
+    // hand's twist about the forearm; the hand all of it.
+    const Vec3 axis   = {1, 0, 0}; // the hand's offset in the forearm's frame
+    const float twist = twist_angle(rigid_of(s.local[static_cast<std::size_t>(right.hand)]).rotation, axis);
+    CHECK(std::fabs(twist) > 0.5f);
+    CHECK(twist_angle(rigid_of(s.local[static_cast<std::size_t>(right.roll)]).rotation, axis) ==
+          doctest::Approx(twist / 3).epsilon(1e-3));
+    CHECK(twist_angle(rigid_of(s.local[static_cast<std::size_t>(right.roll1)]).rotation, axis) ==
+          doctest::Approx(twist * 2 / 3).epsilon(1e-3));
+    // 21 §4.2 item 9: local and model transforms agree; the other arm is
+    // untouched.
+    s.check_consistent();
+    check_close(s.position(r.rig->sides[kLeftHand].hand), {-0.75f, 1.4f, 0});
+}
+
+TEST_CASE("pose edit: out of reach straight at the target; a weight blends from the game's hand") {
+    TestSkeleton s;
+    const RigResult r = find_arm_rig(s.bones());
+    REQUIRE(r.rig.has_value());
+    const ArmSideBones& right = r.rig->sides[kRightHand];
+    PoseArrays p              = s.arrays();
+    REQUIRE(prepare_arms(p, *r.rig) == PoseFault::None);
+    const ArmOutcome far = pose_arm(p, right, {{{2.0f, 1.4f, 0}, about({0, 0, 1}, 0.4f)}, 1.0f, {0, -1, 0}});
+    refresh_arms(p, *r.rig);
+    CHECK_FALSE(far.in_reach);
+    CHECK(s.position(right.hand).x == doctest::Approx(0.75f).epsilon(1e-3));
+    CHECK(rotation_gap(rigid_of(s.model[static_cast<std::size_t>(right.hand)]).rotation,
+                       about({0, 0, 1}, 0.4f)) < 1e-3f);
+
+    // Half the weight: the goal halfway from the game's hand.
+    TestSkeleton t;
+    PoseArrays q = t.arrays();
+    REQUIRE(prepare_arms(q, *r.rig) == PoseFault::None);
+    const ArmOutcome half = pose_arm(q, right, {{{0.55f, 1.2f, 0}, {}}, 0.5f, {0, -1, 0}});
+    refresh_arms(q, *r.rig);
+    check_close(half.goal.translation, {0.65f, 1.3f, 0});
+    CHECK(omvr::util::distance(t.position(right.hand), {0.65f, 1.3f, 0}) < 1e-3f);
+    // 0 is no edit.
+    CHECK_FALSE(pose_arm(q, right, {{{0.3f, 1.0f, 0}, {}}, 0.0f, {0, -1, 0}}).edited);
+}
+
+TEST_CASE("pose edit: an out-of-date local transform is made current; an out-of-date model is refused") {
+    TestSkeleton s;
+    const RigResult r = find_arm_rig(s.bones());
+    REQUIRE(r.rig.has_value());
+    const auto hand = static_cast<std::size_t>(r.rig->sides[kRightHand].hand);
+    // The game left the hand's local transform out of date (its model one
+    // is the truth).
+    s.local[hand].translation = {9, 9, 9, 0};
+    s.flags[hand]             = kBoneLocalStale;
+    PoseArrays p              = s.arrays();
+    REQUIRE(prepare_arms(p, *r.rig) == PoseFault::None);
+    CHECK(s.local[hand].translation[0] == doctest::Approx(0.25f));
+    CHECK(s.flags[hand] == 0);
+
+    s.flags[hand] = kBoneModelStale;
+    CHECK(prepare_arms(p, *r.rig) == PoseFault::Stale);
+    PoseArrays short_pose{std::span{s.local}.first(5), s.model, s.flags, s.parents};
+    CHECK(prepare_arms(short_pose, *r.rig) == PoseFault::Size);
+}
+
+TEST_CASE("ArmPoser: the job edits once per frame from the published targets; the report is drawn") {
+    omvr::tests::RecordingLog log;
+    ArmPoser arms{log};
+    TestSkeleton s;
+    const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "TESTFP"};
+    TimePoint now{std::chrono::seconds(50)};
+    REQUIRE(arms.wants_rig(player, now));
+    const SkeletonBones bones = s.bones(true);
+    arms.set_rig(player, &bones, {}, now);
+    CHECK_FALSE(arms.wants_rig(player, now));
+    CHECK(log.contains(
+        "hands: the arms of skeleton TESTFP follow the controllers (bones found by name, names "
+        "from the first-person table): left shoulder 2 arm 3 forearm 4 rolls 5 6 hand 7, right "
+        "shoulder 14 arm 15 forearm 16 rolls 17 18 hand 19; the game's limb IK is not run for it "
+        "while tracked hands are active"));
+
+    // Nothing published: no frame, the limb IK runs.
+    CHECK(arms.pending() == nullptr);
+    CHECK_FALSE(arms.limb_ik_off(player.skeleton));
+
+    // The right grip held level ahead of the right shoulder; the camera at
+    // the head looking along +z; the body's model-to-world the identity
+    // except a step of 2 cm along +x since the targets were placed
+    // (21 §4.2 item 10).
+    const CameraPose camera{{}, {0, 1.5f, 0}};
+    ModelToWorld w;
+    ArmTargets targets;
+    targets[kRightHand] = ArmTarget{{{0.45f, 1.1f, 0.25f}, {}}, 1.0f};
+    arms.publish(player, camera, w, targets, now);
+    CHECK(arms.limb_ik_off(player.skeleton));
+    const ArmFrame* f = arms.pending();
+    REQUIRE(f != nullptr);
+    CHECK(arms.claim(*f));
+    CHECK_FALSE(arms.claim(*f)); // one job per frame
+    w.translation   = {0.02f, 0, 0};
+    PoseArrays pose = s.arrays();
+    arms.apply(*f, w, pose);
+    CHECK(arms.pending() == nullptr);
+    CHECK(arms.right_edited());
+
+    // The grip frame lands where the target moved with the body.
+    const auto grip    = grip_frame(fingers(1.0f), kRightHand);
+    const auto hand    = static_cast<std::size_t>(find_arm_rig(bones).rig->sides[kRightHand].hand);
+    const auto drawn   = rigid_of(s.model[hand]);
+    const Vec3 at_grip = omvr::util::add(omvr::util::add(drawn.translation, w.translation),
+                                         omvr::util::rotate(drawn.rotation, grip->in_hand.translation));
+    check_close(at_grip, {0.47f, 1.1f, 0.25f});
+
+    REQUIRE(arms.head_check_due().has_value());
+    CHECK(*arms.head_check_due() == 1);
+    arms.after_pass(Vec3{0, 1.55f, 0.05f}, camera, true, now);
+    CHECK(log.contains(
+        "hands: grip frame of TESTFP, right hand: wrist to grip 0.093 m (expected 0.07 to 0.12 m)"));
+    CHECK(log.contains(
+        "hands: Head bone 1 of TESTFP at (0.000 1.550 0.050) in the world (BoneWorldTransform, "
+        "final pose), active camera at (0.000 1.500 0.000): 0.071 m apart (expected within 0.25 m)"));
+    CHECK(log.contains("hands: the player's arms are drawn from the edited pose"));
+    CHECK(log.contains("hands: the held item follows the moved right hand"));
+    CHECK(arms.weapon_in_moved_hand(now));
+    CHECK_FALSE(arms.weapon_in_moved_hand(now + std::chrono::seconds(1)));
+    // The left arm was not edited: no drawn left hand for the tracker.
+    CHECK_FALSE(arms.drawn_left(now).has_value());
+
+    // Hands off (nothing published): the limb IK runs again, no frame.
+    arms.publish_none();
+    CHECK_FALSE(arms.limb_ik_off(player.skeleton));
+    CHECK(arms.pending() == nullptr);
+}
+
+TEST_CASE("ArmPoser: the drawn left hand points from the hand bone to the middle finger (21 §6.2)") {
+    omvr::tests::RecordingLog log;
+    ArmPoser arms{log};
+    TestSkeleton s;
+    const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "TESTFP"};
+    TimePoint now{std::chrono::seconds(50)};
+    const SkeletonBones bones = s.bones();
+    arms.set_rig(player, &bones, {}, now);
+    // A rig with its own names: the game's limb IK is left alone.
+    CHECK(log.contains("the game's limb IK runs for it as in v1"));
+    ArmTargets targets;
+    // The left grip held level ahead: the handle along +z, so the fingers
+    // point down and the knuckles ahead of the wrist point down too.
+    targets[kLeftHand] = ArmTarget{{{-0.4f, 1.1f, 0.3f}, {}}, 1.0f};
+    arms.publish(player, {{}, {0, 1.5f, 0}}, {}, targets, now);
+    CHECK_FALSE(arms.limb_ik_off(player.skeleton));
+    const ArmFrame* f = arms.pending();
+    REQUIRE(f != nullptr);
+    REQUIRE(arms.claim(*f));
+    PoseArrays pose = s.arrays();
+    arms.apply(*f, {}, pose);
+    const auto dir = arms.drawn_left(now);
+    REQUIRE(dir.has_value());
+    CHECK(dir->y < -0.08f);
+    CHECK(std::fabs(dir->x) < 1e-3f);
+    CHECK_FALSE(arms.drawn_left(now + std::chrono::seconds(1)).has_value());
+}
+
+TEST_CASE("ArmPoser: a skeleton without the arms' bones is logged once and not edited (21 §4.6)") {
+    omvr::tests::RecordingLog log;
+    ArmPoser arms{log};
+    TestSkeleton s;
+    s.names[2 + 5] = "LeftPaw";
+    const PlayerSkeleton player{0x1000, 0x2000, 0x3000, "DLCFP"};
+    TimePoint now{std::chrono::seconds(50)};
+    const SkeletonBones bones = s.bones();
+    arms.set_rig(player, &bones, {}, now);
+    arms.set_rig(player, &bones, {}, now);
+    CHECK(log.contains(
+        "hands: WARNING the arms of skeleton DLCFP keep the game's animation: a bone is missing by "
+        "name: Hand"));
+    CHECK(log.lines.size() == 1);
+    ArmTargets targets;
+    targets[kLeftHand] = ArmTarget{{{-0.4f, 1.1f, 0.3f}, {}}, 1.0f};
+    arms.publish(player, {}, {}, targets, now);
+    CHECK(arms.pending() == nullptr);
+    // A skeleton that cannot be read yet is read again a second later.
+    const PlayerSkeleton other{0x1000, 0x2000, 0x4000, "FEMALEFP"};
+    arms.set_rig(other, nullptr, {SkeletonFault::NoBones, 0, 0}, now);
+    CHECK(
+        log.contains("hands: WARNING the arms of skeleton FEMALEFP keep the game's animation until it can be "
+                     "read: the skeleton has no bones; it is read again every 1 s"));
+    CHECK_FALSE(arms.wants_rig(other, now));
+    CHECK(arms.wants_rig(other, now + std::chrono::seconds(1)));
+}
+
+TEST_CASE("Hands: arm targets are the tracked grips in the world, weighted; none with the key off") {
+    HandsRig rig;
+    const CameraPose cam{yaw(std::numbers::pi_v<float> / 2), {5, 0, 5}};
+    rig.run(std::chrono::milliseconds(11), 5, {});
+    CHECK_FALSE(rig.hands.arm_targets(cam, rig.now)[kRightHand].has_value());
+    rig.settings.enabled = true;
+    rig.run(std::chrono::milliseconds(11), 30, HandsRig::active());
+    const ArmTargets t = rig.hands.arm_targets(cam, rig.now);
+    REQUIRE(t[kRightHand].has_value());
+    REQUIRE(t[kLeftHand].has_value());
+    // 0.5 m ahead of a camera at (5, 0, 5) looking along +x.
+    check_close(t[kRightHand]->grip.position, {5.5f, 0, 5});
+    CHECK(t[kRightHand]->weight == doctest::Approx(1.0f));
+    // Stale (no update for a second): none.
+    CHECK_FALSE(rig.hands.arm_targets(cam, rig.now + std::chrono::seconds(1))[kLeftHand].has_value());
 }
 
 } // namespace

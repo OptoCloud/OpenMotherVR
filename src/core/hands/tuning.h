@@ -67,6 +67,49 @@ inline constexpr float kTransformNozzleOffsetMetres = 0.0f;
 // A barrel column shorter than this (a degenerate transform) is not used.
 inline constexpr float kMinBarrelColumnLength = 1.0e-3f;
 
+// ---- The arm pose edit (21 §3.5, §4.2) ------------------------------------------
+
+// 21 §3.5 [proposal]: the grip origin sits this far inside the knuckle line,
+// towards the palm (about half a finger's thickness).
+inline constexpr float kGripPalmInset = 0.025f;
+// Below this length a knuckle line, forward or palm normal is degenerate:
+// the finger bones do not span a hand (implementation choice: a tenth of a
+// millimetre).
+inline constexpr float kMinBoneSpan = 1.0e-4f;
+// 21 §3.5 [likely]: the wrist to grip distance the game's skeletons give,
+// for the log of 21 §21 item 3.
+inline constexpr float kWristGripMinM = 0.07f;
+inline constexpr float kWristGripMaxM = 0.12f;
+
+// 21 §4.2 item 3 [proposal]: the shoulder turns at most this far (enough to
+// reach across the chest, not enough to dislocate it visually). It starts
+// to turn once the target is kShoulderEngage of the arm's reach away and
+// turns fully at the full reach (implementation choice: the arm is nearly
+// straight there, so the turn adds reach where the elbow cannot).
+inline constexpr float kMaxShoulderTurnRad = 0.2617994f; // 15 degrees
+inline constexpr float kShoulderEngage     = 0.9f;
+// 21 §4.2 item 3 (r11) [proposal]: the forearm's roll bones take these
+// shares of the hand's twist about the forearm.
+inline constexpr float kForeArmRollShare  = 1.0f / 3.0f;
+inline constexpr float kForeArmRoll1Share = 2.0f / 3.0f;
+// 21 §4.2 item 2: the straight arm stops this fraction short of its full
+// length, so the elbow's angle never reaches the singular straight line.
+inline constexpr float kReachSlack = 1.0e-4f;
+// 21 §4.2 item 4 [proposal]: the elbow bends towards a hint below, behind
+// and outside the shoulder: these weights of the world's down, the
+// camera's backward and its outward side (implementation choice: mostly
+// down, as an arm holding something in front of the body hangs).
+inline constexpr float kElbowHintDown = 1.0f;
+inline constexpr float kElbowHintBack = 0.5f;
+inline constexpr float kElbowHintOut  = 0.5f;
+
+// 21 §4.2 item 1 [proposal]: the precision the hand bone must reach, for
+// the log of 21 §21 item 3.
+inline constexpr float kHandPrecisionM = 0.005f;
+// 21 §21 item 3: the Head bone from BoneWorldTransform and the active
+// camera are expected within this distance.
+inline constexpr float kHeadCameraExpectedM = 0.25f;
+
 // 21 §5.3: the fire alignment test passes when its length is above the
 // threshold; a negative threshold passes every length the test computes.
 inline constexpr float kFireGateAlwaysPass = -1.0f;

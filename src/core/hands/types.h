@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 
 // Values the hand features work on (spec 21 §3). Poses from the runtime are
 // in the convention of the head pose the stereo device returns
@@ -110,6 +111,33 @@ struct FireSample {
     bool pressed = false;                   // the VR fire control
     std::optional<game::WeaponType> weapon; // the current item's weapon type; nullopt: no weapon
     bool gate_open = false;                 // the fire alignment byte allows firing (21 §2.5)
+};
+
+// A bone transform of the game's pose (21 §2.3): translation, rotation
+// quaternion (x, y, z, w) and scale, four floats each.
+struct BoneTransform {
+    std::array<float, 4> translation{};
+    std::array<float, 4> rotation{};
+    std::array<float, 4> scale{};
+};
+inline constexpr std::size_t kBoneTransformSize = 0x30;
+static_assert(sizeof(BoneTransform) == kBoneTransformSize);
+
+// The arm pose edit (21 §2.3, r9): the character's model-to-world transform (animation
+// component +0x270, +0x280, +0x290): world = T + rotate(Q, S * model),
+// world rotation = Q * model rotation.
+struct ModelToWorld {
+    util::Vec3 translation{};
+    util::Quat rotation{};
+    util::Vec3 scale{1.0f, 1.0f, 1.0f};
+};
+
+// The game's pose as arrays of the skeleton's size (21 §2.3).
+struct PoseArrays {
+    std::span<BoneTransform> local;
+    std::span<BoneTransform> model;
+    std::span<std::uint32_t> flags;
+    std::span<const std::int16_t> parents;
 };
 
 } // namespace omvr::core::hands
