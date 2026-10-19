@@ -9,6 +9,7 @@
 #include "loader/hooks/stereo_device_hooks.h"
 
 #include "core/config/settings_table.h"
+#include "core/diag/trace.h"
 #include "core/stereo/play_space.h"
 #include "core/stereo/sensor_start.h"
 #include "game/stereo/graphics_settings.h"
@@ -147,6 +148,10 @@ bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noex
         const auto size = texture_size(si.eye_texture[0].texture);
         auto* device    = renderer_get<ID3D11Device>(ctx.addresses, AiAddr::RendererDevice);
         auto* dc        = renderer_get<ID3D11DeviceContext>(ctx.addresses, AiAddr::RendererContext);
+        // Traced flavour: GPU time on the game's device, and this thread's
+        // name in the profiler.
+        ctx.tracer.name_thread("render");
+        ctx.tracer.gpu_attach(reinterpret_cast<std::uintptr_t>(device), reinterpret_cast<std::uintptr_t>(dc));
         // Spec 22 §15: the comfort pass's resources follow the target.
         ctx.vignette.configure(platform::d3d11::gpu_device(device),
                                platform::d3d11::gpu_texture(si.eye_texture[0].texture));
@@ -159,6 +164,10 @@ bool __fastcall dev_configure_rendering(void* self, void*, void* stereo_rt) noex
 // [4] ShutdownRendering.
 bool __fastcall dev_shutdown_rendering(void* self, void*) noexcept {
     guarded("ShutdownRendering", [&] {
+        auto& ctx = context();
+        // The profiler's GPU context holds references on the device.
+        ctx.gpu_frame.end();
+        ctx.tracer.gpu_detach();
         if (auto* backend = load_backend(device_of(self))) backend->release_render_resources();
     });
     return true;
@@ -166,7 +175,12 @@ bool __fastcall dev_shutdown_rendering(void* self, void*) noexcept {
 
 // [5] BeginFrame. Render thread.
 void __fastcall dev_begin_frame(void* self, void*) noexcept {
-    guarded("BeginFrame", [&] { context().stereo.begin_frame(device_of(self)); });
+    auto& ctx = context();
+    {
+        OMVR_ZONE(ctx.tracer, "begin_frame");
+        guarded("BeginFrame", [&] { ctx.stereo.begin_frame(device_of(self)); });
+    }
+    OMVR_GPU_SPAN_BEGIN(ctx.gpu_frame, ctx.tracer, "game_frame");
 }
 
 // [6] EndFrame: submit the eyes, draw the mirror, present. LibOVR's
@@ -179,17 +193,34 @@ void __fastcall dev_end_frame(void* self, void*) noexcept {
     // game thread reads for the next frame while submit_frame waits on the
     // runtime then counts for that frame, not this one.
     const bool tracked = take_pose_fetched(si);
+    ctx.gpu_frame.end();
+    OMVR_ZONE(ctx.tracer, "end_frame");
     guarded("EndFrame", [&] {
         if (auto* backend = load_backend(si)) {
-            draw_comfort(ctx, si, tracked);
+            {
+                OMVR_ZONE(ctx.tracer, "comfort");
+                OMVR_GPU_ZONE(ctx.tracer, "comfort");
+                draw_comfort(ctx, si, tracked);
+            }
+            OMVR_ZONE(ctx.tracer, "submit");
             backend->submit_frame(platform::d3d11::gpu_texture(si.eye_texture[0].texture));
         }
     });
     auto* swap = renderer_get<IDXGISwapChain>(ctx.addresses, AiAddr::RendererSwapChain);
     auto* dc   = renderer_get<ID3D11DeviceContext>(ctx.addresses, AiAddr::RendererContext);
     ctx.mirror.use_swapchain(swap);
-    ctx.mirror.draw(platform::d3d11::gpu_context(dc), tracked);
-    swap->Present(kPresentSyncInterval, kPresentFlags);
+    {
+        OMVR_ZONE(ctx.tracer, "mirror");
+        OMVR_GPU_ZONE(ctx.tracer, "mirror");
+        ctx.mirror.draw(platform::d3d11::gpu_context(dc), tracked);
+    }
+    {
+        OMVR_ZONE(ctx.tracer, "present");
+        swap->Present(kPresentSyncInterval, kPresentFlags);
+    }
+    // The end of the render frame: the profiler's main frame set.
+    ctx.tracer.gpu_collect();
+    ctx.tracer.frame_mark();
     // 22 §13: a VR-off request takes effect between frames; the game's
     // targets then return to the window's size.
     if (ctx.stereo.turn_off_if_requested(si)) ctx.display_reset.reset_after_vr_off();
@@ -214,6 +245,9 @@ bool __fastcall dev_presents(void*, void*) noexcept { return true; }
 float* __fastcall dev_head_pose(void* self, void*, float* out) noexcept {
     auto& ctx = context();
     auto& si  = device_of(self);
+    OMVR_ZONE(ctx.tracer, "head_pose");
+    // The game thread's frame: one head pose each.
+    ctx.tracer.frame_mark("game");
     // The game builds its camera from `out` whatever happens below: the last
     // pose it was handed, until this call makes a new one.
     pose_out(out) = ctx.last_head_pose;

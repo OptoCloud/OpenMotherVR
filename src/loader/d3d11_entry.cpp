@@ -4,6 +4,7 @@
 #include "loader/d3d11_forwarders.h"
 #include "loader/hooks/crash_hook.h"
 #include "loader/hooks/d3d11_hooks.h"
+#include "loader/tracing.h"
 #include "platform/win32/module.h"
 
 #include <windows.h>
@@ -70,6 +71,7 @@ extern "C" __declspec(dllexport) HRESULT WINAPI D3D11CreateDeviceAndSwapChain(
             omvr::loader::hooks::reassert_crash_hook();
             // The first point after attach outside the loader lock (22 §14).
             omvr::loader::hooks::start_log_flusher();
+            omvr::loader::start_tracing();
         });
     } catch (...) {
         // call_once only throws if the callable does, and it is noexcept.

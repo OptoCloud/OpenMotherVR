@@ -6,6 +6,7 @@
 #include "core/diag/flush_schedule.h"
 #include "core/diag/logger.h"
 #include "core/diag/thread_roles.h"
+#include "core/diag/trace.h"
 #include "core/hands/body_controls.h"
 #include "core/hands/body_hider.h"
 #include "core/hands/hand_back.h"
@@ -83,6 +84,10 @@
 #include "platform/win32/payload_files.h"
 #include "util/math/matrix.h"
 
+#if defined(OMVR_TRACE)
+#include "platform/tracy/tracy_tracer.h"
+#endif
+
 #include <atomic>
 #include <cstdint>
 
@@ -124,6 +129,13 @@ struct Context {
     core::diag::CrashSafeSink log_out;         // the logger's sink: the file, flushed by policy
     core::diag::Logger log;
     platform::win32::CrashRecorder crash;
+#if defined(OMVR_TRACE)
+    platform::tracy::TracyTracer tracy; // the profiler client, started after attach (loader/tracing.h)
+#endif
+    // The profiler the hooks record on: the client in the traced flavour,
+    // none (an empty type, every call a no-op) in the release one.
+    core::diag::TracerRef tracer;
+    core::diag::GpuSpan gpu_frame; // render thread: the game's GPU work, BeginFrame to EndFrame
     // config, ui
     ProcessLaunchSwitches launch; // the command-line switches, read at attach
     platform::win32::FileStore files;

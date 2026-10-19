@@ -29,9 +29,9 @@ std::unique_ptr<core::vr::ports::VrRuntime> make_runtime(Context& c, core::vr::D
     core::vr::ports::HapticSource* haptics =
         c.settings.current().hands.haptics.enabled && hooks::haptics_installed() ? &c.haptics : nullptr;
     if (chosen == core::vr::DetectResult::Chosen::OpenVR) {
-        return platform::openvr::make_openvr_runtime({c.log, c.clock, c.failure, c.archive_files, c.body_controls,
-                                                      c.dialogs, c.runtimes.last_result().openvr_runtime_path,
-                                                      aim_poses, haptics});
+        return platform::openvr::make_openvr_runtime(
+            {c.log, c.clock, c.failure, c.archive_files, c.body_controls, c.dialogs,
+             c.runtimes.last_result().openvr_runtime_path, aim_poses, haptics});
     }
     return platform::openxr::make_openxr_runtime(
         {c.log, c.xr, c.body_controls, c.headset_audio, c.console, aim_poses, haptics});
@@ -46,6 +46,9 @@ Context::Context(void* self) noexcept
       log_out(log_sink, log_flusher, current_thread, thread_roles),
       log(clock, log_out, platform::win32::current_process_id()),
       crash(log),
+#if defined(OMVR_TRACE)
+      tracer(tracy),
+#endif
       settings(files, log),
       dialogs(core::ui::kCaption, log),
       archive_files(self, OMVR_IDR_OPENVR_API, OMVR_IDR_UI_PATCH, log),
@@ -92,7 +95,8 @@ Context::Context(void* self) noexcept
       window(stereo, log),
       shader_fixes(log),
       sprite_fixes(log, core::render::ShaderFix::UprightSprites),
-      constant_smoke(log) {}
+      constant_smoke(log) {
+}
 
 Context& create_context(void* module) noexcept {
     // Leaked on purpose: nothing of the mod runs at process exit (no
