@@ -44,7 +44,7 @@ int stock_code(const ActionTiers& tiers, int code) noexcept {
 
 float vr_analog(const ActionTier& t, int code) noexcept {
     const int j = (code - t.base) - t.num_digital;
-    return in_range(j, t.num_analog) ? t.analog[static_cast<std::size_t>(j)] : 0.0f;
+    return in_range(j, t.num_analog) ? vr_analog_at(t, static_cast<std::size_t>(j)) : 0.0f;
 }
 
 int analog_virtual_code(const ActionTiers& tiers, int map, int index) noexcept {

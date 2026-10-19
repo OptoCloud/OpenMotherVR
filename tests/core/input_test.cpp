@@ -115,9 +115,21 @@ TEST_CASE("action tiers: bases, lookups and the left-stick prompt") {
     tiers[0].stock_code[0x20 + game::player_action::kMoveX] = 0x14;
     CHECK_FALSE(move_on_left_stick(tiers));
 
-    tiers[0].analog[1] = 0.25f;
+    set_vr_analog(tiers[0], 1, 0.25f);
+    CHECK(tiers[0].analog[1] == 0.25f);
+    CHECK(vr_analog_at(tiers[0], 1) == 0.25f);
     CHECK(vr_analog(tiers[0], 0x100 + 0x20 + 1) == 0.25f);
     CHECK(vr_analog(tiers[0], 0x100 + 1) == 0.0f); // a digital code
+
+    // The VR state goes through the accessors (it crosses threads); they
+    // read and write the tier's own elements.
+    const ActionTier& player = tiers[0];
+    CHECK_FALSE(vr_digital(player, 3));
+    set_vr_digital(tiers[0], 3, true);
+    CHECK(tiers[0].digital[3] == 1);
+    CHECK(vr_digital(player, 3));
+    set_vr_digital(tiers[0], 3, false);
+    CHECK(tiers[0].digital[3] == 0);
 }
 
 // Action-map structs of the game's shape (04 §2.4).

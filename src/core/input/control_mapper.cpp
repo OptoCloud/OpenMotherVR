@@ -87,7 +87,7 @@ public:
     explicit TierWriter(ActionTier& tier) noexcept : tier_(tier) {}
 
     void digital(int k, bool v) noexcept {
-        tier_.digital[static_cast<std::size_t>(k)] = v;
+        set_vr_digital(tier_, static_cast<std::size_t>(k), v);
         active_ |= v;
     }
 
@@ -97,7 +97,7 @@ public:
     // first.
     void analog(int j, float v) noexcept {
         v = std::isnan(v) ? 0.0f : std::clamp(v, -kAnalogLimit, kAnalogLimit);
-        tier_.analog[static_cast<std::size_t>(j)] = v;
+        set_vr_analog(tier_, static_cast<std::size_t>(j), v);
         active_ |= std::fabs(v) > kActivityThreshold;
     }
 

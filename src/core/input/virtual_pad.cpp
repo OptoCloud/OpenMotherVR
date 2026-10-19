@@ -39,7 +39,7 @@ void VirtualPad::log_remap() noexcept {
 bool VirtualPad::merge_down(int code, bool stock_down) const noexcept {
     const ActionTier& t = tier_for(tiers_, code);
     const int k         = code - t.base;
-    const bool vr_down  = k >= 0 && k < t.num_digital && t.digital[static_cast<std::size_t>(k)] != 0;
+    const bool vr_down  = k >= 0 && k < t.num_digital && vr_digital(t, static_cast<std::size_t>(k));
     return stock_down || vr_down || dpad_down(code);
 }
 

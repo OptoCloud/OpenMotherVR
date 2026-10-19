@@ -3,6 +3,7 @@
 #include "game/constants.h"
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
@@ -25,8 +26,11 @@ namespace omvr::core::input {
 // FUN_10003050 (layout of the original's is in the analysis doc; ours need
 // not match).
 struct ActionTier {
-    std::array<std::uint8_t, game::kMaxDigitalActions> digital{}; // VR state of digital action k
-    std::array<float, game::kMaxAnalogActions> analog{};          // VR value of analog action j
+    // Written and read across threads only through vr_digital / vr_analog_at
+    // and their setters below. Mutable so a reader of a const tier can still
+    // make an atomic_ref (which needs a non-const object) for its load.
+    mutable std::array<std::uint8_t, game::kMaxDigitalActions> digital{}; // VR state of digital action k
+    mutable std::array<float, game::kMaxAnalogActions> analog{};          // VR value of analog action j
     int base        = 0;
     int num_digital = 0;
     int num_analog  = 0;
@@ -43,6 +47,33 @@ using ActionTiers                       = std::array<ActionTier, kTierCount>;
 // A code the replaced pad methods treat as a virtual code: at or above the
 // first tier's base, outside the game's pad codes (04 §3.1).
 [[nodiscard]] constexpr bool is_virtual_code(int code) noexcept { return code >= game::kTierBase[0]; }
+
+// The VR state of digital action `k` / analog action `j` of a tier. The
+// render thread writes it (ControlMapper) and the game thread reads it (the
+// pad methods, the aim and haptic hooks), so every element goes through
+// atomic_ref (AGENTS.md: data crossing threads goes through atomics).
+// Relaxed: each value stands alone and one frame stale is harmless. The
+// game thread's remap changes only the counts and pad codes, never these.
+// `k` and `j` are in range (callers check against the counts or use the
+// game's fixed action indices).
+static_assert(std::atomic_ref<std::uint8_t>::is_always_lock_free);
+static_assert(std::atomic_ref<float>::is_always_lock_free);
+
+[[nodiscard]] inline bool vr_digital(const ActionTier& t, std::size_t k) noexcept {
+    return std::atomic_ref(t.digital[k]).load(std::memory_order_relaxed) != 0;
+}
+
+inline void set_vr_digital(ActionTier& t, std::size_t k, bool down) noexcept {
+    std::atomic_ref(t.digital[k]).store(down ? 1 : 0, std::memory_order_relaxed);
+}
+
+[[nodiscard]] inline float vr_analog_at(const ActionTier& t, std::size_t j) noexcept {
+    return std::atomic_ref(t.analog[j]).load(std::memory_order_relaxed);
+}
+
+inline void set_vr_analog(ActionTier& t, std::size_t j, float v) noexcept {
+    std::atomic_ref(t.analog[j]).store(v, std::memory_order_relaxed);
+}
 
 // The tiers with their bases and no recorded pad codes.
 [[nodiscard]] ActionTiers make_tiers() noexcept;
