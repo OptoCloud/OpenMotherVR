@@ -3,6 +3,7 @@
 target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/addresses.cpp
     ${CMAKE_CURRENT_LIST_DIR}/addresses.h
+    ${CMAKE_CURRENT_LIST_DIR}/ai_address_tables.inc
     ${CMAKE_CURRENT_LIST_DIR}/build.cpp
     ${CMAKE_CURRENT_LIST_DIR}/build.h
     ${CMAKE_CURRENT_LIST_DIR}/clear_gate.cpp

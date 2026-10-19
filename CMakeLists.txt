@@ -146,7 +146,7 @@ add_library(mothervr SHARED "${CMAKE_CURRENT_BINARY_DIR}/version.rc")
 # order of the layers: util, platform, game, core, loader. util and core
 # list theirs into omvr_util and omvr_core, the rest into mothervr.
 set(MOTHERVR_SOURCE_DIRS
-    util/base util/binary util/hash util/math util/sync util/text
+    util/base util/binary util/hash util/math util/sync util/text util/time
     platform/win32 platform/win32/input platform/win32/patching platform/win32/window
     platform/d3d11 platform/d3d11/render platform/openvr platform/openxr platform/audio platform/discord
     game game/sites game/stereo game/input game/ui game/audio game/hands
@@ -157,6 +157,29 @@ set(MOTHERVR_SOURCE_DIRS
 foreach(_dir IN LISTS MOTHERVR_SOURCE_DIRS)
     include("${CMAKE_CURRENT_SOURCE_DIR}/src/${_dir}/sources.cmake")
 endforeach()
+
+# Both lists are hand-kept copies of the tree, so check them against it:
+# every src/**/sources.cmake must be named above, and every source file
+# under src/ must be in one of the targets. CONFIGURE_DEPENDS re-runs the
+# globs at build time, so a file added without its entry stops the next
+# build. (The .hlsl files are compiled by hand into the .inc beside them.)
+file(GLOB_RECURSE _omvr_lists CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/src" src/sources.cmake)
+foreach(_list IN LISTS _omvr_lists)
+    get_filename_component(_dir "${_list}" DIRECTORY)
+    if(NOT _dir IN_LIST MOTHERVR_SOURCE_DIRS)
+        message(FATAL_ERROR "src/${_list} is never included: add ${_dir} to MOTHERVR_SOURCE_DIRS")
+    endif()
+endforeach()
+file(GLOB_RECURSE _omvr_unlisted CONFIGURE_DEPENDS
+    src/*.cpp src/*.h src/*.inc src/*.rc src/*.def)
+foreach(_target IN ITEMS omvr_util omvr_core mothervr)
+    get_target_property(_srcs ${_target} SOURCES)
+    list(REMOVE_ITEM _omvr_unlisted ${_srcs})
+endforeach()
+if(_omvr_unlisted)
+    list(JOIN _omvr_unlisted "\n  " _omvr_unlisted)
+    message(FATAL_ERROR "in no sources.cmake (each directory lists its own files):\n  ${_omvr_unlisted}")
+endif()
 
 # resources.rc embeds these as BINARY resources. Ninja and Makefile builds
 # track only the files an .rc #includes, so without this a regenerated

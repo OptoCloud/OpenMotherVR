@@ -1,6 +1,7 @@
 # OpenMotherVR-Provenance: clean
 # Sources of src/loader/hooks/; each directory lists its own files.
 target_sources(mothervr PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/activity_input.h
     ${CMAKE_CURRENT_LIST_DIR}/alpha_light_hooks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/alpha_light_hooks.h
     ${CMAKE_CURRENT_LIST_DIR}/audio_hooks.cpp

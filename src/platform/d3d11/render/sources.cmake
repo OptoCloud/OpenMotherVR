@@ -4,6 +4,8 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/dds.h
     ${CMAKE_CURRENT_LIST_DIR}/mirror_renderer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mirror_renderer.h
+    ${CMAKE_CURRENT_LIST_DIR}/shaders/mirror_shaders.inc
+    ${CMAKE_CURRENT_LIST_DIR}/shaders/vignette_shaders.inc
     ${CMAKE_CURRENT_LIST_DIR}/texture_dump.cpp
     ${CMAKE_CURRENT_LIST_DIR}/texture_dump.h
     ${CMAKE_CURRENT_LIST_DIR}/vignette_renderer.cpp

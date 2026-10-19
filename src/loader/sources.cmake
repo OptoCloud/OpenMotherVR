@@ -7,6 +7,7 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/context.h
     ${CMAKE_CURRENT_LIST_DIR}/d3d11.def
     ${CMAKE_CURRENT_LIST_DIR}/d3d11_entry.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/d3d11_exports.inc
     ${CMAKE_CURRENT_LIST_DIR}/d3d11_forwarders.cpp
     ${CMAKE_CURRENT_LIST_DIR}/d3d11_forwarders.h
     ${CMAKE_CURRENT_LIST_DIR}/dll_main.cpp

@@ -21,7 +21,9 @@ tracked any more (`archive/dumps/v2/decompiled/` where kept locally).
     ui_patch.bin               delta stock UI.PAK -> MotherVR's MOTHER.PAK (neither archive is in the repo)
     openvr_api.dll             Valve OpenVR loader 1.0.10
   src/                         layers, each depending only on those above it; every
-                               directory lists its files in its own sources.cmake
+                               directory lists its files in its own sources.cmake,
+                               named in CMakeLists.txt's MOTHERVR_SOURCE_DIRS
+                               (configure fails on an unlisted file or directory)
     util/                      standard library only: math, sync, hash, binary, text, base
                                (Error, Result); the omvr_util static library
     platform/                  one external API each, wrapped in project types
