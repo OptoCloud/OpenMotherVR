@@ -11,6 +11,7 @@
 #include <format>
 #include <optional>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 #include <windows.h>
@@ -145,8 +146,7 @@ void Presence::start(std::string application_id, Source source, core::diag::port
     source_         = std::move(source);
     log_            = &log;
     try {
-        worker_ = std::thread([this] { run(); });
-        worker_.detach();
+        std::thread([this] { run(); }).detach();
     } catch (...) {
         log.line("discord: could not start the worker thread, Rich Presence off");
     }

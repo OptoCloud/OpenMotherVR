@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <thread>
 
 namespace omvr::platform::discord {
 
@@ -45,7 +44,6 @@ private:
     Source source_;
     core::diag::ports::Log* log_ = nullptr;
     std::atomic<bool> started_{false};
-    std::thread worker_;
 };
 
 } // namespace omvr::platform::discord
