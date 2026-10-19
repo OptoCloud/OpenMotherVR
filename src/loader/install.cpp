@@ -122,13 +122,12 @@ int ui_set_sites(bool mod_archive) noexcept {
 // 2, 4, 5: the UI set. Sets `mod_archive` when the game now opens the
 // mod's archive. (3, openvr_api.dll, is in the OpenVR runtime's start.)
 bool install_ui_set(Context& ctx, const GameImage& g, Patcher& p, const std::filesystem::path& game_dir,
-                    bool& mod_archive) noexcept {
+                    bool full_set, bool& mod_archive) noexcept {
     const auto stamp = platform::win32::this_module_build_filetime();
     // 23 §6.2: the terminal text size is a layout change of the VR set.
     const auto variant =
-        ctx.ui_set_only.load(std::memory_order_acquire)
-            ? core::ui::UiVariant{}
-            : core::ui::terminal_text_variant(ctx.settings.current().interaction.terminal_text_scale);
+        full_set ? core::ui::terminal_text_variant(ctx.settings.current().interaction.terminal_text_scale)
+                 : core::ui::UiVariant{};
     mod_archive = sites::redirect_ui_archive(g, p, ctx.ui_archive.deploy(game_dir, stamp, variant));
     if (!mod_archive) {
         // The stock movies register no VR glyph ids: keep the game's pad glyphs.
@@ -231,15 +230,9 @@ bool install_patches_and_controls(Context& ctx, const GameImage& g, Patcher& p) 
     return true;
 }
 
-} // namespace
-
-bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept {
-    // The patch set follows the runtime for this run (01 §2.3): runtime None
-    // is the unmodded game plus the options page.
-    const auto [runtime, forced] = runtime_for_this_run(ctx.settings.current(), ctx.launch);
-    const bool full_set          = runtime != config::VRRuntime::None;
-    ctx.ui_set_only.store(!full_set, std::memory_order_release);
-
+// Steps 1 to 9. True when every step of the set asked for went in.
+bool install_set(Context& ctx, const std::filesystem::path& game_dir, bool full_set,
+                 config::VRRuntime runtime, bool forced) noexcept {
     auto* ai_base = static_cast<std::uint8_t*>(platform::win32::module_handle(nullptr));
 
     // 1
@@ -253,7 +246,7 @@ bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept {
 
     Patcher patcher{ctx.log};
     bool mod_archive = false;
-    if (!install_ui_set(ctx, g, patcher, game_dir, mod_archive)) return failed(ctx.log, kOptionsUi);
+    if (!install_ui_set(ctx, g, patcher, game_dir, full_set, mod_archive)) return failed(ctx.log, kOptionsUi);
     if (!full_set) return finish_ui_only(ctx, g, patcher, mod_archive);
 
     // Settings reach the menu through on_menu_open (5).
@@ -276,6 +269,21 @@ bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept {
     // imports alone like everything else outside the UI set.
     const bool levels = installed && ctx.settings.current().discord_rich_presence;
     if (levels || engine_settings) hooks::watch_game_file_opens(ai_base, levels);
+    return installed;
+}
+
+} // namespace
+
+bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept {
+    // The patch set follows the runtime for this run (01 §2.3): runtime None
+    // is the unmodded game plus the options page.
+    const auto [runtime, forced] = runtime_for_this_run(ctx.settings.current(), ctx.launch);
+    const bool full_set          = runtime != config::VRRuntime::None;
+    const bool installed         = install_set(ctx, game_dir, full_set, runtime, forced);
+    // Only now, from the outcome (A1): until here, and on any failure, the
+    // proxy treats the game as stock.
+    const PatchSet set = !installed ? PatchSet::Stock : full_set ? PatchSet::Full : PatchSet::UiOnly;
+    ctx.patch_set.store(set, std::memory_order_release);
     return installed;
 }
 

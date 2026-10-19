@@ -83,8 +83,19 @@
 #include "platform/win32/payload_files.h"
 
 #include <atomic>
+#include <cstdint>
 
 namespace omvr::loader {
+
+// What the installer put into AI.exe. Stock covers every run where it did
+// not finish: an unknown build, a failed preflight, a write that failed part
+// way, or an exception in attach before it ran. Then the proxy passes the
+// game's D3D11 calls straight through, as for runtime None (UiOnly).
+enum class PatchSet : std::uint8_t {
+    Stock,  // nothing, or not all of the set asked for
+    UiOnly, // runtime None: the options page and its settings push
+    Full,   // the VR set
+};
 
 // Every long-lived object of the mod, built and wired once at attach. The
 // hooks the game, COM and the OS call reach it through context(). Member
@@ -219,7 +230,10 @@ struct Context {
     game::stereo::PostFxEffectTargets post_fx_targets{};
     // proxy, hooks
     platform::d3d11::SystemD3d11 system_d3d11;
-    std::atomic<bool> ui_set_only{false};
+    // What install() left in AI.exe, stored once at its end (A1). Read by
+    // the proxy, which wraps the device and swapchain only on Full, and by
+    // the Discord activity.
+    std::atomic<PatchSet> patch_set{PatchSet::Stock};
     HookTargets targets;
     // What the player is doing (level, menu, cutscene), and the Discord
     // Rich Presence whose worker polls it.

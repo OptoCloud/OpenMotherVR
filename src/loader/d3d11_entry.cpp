@@ -75,9 +75,11 @@ extern "C" __declspec(dllexport) HRESULT WINAPI D3D11CreateDeviceAndSwapChain(
         entry::log().line(kNoRealFunctionLog);
         return E_FAIL;
     }
-    // Runtime None is the unmodded game: no swapchain change and no wrapper
-    // on the device or the swapchain (no shader fix, no window changes).
-    if (entry::ui_set_only()) {
+    // Without the VR set in AI.exe (runtime None, an unknown build, a failed
+    // preflight or install) the game is unmodded: no swapchain change and no
+    // wrapper on the device or the swapchain (no shader fix, no window
+    // changes). The install ran at attach, before the game creates a device.
+    if (!entry::full_patch_set()) {
         return real(adapter, driver_type, software, flags, feature_levels, feature_level_count, sdk_version,
                     swapchain_desc, swapchain, device, feature_level, immediate_context);
     }

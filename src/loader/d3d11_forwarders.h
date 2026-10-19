@@ -25,8 +25,9 @@ namespace entry {
 platform::d3d11::CreateDeviceAndSwapChainFn real_create_device_and_swapchain() noexcept;
 // The attach-time message boxes are up until the player closes them.
 void wait_for_dialogs() noexcept;
-// Runtime None: the unmodded game.
-bool ui_set_only() noexcept;
+// The installer put the VR set into AI.exe. False for runtime None, an
+// unknown or mismatching build and a failed install: the unmodded game.
+bool full_patch_set() noexcept;
 bool headset_attached() noexcept;
 bool mirror_size(std::uint32_t& width, std::uint32_t& height) noexcept;
 // The project log.

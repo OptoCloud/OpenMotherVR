@@ -43,6 +43,9 @@ struct Context;
 // disables the options page (the original bails out there). Also returns
 // false if a write fails after the preflight passed; the patches made before
 // it stay in place.
+//
+// Stores what went in in ctx.patch_set, at the end: Full or UiOnly when it
+// returns true, Stock when it returns false.
 bool install(Context& ctx, const std::filesystem::path& game_dir) noexcept;
 
 } // namespace omvr::loader

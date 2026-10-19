@@ -98,7 +98,7 @@ platform::d3d11::CreateDeviceAndSwapChainFn real_create_device_and_swapchain() n
 
 void wait_for_dialogs() noexcept { context().dialogs.wait_posted(); }
 
-bool ui_set_only() noexcept { return context().ui_set_only.load(std::memory_order_acquire); }
+bool full_patch_set() noexcept { return context().patch_set.load(std::memory_order_acquire) == PatchSet::Full; }
 
 bool headset_attached() noexcept { return context().window.headset_attached(); }
 

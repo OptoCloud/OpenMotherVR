@@ -98,7 +98,7 @@ void start_discord(Context& ctx) {
     ctx.discord.start(
         std::string(platform::discord::kApplicationId),
         [&ctx, label, start] {
-            const bool tracked = !ctx.ui_set_only.load(std::memory_order_acquire);
+            const bool tracked = ctx.patch_set.load(std::memory_order_acquire) == PatchSet::Full;
             const auto text    = core::ui::describe({.tracked     = tracked,
                                                      .level       = ctx.play.level(),
                                                      .screen      = ctx.play.screen(),
