@@ -142,15 +142,9 @@ std::optional<Corner> match_corner(const std::uint32_t* t, const Instruction& in
 // Whether instruction `in` writes component `c` of temporary `reg`. Only
 // the first operand is a destination except for the few two-result
 // instructions, whose second is one too.
-// The shader model 4 declarations, which write no temporary.
-constexpr std::uint32_t kOpFirstDeclaration = 0x58, kOpLastDeclaration = 0x6A;
-
 bool writes(const std::uint32_t* t, const Instruction& in, std::uint32_t reg, std::uint32_t c) {
-    constexpr std::uint32_t kOpImul = 0x26, kOpSincos = 0x4D, kOpUdiv = 0x4E, kOpUmul = 0x51, kOpUaddc = 0x84,
-                            kOpUsubb = 0x85, kOpSwapc = 0x8E;
     if (in.len == 1) return false; // no operands (ret, nop, flags)
-    const bool two = in.op == kOpImul || in.op == kOpSincos || in.op == kOpUdiv || in.op == kOpUmul ||
-                     in.op == kOpUaddc || in.op == kOpUsubb || in.op == kOpSwapc;
+    const bool two = has_two_results(in.op);
     std::size_t p  = in.at + 1;
     if (in.extended) {
         while (p < in.at + in.len && op_extended(t[p])) ++p; // chained extended opcode tokens
@@ -175,7 +169,9 @@ bool clip_from_view_proj(const std::uint32_t* t, const std::vector<Instruction>&
                          std::uint32_t component) {
     for (std::size_t k = corner.inst; k-- > 0;) {
         const Instruction& in = insts[k];
-        if (in.op == kOpCustomData || (in.op >= kOpFirstDeclaration && in.op <= kOpLastDeclaration)) continue;
+        // The SM4 declarations write no temporary; any other instruction,
+        // an SM5 declaration included, goes through writes().
+        if (in.op == kOpCustomData || is_sm4_declaration(in.op)) continue;
         if (!writes(t, in, corner.clip.reg, corner.clip.component)) continue;
         if (in.op != kOpDp4 || in.extended) return false;
         std::size_t p = in.at + 1;

@@ -89,11 +89,6 @@ bool binds_atlas(std::span<const std::uint8_t> in) {
 
 // ---- The program -----------------------------------------------------------------
 
-bool is_declaration(std::uint32_t op) {
-    return (op >= kOpFirstSm4Declaration && op <= kOpLastSm4Declaration) ||
-           (op >= kOpFirstSm5Declaration && op <= kOpLastSm5Declaration) || op == kOpDclGsInstanceCount;
-}
-
 // t[p] and t[p + 1] are a texture operand of slot t9 with an immediate index.
 bool is_atlas_operand(const std::vector<std::uint32_t>& t, std::size_t p) {
     const std::uint32_t tok = t[p];

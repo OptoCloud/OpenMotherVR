@@ -63,6 +63,10 @@ inline constexpr std::uint32_t kOpSample = 0x45, kOpDclResource = 0x58;
 inline constexpr std::uint32_t kOpFirstSm4Declaration = 0x58, kOpLastSm4Declaration = 0x6A,
                                kOpFirstSm5Declaration = 0x8F, kOpLastSm5Declaration = 0xA2,
                                kOpDclGsInstanceCount = 0xCE;
+// The instructions with two results, whose second operand is a destination
+// too.
+inline constexpr std::uint32_t kOpImul = 0x26, kOpSincos = 0x4D, kOpUdiv = 0x4E, kOpUmul = 0x51,
+                               kOpUaddc = 0x84, kOpUsubb = 0x85, kOpSwapc = 0x8E;
 
 inline constexpr std::uint32_t kOpcodeMask   = 0x7FF;
 inline constexpr std::uint32_t kLengthShift  = 24;
@@ -133,6 +137,21 @@ inline std::uint32_t selection_mode(std::uint32_t tok) {
 }
 inline std::uint32_t index_rep(std::uint32_t tok, std::uint32_t dim) {
     return (tok >> (kIndexRepShift + kIndexRepBits * dim)) & kIndexRepMask;
+}
+
+// A Shader Model 4 declaration.
+inline bool is_sm4_declaration(std::uint32_t op) {
+    return op >= kOpFirstSm4Declaration && op <= kOpLastSm4Declaration;
+}
+// A declaration of either shader model.
+inline bool is_declaration(std::uint32_t op) {
+    return is_sm4_declaration(op) || (op >= kOpFirstSm5Declaration && op <= kOpLastSm5Declaration) ||
+           op == kOpDclGsInstanceCount;
+}
+// An instruction with two destinations.
+inline bool has_two_results(std::uint32_t op) {
+    return op == kOpImul || op == kOpSincos || op == kOpUdiv || op == kOpUmul || op == kOpUaddc ||
+           op == kOpUsubb || op == kOpSwapc;
 }
 
 // `tok` with its instruction length set to `length`.
