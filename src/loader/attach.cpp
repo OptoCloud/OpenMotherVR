@@ -126,6 +126,9 @@ void attach(Context& ctx) {
 
     const bool first_launch = ctx.settings.initialize(dir);
     log_settings(ctx);
+    // The settings the game's targets will be made with: a change pushed
+    // later, even the first, is then seen as one (core-ui-vr#0).
+    ctx.display_reset.seed(ctx.settings.current());
     check_game_build(ctx);
 
     const bool installed = install(ctx, dir);
