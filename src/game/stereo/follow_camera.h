@@ -32,10 +32,6 @@ public:
     void on_deactivate_begin(const void* behaviour) noexcept {
         if (object_ == nullptr || object_ == behaviour) active_ = false;
     }
-    // Without the object, as the original does (FUN_10001740): inactive
-    // whichever FollowBehavior deactivates. Kept until the hook passes the
-    // object; prefer the overload above.
-    void on_deactivate_begin() noexcept { active_ = false; }
     void on_deactivate_end(void* behaviour) noexcept;
 
     bool active() const noexcept { return active_; }
