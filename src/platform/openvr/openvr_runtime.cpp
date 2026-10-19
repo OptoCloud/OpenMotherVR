@@ -635,6 +635,7 @@ void OpenVrRuntime::submit_frame(core::vr::GpuTexture texture) {
     // The controllers as of this WaitGetPoses go to the game now, before its
     // next simulation step, not at the next BeginFrame (P10, as OpenXR).
     write_controls();
+    controls_written_ = true; // the next BeginFrame need not read them again
     if (++submitted_frames_ == core::vr::kSceneCheckFrame) check_scene_app();
 }
 
@@ -769,6 +770,8 @@ void OpenVrRuntime::register_control_hints() {
 
 // BeginFrame. Only when no submit has handed over the controls since the
 // last one (before the first frame, or a frame without an eye texture).
+// Only the submit path sets the flag, so with no submits every BeginFrame
+// reads.
 void OpenVrRuntime::poll_input() {
     if (!std::exchange(controls_written_, false)) write_controls();
 }
@@ -795,7 +798,6 @@ void OpenVrRuntime::note_controller(std::size_t hand, vr::TrackedDeviceIndex_t i
 // Render thread. Reads its own copy of the device poses: poses_ belongs to
 // the game thread (head_pose).
 void OpenVrRuntime::write_controls() {
-    controls_written_ = true;
     vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};
     compositor_->GetLastPoses(poses, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
 
