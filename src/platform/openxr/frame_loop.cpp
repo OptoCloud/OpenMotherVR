@@ -142,6 +142,28 @@ void Session::Impl::end_frame(IDXGISwapChain* swapchain) {
     check_frame(xrEndFrame(state.session.get(), &ei), "xrEndFrame", state.end_result);
 }
 
+// Ends the begun frame, if any, with no layer: the session is about to end.
+void Session::Impl::end_frame_empty() {
+    if (!state.frame_begun) return;
+    state.should_render = false; // no layer, so no copies and no flush
+    end_frame(nullptr);
+}
+
+// A whole frame with no layer, for a session that is ending: a runtime may
+// advance its state changes (towards STOPPING) only as frames are
+// submitted. Nothing is located or synced: no game frame uses it.
+void Session::Impl::empty_frame() {
+    XrFrameWaitInfo wi{XR_TYPE_FRAME_WAIT_INFO};
+    XrFrameState fs{XR_TYPE_FRAME_STATE};
+    if (!check_frame(xrWaitFrame(state.session.get(), &wi, &fs), "xrWaitFrame", state.wait_result)) return;
+    XrFrameBeginInfo bi{XR_TYPE_FRAME_BEGIN_INFO};
+    if (!check_frame(xrBeginFrame(state.session.get(), &bi), "xrBeginFrame", state.begin_result)) return;
+    XrFrameEndInfo ei{XR_TYPE_FRAME_END_INFO};
+    ei.displayTime          = fs.predictedDisplayTime;
+    ei.environmentBlendMode = state.blend;
+    check_frame(xrEndFrame(state.session.get(), &ei), "xrEndFrame", state.end_result);
+}
+
 // Controllers at the start of the frame, so the game's next simulation step
 // reads them (P10, 04 §5.9). Their grip poses are located at the same time
 // in the same space as the views, and published with them.

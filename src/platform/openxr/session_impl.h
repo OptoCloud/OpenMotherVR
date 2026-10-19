@@ -79,6 +79,8 @@ struct Session::Impl {
     struct FrameLayers;
     bool frame(IDXGISwapChain* swapchain) noexcept;
     void end_frame(IDXGISwapChain* swapchain);
+    void end_frame_empty();
+    void empty_frame();
     const XrCompositionLayerBaseHeader* projection_layer(FrameLayers& layers);
     const XrCompositionLayerBaseHeader* screen_layer(FrameLayers& layers, IDXGISwapChain* swapchain);
     bool begin_frame();

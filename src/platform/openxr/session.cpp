@@ -332,14 +332,22 @@ void Session::Impl::shutdown() noexcept {
 }
 
 // Polls events until handle_state has seen STOPPING (and called
-// xrEndSession) or the session is lost; false when the wait ran out.
+// xrEndSession) or the session is lost; false when the wait ran out. In
+// the states where the API expects the frame loop to run, empty frames keep
+// it running (xrWaitFrame paces the wait then); otherwise it sleeps.
 bool Session::Impl::wait_for_stopping() {
     const auto deadline = clock.now() + core::vr::kExitSessionWait;
     for (;;) {
         poll_events();
         if (!state.running || state.lost) return true;
         if (clock.now() >= deadline) return false;
-        std::this_thread::sleep_for(core::vr::kExitSessionPoll);
+        const XrSessionState s = state.session_state;
+        if (s == XR_SESSION_STATE_SYNCHRONIZED || s == XR_SESSION_STATE_VISIBLE ||
+            s == XR_SESSION_STATE_FOCUSED) {
+            empty_frame();
+        } else {
+            std::this_thread::sleep_for(core::vr::kExitSessionPoll);
+        }
     }
 }
 
@@ -349,6 +357,10 @@ void Session::Impl::end_on_request() noexcept {
     try {
         if (state.session && state.running) {
             log.line(kLogExitRequest);
+            // The frame the last boundary began is ended first, with no
+            // layer: a begun frame left open can hold the runtime back from
+            // STOPPING.
+            end_frame_empty();
             if (check(xrRequestExitSession(state.session.get()), "xrRequestExitSession") &&
                 !wait_for_stopping())
                 logf(log, kLogExitTimeout, core::vr::kExitSessionWait.count());

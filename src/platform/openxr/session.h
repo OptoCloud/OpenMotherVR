@@ -147,9 +147,11 @@ public:
     void shutdown() noexcept;
 
     // The player turned VR off (22 §13): the session is ended in the order
-    // the API requires (xrRequestExitSession, then xrEndSession once the
-    // state is STOPPING, waiting at most kExitSessionWait), then the
-    // session and the instance are destroyed. Render thread.
+    // the API requires (the begun frame ended with no layer,
+    // xrRequestExitSession, then xrEndSession once the state is STOPPING,
+    // waiting at most kExitSessionWait with empty frames while the frame
+    // loop is expected), then the session and the instance are destroyed.
+    // Render thread.
     void end_on_request() noexcept;
 
     // True between xrBeginSession and xrEndSession, while the session is not
