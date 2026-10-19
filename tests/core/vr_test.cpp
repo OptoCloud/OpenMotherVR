@@ -1,6 +1,6 @@
 // core/vr: heading and the vertical rule, the game pose conversion, FOV
 // tangents and crop bounds, pose hold rules, pose age, runtime choice,
-// tracking space changes and the frame kind log.
+// tracking space changes, the frame kind log and the hand index check.
 
 #include "core/diag/tuning.h"
 #include "core/vr/fov.h"
@@ -12,6 +12,7 @@
 #include "core/vr/runtime_detector.h"
 #include "core/vr/space_change.h"
 #include "core/vr/tuning.h"
+#include "core/vr/types.h"
 #include "fakes/fakes.h"
 
 #include <doctest/doctest.h>
@@ -28,6 +29,14 @@ using omvr::core::config::VRRuntime;
 using omvr::util::Quat;
 using omvr::util::Vec3;
 using Chosen = DetectResult::Chosen;
+
+TEST_CASE("a hand index names the left or the right hand") {
+    // What both backends' own copies accepted.
+    CHECK(valid_hand(0));
+    CHECK(valid_hand(1));
+    CHECK_FALSE(valid_hand(-1));
+    CHECK_FALSE(valid_hand(2));
+}
 
 TEST_CASE("heading from the forward axis, and the vertical rule") {
     const Heading ahead = heading_from_forward(0.0f, 1.0f, 0.3f);

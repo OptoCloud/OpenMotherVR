@@ -10,10 +10,10 @@
 #include "platform/openxr/session_impl.h"
 #include "platform/win32/text.h"
 #include "util/math/angle.h"
+#include "util/math/finite.h"
 
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <thread>
 #include <string>
 #include <string_view>
@@ -62,9 +62,7 @@ bool same_adapter(const LUID& a, const LUID& b) noexcept {
 bool all_finite(const Pose& p) noexcept {
     const float v[] = {p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w,
                        p.position.x,    p.position.y,    p.position.z};
-    for (float f : v)
-        if (!std::isfinite(f)) return false;
-    return true;
+    return util::all_finite(v);
 }
 
 XrSpaceLocationFlags locate_flags(XrSpace space, XrSpace base, XrTime t, Pose& out) {

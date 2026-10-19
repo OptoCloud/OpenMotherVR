@@ -11,6 +11,11 @@ namespace omvr::core::vr {
 inline constexpr std::size_t kEyeCount  = 2;
 inline constexpr std::size_t kHandCount = 2;
 
+// `hand` names a hand of the port's per-hand calls (hand_pose, aim_pose...).
+[[nodiscard]] constexpr bool valid_hand(int hand) noexcept {
+    return hand >= 0 && static_cast<std::size_t>(hand) < kHandCount;
+}
+
 // Opaque GPU objects of the game's renderer (D3D11 interface pointers on
 // the platform side, see platform/d3d11/handles.h).
 enum class GpuDevice : std::uintptr_t {};

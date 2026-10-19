@@ -34,6 +34,7 @@
 #include "platform/win32/module.h"
 #include "platform/win32/process_info.h"
 #include "util/math/angle.h"
+#include "util/math/finite.h"
 #include "util/math/vec.h"
 #include "util/sync/change_latch.h"
 #include "util/sync/frame_period.h"
@@ -50,6 +51,7 @@
 #include <filesystem>
 #include <format>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -71,6 +73,7 @@ using core::vr::RenderTangents;
 using core::vr::TextureSize;
 using core::vr::to_game_pose;
 using core::vr::to_game_velocity;
+using core::vr::valid_hand;
 using util::Matrix34;
 using util::SeqLock;
 using Clock = std::chrono::steady_clock;
@@ -112,13 +115,8 @@ constexpr vr::HmdMatrix34_t kIdentity34{
     {{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}};
 
 bool all_finite(const vr::HmdMatrix34_t& m) noexcept {
-    for (const auto& row : m.m)
-        for (float v : row)
-            if (!std::isfinite(v)) return false;
-    return true;
+    return util::all_finite(std::span<const float>{&m.m[0][0], sizeof(m.m) / sizeof(float)});
 }
-
-bool valid_hand(int hand) noexcept { return hand >= 0 && static_cast<std::size_t>(hand) < kHandCount; }
 
 vr::VRTextureBounds_t to_vr(const core::vr::TextureBounds& b) noexcept {
     return {b.u_min, b.v_min, b.u_max, b.v_max};

@@ -51,6 +51,7 @@ using core::vr::RenderTangents;
 using core::vr::TextureSize;
 using core::vr::to_game_pose;
 using core::vr::to_game_velocity;
+using core::vr::valid_hand;
 using util::Matrix34;
 using util::Pose;
 using util::pose_matrix;
@@ -67,8 +68,6 @@ constexpr std::string_view kLogHandsPrefix = "openxr: hands (head-local m, +x ri
 // OpenXR's forward axis (09 §5.2: the screen sits along the reference's
 // forward direction).
 constexpr Vec3 kForward{0, 0, -1};
-
-bool valid_hand(int hand) noexcept { return hand >= 0 && static_cast<std::size_t>(hand) < kHandCount; }
 
 // One hand as the controller schemes read it (04 §5.8.5). A thumbstick is
 // always "touched"; on Vive wands the stick is the touchpad, which OpenXR
