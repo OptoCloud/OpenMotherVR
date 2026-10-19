@@ -4,6 +4,16 @@ cmake_minimum_required(VERSION 3.20)
 # before project() so the vcpkg toolchain picks it up.
 set(VCPKG_OVERLAY_TRIPLETS "${CMAKE_CURRENT_SOURCE_DIR}/triplets" CACHE STRING "")
 set(VCPKG_TARGET_TRIPLET "x86-windows-mothervr" CACHE STRING "")
+# ports/: the project's own vcpkg ports (Tracy at the profiler's version).
+set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/ports" CACHE STRING "")
+
+# The traced flavour: d3d11.dll with the Tracy client, for profiling only.
+# It imports ws2_32.dll, so scripts/check_dll.ps1 refuses it and it is never
+# packaged. Its own build directory (build-tracy/); see BUILDING.md.
+option(MOTHERVR_TRACY "Build the traced flavour with the Tracy profiler client" OFF)
+if(MOTHERVR_TRACY)
+    list(APPEND VCPKG_MANIFEST_FEATURES "tracy")
+endif()
 
 project(mothervr LANGUAGES CXX)
 
@@ -20,6 +30,9 @@ option(MOTHERVR_WERROR "Treat compiler warnings as errors" OFF)
 set(MOTHERVR_VERSION "0.0.0-dev" CACHE STRING "Version stamped into d3d11.dll")
 if(NOT MOTHERVR_VERSION MATCHES "^([0-9]+)[.]([0-9]+)[.]([0-9]+)([-+][0-9A-Za-z.+-]+)?$")
     message(FATAL_ERROR "MOTHERVR_VERSION '${MOTHERVR_VERSION}' is not MAJOR.MINOR.PATCH[-pre]")
+endif()
+if(MOTHERVR_TRACY AND NOT MOTHERVR_VERSION STREQUAL "0.0.0-dev")
+    message(FATAL_ERROR "MOTHERVR_TRACY builds are for local profiling and never carry a release version")
 endif()
 set(MOTHERVR_VERSION_MAJOR ${CMAKE_MATCH_1})
 set(MOTHERVR_VERSION_MINOR ${CMAKE_MATCH_2})
@@ -123,6 +136,9 @@ if(MSVC)
         $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive- /Zc:__cplusplus /utf-8 /EHsc>
         $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<BOOL:${MOTHERVR_WERROR}>>:/WX>)
     target_compile_definitions(omvr_options INTERFACE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+    # Every target sees the same flavour: core/diag/trace.h's types differ
+    # between the two.
+    target_compile_definitions(omvr_options INTERFACE $<$<BOOL:${MOTHERVR_TRACY}>:OMVR_TRACE>)
     # Release builds keep debug info in the objects (/Z7), so parallel
     # compiles share no PDB and the DLL's d3d11.pdb covers the libraries too.
     target_compile_options(omvr_options INTERFACE "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Z7>")
@@ -154,6 +170,12 @@ set(MOTHERVR_SOURCE_DIRS
     core/vr core/vr/ports core/input core/input/ports core/stereo core/stereo/ports core/render core/hands
     loader loader/hooks
 )
+# Directories built only in the traced flavour; the checks below accept
+# them, and their files, when it is off.
+set(MOTHERVR_TRACED_DIRS platform/tracy)
+if(MOTHERVR_TRACY)
+    list(APPEND MOTHERVR_SOURCE_DIRS ${MOTHERVR_TRACED_DIRS})
+endif()
 foreach(_dir IN LISTS MOTHERVR_SOURCE_DIRS)
     include("${CMAKE_CURRENT_SOURCE_DIR}/src/${_dir}/sources.cmake")
 endforeach()
@@ -166,7 +188,7 @@ endforeach()
 file(GLOB_RECURSE _omvr_lists CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/src" src/sources.cmake)
 foreach(_list IN LISTS _omvr_lists)
     get_filename_component(_dir "${_list}" DIRECTORY)
-    if(NOT _dir IN_LIST MOTHERVR_SOURCE_DIRS)
+    if(NOT _dir IN_LIST MOTHERVR_SOURCE_DIRS AND NOT _dir IN_LIST MOTHERVR_TRACED_DIRS)
         message(FATAL_ERROR "src/${_list} is never included: add ${_dir} to MOTHERVR_SOURCE_DIRS")
     endif()
 endforeach()
@@ -176,6 +198,11 @@ foreach(_target IN ITEMS omvr_util omvr_core mothervr)
     get_target_property(_srcs ${_target} SOURCES)
     list(REMOVE_ITEM _omvr_unlisted ${_srcs})
 endforeach()
+if(NOT MOTHERVR_TRACY)
+    foreach(_dir IN LISTS MOTHERVR_TRACED_DIRS)
+        list(FILTER _omvr_unlisted EXCLUDE REGEX "/src/${_dir}/")
+    endforeach()
+endif()
 if(_omvr_unlisted)
     list(JOIN _omvr_unlisted "\n  " _omvr_unlisted)
     message(FATAL_ERROR "in no sources.cmake (each directory lists its own files):\n  ${_omvr_unlisted}")
@@ -207,6 +234,10 @@ target_link_libraries(mothervr PRIVATE
     OpenXR::openxr_loader
     minhook::minhook
 )
+if(MOTHERVR_TRACY)
+    find_package(Tracy CONFIG REQUIRED)
+    target_link_libraries(mothervr PRIVATE Tracy::TracyClient)
+endif()
 
 set_target_properties(mothervr PROPERTIES
     OUTPUT_NAME "d3d11"

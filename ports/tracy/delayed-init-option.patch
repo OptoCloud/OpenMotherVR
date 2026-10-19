@@ -1,0 +1,10 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -128,6 +128,7 @@
+ set_option(TRACY_NO_SYSTEM_TRACING "Disable systrace sampling" OFF TracyClient)
+ set_option(TRACY_PATCHABLE_NOPSLEDS "Enable nopsleds for efficient patching by system-level tools (e.g. rr)" OFF TracyClient)
+ set_option(TRACY_MANUAL_LIFETIME "Enable the manual lifetime management of the profile" OFF TracyClient)
++set_option(TRACY_DELAYED_INIT "Defer the profiler's initialisation to StartupProfiler (with TRACY_MANUAL_LIFETIME)" OFF TracyClient)
+ set_option(TRACY_FIBERS "Enable fibers support" OFF TracyClient)
+ set_option(TRACY_NO_CRASH_HANDLER "Disable crash handling" OFF TracyClient)
+ set_option(TRACY_TIMER_FALLBACK "Use lower resolution timers" OFF TracyClient)

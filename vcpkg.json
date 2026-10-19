@@ -8,5 +8,13 @@
         "nlohmann-json",
         "openvr",
         "openxr-loader"
-    ]
+    ],
+    "features": {
+        "tracy": {
+            "description": "Tracy profiler client for the traced build flavour (MOTHERVR_TRACY); ports/tracy",
+            "dependencies": [
+                "tracy"
+            ]
+        }
+    }
 }

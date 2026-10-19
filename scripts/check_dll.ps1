@@ -15,6 +15,9 @@
 #   or OpenXR loader (loaded at run time / linked statically), or a C or C++
 #   runtime DLL (the static CRT is what lets players skip the VC++
 #   redistributable).
+# - No profiler: the traced flavour (MOTHERVR_TRACY) is for local profiling
+#   only and never ships, so neither its socket import nor the Tracy client
+#   itself may be in the image.
 # - With -Version: the version resource carries that version, so the zip
 #   name, the file's Details tab and the log agree.
 
@@ -34,7 +37,7 @@ if ($headers -notmatch '14C machine \(x86\)') { Fail "$Dll is not a 32-bit (x86)
 
 $deps = dumpbin /nologo /dependents $Dll | Out-String
 $dlls = @([regex]::Matches($deps, '(?im)^\s+(\S+\.dll)\s*$') | ForEach-Object { $_.Groups[1].Value.ToLowerInvariant() })
-foreach ($banned in 'd3d11.dll', 'dxgi.dll', 'openvr_api.dll', 'openxr_loader.dll') {
+foreach ($banned in 'd3d11.dll', 'dxgi.dll', 'openvr_api.dll', 'openxr_loader.dll', 'ws2_32.dll') {
     if ($dlls -contains $banned) { Fail "$Dll imports $banned" }
 }
 $crt = $dlls | Where-Object { $_ -match '^(msvcp|msvcr|vcruntime|ucrtbase|concrt|api-ms-win-crt-)' }
@@ -45,6 +48,9 @@ $system = 'kernel32.dll', 'user32.dll', 'gdi32.dll', 'advapi32.dll', 'shell32.dl
           'ole32.dll', 'oleaut32.dll', 'version.dll', 'bcrypt.dll', 'dbghelp.dll', 'winmm.dll', 'ntdll.dll'
 $other = $dlls | Where-Object { $system -notcontains $_ -and $_ -notin $crt }
 if ($other) { Fail "$Dll imports DLLs outside the system allow list: $($other -join ', ')" }
+
+$image = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes((Resolve-Path $Dll)))
+if ($image -cmatch 'Tracy') { Fail "$Dll contains the Tracy profiler client (a MOTHERVR_TRACY build)" }
 
 # ---- exports ----------------------------------------------------------------
 
