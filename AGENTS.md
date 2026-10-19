@@ -63,7 +63,14 @@ that each depend only on the ones before them:
   `tuning.h`. Core may include `game/constants.h` and nothing else of the
   game (exception: `core/stereo/stereo_device`, which works on the game's
   `StereoInterface` in place); `platform/` and `game/` may include only
-  `core/**/ports/*.h`, `core/**/types.h` and `core/**/tuning.h`.
+  `core/**/ports/*.h`, `core/**/types.h` and `core/**/tuning.h`. The two
+  VR backends (`platform/openvr`, `platform/openxr`) may also include the
+  backend-neutral rules both apply, `core/vr/*.h` and
+  `core/input/controller_*.h`: pure functions and self-contained classes,
+  so each rule is written and tested once. A rule a backend would
+  otherwise write for itself goes there, not in `platform/`. One exception
+  is left: the backends take the player's runtime warnings from
+  `core/ui/notices.h`, until those go through the `Dialogs` port.
 - `src/loader/`: the composition root. `Context` (`loader/context.h`)
   builds and wires every long-lived object once at attach; `hooks/` holds
   every function the game, COM or the OS calls, each thin: read game
