@@ -69,6 +69,7 @@ struct Session::Impl {
     void check_visible() noexcept;
     void handle_state(XrSessionState s);
     void poll_events();
+    void publish_flags() noexcept;
     void teardown();
     void shutdown() noexcept;
     void end_on_request() noexcept;
@@ -158,6 +159,11 @@ struct Session::Impl {
     util::SeqLock<FrameViews> published_views;
     // state.floor exists; read on the game thread (22 §6.1).
     std::atomic<bool> floor_available{false};
+    // state.running && !state.lost, and state.exit_requested, as
+    // publish_flags last saw them: headset_in_use reads them on the game
+    // thread while the render thread changes them (12 §3).
+    std::atomic<bool> running_published{false};
+    std::atomic<bool> exit_published{false};
 
     // The manifest probe() chose; init_system hands it to the loader.
     std::filesystem::path manifest;

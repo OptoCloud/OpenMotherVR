@@ -127,6 +127,12 @@ void Session::Impl::check_visible() noexcept {
                        kNotShowingLabel);
 }
 
+// The render thread's flags, for the getters other threads call.
+void Session::Impl::publish_flags() noexcept {
+    running_published.store(state.running && !state.lost, std::memory_order_release);
+    exit_published.store(state.exit_requested, std::memory_order_release);
+}
+
 void Session::Impl::handle_state(XrSessionState s) {
     state.session_state = s;
     logf(log, kLogState, state_name(s));
@@ -182,6 +188,7 @@ void Session::Impl::poll_events() {
             default: break;
         }
     }
+    publish_flags();
 }
 
 // In the order 09 §3 needs: swapchains, input, spaces, session, instance,
@@ -200,6 +207,7 @@ void Session::Impl::teardown() {
     state.context.reset();
     state.device.reset();
     state = State{};
+    publish_flags();
     published_views.store({});
 }
 
@@ -360,11 +368,13 @@ void Session::set_aim_poses(bool on) noexcept { impl_->input.set_aim_poses(on); 
 
 void Session::set_haptics(bool on) noexcept { impl_->input.set_haptics(on); }
 
-bool Session::running() const noexcept { return impl_->state.running && !impl_->state.lost; }
+bool Session::running() const noexcept { return impl_->running_published.load(std::memory_order_acquire); }
 
 bool Session::has_floor() const noexcept { return impl_->floor_available.load(std::memory_order_relaxed); }
 
-bool Session::exit_requested() const noexcept { return impl_->state.exit_requested; }
+bool Session::exit_requested() const noexcept {
+    return impl_->exit_published.load(std::memory_order_acquire);
+}
 
 FrameViews Session::views() const noexcept { return impl_->published_views.load(); }
 

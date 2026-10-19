@@ -152,7 +152,8 @@ public:
     // session and the instance are destroyed. Render thread.
     void end_on_request() noexcept;
 
-    // True between xrBeginSession and xrEndSession.
+    // True between xrBeginSession and xrEndSession, while the session is not
+    // lost. Any thread.
     bool running() const noexcept;
 
     // The session has a floor reference space (STAGE, else LOCAL_FLOOR) for
@@ -160,6 +161,7 @@ public:
     bool has_floor() const noexcept;
 
     // The runtime asked the application to quit (session state EXITING).
+    // Any thread.
     bool exit_requested() const noexcept;
 
     // The views of the frame begun by the last frame(), located for its own
