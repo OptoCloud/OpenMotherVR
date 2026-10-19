@@ -15,5 +15,6 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/logger.h
     ${CMAKE_CURRENT_LIST_DIR}/thread_roles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/thread_roles.h
+    ${CMAKE_CURRENT_LIST_DIR}/trace.h
     ${CMAKE_CURRENT_LIST_DIR}/tuning.h
 )
