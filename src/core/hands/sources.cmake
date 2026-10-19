@@ -31,6 +31,8 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/pose_filter.h
     ${CMAKE_CURRENT_LIST_DIR}/real_crouch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/real_crouch.h
+    ${CMAKE_CURRENT_LIST_DIR}/skeleton.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/skeleton.h
     ${CMAKE_CURRENT_LIST_DIR}/tuning.h
     ${CMAKE_CURRENT_LIST_DIR}/types.h
 )

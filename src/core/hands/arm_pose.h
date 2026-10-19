@@ -1,7 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #pragma once
 
-#include "core/hands/body_visibility.h"
+#include "core/hands/skeleton.h"
 #include "core/hands/types.h"
 #include "util/math/vec.h"
 

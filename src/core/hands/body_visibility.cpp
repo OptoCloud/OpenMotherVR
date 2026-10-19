@@ -11,8 +11,7 @@ namespace {
 
 using config::BodyVisible;
 
-constexpr std::int16_t kNoParent   = -1;
-constexpr char kNamespaceSeparator = ':';
+constexpr std::int16_t kNoParent = -1;
 
 struct ListedBone {
     std::string_view name;
@@ -150,11 +149,6 @@ std::size_t root_of(std::span<const std::int16_t> parents, std::size_t b) noexce
 }
 
 } // namespace
-
-std::string_view bare_bone_name(std::string_view name) noexcept {
-    const auto colon = name.rfind(kNamespaceSeparator);
-    return colon == std::string_view::npos ? name : name.substr(colon + 1);
-}
 
 std::optional<BoneGroup> listed_group(std::string_view name) noexcept {
     const std::string_view bare = bare_bone_name(name);

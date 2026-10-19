@@ -4,7 +4,7 @@
 #include "core/diag/ports/log.h"
 #include "core/diag/tuning.h"
 #include "core/hands/arm_pose.h"
-#include "core/hands/body_hider.h"
+#include "core/hands/skeleton.h"
 #include "core/hands/types.h"
 #include "util/sync/frame_period.h"
 #include "util/sync/once_latch.h"

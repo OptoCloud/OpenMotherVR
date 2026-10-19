@@ -4,6 +4,7 @@
 #include "core/config/settings.h"
 #include "core/diag/ports/log.h"
 #include "core/hands/body_visibility.h"
+#include "core/hands/skeleton.h"
 #include "core/hands/types.h"
 #include "util/sync/once_latch.h"
 
@@ -27,35 +28,6 @@ struct HiddenPose {
     std::uintptr_t pose      = 0;
     std::uintptr_t skeleton  = 0;
     CollapsePlan plan{};
-};
-
-// The player's skeleton as the game thread found it this frame.
-struct PlayerSkeleton {
-    std::uintptr_t animation = 0;
-    std::uintptr_t pose      = 0; // 0: no player pose
-    std::uintptr_t skeleton  = 0;
-    std::string_view name; // the skeleton's own name, for the log
-};
-
-// Why the game side could not read the player's skeleton (21 §10.2, §18),
-// for the log.
-enum class SkeletonFault : std::uint8_t {
-    Unknown,      // not said
-    NoBones,      // the bone count is not above 0
-    NoArrays,     // the bone or parent array pointer is null
-    TooManyBones, // more bones than the reader holds
-    UnnamedBone,  // a bone without a name
-    // A skeleton of a first-person table's name whose bone count or parents
-    // are not the table's (21 §2.3, r10): rejected, not posed with the
-    // table's bone meanings.
-    TableMismatch,
-};
-struct SkeletonReadFault {
-    SkeletonFault fault = SkeletonFault::Unknown;
-    std::int32_t count  = 0; // the skeleton's bone count as read
-    // UnnamedBone: the first bone without a name; TableMismatch: the first
-    // index whose parent differs from the table's.
-    std::size_t bone = 0;
 };
 
 class BodyHider final {
