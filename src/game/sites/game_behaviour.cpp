@@ -126,7 +126,8 @@ bool install_game_side_hooks(const GameImage& g, Patcher& patcher, const GameSid
 void find_mode_stack_append(const GameImage& g, core::diag::ports::Log& log,
                             stereo::ModeStackTargets& out) noexcept {
     const ReconRvas& r = kReconRvas[g.version];
-    if (r.mode_stack_append == 0) {
+    // Both rows: the check reads the bytes before the call site.
+    if (r.mode_stack_append == 0 || r.mode_stack_append_call == 0) {
         log.line(kNoAppendLog);
         return;
     }

@@ -166,10 +166,12 @@ void fix_anti_aliasing(const GameImage& g, Patcher& p, const ReconRvas& r,
 // POV group and the main POV's centre-view occlusion test passes; the
 // frustum and the shadow lights' view-volume test stay the game's.
 void fix_culling(const GameImage& g, Patcher& p, const ReconRvas& r, const RenderFixHooks& hooks) noexcept {
-    const std::uint8_t* occlusion_args = g.at_rva(r.cull_occlusion_call) - kOcclusionArgs.size();
-    if (!calls(g.at_rva(r.cull_distance_call), g.at_rva(r.cull_distance)) ||
+    // The caller checked cull_distance_call only; the bytes before the
+    // occlusion call are read only once its row is known.
+    if (r.cull_occlusion_call == 0 || r.cull_distance == 0 || r.cull_occlusion == 0 ||
+        !calls(g.at_rva(r.cull_distance_call), g.at_rva(r.cull_distance)) ||
         !calls(g.at_rva(r.cull_occlusion_call), g.at_rva(r.cull_occlusion)) ||
-        !x86::matches(occlusion_args, kOcclusionArgs)) {
+        !x86::matches(g.at_rva(r.cull_occlusion_call) - kOcclusionArgs.size(), kOcclusionArgs)) {
         ports::logf(p.log(), kCullingCodeLog, kCullingArea, r.cull_distance_call, r.cull_occlusion_call);
         return;
     }
