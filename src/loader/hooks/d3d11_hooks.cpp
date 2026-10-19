@@ -119,6 +119,9 @@ HRESULT __stdcall hook_resize_buffers(void* self, UINT buffer_count, UINT width,
         // line, which ties resize events to what follows.
         ctx.targets.present_count.store(0, std::memory_order_relaxed);
         if (ctx.window.mirror_size(width, height)) ports::logf(ctx.log, kResizeMirrorLog, width, height);
+        // The mirror's view of the old back buffer would keep it alive and
+        // fail the resize.
+        ctx.mirror.release_back_buffer();
     }
     const HRESULT hr = system_method<ResizeBuffersFn>(ctx.targets.resize_buffers)(
         self, buffer_count, width, height, format, swapchain_flags);

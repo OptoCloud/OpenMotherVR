@@ -187,6 +187,7 @@ void __fastcall dev_end_frame(void* self, void*) noexcept {
     });
     auto* swap = renderer_get<IDXGISwapChain>(ctx.addresses, AiAddr::RendererSwapChain);
     auto* dc   = renderer_get<ID3D11DeviceContext>(ctx.addresses, AiAddr::RendererContext);
+    ctx.mirror.use_swapchain(swap);
     ctx.mirror.draw(platform::d3d11::gpu_context(dc), tracked);
     swap->Present(kPresentSyncInterval, kPresentFlags);
     // 22 §13: a VR-off request takes effect between frames; the game's
