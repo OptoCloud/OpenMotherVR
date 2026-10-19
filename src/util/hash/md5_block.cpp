@@ -55,9 +55,10 @@ constexpr std::uint32_t round_function(int round, std::uint32_t b, std::uint32_t
 
 } // namespace
 
-void md5_block(std::uint32_t state[4], const std::uint8_t* block) noexcept {
+void md5_block(Md5State& state, std::span<const std::uint8_t, kMd5BlockBytes> block) noexcept {
     std::array<std::uint32_t, kBlockWords> m{};
-    std::memcpy(m.data(), block, sizeof(m));
+    static_assert(sizeof(m) == kMd5BlockBytes);
+    std::memcpy(m.data(), block.data(), sizeof(m));
     std::uint32_t a = state[0], b = state[1], c = state[2], d = state[3];
     for (int i = 0; i < kSteps; ++i) {
         const int round   = i / kStepsPerRound;

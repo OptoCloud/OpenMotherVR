@@ -24,6 +24,7 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -47,15 +48,22 @@ TEST_CASE("crc32 gives the zlib known answers") {
 }
 
 TEST_CASE("md5_block of the padded empty message is MD5(\"\")") {
-    std::uint32_t state[4] = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476};
-    std::array<std::uint8_t, 64> block{};
+    // RFC 1321 section 3.3: A, B, C, D.
+    CHECK(util::kMd5InitialState == util::Md5State{0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476});
+    util::Md5State state = util::kMd5InitialState;
+    std::array<std::uint8_t, util::kMd5BlockBytes> block{};
     block[0] = 0x80; // the pad; length 0 bits
-    util::md5_block(state, block.data());
+    util::md5_block(state, block);
     // d41d8cd98f00b204e9800998ecf8427e as little-endian words.
     CHECK(state[0] == 0xD98C1DD4u);
     CHECK(state[1] == 0x04B2008Fu);
     CHECK(state[2] == 0x980980E9u);
     CHECK(state[3] == 0x7E42F8ECu);
+
+    // The unsized form folds the same block the same way.
+    std::uint32_t words[4] = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476};
+    util::md5_block(words, block.data());
+    CHECK(std::ranges::equal(words, state));
 }
 
 TEST_CASE("parse_int takes a whole decimal integer") {
