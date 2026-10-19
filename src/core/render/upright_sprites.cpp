@@ -154,9 +154,11 @@ std::optional<Corner> match_corner(const std::uint32_t* t, const Inst& in, std::
 constexpr std::uint32_t kOpFirstDeclaration = 0x58, kOpLastDeclaration = 0x6A;
 
 bool writes(const std::uint32_t* t, const Inst& in, std::uint32_t reg, std::uint32_t c) {
-    constexpr std::uint32_t kOpImul = 0x26, kOpSincos = 0x4D, kOpUdiv = 0x4E, kOpUmul = 0x51;
+    constexpr std::uint32_t kOpImul = 0x26, kOpSincos = 0x4D, kOpUdiv = 0x4E, kOpUmul = 0x51, kOpUaddc = 0x84,
+                            kOpUsubb = 0x85, kOpSwapc = 0x8E;
     if (in.len == 1) return false; // no operands (ret, nop, flags)
-    const bool two = in.op == kOpImul || in.op == kOpSincos || in.op == kOpUdiv || in.op == kOpUmul;
+    const bool two = in.op == kOpImul || in.op == kOpSincos || in.op == kOpUdiv || in.op == kOpUmul ||
+                     in.op == kOpUaddc || in.op == kOpUsubb || in.op == kOpSwapc;
     std::size_t p  = in.at + 1;
     if (in.extended) {
         while (p < in.at + in.len && op_extended(t[p])) ++p; // chained extended opcode tokens
@@ -218,7 +220,9 @@ std::optional<Site> find_site(const std::vector<std::uint32_t>& t, std::size_t e
             if (i + 1 >= end) return std::nullopt;
             len = t[i + 1];
         }
-        if (len == 0 || i + len > end) return std::nullopt;
+        // Not `i + len > end`: a customData length near 2^32 wraps
+        // size_t on Win32 and would walk backwards forever.
+        if (len == 0 || len > end - i) return std::nullopt;
         insts.push_back({i, len, op, op_extended(tok)});
         i += len;
     }

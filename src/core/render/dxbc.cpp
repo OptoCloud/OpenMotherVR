@@ -39,6 +39,7 @@ std::optional<Operand> parse_operand(const std::uint32_t* t, std::size_t end, st
         const std::uint32_t dims = index_dim(tok);
         for (std::uint32_t d = 0; d < dims; ++d) {
             if (index_rep(tok, d) != kIndexImmediate32) return std::nullopt;
+            if (p >= end) return std::nullopt; // the index lies past the instruction
             if (d == 0) o.reg = t[p];
             ++p;
         }
@@ -89,6 +90,22 @@ std::uint32_t read_u32(std::span<const std::uint8_t> in, std::size_t at) noexcep
     return v;
 }
 
+// The bounds checks compare against what is left rather than summing: the
+// counts, offsets and sizes are untrusted 32-bit values, and a sum wraps
+// size_t on Win32. Each takes a container of at least the header's size.
+bool chunk_offsets_fit(std::span<const std::uint8_t> in, std::uint32_t count) noexcept {
+    return count <= (in.size() - kChunkOffsetsOffset) / kTokenBytes;
+}
+
+bool chunk_header_fits(std::span<const std::uint8_t> in, std::uint32_t off) noexcept {
+    return off <= in.size() - kChunkHeaderSize;
+}
+
+// After chunk_header_fits(in, off).
+bool chunk_data_fits(std::span<const std::uint8_t> in, std::uint32_t off, std::uint32_t bytes) noexcept {
+    return bytes <= in.size() - off - kChunkHeaderSize;
+}
+
 bool is_program_chunk(const std::uint8_t* chunk) noexcept {
     return std::memcmp(chunk, kProgramChunkSm5.data(), kFourCcBytes) == 0 ||
            std::memcmp(chunk, kProgramChunkSm4.data(), kFourCcBytes) == 0;
@@ -103,16 +120,14 @@ std::optional<ProgramChunk> find_program(std::span<const std::uint8_t> in) noexc
     const std::uint32_t declared = read_u32(in, kTotalSizeOffset);
     ProgramChunk p;
     p.chunk_count = read_u32(in, kChunkCountOffset);
-    if (declared != in.size() || kChunkOffsetsOffset + std::size_t(p.chunk_count) * kTokenBytes > in.size())
-        return std::nullopt;
+    if (declared != in.size() || !chunk_offsets_fit(in, p.chunk_count)) return std::nullopt;
     for (std::uint32_t c = 0; c < p.chunk_count; ++c) {
         const std::uint32_t off = read_u32(in, kChunkOffsetsOffset + kTokenBytes * std::size_t(c));
-        if (std::size_t(off) + kChunkHeaderSize > in.size()) return std::nullopt;
+        if (!chunk_header_fits(in, off)) return std::nullopt;
         if (!is_program_chunk(in.data() + off)) continue;
         if (p.offset) return std::nullopt;
         const std::uint32_t bytes = read_u32(in, off + kChunkSizeOffset);
-        if (std::size_t(off) + kChunkHeaderSize + bytes > in.size() || bytes % kTokenBytes)
-            return std::nullopt;
+        if (!chunk_data_fits(in, off, bytes) || bytes % kTokenBytes) return std::nullopt;
         p.offset = off;
         p.bytes  = bytes;
     }
@@ -130,14 +145,14 @@ std::optional<std::span<const std::uint8_t>> find_chunk(std::span<const std::uin
                                                         std::string_view fourcc) noexcept {
     if (in.size() < kContainerHeaderSize || fourcc.size() != kFourCcBytes) return std::nullopt;
     const std::uint32_t count = read_u32(in, kChunkCountOffset);
-    if (kChunkOffsetsOffset + std::size_t(count) * kTokenBytes > in.size()) return std::nullopt;
+    if (!chunk_offsets_fit(in, count)) return std::nullopt;
     std::optional<std::span<const std::uint8_t>> found;
     for (std::uint32_t c = 0; c < count; ++c) {
         const std::uint32_t off = read_u32(in, kChunkOffsetsOffset + kTokenBytes * std::size_t(c));
-        if (std::size_t(off) + kChunkHeaderSize > in.size()) return std::nullopt;
+        if (!chunk_header_fits(in, off)) return std::nullopt;
         if (std::memcmp(in.data() + off, fourcc.data(), kFourCcBytes) != 0) continue;
         const std::uint32_t bytes = read_u32(in, off + kChunkSizeOffset);
-        if (found || std::size_t(off) + kChunkHeaderSize + bytes > in.size()) return std::nullopt;
+        if (found || !chunk_data_fits(in, off, bytes)) return std::nullopt;
         found = in.subspan(std::size_t(off) + kChunkHeaderSize, bytes);
     }
     return found;

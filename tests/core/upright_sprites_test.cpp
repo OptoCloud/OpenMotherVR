@@ -335,6 +335,29 @@ TEST_CASE("the sprite rewrite turns the corner and keeps the container valid") {
     CHECK(half[1] == doctest::Approx(-0.25f - 3.0f * std::sqrt(0.5f)).epsilon(kEps));
 }
 
+TEST_CASE("the sprite rewrite refuses a customData length that wraps") {
+    std::vector<std::uint32_t> t = sprite_program();
+    const auto at                = static_cast<std::uint32_t>(t.size() - 1);
+    t.insert(t.end() - 1, {0x00000035, 0u - (at - 2)}); // at + length wraps to 2
+    t[1]          = static_cast<std::uint32_t>(t.size());
+    int sites     = 0;
+    const auto in = container(t);
+    CHECK(patch_upright_sprites(in.data(), in.size(), sites).empty());
+}
+
+TEST_CASE("the sprite rewrite sees a clip coordinate written by a two-result instruction") {
+    // swapc r1.w, r0.z, r2.xxxx, r2.xxxx, r2.xxxx after the first dp4: the
+    // clip coordinate the x corner adds is then no longer cb0[0]'s.
+    std::vector<std::uint32_t> t = sprite_program();
+    t.insert(t.begin() + 20,
+             {0x0B00008E, 0x00100082, 1, 0x00100042, 0, 0x00100006, 2, 0x00100006, 2, 0x00100006, 2});
+    t[1]          = static_cast<std::uint32_t>(t.size());
+    int sites     = 0;
+    const auto in = container(t);
+    CHECK(patch_upright_sprites(in.data(), in.size(), sites).empty());
+    CHECK(sites == 0);
+}
+
 TEST_CASE("the sprite rewrite refuses what is not the game's sprite form") {
     int sites = 0;
 

@@ -173,7 +173,9 @@ std::optional<Sample> find_sample(const std::vector<std::uint32_t>& t, std::size
             if (i + 1 >= end) return std::nullopt;
             len = t[i + 1];
         }
-        if (len == 0 || i + len > end) return std::nullopt;
+        // Not `i + len > end`: a customData length near 2^32 wraps
+        // size_t on Win32 and would walk backwards forever.
+        if (len == 0 || len > end - i) return std::nullopt;
         if (op != kOpCustomData && !is_declaration(op)) {
             bool reads_atlas = false;
             for (std::size_t p = i + 1; p + 1 < i + len; ++p)

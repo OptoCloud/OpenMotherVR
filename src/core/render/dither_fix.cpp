@@ -203,7 +203,9 @@ std::optional<std::vector<std::size_t>> instructions(const std::vector<std::uint
             if (i + 1 >= end) return std::nullopt;
             len = t[i + 1];
         }
-        if (len == 0 || i + len > end) return std::nullopt;
+        // Not `i + len > end`: a customData length near 2^32 wraps
+        // size_t on Win32 and would walk backwards forever.
+        if (len == 0 || len > end - i) return std::nullopt;
         at.push_back(i);
         i += len;
     }

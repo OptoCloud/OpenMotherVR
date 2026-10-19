@@ -478,6 +478,50 @@ TEST_CASE("the dither fix refuses what it does not understand") {
     CHECK(patch_position_dither(vs.data(), vs.size()).blob.empty());
 }
 
+// The program with a customData block before its `ret` whose length, added
+// to its position, wraps a 32-bit size_t back to the first instruction.
+std::vector<std::uint32_t> with_wrapping_custom_data(std::vector<std::uint32_t> t) {
+    const auto at = static_cast<std::uint32_t>(t.size() - 1);
+    t.insert(t.end() - 1, {0x00000035, 0u - (at - 2)});
+    t[1] = static_cast<std::uint32_t>(t.size());
+    return t;
+}
+
+TEST_CASE("the dither fix refuses a customData length that wraps") {
+    const std::vector<std::uint8_t> in = container(with_wrapping_custom_data(dither_program()));
+    CHECK(patch_position_dither(in.data(), in.size()).blob.empty());
+}
+
+TEST_CASE("parse_operand refuses an index past the instruction's end") {
+    const std::uint32_t temp_1d = 0x00100012; // r?.x, one immediate index after it
+    const std::uint32_t t[]     = {temp_1d, 7};
+    CHECK_FALSE(parse_operand(t, 1, 0).has_value()); // the index is not inside
+    const auto o = parse_operand(t, 2, 0);
+    REQUIRE(o.has_value());
+    CHECK(o->reg == 7u);
+    CHECK(o->size == 2u);
+}
+
+// `blob` with the word at `at` replaced and the checksum stored again.
+std::vector<std::uint8_t> with_word(std::vector<std::uint8_t> blob, std::size_t at, std::uint32_t v) {
+    std::memcpy(blob.data() + at, &v, sizeof(v));
+    const DxbcChecksum sum = dxbc_checksum(blob);
+    std::memcpy(blob.data() + 4, sum.data(), 16);
+    return blob;
+}
+
+TEST_CASE("the container walk refuses chunk sizes and counts that wrap") {
+    const std::vector<std::uint8_t> in = container(dither_program());
+    // The program chunk's size: offset + 8 + size wraps to the offset.
+    const auto big_size = with_word(in, 36 + 4, 0xFFFFFFF8u);
+    CHECK(patch_position_dither(big_size.data(), big_size.size()).blob.empty());
+    CHECK_FALSE(find_chunk(big_size, "SHEX").has_value());
+    // The chunk count: 32 + 4 * count wraps to 36.
+    const auto many = with_word(in, 28, 0x40000001u);
+    CHECK(patch_position_dither(many.data(), many.size()).blob.empty());
+    CHECK_FALSE(find_chunk(many, "SHEX").has_value());
+}
+
 TEST_CASE("the dither event counts the shaders left unchanged") {
     omvr::tests::RecordingLog log;
     ShaderFixStats stats{log};
@@ -747,6 +791,11 @@ TEST_CASE("constant smoke: any other form of the sample leaves the shader unchan
     auto ld = atlas_sample(kDstXyz, kAtlasXyzw);
     ld.insert(ld.end(), {0x0700002D, 0x001000F2, 0, 0x00100006, 0, kAtlasXyzw, 9}); // ld r0, r0.x, t9
     CHECK(smoke_unchanged(lit_container(lit_program(ld))));
+}
+
+TEST_CASE("constant smoke: a customData length that wraps leaves the shader unchanged") {
+    const auto program = lit_program(atlas_sample(kDstXyz, kAtlasXyzw));
+    CHECK(smoke_unchanged(lit_container(with_wrapping_custom_data(program))));
 }
 
 TEST_CASE("constant smoke: only the atlas, bound by its name at t9, in a pixel shader") {
