@@ -81,6 +81,7 @@
 #include "platform/win32/input/keyboard.h"
 #include "platform/win32/log_flusher.h"
 #include "platform/win32/payload_files.h"
+#include "util/math/matrix.h"
 
 #include <atomic>
 #include <cstdint>
@@ -91,6 +92,10 @@ namespace omvr::loader {
 // not finish: an unknown build, a failed preflight, a write that failed part
 // way, or an exception in attach before it ran. Then the proxy passes the
 // game's D3D11 calls straight through, as for runtime None (UiOnly).
+// The identity rotation at the origin, in the game's 3x4 layout.
+inline constexpr util::Matrix34 kNeutralPose{
+    {{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}};
+
 enum class PatchSet : std::uint8_t {
     Stock,  // nothing, or not all of the set asked for
     UiOnly, // runtime None: the options page and its settings push
@@ -206,6 +211,12 @@ struct Context {
     // 21 §11), and the standing height calibration (22 §6.2). Game thread.
     core::stereo::PlaySpace play_space;
     core::stereo::HeightCalibration calibration;
+    // The last head pose and reference slots 11 and 21 handed the game: what
+    // they hand it again when no pose can be made (no backend, a backend
+    // that threw), so the game never builds its camera from an unwritten
+    // buffer. The neutral pose before any. Game thread.
+    util::Matrix34 last_head_pose{kNeutralPose};
+    util::Matrix34 last_reference_pose{kNeutralPose};
     // Dev. Debug Options: what darkens the view (the game's head-in-wall
     // fade, the scene visibility the stereo update finds, and what it
     // leaves). Game thread.

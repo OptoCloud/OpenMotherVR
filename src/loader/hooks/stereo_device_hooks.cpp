@@ -40,7 +40,6 @@ using core::stereo::PixelSize;
 using game::AiAddr;
 using game::DeviceState;
 using game::load_backend;
-using game::load_pose_fetched;
 using game::StereoInterface;
 using game::StereoManager;
 using game::store_pose_fetched;
@@ -77,6 +76,12 @@ StereoInterface& device_of(void* self) noexcept { return *static_cast<StereoInte
 // The 3x4 head pose the game hands in, as the runtime port writes it.
 util::Matrix34& pose_out(float* out) noexcept { return *reinterpret_cast<util::Matrix34*>(out); }
 
+// Whether a head pose was handed to the game since the last EndFrame, and
+// clears it, in one step.
+bool take_pose_fetched(StereoInterface& si) noexcept {
+    return std::atomic_ref(si.pose_fetched).exchange(0, std::memory_order_acq_rel) != 0;
+}
+
 // The stereo texture's real size, nullopt without one (03 §4.3).
 std::optional<PixelSize> texture_size(ID3D11Texture2D* texture) noexcept {
     if (!texture) return std::nullopt;
@@ -99,10 +104,10 @@ void take_stereo_target(const game::AddressMap& addresses, StereoInterface& si, 
 // the eyes before the runtime takes them (OpenVR's submit, OpenXR's copy)
 // and before the mirror samples them. Head-tracked frames only. Nothing to
 // draw costs one comparison. Render thread.
-void draw_comfort(Context& ctx, StereoInterface& si) noexcept {
+void draw_comfort(Context& ctx, StereoInterface& si, bool tracked) noexcept {
     const auto& fov      = si.eye_fov[0]; // symmetric (03 §3.2): one eye gives both
-    const auto constants = ctx.comfort.frame(ctx.clock.now(), load_pose_fetched(si),
-                                             std::max(fov.left, fov.right), std::max(fov.up, fov.down));
+    const auto constants = ctx.comfort.frame(ctx.clock.now(), tracked, std::max(fov.left, fov.right),
+                                             std::max(fov.up, fov.down));
     if (!constants) return;
     auto* dc = renderer_get<ID3D11DeviceContext>(ctx.addresses, AiAddr::RendererContext);
     ctx.vignette.draw(platform::d3d11::gpu_context(dc),
@@ -170,18 +175,20 @@ void __fastcall dev_begin_frame(void* self, void*) noexcept {
 void __fastcall dev_end_frame(void* self, void*) noexcept {
     auto& ctx = context();
     auto& si  = device_of(self);
+    // This frame's kind, taken and cleared at entry (P1): a head pose the
+    // game thread reads for the next frame while submit_frame waits on the
+    // runtime then counts for that frame, not this one.
+    const bool tracked = take_pose_fetched(si);
     guarded("EndFrame", [&] {
         if (auto* backend = load_backend(si)) {
-            draw_comfort(ctx, si);
+            draw_comfort(ctx, si, tracked);
             backend->submit_frame(platform::d3d11::gpu_texture(si.eye_texture[0].texture));
         }
     });
     auto* swap = renderer_get<IDXGISwapChain>(ctx.addresses, AiAddr::RendererSwapChain);
     auto* dc   = renderer_get<ID3D11DeviceContext>(ctx.addresses, AiAddr::RendererContext);
-    // The frame kind, decided before the request is cleared.
-    ctx.mirror.draw(platform::d3d11::gpu_context(dc), load_pose_fetched(si));
+    ctx.mirror.draw(platform::d3d11::gpu_context(dc), tracked);
     swap->Present(kPresentSyncInterval, kPresentFlags);
-    store_pose_fetched(si, false);
     // 22 §13: a VR-off request takes effect between frames; the game's
     // targets then return to the window's size.
     if (ctx.stereo.turn_off_if_requested(si)) ctx.display_reset.reset_after_vr_off();
@@ -204,22 +211,29 @@ bool __fastcall dev_presents(void*, void*) noexcept { return true; }
 // goes to the render thread's slot 5 with the pose (22 §15). The hands are
 // placed relative to the real head, so they follow the moved eye (21 §11.2).
 float* __fastcall dev_head_pose(void* self, void*, float* out) noexcept {
-    auto& si = device_of(self);
+    auto& ctx = context();
+    auto& si  = device_of(self);
+    // The game builds its camera from `out` whatever happens below: the last
+    // pose it was handed, until this call makes a new one.
+    pose_out(out) = ctx.last_head_pose;
+    bool written  = false;
     guarded("GetHeadPose", [&] {
         if (auto* backend = load_backend(si)) {
-            auto& ctx = context();
             util::Matrix34 head{};
             backend->head_pose(head, kUnscaled);
             const auto poses = ctx.play_space.on_head_pose(head, backend->floor_height());
             std::atomic_ref(si.world_scale).store(ctx.play_space.world_scale(), std::memory_order_release);
-            pose_out(out) = poses.game;
+            pose_out(out)      = poses.game;
+            ctx.last_head_pose = poses.game;
+            written            = true;
             hands_on_head_pose(si, *backend, poses.tracked); // 21 §3.4: the hands of this pose
             // 21 §14: the health and the firing of this frame.
             haptics_on_head_pose();
             ctx.head_clip_pivot.on_head_pose(poses.player);
         }
     });
-    store_pose_fetched(si, true);
+    // A head-tracked frame only with a pose from the headset.
+    if (written) store_pose_fetched(si, true);
     return out;
 }
 
@@ -274,13 +288,16 @@ void __fastcall dev_unused(void*, void*) noexcept {}
 // without a calibration, a reference taken with the headset in use also
 // calibrates.
 float* __fastcall dev_recenter_pose(void* self, void*, float* out) noexcept {
-    auto& si = device_of(self);
+    auto& ctx = context();
+    auto& si  = device_of(self);
+    // As in slot 11: the last reference until this call makes a new one.
+    pose_out(out) = ctx.last_reference_pose;
     guarded("RecenterAndGetHeadPose", [&] {
         if (auto* backend = load_backend(si)) {
-            auto& ctx = context();
             util::Matrix34 reference{};
             backend->head_yaw_pose(reference, kUnscaled);
             pose_out(out) = ctx.play_space.on_reference(reference, backend->floor_height(), runtime_name(si));
+            ctx.last_reference_pose = pose_out(out);
             ctx.head_clip_pivot.on_reference(pose_out(out));
             if (!backend->recenter_taken()) {
                 ctx.update.request_recenter();
