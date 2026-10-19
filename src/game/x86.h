@@ -110,6 +110,7 @@ inline constexpr std::size_t kMovEaxImm32Size  = 5; // B8 imm32
 inline constexpr std::size_t kMovEcxAbsSize    = 6; // 8B 0D disp32
 inline constexpr std::size_t kPushImm8Size     = 2; // 6A imm8
 inline constexpr std::size_t kMovRm8Disp32Size = 6; // 88 modrm disp32
+inline constexpr std::size_t kMovAbsImm8Size   = 7; // C6 05 disp32 imm8
 inline constexpr std::size_t kRel32Size        = 4; // the operand of a rel32 or disp32 form
 
 // The operand of `call rel32` (and of `push imm32`, `mov eax, imm32`)
@@ -125,6 +126,9 @@ inline constexpr std::size_t kComissDispOffset = 3;
 // `mov [reg+disp32], r8` (88 modrm disp32) and `mov r32, [reg+disp8]` (8B
 // modrm disp8): the displacement at byte 2.
 inline constexpr std::size_t kMovRmDispOffset = 2;
+// `mov byte [disp32], imm8` (C6 05 disp32 imm8): the address at byte 2,
+// the value at byte 6.
+inline constexpr std::size_t kMovAbsDispOffset = 2;
 
 // The farthest a `jmp short` reaches forward.
 inline constexpr std::size_t kMaxRel8 = 0x7F;

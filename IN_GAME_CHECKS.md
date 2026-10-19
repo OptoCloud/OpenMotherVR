@@ -467,6 +467,19 @@ be on. Try on OpenVR and OpenXR, with Dev. Debug Options on.
       launch): `log: crash-safe logging on` at start, no stutter from
       logging; after a crash the `crash: mod state:` line is in the file.
 
+## Window focus
+
+- [ ] **No background input.** With a headset attached, load a level,
+      then click another window (or alt-tab) and type and move the mouse:
+      nothing reaches the game, and no pause menu opens. Click the game
+      window again: keyboard and mouse work at once. At start the log has
+      `[hook] window focus: flag at RVA 01251298`; each focus loss logs
+      `proxy: focus taken by process ... game kept running`.
+- [ ] **Load while unfocused (still open).** Start loading a save, then
+      focus another window and wait: does the loading screen finish? If it
+      holds until the game is focused again, keep the log (Dev. Debug
+      Options on) for reviews/2026-10-19/focus-investigation.md.
+
 ## Gestures and hiding
 
 Controls keys in `mothervr.json`, Dev. Debug Options on.

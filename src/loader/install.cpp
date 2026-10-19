@@ -26,6 +26,7 @@
 #include "game/preflight.h"
 #include "game/sites/area_log.h"
 #include "game/sites/controls.h"
+#include "game/input/window_focus.h"
 #include "game/sites/game_behaviour.h"
 #include "game/sites/render_fixes.h"
 #include "game/sites/stereo_path.h"
@@ -201,6 +202,7 @@ bool install_game_side(Context& ctx, const GameImage& g, Patcher& p, bool mod_ar
         return failed(ctx.log, kGameBehaviour);
     }
     sites::find_mode_stack_append(g, ctx.log, ctx.targets.mode_stack);
+    ctx.targets.window_focus = game::input::find_window_focus(g, ctx.log);
     // The pause menu's open slot is written with the game-side hooks; its
     // wrapper also pushes the settings.
     sites::area_on(ctx.log, kOptionsUi, ui_set_sites(mod_archive));

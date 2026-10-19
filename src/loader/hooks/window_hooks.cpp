@@ -1,6 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #include "loader/hooks/window_hooks.h"
 
+#include "game/input/window_focus.h"
 #include "loader/context.h"
 #include "platform/win32/window/game_window.h"
 
@@ -17,7 +18,12 @@ LRESULT CALLBACK game_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) noexcep
     auto& ctx = context();
     // A mirror window fit asked for on the render thread (spec 03 §9.3).
     if (platform::win32::handle_fit_message(hwnd, msg, ctx.log)) return 0;
+    // Focus loss would pause the game: kept from its procedure, all but the
+    // focus byte, which the procedure clears first. The game registers its
+    // raw input with RIDEV_INPUTSINK, so keys and the mouse keep arriving in
+    // the background; the cleared byte is what makes it drop them.
     if (msg == WM_KILLFOCUS && ctx.window.headset_attached()) {
+        game::input::clear_window_focus(ctx.targets.window_focus);
         platform::win32::log_focus_loss(ctx.log);
         return 0;
     }

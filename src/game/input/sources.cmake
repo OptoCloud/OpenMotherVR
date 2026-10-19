@@ -5,4 +5,6 @@ target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/input_devices.h
     ${CMAKE_CURRENT_LIST_DIR}/input_manager.cpp
     ${CMAKE_CURRENT_LIST_DIR}/input_manager.h
+    ${CMAKE_CURRENT_LIST_DIR}/window_focus.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/window_focus.h
 )

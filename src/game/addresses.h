@@ -205,6 +205,16 @@ struct ReconRvas {
     // `8d 4b 68 e8 e8 a8 cb ff` at 0x5D9C50.
     std::uint32_t mode_stack_append_call;
     std::uint32_t mode_stack_append;
+
+    // Window focus: the byte the game's window procedure sets on
+    // WM_SETFOCUS and clears on WM_KILLFOCUS, and the clear itself,
+    // `mov byte [flag], 0` in the WM_KILLFOCUS branch before the pause
+    // event. While the byte is 0 the input update drops the keyboard and
+    // mouse state the raw input (registered with RIDEV_INPUTSINK) keeps
+    // delivering in the background. Checked in the 2015 AI.exe (timestamp
+    // 0x54E3199D): `c6 05 98 12 65 01 00` at 0x612917.
+    std::uint32_t window_focus_clear;
+    std::uint32_t window_focus;
 };
 
 inline constexpr ReconRvas kReconRvas2015 = {
@@ -238,6 +248,8 @@ inline constexpr ReconRvas kReconRvas2015 = {
     .camera_constants        = 0x01357E40,
     .mode_stack_append_call  = 0x005D9C53,
     .mode_stack_append       = 0x00294540,
+    .window_focus_clear      = 0x00612917,
+    .window_focus            = 0x01251298,
 };
 
 inline constexpr ReconRvas kReconRvas2020 = {};

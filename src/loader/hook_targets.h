@@ -11,6 +11,7 @@
 #include "platform/win32/window/game_window.h"
 
 #include <atomic>
+#include <cstdint>
 
 namespace omvr::loader {
 
@@ -66,6 +67,9 @@ struct HookTargets {
     // The game's window procedure, once the window is subclassed: stored
     // before the subclass, read on the game thread.
     std::atomic<platform::win32::WindowProc> game_wndproc{nullptr};
+    // The game's window-focus byte (game/input/window_focus.h), null on a
+    // build without it. Set at install, before the window is subclassed.
+    std::uint8_t* window_focus = nullptr;
 };
 
 } // namespace omvr::loader
