@@ -5,8 +5,10 @@
 // Expected values come from the geometry of 24 §14.3: a rolled camera's
 // view of the world's axes.
 
+#include "core/dxbc_builder.h"
 #include "core/render/dxbc.h"
 #include "core/render/upright_sprites.h"
+#include "core/sm5_machine.h"
 
 #include <doctest/doctest.h>
 
@@ -22,6 +24,9 @@
 namespace {
 
 using namespace omvr::core::render;
+using omvr::tests::container;
+using omvr::tests::program_of;
+using omvr::tests::Sm5Machine;
 using omvr::util::Vec2;
 using omvr::util::Vec3;
 
@@ -162,119 +167,11 @@ std::vector<std::uint32_t> sprite_program() {
     };
 }
 
-std::vector<std::uint8_t> container(const std::vector<std::uint32_t>& program) {
-    constexpr std::size_t kChunkAt = 36;
-    const std::size_t bytes        = program.size() * 4;
-    std::vector<std::uint8_t> out(kChunkAt + 8 + bytes);
-    const auto put = [&out](std::size_t at, std::uint32_t v) { std::memcpy(out.data() + at, &v, sizeof(v)); };
-    std::memcpy(out.data(), "DXBC", 4);
-    put(20, 1);
-    put(24, static_cast<std::uint32_t>(out.size()));
-    put(28, 1);
-    put(32, kChunkAt);
-    std::memcpy(out.data() + kChunkAt, "SHEX", 4);
-    put(kChunkAt + 4, static_cast<std::uint32_t>(bytes));
-    std::memcpy(out.data() + kChunkAt + 8, program.data(), bytes);
-    const DxbcChecksum sum = dxbc_checksum(out);
-    std::memcpy(out.data() + 4, sum.data(), 16);
-    return out;
-}
-
-std::vector<std::uint32_t> program_of(const std::vector<std::uint8_t>& blob) {
-    std::uint32_t bytes = 0;
-    std::memcpy(&bytes, blob.data() + 36 + 4, 4);
-    std::vector<std::uint32_t> t(bytes / 4);
-    std::memcpy(t.data(), blob.data() + 44, bytes);
-    return t;
-}
-
-// A small interpreter of the shader model 5 instructions the rewritten
-// program uses, over temporaries and constant buffers 0 and 1.
-struct Machine {
-    std::array<std::array<float, 4>, 8> r{};
-    std::array<std::array<std::array<float, 4>, 24>, 2> cb{};
-
-    struct Src {
-        std::array<float, 4> v;
-    };
-
-    static std::uint32_t sel(std::uint32_t tok, int c) { return (tok >> (4 + 2 * c)) & 3; }
-
-    // Reads the source operand at t[p]; advances p.
-    std::array<float, 4> src(const std::vector<std::uint32_t>& t, std::size_t& p) {
-        const std::uint32_t tok = t[p++];
-        bool neg                = false;
-        if (tok & 0x80000000u) neg = (t[p++] & 0x40) != 0;
-        const std::uint32_t type = (tok >> 12) & 0xFF;
-        std::array<float, 4> v{};
-        if (type == 4) { // immediate
-            const int n = (tok & 3) == 2 ? 4 : 1;
-            for (int i = 0; i < n; ++i) v[i] = std::bit_cast<float>(t[p++]);
-            if (n == 1) v = {v[0], v[0], v[0], v[0]};
-        } else {
-            std::array<float, 4> reg{};
-            if (type == 0) {
-                reg = r.at(t[p++]);
-            } else {
-                REQUIRE(type == 8);
-                const std::uint32_t b = t[p++];
-                reg                   = cb.at(b).at(t[p++]);
-            }
-            const std::uint32_t mode = (tok >> 2) & 3;
-            for (int c = 0; c < 4; ++c) v[c] = reg[mode == 2 ? sel(tok, 0) : sel(tok, c)];
-        }
-        if (neg)
-            for (auto& x : v) x = -x;
-        return v;
-    }
-
-    void run(const std::vector<std::uint32_t>& t) {
-        for (std::size_t i = 2; i < t[1];) {
-            const std::uint32_t op  = t[i] & 0x7FF;
-            const std::uint32_t len = (t[i] >> 24) & 0x7F;
-            if (op == 0x3E) break;          // ret
-            if (op >= 0x58 && op <= 0x6A) { // declarations
-                i += len;
-                continue;
-            }
-            std::size_t p           = i + 1;
-            const std::uint32_t dtk = t[p++];
-            const std::uint32_t dr  = t[p++];
-            const std::uint32_t msk = (dtk >> 4) & 0xF;
-            std::array<float, 4> a  = src(t, p), res{};
-            std::array<float, 4> b{}, c{};
-            if (op != 0x36 && op != 0x4B && op != 0x44) b = src(t, p);
-            if (op == 0x32 || op == 0x37) c = src(t, p);
-            REQUIRE(p == i + len);
-            for (int k = 0; k < 4; ++k) {
-                switch (op) {
-                    case 0x36: res[k] = a[k]; break;                                                  // mov
-                    case 0x00: res[k] = a[k] + b[k]; break;                                           // add
-                    case 0x38: res[k] = a[k] * b[k]; break;                                           // mul
-                    case 0x32: res[k] = a[k] * b[k] + c[k]; break;                                    // mad
-                    case 0x34: res[k] = std::max(a[k], b[k]); break;                                  // max
-                    case 0x0F: res[k] = a[0] * b[0] + a[1] * b[1]; break;                             // dp2
-                    case 0x11: res[k] = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]; break; // dp4
-                    case 0x4B: res[k] = std::sqrt(a[k]); break;                                       // sqrt
-                    case 0x44: res[k] = 1.0f / std::sqrt(a[k]); break;                                // rsq
-                    case 0x31: res[k] = std::bit_cast<float>(a[k] < b[k] ? 0xFFFFFFFFu : 0u); break;  // lt
-                    case 0x37: res[k] = std::bit_cast<std::uint32_t>(a[k]) != 0 ? b[k] : c[k]; break; // movc
-                    default: FAIL("unexpected opcode " << op);
-                }
-            }
-            // Scalar-result instructions replicate; masks pick components.
-            for (int k = 0; k < 4; ++k)
-                if (msk & (1u << k)) r.at(dr)[k] = res[k];
-            i += len;
-        }
-    }
-};
-
 // Runs `program` with a sprite corner offset (a, b) and the world's up at
 // view (ux, uy); returns r1.xy.
 std::array<float, 2> run_sprite(const std::vector<std::uint32_t>& program, float a, float b, float ux,
                                 float uy) {
-    Machine m;
+    Sm5Machine m;
     m.r[2]        = {0.5f, -0.25f, 2.0f, 1.0f}; // the sprite centre
     m.cb[0][0]    = {1, 0, 0, 0};               // ViewProj rows as the dp4s read them
     m.cb[0][1]    = {0, 1, 0, 0};

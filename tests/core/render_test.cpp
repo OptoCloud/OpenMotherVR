@@ -11,6 +11,8 @@
 #include "core/render/dxbc.h"
 #include "core/render/pixel_shader_fixes.h"
 #include "core/render/shader_fix_stats.h"
+#include "core/dxbc_builder.h"
+#include "core/sm5_machine.h"
 #include "fakes/fakes.h"
 
 #include <doctest/doctest.h>
@@ -32,17 +34,15 @@
 namespace {
 
 using namespace omvr::core::render;
-
-std::uint32_t u32_at(std::span<const std::uint8_t> b, std::size_t at) {
-    std::uint32_t v = 0;
-    std::memcpy(&v, b.data() + at, sizeof(v));
-    return v;
-}
-
-void check_stored_checksum(std::span<const std::uint8_t> blob) {
-    const DxbcChecksum sum = dxbc_checksum(blob);
-    for (std::size_t i = 0; i < sum.size(); ++i) CHECK(sum[i] == u32_at(blob, 4 + 4 * i));
-}
+using omvr::tests::bytes_of_words;
+using omvr::tests::check_stored_checksum;
+using omvr::tests::container;
+using omvr::tests::container_of;
+using omvr::tests::program_of;
+using omvr::tests::Reg4;
+using omvr::tests::Sm5Machine;
+using omvr::tests::u32_at;
+using omvr::tests::with_word;
 
 TEST_CASE("the DXBC checksum equals the one fxc stored") {
     check_stored_checksum({kMirrorVS, sizeof(kMirrorVS)});
@@ -80,32 +80,6 @@ std::vector<std::uint32_t> dither_program() {
     };
 }
 
-// A DXBC container with one SHEX chunk holding `program`, checksummed.
-std::vector<std::uint8_t> container(const std::vector<std::uint32_t>& program) {
-    constexpr std::size_t kChunkAt = 36;
-    const std::size_t bytes        = program.size() * 4;
-    std::vector<std::uint8_t> out(kChunkAt + 8 + bytes);
-    const auto put = [&out](std::size_t at, std::uint32_t v) { std::memcpy(out.data() + at, &v, sizeof(v)); };
-    std::memcpy(out.data(), "DXBC", 4);
-    put(20, 1);
-    put(24, static_cast<std::uint32_t>(out.size()));
-    put(28, 1);
-    put(32, kChunkAt);
-    std::memcpy(out.data() + kChunkAt, "SHEX", 4);
-    put(kChunkAt + 4, static_cast<std::uint32_t>(bytes));
-    std::memcpy(out.data() + kChunkAt + 8, program.data(), bytes);
-    const DxbcChecksum sum = dxbc_checksum(out);
-    std::memcpy(out.data() + 4, sum.data(), 16);
-    return out;
-}
-
-// The program tokens of a container built by container().
-std::vector<std::uint32_t> program_of(const std::vector<std::uint8_t>& blob) {
-    std::vector<std::uint32_t> t((blob.size() - 44) / 4);
-    std::memcpy(t.data(), blob.data() + 44, t.size() * 4);
-    return t;
-}
-
 TEST_CASE("the dither fix rewrites one site and keeps the container valid") {
     const std::vector<std::uint8_t> in   = container(dither_program());
     const DitherPatch patched            = patch_position_dither(in.data(), in.size());
@@ -133,82 +107,6 @@ TEST_CASE("the dither fix rewrites one site and keeps the container valid") {
     CHECK(t[37] == 0x0700000Fu); // the dp2, unchanged
     CHECK(t[44] == 0x0100003Eu); // ret
 }
-
-// ---- Shader model 5 arithmetic, as the device runs it ---------------------------
-//
-// Enough of the public token format to run the synthetic programs: mul, mad,
-// dp2, frc, add and ret on temporaries, inputs, immediates and cb2, with
-// swizzles, write masks and the negate modifier. Written independently of
-// the patcher, so the tests check what the patched program computes.
-
-using Reg4 = std::array<float, 4>;
-
-struct Machine {
-    std::array<Reg4, 8> r{};
-    std::array<Reg4, 4> v{};
-    std::array<Reg4, 40> cb2{};
-
-    // Reads the source operand at t[i] into `out`; returns its tokens.
-    std::size_t source(const std::vector<std::uint32_t>& t, std::size_t i, Reg4& out) const {
-        const std::uint32_t tok  = t[i];
-        const std::uint32_t type = (tok >> 12) & 0xFF;
-        std::size_t p            = i + 1;
-        bool negate              = false;
-        if (tok & 0x80000000u) negate = t[p++] == 0x41;
-        Reg4 raw{};
-        if (type == 4) {
-            for (std::size_t c = 0; c < 4; ++c) std::memcpy(&raw[c], &t[p + c], 4);
-            p += 4;
-        } else if (type == 8) {
-            REQUIRE(t[p] == 2);
-            raw = cb2.at(t[p + 1]);
-            p += 2;
-        } else {
-            raw = type == 0 ? r.at(t[p]) : v.at(t[p]);
-            p += 1;
-        }
-        const std::uint32_t swizzle = type == 4 ? 0xE4 : (tok >> 4) & 0xFF;
-        for (std::size_t c = 0; c < 4; ++c) {
-            out[c] = raw[(swizzle >> (2 * c)) & 3];
-            if (negate) out[c] = -out[c];
-        }
-        return p - i;
-    }
-
-    static float apply(std::uint32_t op, const std::array<Reg4, 3>& s, std::size_t c) {
-        switch (op) {
-            case 0x00: return s[0][c] + s[1][c];                     // add
-            case 0x38: return s[0][c] * s[1][c];                     // mul
-            case 0x32: return s[0][c] * s[1][c] + s[2][c];           // mad
-            case 0x0F: return s[0][0] * s[1][0] + s[0][1] * s[1][1]; // dp2
-            case 0x1A: return s[0][c] - std::floor(s[0][c]);         // frc
-            default: FAIL("unexpected opcode ", op); return 0.0f;
-        }
-    }
-
-    void run(const std::vector<std::uint32_t>& t) {
-        for (std::size_t i = 2; i < t[1];) {
-            const std::uint32_t op  = t[i] & 0x7FF;
-            const std::uint32_t len = (t[i] >> 24) & 0x7F;
-            if (op == 0x3E) return; // ret
-            if (op != 0x59) {       // dcl_constantbuffer: nothing to run
-                const std::uint32_t mask = (t[i + 1] >> 4) & 0xF;
-                std::array<Reg4, 3> s{};
-                std::size_t p           = i + 3;
-                const std::size_t count = op == 0x32 ? 3 : op == 0x1A ? 1 : 2;
-                for (std::size_t k = 0; k < count; ++k) p += source(t, p, s[k]);
-                REQUIRE(p == i + len);
-                Reg4 res{};
-                for (std::size_t c = 0; c < 4; ++c) res[c] = apply(op, s, c);
-                Reg4& dst = r.at(t[i + 2]);
-                for (std::size_t c = 0; c < 4; ++c) {
-                    if (mask & (1u << c)) dst[c] = res[c];
-                }
-            }
-            i += len;
-        }
-    }
-};
 
 // Builds the layouts of 08 §1.1.
 constexpr std::uint32_t kX = 0, kY = 1, kZ = 2, kW = 3;
@@ -278,13 +176,13 @@ Program one_temp_zw_then_xy() {
 
 // Runs `prog` at pixel (x, y) of a w x h target, with the texture
 // coordinate `tc` in every component of v1 and v2.
-Machine run_at(const Tokens& prog, float x, float y, float tc, float w, float h) {
-    Machine m;
+Sm5Machine run_at(const Tokens& prog, float x, float y, float tc, float w, float h) {
+    Sm5Machine m;
     for (auto& reg : m.r) reg = {7.0f, 7.0f, 7.0f, 7.0f}; // values the rest of a shader may read
-    m.v[0]       = {x, y, 0.25f, 1.0f};
-    m.v[1]       = {tc, tc, tc, tc};
-    m.v[2]       = {tc, tc, tc, tc};
-    m.cb2.at(39) = {w, h, 1.0f / w, 1.0f / h};
+    m.v[0]         = {x, y, 0.25f, 1.0f};
+    m.v[1]         = {tc, tc, tc, tc};
+    m.v[2]         = {tc, tc, tc, tc};
+    m.cb[2].at(39) = {w, h, 1.0f / w, 1.0f / h};
     m.run(prog);
     return m;
 }
@@ -301,7 +199,7 @@ float wrapped(float p) { return p / 1024.0f - std::floor(p / 1024.0f); }
 
 // 08 §1.4 "No live value overwritten": every register component other than
 // those listed is as the original program left it.
-void check_untouched(const Machine& before, const Machine& after,
+void check_untouched(const Sm5Machine& before, const Sm5Machine& after,
                      std::initializer_list<std::pair<std::uint32_t, std::uint32_t>> results) {
     for (std::uint32_t reg = 0; reg < before.r.size(); ++reg) {
         for (std::uint32_t c = 0; c < 4; ++c) {
@@ -319,14 +217,27 @@ constexpr std::array kPixels    = {std::pair{0.5f, 0.5f}, std::pair{5375.5f, 268
                                    std::pair{1023.5f, 1024.5f}};
 constexpr std::array kTexcoords = {-1000.0f, -5.0f, -2.0f, 0.0f, 0.5f, 1000.0f};
 
+TEST_CASE("the test interpreter decodes modifiers, scalar immediates and select-1") {
+    // add r0.xyzw, -v0.xyzw, l(2.0); add r1.xyzw, |v0|.yyyy, -|v0|.x
+    const std::uint32_t two = std::bit_cast<std::uint32_t>(2.0f);
+    const Tokens t = {0x00000050, 20,         0x08000000, 0x001000F2, 0,          0x80101E46, 0x00000041,
+                      0,          0x00004001, two,        0x09000000, 0x001000F2, 1,          0x80101556,
+                      0x00000081, 0,          0x8010100A, 0x000000C1, 0,          0x0100003E};
+    Sm5Machine m;
+    m.v[0] = {1.0f, -3.0f, 0.5f, 4.0f};
+    m.run(t);
+    CHECK(m.r[0] == Reg4{1.0f, 5.0f, 1.5f, -2.0f});
+    CHECK(m.r[1] == Reg4{2.0f, 2.0f, 2.0f, 2.0f});
+}
+
 TEST_CASE("the table's layout: the patched hash input is that of p / size, bounded") {
     const Tokens prog = dither_program();
     const auto in     = container(prog);
     const Tokens t    = program_of(patch_position_dither(in.data(), in.size()).blob);
     for (const float tc : kTexcoords) {
         for (const auto [x, y] : kPixels) {
-            const Machine a = run_at(prog, x, y, tc, kWidth, kHeight);
-            const Machine b = run_at(t, x, y, tc, kWidth, kHeight);
+            const Sm5Machine a = run_at(prog, x, y, tc, kWidth, kHeight);
+            const Sm5Machine b = run_at(t, x, y, tc, kWidth, kHeight);
             CHECK(a.r[2][kX] == doctest::Approx(spec_d(x, y, tc)).epsilon(1e-4)); // the game's d
             CHECK(b.r[2][kX] == doctest::Approx(spec_d(x / kWidth, y / kHeight, tc)).epsilon(1e-4));
             CHECK(std::abs(b.r[2][kX]) <= 8.0f);
@@ -351,8 +262,8 @@ TEST_CASE("another layout (yz then xy) is patched with cb2[39]") {
     CHECK(t[18] == 3u);
     for (const float tc : kTexcoords) {
         for (const auto [x, y] : kPixels) {
-            const Machine a = run_at(prog, x, y, tc, kWidth, kHeight);
-            const Machine b = run_at(t, x, y, tc, kWidth, kHeight);
+            const Sm5Machine a = run_at(prog, x, y, tc, kWidth, kHeight);
+            const Sm5Machine b = run_at(t, x, y, tc, kWidth, kHeight);
             CHECK(a.r[2][kY] == doctest::Approx(spec_d(x, y, tc)).epsilon(1e-4));
             CHECK(b.r[2][kY] == doctest::Approx(spec_d(x / kWidth, y / kHeight, tc)).epsilon(1e-4));
             CHECK(std::abs(b.r[2][kY]) <= 8.0f);
@@ -372,8 +283,8 @@ TEST_CASE("a shader without cb2 is patched with the position wrapped to 1024 pix
     for (std::size_t i = 2; i < t.size(); ++i) CHECK((t[i] & 0x7FF) != 0x59u);
     for (const float tc : kTexcoords) {
         for (const auto [x, y] : kPixels) {
-            const Machine a = run_at(prog, x, y, tc, kWidth, kHeight);
-            const Machine b = run_at(t, x, y, tc, kWidth, kHeight);
+            const Sm5Machine a = run_at(prog, x, y, tc, kWidth, kHeight);
+            const Sm5Machine b = run_at(t, x, y, tc, kWidth, kHeight);
             CHECK(b.r[2][kY] == doctest::Approx(spec_d(wrapped(x), wrapped(y), tc)).epsilon(1e-4));
             CHECK(std::abs(b.r[2][kY]) <= 8.0f);
             check_untouched(a, b, {{3, 0b0110}, {1, 0b0011}, {2, 0b0010}});
@@ -391,8 +302,8 @@ TEST_CASE("two pairs of one temporary are patched, and the cb2 declared after th
     const Tokens t = program_of(out.blob);
     CHECK(t[t[1] - 2] == 40u);
     for (const float tc : kTexcoords) {
-        const Machine a = run_at(prog, 10000.5f, 5000.5f, tc, kWidth, kHeight);
-        const Machine b = run_at(t, 10000.5f, 5000.5f, tc, kWidth, kHeight);
+        const Sm5Machine a = run_at(prog, 10000.5f, 5000.5f, tc, kWidth, kHeight);
+        const Sm5Machine b = run_at(t, 10000.5f, 5000.5f, tc, kWidth, kHeight);
         CHECK(b.r[5][kW] == doctest::Approx(spec_d(10000.5f / kWidth, 5000.5f / kHeight, tc)).epsilon(1e-4));
         check_untouched(a, b, {{4, 0b1111}, {5, 0b1000}, {6, 0b0001}});
         CHECK(b.r[6][kX] == b.r[5][kW] + b.r[4][kX]); // what follows reads the new values
@@ -567,14 +478,6 @@ TEST_CASE("operands must fill the instruction; leading operands need not") {
     CHECK_FALSE(leading_operands<4>(t.data(), mul).has_value()); // a fourth lies past the end
 }
 
-// `blob` with the word at `at` replaced and the checksum stored again.
-std::vector<std::uint8_t> with_word(std::vector<std::uint8_t> blob, std::size_t at, std::uint32_t v) {
-    std::memcpy(blob.data() + at, &v, sizeof(v));
-    const DxbcChecksum sum = dxbc_checksum(blob);
-    std::memcpy(blob.data() + 4, sum.data(), 16);
-    return blob;
-}
-
 TEST_CASE("the container walk refuses chunk sizes and counts that wrap") {
     const std::vector<std::uint8_t> in = container(dither_program());
     // The program chunk's size: offset + 8 + size wraps to the offset.
@@ -746,48 +649,13 @@ std::vector<std::uint8_t> lit_container(const std::vector<std::uint32_t>& progra
     // RDEF: header (7 words), one binding (8 words), the name.
     std::vector<std::uint32_t> rdef = {0, 0, 1, 28, 0xFFFF0500, 0, 0};
     rdef.insert(rdef.end(), {60, 2, 5, 4, 0xFFFFFFFF, slot, 1, 0x0C});
-    std::vector<std::uint8_t> rdef_bytes(rdef.size() * 4);
-    std::memcpy(rdef_bytes.data(), rdef.data(), rdef_bytes.size());
+    std::vector<std::uint8_t> rdef_bytes = bytes_of_words(rdef);
     rdef_bytes.insert(rdef_bytes.end(), name.begin(), name.end());
     rdef_bytes.push_back(0);
     while (rdef_bytes.size() % 4) rdef_bytes.push_back(0);
-    const std::vector<std::uint8_t> stat(16, 0xAB);
-
-    const std::size_t rdef_at = 32 + 3 * 4;
-    const std::size_t shex_at = rdef_at + 8 + rdef_bytes.size();
-    const std::size_t stat_at = shex_at + 8 + program.size() * 4;
-    std::vector<std::uint8_t> out(stat_at + 8 + stat.size());
-    const auto put = [&out](std::size_t at, std::size_t v) {
-        const auto u = static_cast<std::uint32_t>(v);
-        std::memcpy(out.data() + at, &u, sizeof(u));
-    };
-    std::memcpy(out.data(), "DXBC", 4);
-    put(20, 1);
-    put(24, out.size());
-    put(28, 3);
-    put(32, rdef_at);
-    put(36, shex_at);
-    put(40, stat_at);
-    std::memcpy(out.data() + rdef_at, "RDEF", 4);
-    put(rdef_at + 4, rdef_bytes.size());
-    std::memcpy(out.data() + rdef_at + 8, rdef_bytes.data(), rdef_bytes.size());
-    std::memcpy(out.data() + shex_at, "SHEX", 4);
-    put(shex_at + 4, program.size() * 4);
-    std::memcpy(out.data() + shex_at + 8, program.data(), program.size() * 4);
-    std::memcpy(out.data() + stat_at, "STAT", 4);
-    put(stat_at + 4, stat.size());
-    std::memcpy(out.data() + stat_at + 8, stat.data(), stat.size());
-    const DxbcChecksum sum = dxbc_checksum(out);
-    std::memcpy(out.data() + 4, sum.data(), 16);
-    return out;
-}
-
-// The program of a container built by lit_container().
-std::vector<std::uint32_t> lit_program_of(const std::vector<std::uint8_t>& blob) {
-    const std::uint32_t at = u32_at(blob, 36);
-    std::vector<std::uint32_t> t(u32_at(blob, at + 4) / 4);
-    std::memcpy(t.data(), blob.data() + at + 8, t.size() * 4);
-    return t;
+    return container_of({{"RDEF", rdef_bytes},
+                         {"SHEX", bytes_of_words(program)},
+                         {"STAT", std::vector<std::uint8_t>(16, 0xAB)}});
 }
 
 // sample_indexable(texture2d)(float,float,float,float) r0.<dst>, v1.xyxx,
@@ -832,7 +700,7 @@ void check_smoke_rewrite(std::uint32_t dst, std::uint32_t resource) {
     CHECK(u32_at(out, 40) == u32_at(in, 40) - 12); // STAT, after it, moves
     CHECK(std::memcmp(out.data() + u32_at(out, 40), "STAT", 4) == 0);
 
-    const std::vector<std::uint32_t> t = lit_program_of(out);
+    const std::vector<std::uint32_t> t = program_of(out);
     REQUIRE(t.size() == before.size() - 3);
     CHECK(t[1] == t.size());
     // Everything before the sample is unchanged, the depth fade included.
@@ -924,8 +792,8 @@ TEST_CASE("constant smoke: on top of the dither fix, both changes are kept") {
     const std::vector<std::uint8_t> out = patch_constant_smoke(dither.blob.data(), dither.blob.size(), kB);
     REQUIRE(out.size() == dither.blob.size() - 12);
     check_stored_checksum(out);
-    const std::vector<std::uint32_t> both     = lit_program_of(out);
-    const std::vector<std::uint32_t> dithered = lit_program_of(dither.blob);
+    const std::vector<std::uint32_t> both     = program_of(out);
+    const std::vector<std::uint32_t> dithered = program_of(dither.blob);
     // The dither's rewrite, all before the sample, is as the dither fix left it.
     const std::size_t sample_at = dithered.size() - 12;
     CHECK(std::equal(both.begin() + 2, both.begin() + static_cast<std::ptrdiff_t>(sample_at),
