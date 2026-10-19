@@ -27,7 +27,8 @@ inline constexpr bool kTraceBuilt = true;
 class TracerRef {
 public:
     constexpr TracerRef() noexcept = default;
-    constexpr TracerRef(ports::Tracer& tracer) noexcept : tracer_(&tracer) {} // NOLINT(google-explicit-constructor)
+    constexpr TracerRef(ports::Tracer& tracer) noexcept
+        : tracer_(&tracer) {} // NOLINT(google-explicit-constructor)
 
     void frame_mark(const char* name = nullptr) const noexcept {
         if (tracer_ != nullptr) tracer_->frame_mark(name);
@@ -91,6 +92,27 @@ private:
     ports::ZoneToken token_{};
 };
 
+// A GPU zone opened in one call and closed in a later one (the game's
+// frame, from the device's BeginFrame to its EndFrame). Render thread; open
+// it through OMVR_GPU_SPAN_BEGIN. Closing one that is not open does
+// nothing, and opening one that is open closes it first.
+class GpuSpan final {
+public:
+    void begin(TracerRef tracer, const ZoneSite& site) noexcept {
+        end();
+        tracer_ = tracer.get();
+        if (tracer_ != nullptr) token_ = tracer_->gpu_zone_begin(site);
+    }
+    void end() noexcept {
+        if (tracer_ != nullptr) tracer_->gpu_zone_end(token_);
+        tracer_ = nullptr;
+    }
+
+private:
+    ports::Tracer* tracer_ = nullptr;
+    ports::ZoneToken token_{};
+};
+
 } // namespace traced
 #else
 inline namespace untraced {
@@ -113,6 +135,11 @@ public:
     ports::Tracer* get() const noexcept { return nullptr; }
 };
 
+class GpuSpan final {
+public:
+    void end() noexcept {}
+};
+
 } // namespace untraced
 #endif
 
@@ -127,17 +154,26 @@ public:
 // caller's __FILE__ and __LINE__. In the release flavour `tracer` is
 // checked by the compiler but not evaluated.
 // OMVR_GPU_ZONE is the same for GPU time, on the render thread, between
-// gpu_attach and gpu_detach.
+// gpu_attach and gpu_detach; OMVR_GPU_SPAN_BEGIN opens a GpuSpan, which
+// its end() closes.
 #if defined(OMVR_TRACE)
-#define OMVR_TRACE_SCOPE(scope, tracer, name)                                                                          \
-    static const ::omvr::core::diag::ZoneSite OMVR_TRACE_CONCAT(omvr_zone_site_, __LINE__){                           \
-        name, __func__, __FILE__, static_cast<std::uint32_t>(__LINE__), 0};                                            \
-    const ::omvr::core::diag::scope OMVR_TRACE_CONCAT(omvr_zone_, __LINE__) {                                          \
-        ::omvr::core::diag::TracerRef{tracer}, OMVR_TRACE_CONCAT(omvr_zone_site_, __LINE__)                            \
+#define OMVR_TRACE_SCOPE(scope, tracer, name)                                               \
+    static const ::omvr::core::diag::ZoneSite OMVR_TRACE_CONCAT(omvr_zone_site_, __LINE__){ \
+        name, __func__, __FILE__, static_cast<std::uint32_t>(__LINE__), 0};                 \
+    const ::omvr::core::diag::scope OMVR_TRACE_CONCAT(omvr_zone_, __LINE__) {               \
+        ::omvr::core::diag::TracerRef{tracer}, OMVR_TRACE_CONCAT(omvr_zone_site_, __LINE__) \
     }
 #define OMVR_ZONE(tracer, name) OMVR_TRACE_SCOPE(ScopedZone, tracer, name)
 #define OMVR_GPU_ZONE(tracer, name) OMVR_TRACE_SCOPE(ScopedGpuZone, tracer, name)
+#define OMVR_GPU_SPAN_BEGIN(span, tracer, name)                                                            \
+    do {                                                                                                   \
+        static const ::omvr::core::diag::ZoneSite omvr_span_site{name, __func__, __FILE__,                 \
+                                                                 static_cast<std::uint32_t>(__LINE__), 0}; \
+        (span).begin(::omvr::core::diag::TracerRef{tracer}, omvr_span_site);                               \
+    } while (false)
 #else
 #define OMVR_ZONE(tracer, name) static_cast<void>(sizeof(::omvr::core::diag::TracerRef{tracer}))
 #define OMVR_GPU_ZONE(tracer, name) static_cast<void>(sizeof(::omvr::core::diag::TracerRef{tracer}))
+#define OMVR_GPU_SPAN_BEGIN(span, tracer, name) \
+    static_cast<void>(sizeof((span), ::omvr::core::diag::TracerRef{tracer}))
 #endif

@@ -16,6 +16,7 @@ using omvr::core::diag::TracerRef;
 
 static_assert(std::is_empty_v<TracerRef>, "the release TracerRef carries no state");
 static_assert(!omvr::core::diag::kTraceBuilt);
+static_assert(std::is_empty_v<omvr::core::diag::GpuSpan>, "the release GpuSpan carries no state");
 
 int evaluations = 0;
 TracerRef counted() {
@@ -28,6 +29,9 @@ TEST_CASE("release: zones do not evaluate their tracer") {
     {
         OMVR_ZONE(counted(), "zone");
         OMVR_GPU_ZONE(counted(), "gpu");
+        omvr::core::diag::GpuSpan span;
+        OMVR_GPU_SPAN_BEGIN(span, counted(), "span");
+        span.end();
     }
     CHECK(evaluations == 0);
 }

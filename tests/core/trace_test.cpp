@@ -38,7 +38,9 @@ public:
     void plot(const char* name, double value) noexcept override {
         events.push_back(std::string("plot ") + name + " " + std::to_string(value));
     }
-    void message(std::string_view text) noexcept override { events.push_back("message " + std::string(text)); }
+    void message(std::string_view text) noexcept override {
+        events.push_back("message " + std::string(text));
+    }
     void name_thread(const char* name) noexcept override { events.push_back(std::string("thread ") + name); }
     void gpu_attach(std::uintptr_t device, std::uintptr_t context) noexcept override {
         events.push_back("gpu attach " + std::to_string(device) + " " + std::to_string(context));
@@ -69,9 +71,7 @@ private:
 
 void nested(TracerRef tracer) {
     OMVR_ZONE(tracer, "outer");
-    {
-        OMVR_ZONE(tracer, "inner");
-    }
+    { OMVR_ZONE(tracer, "inner"); }
 }
 
 TEST_CASE("traced: the flavour is reported as built") { CHECK(omvr::core::diag::kTraceBuilt); }
@@ -146,8 +146,29 @@ TEST_CASE("traced: GPU zones nest inside attach and collect") {
     }
     ref.gpu_collect();
     ref.gpu_detach();
-    CHECK(tracer.events == std::vector<std::string>{"gpu attach 10 20", "gpu begin game_render", "gpu begin mirror",
-                                                    "gpu end 2", "gpu end 1", "gpu collect", "gpu detach"});
+    CHECK(tracer.events == std::vector<std::string>{"gpu attach 10 20", "gpu begin game_render",
+                                                    "gpu begin mirror", "gpu end 2", "gpu end 1",
+                                                    "gpu collect", "gpu detach"});
+}
+
+TEST_CASE("traced: a GPU span closes in a later call, once") {
+    RecordingTracer tracer;
+    omvr::core::diag::GpuSpan span;
+    span.end(); // not open: nothing
+    OMVR_GPU_SPAN_BEGIN(span, tracer, "game_frame");
+    span.end();
+    span.end(); // already closed: nothing
+    CHECK(tracer.events == std::vector<std::string>{"gpu begin game_frame", "gpu end 1"});
+}
+
+TEST_CASE("traced: opening an open GPU span closes the earlier one first") {
+    RecordingTracer tracer;
+    omvr::core::diag::GpuSpan span;
+    OMVR_GPU_SPAN_BEGIN(span, tracer, "first");
+    OMVR_GPU_SPAN_BEGIN(span, tracer, "second");
+    span.end();
+    CHECK(tracer.events ==
+          std::vector<std::string>{"gpu begin first", "gpu end 1", "gpu begin second", "gpu end 2"});
 }
 
 } // namespace
