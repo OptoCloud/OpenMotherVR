@@ -1,9 +1,11 @@
 // OpenMotherVR-Provenance: clean
 // util: hashes, parsers, the command-line splitter, the binary reader, the
-// latches and the vector and pose maths. Expected values are the published
+// latches, the seqlock, steady time, ScopeExit, units and the vector,
+// quaternion and pose maths. Expected values are the published
 // known answers (RFC 1952, RFC 1321) or follow from the definitions.
 
 #include "fakes/fakes.h"
+#include "util/base/scope_exit.h"
 #include "util/binary/align.h"
 #include "util/binary/reader.h"
 #include "util/binary/writer.h"
@@ -12,6 +14,8 @@
 #include "util/math/finite.h"
 #include "util/math/matrix.h"
 #include "util/math/pose.h"
+#include "util/math/quat.h"
+#include "util/math/units.h"
 #include "util/math/vec.h"
 #include "util/sync/change_latch.h"
 #include "util/sync/frame_period.h"
@@ -21,11 +25,14 @@
 #include "util/text/command_line_split.h"
 #include "util/text/fixed_format.h"
 #include "util/text/number_parse.h"
+#include "util/time/steady.h"
 
 #include <doctest/doctest.h>
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -33,6 +40,7 @@
 #include <numbers>
 #include <span>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -331,3 +339,122 @@ TEST_CASE("4x4 rows and columns, 3x4 translation") {
 }
 
 } // namespace
+
+TEST_CASE("steady time: stamps, offsets and the atomic stamp") {
+    using namespace std::chrono_literals;
+    const util::TimePoint epoch{};
+    // A time at the clock's epoch is still a time: its stamp is 1, not 0.
+    CHECK(util::stamp_ticks(epoch) == 1);
+    CHECK_FALSE(util::from_stamp_ticks(0).has_value());
+    const util::TimePoint t = epoch + 5s;
+    CHECK(util::from_stamp_ticks(util::stamp_ticks(t)) == t);
+
+    CHECK(util::after(t, util::Seconds{0.5f}) == t + 500ms);
+    CHECK(util::seconds_between(t, t + 250ms).count() == doctest::Approx(0.25f));
+    CHECK(util::seconds_between(t + 250ms, t).count() == doctest::Approx(-0.25f));
+
+    util::AtomicStamp stamp;
+    CHECK_FALSE(stamp.load().has_value());
+    stamp.store(t);
+    CHECK(stamp.load() == t);
+}
+
+TEST_CASE("ScopeExit runs once at scope end, not after release") {
+    int runs = 0;
+    {
+        const util::ScopeExit guard{[&runs]() noexcept { ++runs; }};
+        CHECK(runs == 0);
+    }
+    CHECK(runs == 1);
+    {
+        util::ScopeExit guard{[&runs]() noexcept { ++runs; }};
+        guard.release();
+    }
+    CHECK(runs == 1);
+}
+
+TEST_CASE("Unit compares by value") {
+    CHECK(util::Metres{1.5f} == util::Metres{1.5f});
+    CHECK(util::Metres{1.0f} < util::Metres{2.0f});
+    CHECK(util::Radians{}.value == 0.0f);
+}
+
+TEST_CASE("lerp, rotate_inverse and relative_rotation") {
+    const util::Vec3 mid = util::lerp({0, 2, 4}, {2, 4, 8}, 0.5f);
+    CHECK(mid.x == 1.0f);
+    CHECK(mid.y == 3.0f);
+    CHECK(mid.z == 6.0f);
+    const util::Vec3 end = util::lerp({0, 2, 4}, {2, 4, 8}, 1.0f);
+    CHECK(end.z == 8.0f);
+
+    // A quarter turn about +Z: x goes to y.
+    const float half = std::numbers::pi_v<float> / 4.0f;
+    const util::Quat z90{0, 0, std::sin(half), std::cos(half)};
+    const util::Matrix34 r = util::pose_matrix({z90, {5, 6, 7}});
+    const util::Vec3 local = util::rotate_inverse(r, {0, 1, 0});
+    CHECK(local.x == doctest::Approx(1.0f));
+    CHECK(local.y == doctest::Approx(0.0f).epsilon(1e-6));
+    CHECK(local.z == doctest::Approx(0.0f));
+
+    // B's rotation in A's axes: the same pose gives identity, no translation.
+    const util::Matrix34 same = util::relative_rotation(r, r);
+    for (int row = 0; row < 3; ++row) {
+        for (int col = 0; col < 4; ++col)
+            CHECK(same.m[row][col] == doctest::Approx(row == col ? 1.0f : 0.0f).epsilon(1e-6));
+    }
+    // From identity to the quarter turn: the quarter turn itself.
+    const util::Matrix34 from_identity = util::relative_rotation(util::pose_matrix({}), r);
+    CHECK(from_identity.m[1][0] == doctest::Approx(1.0f));
+    CHECK(from_identity.m[0][1] == doctest::Approx(-1.0f));
+    CHECK(from_identity.m[0][3] == 0.0f);
+}
+
+TEST_CASE("quaternions: from a rotation matrix, product, nlerp, angle") {
+    const auto yaw = [](float a) { return util::Quat{0, std::sin(a / 2), 0, std::cos(a / 2)}; };
+    for (const float angle : {0.0f, 1.0f, 3.0f}) {
+        const util::Quat z{0, 0, std::sin(angle / 2), std::cos(angle / 2)};
+        const util::Quat q = util::quat_from_rotation(util::pose_matrix({z, {}}));
+        CHECK(q.z == doctest::Approx(std::sin(angle / 2)).epsilon(1e-5));
+        CHECK(q.w == doctest::Approx(std::cos(angle / 2)).epsilon(1e-5));
+    }
+    const util::Quat ab = util::multiply(yaw(0.4f), yaw(0.2f));
+    CHECK(ab.y == doctest::Approx(std::sin(0.3f)));
+    CHECK(util::angle_between(yaw(0.4f), yaw(0.2f)) == doctest::Approx(0.2f).epsilon(1e-4));
+    const util::Quat half = util::nlerp(yaw(0), yaw(1.0f), 0.5f);
+    CHECK(util::yaw_of(half) == doctest::Approx(0.5f).epsilon(1e-5));
+    // The shorter arc: -q is the same rotation.
+    const util::Quat neg = util::nlerp(yaw(0), util::Quat{0, -std::sin(0.5f), 0, -std::cos(0.5f)}, 0.5f);
+    CHECK(util::yaw_of(neg) == doctest::Approx(0.5f).epsilon(1e-5));
+}
+
+TEST_CASE("SeqLock: a reader never sees a store half done") {
+    struct Pair {
+        std::uint64_t n;
+        std::uint64_t not_n;
+    };
+    util::SeqLock<Pair> lock;
+    lock.store({0, ~std::uint64_t{0}});
+    // The writer keeps storing until the reader has loaded often enough to
+    // overlap stores, however late it starts.
+    constexpr std::uint64_t kMinStores = 100000;
+    constexpr std::uint64_t kMinReads  = 10000;
+    std::atomic<bool> done{false};
+    std::atomic<std::uint64_t> reads{0};
+    std::uint64_t torn = 0;
+    std::thread reader{[&] {
+        while (!done.load(std::memory_order_acquire)) {
+            const Pair p = lock.load();
+            if (p.not_n != ~p.n) ++torn;
+            reads.fetch_add(1, std::memory_order_relaxed);
+        }
+    }};
+    std::uint64_t n = 0;
+    while (n < kMinStores || reads.load(std::memory_order_relaxed) < kMinReads) {
+        ++n;
+        lock.store({n, ~n});
+    }
+    done.store(true, std::memory_order_release);
+    reader.join();
+    CHECK(torn == 0);
+    CHECK(lock.load().n == n);
+}
