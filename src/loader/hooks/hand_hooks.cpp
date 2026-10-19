@@ -12,12 +12,16 @@
 #include "game/code_address.h"
 #include "game/constants.h"
 #include "game/hands/action_sites.h"
+#include "game/hands/arm_objects.h"
+#include "game/hands/arm_sites.h"
+#include "game/hands/body_objects.h"
 #include "game/hands/hand_objects.h"
 #include "game/hands/hand_sites.h"
 #include "game/patcher.h"
 #include "game/stereo/stereo_objects.h"
 #include "loader/context.h"
 #include "loader/hooks/activity_input.h"
+#include "loader/hooks/body_hooks.h"
 #include "loader/hooks/guard.h"
 #include "loader/hooks/haptic_hooks.h"
 
@@ -28,6 +32,7 @@
 #include <optional>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 namespace omvr::loader::hooks {
 
@@ -36,18 +41,9 @@ namespace {
 namespace hands = core::hands;
 using game::hands::HandTargets;
 
-constexpr std::string_view kLogArmsOff =
-    "hands: the arms keep the game's animation in this build: the grip to hand-bone mapping, held items "
-    "and the model-to-world transform are not known yet (21 §22 items 2, 3); aiming and the tracker follow "
-    "the hands";
-
-// 21 §4.2 item 6: the held item is drawn in the hand the arm edit moved.
-// This build has no arm pose edit (the arms keep the game's animation), so
-// the weapon is where the game's animation put it and the aim keeps the
-// right hand's aim pose (21 §5.2); the drawn left hand is not the
-// controller either, so the tracker faces by the left hand's aim pose
-// (21 §6.2's fallback).
-constexpr bool kArmsFollowHands = false;
+constexpr std::string_view kLogArmsNoSkin =
+    "[hook] hands, arms: off; FinalPoseStep's SkinSetPose calls are not in place, so the arms keep the "
+    "game's animation";
 
 // The thresholds of the fire alignment test (21 §5.3). The game's code reads
 // `fire_gate_threshold` at a fixed address once its test is pointed here:
@@ -62,6 +58,17 @@ float game_fire_gate_threshold                   = 0.0f;
 // (attach runs before the game's threads).
 std::optional<game::GameImage> image;
 bool sites_tried = false;
+// The arm pose edit's sites (21 §4.2): tried at the first head pose with
+// Hands.Enabled on (after attach has prepared body visibility's), and
+// whether the held item's attachment query went in. Game thread; the
+// targets are set before the first redirect and only read after it.
+bool arms_tried      = false;
+bool item_follows_in = false;
+game::hands::ArmTargets arm_targets;
+// 21 §4.2 item 6: while the game thread runs the player's equipment update
+// again after the pass, the animation component whose held item is placed
+// from the final pose (0 otherwise).
+std::atomic<std::uintptr_t> attach_override{0};
 
 constexpr std::string_view kLogPlayAnimation =
     "[diag] hands: play-animation {} (command {:08X}, arguments {:08X} {:08X}); the scripted animation "
@@ -176,6 +183,117 @@ void install_action_sites(Context& ctx, game::Patcher& patcher) noexcept {
     game::hands::install_action_sites(*image, patcher, hooks, wanted, action_targets);
 }
 
+// ---- The arm pose edit (21 §4.2) ---------------------------------------------------
+
+std::uintptr_t id_of(const void* p) noexcept { return game::address_of(p); }
+
+// The player's pose as the arm edit names it.
+std::optional<std::pair<game::hands::PlayerPose, hands::PlayerSkeleton>> player_skeleton(
+    void* player) noexcept {
+    const auto pose = game::hands::player_pose(player);
+    if (!pose) return std::nullopt;
+    return std::pair{*pose,
+                     hands::PlayerSkeleton{id_of(pose->animation), id_of(pose->pose), id_of(pose->skeleton),
+                                           game::hands::skeleton_name(pose->skeleton)}};
+}
+
+// Game thread, just before the frame's final-pose pass: this frame's arm
+// targets for the jobs (21 §17). Returns the player's animation component
+// when they were published.
+void* before_final_pose(Context& ctx, std::optional<hands::CameraPose>& camera) noexcept {
+    hands::ArmPoser& arms = ctx.hands.arms();
+    const auto now        = ctx.clock.now();
+    void* player =
+        ctx.settings.current().hands.enabled ? game::hands::player_character(ctx.targets.hands) : nullptr;
+    const auto found = player ? player_skeleton(player) : std::nullopt;
+    camera           = found ? game::hands::active_camera(ctx.targets.hands) : std::nullopt;
+    if (!found || !camera) {
+        arms.publish_none();
+        return nullptr;
+    }
+    const auto& [pose, skeleton] = *found;
+    if (arms.wants_rig(skeleton, now)) {
+        game::hands::SkeletonRead read;
+        const SkeletonBonesRead bones = read_skeleton_bones(skeleton.skeleton, read);
+        arms.set_rig(skeleton, bones.bones ? &*bones.bones : nullptr, bones.fault, now);
+    }
+    arms.publish(skeleton, *camera, game::hands::model_to_world(pose.animation),
+                 ctx.hands.arm_targets(*camera, now), now);
+    return pose.animation;
+}
+
+// Game thread, after the pass: the held item placed on the edited right
+// hand (21 §4.2 item 6: the equipment update again, its attachment query
+// reading the final pose), then the report's log lines.
+void after_final_pose(Context& ctx, void* animation, const hands::CameraPose& camera) noexcept {
+    hands::ArmPoser& arms = ctx.hands.arms();
+    bool follows          = false;
+    if (item_follows_in && arms.right_edited()) {
+        void* player    = game::hands::player_character(ctx.targets.hands);
+        void* equipment = game::hands::equipment_component(player);
+        if (equipment) {
+            attach_override.store(id_of(animation), std::memory_order_release);
+            game::hands::call_equipment_update(arm_targets, equipment);
+            attach_override.store(0, std::memory_order_release);
+            follows = true;
+        }
+    }
+    std::optional<util::Vec3> head;
+    if (const auto bone = arms.head_check_due())
+        head =
+            game::hands::bone_world_position(arm_targets, animation, *bone, game::hands::kFinalPoseSelector);
+    arms.after_pass(head, camera, follows, ctx.clock.now());
+}
+
+// The stage's call of the final-pose pass (21 §2.1): the arm targets are
+// published before it and the held item follows after it, all on the game
+// thread; the pass itself runs the jobs and waits for them.
+std::uintptr_t __cdecl final_pose_pass(void* list, std::uint32_t count) noexcept {
+    auto& ctx       = context();
+    void* animation = nullptr;
+    std::optional<hands::CameraPose> camera;
+    guarded("arm targets", [&] { animation = before_final_pose(ctx, camera); });
+    const std::uintptr_t r = game::hands::call_final_pose_pass(arm_targets, list, count);
+    if (animation && camera) guarded("arm report", [&] { after_final_pose(ctx, animation, *camera); });
+    return r;
+}
+
+// The held item's attachment query (21 §2.3, §4.2 item 6): selector 6 as
+// the game asks, except for the player's item while it is placed again
+// from the final pose (selector 7).
+void* __fastcall attach_query(void* animation, void*, int bone, int selector, void* out) noexcept {
+    const std::uintptr_t over = attach_override.load(std::memory_order_acquire);
+    if (over != 0 && id_of(animation) == over && selector == game::hands::kAttachPoseSelector)
+        selector = game::hands::kFinalPoseSelector;
+    return game::hands::call_bone_world_transform(arm_targets, animation, bone, selector, out);
+}
+
+// The game's limb IK (21 §4.2 item 7): not run on the player's
+// first-person pose while its arms are edited; as the game asks otherwise.
+std::uintptr_t __stdcall limb_ik(void* setup, void* second, void* pose, void* fourth) noexcept {
+    if (pose && context().hands.arms().limb_ik_off(id_of(game::hands::pose_skeleton(pose)))) return 0;
+    return game::hands::call_limb_ik(arm_targets, setup, second, pose, fourth);
+}
+
+static_assert(std::is_convertible_v<decltype(&final_pose_pass), game::hands::FinalPosePassFn>);
+static_assert(std::is_convertible_v<decltype(&attach_query), game::hands::BoneWorldTransformFn>);
+static_assert(std::is_convertible_v<decltype(&limb_ik), game::hands::LimbIkFn>);
+
+// 21 §4.2: the edit runs in the SkinSetPose calls (body visibility's sites)
+// and is placed around the final-pose pass. Needs the player.
+void install_arms(Context& ctx) noexcept {
+    arms_tried = true;
+    if (!image || !ctx.targets.hands.registry) return;
+    if (!body_pose_sites()) {
+        ctx.log.line(kLogArmsNoSkin);
+        return;
+    }
+    game::Patcher patcher{ctx.log};
+    const game::hands::ArmHooks hooks{game::code_pointer(&final_pose_pass), game::code_pointer(&attach_query),
+                                      game::code_pointer(&limb_ik)};
+    item_follows_in = game::hands::install_arm_sites(*image, patcher, hooks, arm_targets).held_item;
+}
+
 void install_sites(Context& ctx) noexcept {
     sites_tried = true;
     if (!image) return;
@@ -184,7 +302,6 @@ void install_sites(Context& ctx) noexcept {
                                        &fire_gate_threshold};
     const auto o             = game::hands::install_hand_sites(*image, patcher, hooks, ctx.targets.hands);
     game_fire_gate_threshold = fire_gate_threshold;
-    ctx.log.line(kLogArmsOff);
     // The player actions need the player (the hand sites found it).
     if (o.aim || o.tracker) install_action_sites(ctx, patcher);
 }
@@ -237,6 +354,7 @@ void hands_on_head_pose(game::StereoInterface& si, core::vr::ports::VrRuntime& r
             return;
         }
         if (!sites_tried) install_sites(ctx);
+        if (!arms_tried) install_arms(ctx);
         // 21 §4.4: the frame's signals, all from v1's own state.
         void* player = game::hands::player_character(ctx.targets.hands);
         const auto out =
@@ -258,7 +376,9 @@ void __fastcall aim_ray_update(void* component, void*) noexcept {
             return;
         }
         const auto weapon = game::hands::current_weapon(t, component);
-        hands::WeaponSample sample{weapon.type, std::nullopt, kArmsFollowHands};
+        // 21 §5.2 (r11): the weapon's own transform aims while it is drawn
+        // in the hand the arm edit moved (21 §4.2 item 6).
+        hands::WeaponSample sample{weapon.type, std::nullopt, ctx.hands.arms().weapon_in_moved_hand(now)};
         if (ctx.hands.weapon_transform_wanted(sample.type, sample.drawn_in_moved_hand, now)) {
             sample.transform = game::hands::weapon_transform(t, weapon.object);
         }
@@ -277,7 +397,10 @@ bool __fastcall tracker_scan(void* tracker, void*) noexcept {
     guarded("TrackerScan", [&] {
         const auto cam = game::hands::active_camera(t);
         if (!cam) return;
-        const auto facing = ctx.hands.tracker_facing(*cam, std::nullopt, ctx.clock.now());
+        // 21 §6.2 (r11): the drawn left hand from the pose the player saw
+        // last, when the arm edit drew it.
+        const auto now    = ctx.clock.now();
+        const auto facing = ctx.hands.tracker_facing(*cam, ctx.hands.arms().drawn_left(now), now);
         if (!facing) return;
         saved = game::hands::read_tracker_facing(tracker);
         game::hands::write_tracker_facing(tracker, {facing->x, facing->y});
@@ -289,5 +412,18 @@ bool __fastcall tracker_scan(void* tracker, void*) noexcept {
 }
 
 const void* tracker_scan_hook() noexcept { return game::code_pointer(&tracker_scan); }
+
+void hands_on_skin_pose(const void* model) noexcept {
+    hands::ArmPoser& arms    = context().hands.arms();
+    const hands::ArmFrame* f = arms.pending();
+    if (!f) return;
+    void* pose = game::CodeAddress{static_cast<std::uint32_t>(f->pose)};
+    if (game::hands::pose_model_data(pose) != model || !arms.claim(*f)) return;
+    // 21 §4.2, §17: on the player's final-pose job, from the game thread's
+    // copy only; the body's model-to-world transform as it is now.
+    const void* animation = game::CodeAddress{static_cast<std::uint32_t>(f->animation)};
+    auto arrays           = game::hands::pose_arrays(pose).value_or(hands::PoseArrays{});
+    arms.apply(*f, game::hands::model_to_world(animation), arrays);
+}
 
 } // namespace omvr::loader::hooks

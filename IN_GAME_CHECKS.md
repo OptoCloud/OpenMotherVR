@@ -275,8 +275,48 @@ poses are always declared). Try on OpenVR and OpenXR.
       log reads `+ 4 hand poses` (the aim poses are always declared).
 - [ ] **Installed.** With hands on: `+ 4 hand poses` (OpenVR), `[hook]
       hands, aim from hand: in place`, `[hook] hands, motion tracker in
-      hand: in place`, the line that the arms stay animated, then `tracked
-      hands active` in play.
+      hand: in place`, `[hook] body visibility: in place (SkinSetPose calls
+      RVA 002A51D8, 002A536A)`, `[hook] hands, arms: in place (final-pose
+      pass call RVA 003CA04B)`, `[hook] hands, arms: the held item follows
+      the edit (attachment query RVA 003B4E06)` and `[hook] hands, arms:
+      the game's limb IK is left out for the player's first-person
+      skeleton while the hands are tracked (calls RVA 002A7986, 002A79A1,
+      002A79BC, 002A7F30)`, then `tracked hands active` in play.
+- [ ] **Arms on the controllers (21 §4.2, acceptance 2, 3).** Load a level
+      with Dev. Debug Options on. The log has `hands: the arms of skeleton
+      FEMALEFP follow the controllers (bones found by name, names from the
+      first-person table): left shoulder 3 arm 4 forearm 6 rolls 7 8 hand
+      9, right shoulder 26 arm 27 forearm 29 rolls 30 31 hand 32; the
+      game's limb IK is not run for it while tracked hands are active`,
+      then `hands: the player's arms are drawn from the edited pose`, one
+      `hands: grip frame of FEMALEFP, left hand: wrist to grip D m
+      (expected 0.07 to 0.12 m), origin (...) in the hand bone` per hand
+      and `hands: Head bone 1 of FEMALEFP at (...) in the world
+      (BoneWorldTransform, final pose), active camera at (...): D m apart
+      (expected within 0.25 m)`. Send these lines: D outside the expected
+      range means the grip mapping (21 §3.5) or the model-to-world record
+      and selector 7 (21 §2.3) are wrong. Hold both hands out ahead,
+      looking straight on: the drawn hands are in the controllers, palms
+      and fingers as yours (a hand turned upside down or the wrist ahead of
+      the fist means the grip frame's +X sign of 21 §3.5 is wrong); every
+      900 frames `[diag] hands: arms: left target (...) reached (...) D m;
+      right ...` with D under 0.005. Turn the head, snap turn, recenter:
+      the hands stay on the controllers. Repeat in a space-suit section
+      (`SPACESUITFP`).
+- [ ] **Reach (acceptance 4).** Reach above the head, behind the back and
+      across the chest: the elbows do not flip; out of reach the arm is
+      straight towards the hand (`(out of reach)` in the arms line); the
+      forearm turns along its length when the wrist turns, no wringing.
+- [ ] **Held item and drift (21 §4.2 items 6, 10; acceptance 5, 25).**
+      Revolver, shotgun, flare: the item stays in the drawn right hand
+      while the hand moves fast (`hands: the held item follows the moved
+      right hand ...` once). Sprint forward with both hands held out: the
+      drawn hands stay on the controllers, no trailing.
+- [ ] **No pose fault.** No `hands: WARNING the player's pose cannot be
+      edited` and no `WARNING the arms of skeleton ... keep the game's
+      animation` line in normal play. Other characters (androids, crew)
+      animate as without the mod; no crash at a cutscene, a death, a level
+      load or a suit change.
 - [ ] **Aim from the hand.** Revolver, shotgun, bolt gun, flamethrower with
       the head turned about 60 degrees away: shots and flame follow the
       right controller. `[diag] hands: aim ray` lines start near the hand.
@@ -287,14 +327,19 @@ poses are always declared). Try on OpenVR and OpenXR.
       turn with the right controller held out ahead. Each gives one
       `[diag] hands: weapon transform, weapon type N: columns (...) (...)
       (...), origin (...); aim pose forward (...), position (...); drawn
-      by the game's animation`. Send these lines: they show which column
-      is the barrel and how far the origin is from the muzzle. While the
-      arms keep the game's animation the aim stays on the aim pose.
+      in the moved hand`. Send these lines: they show which column is the
+      barrel and how far the origin is from the muzzle. Shots from the
+      revolver, the shotgun and the flamethrower go along the drawn
+      barrel: bullet holes at 5 m within 5 cm of its line, with the head
+      turned 60 degrees away.
 - [ ] **Head aim kept where it should be.** Melee and stun baton aim with
       the head; `"AimFromHand": false` puts all aiming back on the head.
-- [ ] **Motion tracker in the left hand.** Raise the tracker: blips turn
-      with the left controller's heading; nothing breaks with the
-      controller pointing straight up.
+- [ ] **Motion tracker in the left hand (21 §6.2, acceptance 7, 26).**
+      Raise the tracker: it is in the drawn left hand; blips turn with the
+      drawn tracker's heading; turning the left wrist so the drawn tracker
+      points 45 degrees off the controller's pointing direction, the blips
+      follow the drawn tracker; nothing breaks with the controller pointing
+      straight up.
 - [ ] **Controller lost.** Cover a controller: `right hand lost`, aim holds
       0.3 s then returns to the head, and blends back when tracking
       returns. With the dashboard open, aim follows the head.

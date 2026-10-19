@@ -129,14 +129,19 @@ Playing
     false). It applies at once, also when turned on in the menu (a custom
     SteamVR binding for the game made with an older version may lack the
     pointing pose: the log then says so, and a reset to the default binding
-    fixes it). The in-game arms still play the game's own animation for
-    now.
+    fixes it). Ripley's arms reach for your controllers: her hands are
+    where yours are, turned as yours are, the elbows bend down and out,
+    and a hand out of reach gets a straight arm pointing at it. The held
+    weapon or item sits in her right hand. In cutscenes, interactions,
+    hiding and the game's own grabs and melee swings the arms play the
+    game's animation and come back to the controllers afterwards.
   - "AimFromHand": with Enabled, the revolver, shotgun, bolt gun and
     flamethrower aim where your right controller points, not where you
-    look; the drawn weapon does not follow your hand yet. Melee weapons
-    keep the game's aim. Default true.
+    look; the revolver, shotgun and flamethrower along the drawn weapon in
+    her hand. Melee weapons keep the game's aim. Default true.
   - "TrackerInHand": with Enabled, the motion tracker's cone points where
-    your left controller points. Default true.
+    the tracker in her left hand points (where your left controller points
+    while the arm is not drawn at it). Default true.
   - "MeleeByMotion": with Enabled, a real swing of your right controller
     swings the maintenance jack or the stun baton, once per swing; the
     trigger still works. Default true.
@@ -275,7 +280,9 @@ If something goes wrong
   for an "AI.exe" error and send its details.
 
 Known issues
-- No hand tracking yet (controllers act as a gamepad).
+- Tracked hands are a preview: the arms can pass through walls, and a
+  held weapon may lag the hand in some animations. Send mothervr.log with
+  Dev. Debug Options on if the hands sit away from the controllers.
 - Please report anything odd as an issue on GitHub, with mothervr.log.
 
 Licence and source

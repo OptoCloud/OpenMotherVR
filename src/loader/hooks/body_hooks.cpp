@@ -18,6 +18,7 @@
 #include "loader/context.h"
 #include "loader/hooks/activity_input.h"
 #include "loader/hooks/guard.h"
+#include "loader/hooks/hand_hooks.h"
 #include "util/sync/once_latch.h"
 #include "util/time/steady.h"
 
@@ -73,8 +74,8 @@ util::OnceLatch crouch_not_followed_logged;
 std::uintptr_t id_of(const void* p) noexcept { return game::address_of(p); }
 
 void install_sites(Context& ctx) noexcept {
+    if (!image) return; // before attach's prepare_body: tried then
     sites_tried = true;
-    if (!image) return;
     game::Patcher patcher{ctx.log};
     sites_in = game::hands::install_body_sites(*image, patcher, game::code_pointer(&skin_set_pose), targets);
 }
@@ -92,19 +93,6 @@ hands::Activity read_activity(Context& ctx, game::StereoInterface& device, void*
     return hands::activity(activity_input(ctx, device, player));
 }
 
-hands::SkeletonFault fault_of(game::hands::SkeletonReadResult r) noexcept {
-    using R = game::hands::SkeletonReadResult;
-    switch (r) {
-        case R::Ok: break;
-        case R::NoBones: return hands::SkeletonFault::NoBones;
-        case R::NoArrays: return hands::SkeletonFault::NoArrays;
-        case R::TooManyBones: return hands::SkeletonFault::TooManyBones;
-        case R::UnnamedBone: return hands::SkeletonFault::UnnamedBone;
-        case R::TableMismatch: return hands::SkeletonFault::TableMismatch;
-    }
-    return hands::SkeletonFault::Unknown;
-}
-
 // 21 §10: the plan for this frame's skeleton, published for the jobs. A
 // skeleton that cannot be read yet is read again until it can be (21 §10.2).
 void update_visibility(Context& ctx, BodyVisible v, bool running, void* player,
@@ -116,22 +104,12 @@ void update_visibility(Context& ctx, BodyVisible v, bool running, void* player,
         skeleton = {id_of(pose->animation), id_of(pose->pose), id_of(pose->skeleton),
                     game::hands::skeleton_name(pose->skeleton)};
     }
-    std::optional<hands::SkeletonBones> bones;
-    hands::SkeletonReadFault fault;
     // Read only when asked: once per change, and once a second while the
     // skeleton cannot be read (no walk of the bones every frame).
     game::hands::SkeletonRead read;
-    if (ctx.body_hider.wants_bones(v, skeleton, now)) {
-        const auto info = game::hands::read_skeleton(
-            game::CodeAddress{static_cast<std::uint32_t>(skeleton.skeleton)}, read);
-        if (info.result == game::hands::SkeletonReadResult::Ok) {
-            bones = hands::SkeletonBones{std::span{read.names}.first(read.count),
-                                         std::span{read.parents}.first(read.count), read.names_from_table};
-        } else {
-            fault = {fault_of(info.result), info.raw_count, info.bone};
-        }
-    }
-    ctx.body_hider.update(v, running, skeleton, bones ? &*bones : nullptr, now, fault);
+    SkeletonBonesRead bones;
+    if (ctx.body_hider.wants_bones(v, skeleton, now)) bones = read_skeleton_bones(skeleton.skeleton, read);
+    ctx.body_hider.update(v, running, skeleton, bones.bones ? &*bones.bones : nullptr, now, bones.fault);
 }
 
 std::string_view press_name(hands::CrouchPress p) noexcept {
@@ -165,7 +143,38 @@ void update_crouch(Context& ctx, game::StereoInterface& device, void* player, ha
     ctx.play_space.set_crouch_raise(out.eye_raise_m);
 }
 
+hands::SkeletonFault fault_of(game::hands::SkeletonReadResult r) noexcept {
+    using R = game::hands::SkeletonReadResult;
+    switch (r) {
+        case R::Ok: break;
+        case R::NoBones: return hands::SkeletonFault::NoBones;
+        case R::NoArrays: return hands::SkeletonFault::NoArrays;
+        case R::TooManyBones: return hands::SkeletonFault::TooManyBones;
+        case R::UnnamedBone: return hands::SkeletonFault::UnnamedBone;
+        case R::TableMismatch: return hands::SkeletonFault::TableMismatch;
+    }
+    return hands::SkeletonFault::Unknown;
+}
+
 } // namespace
+
+SkeletonBonesRead read_skeleton_bones(std::uintptr_t skeleton, game::hands::SkeletonRead& read) noexcept {
+    SkeletonBonesRead out;
+    const auto info =
+        game::hands::read_skeleton(game::CodeAddress{static_cast<std::uint32_t>(skeleton)}, read);
+    if (info.result == game::hands::SkeletonReadResult::Ok) {
+        out.bones = hands::SkeletonBones{std::span{read.names}.first(read.count),
+                                         std::span{read.parents}.first(read.count), read.names_from_table};
+    } else {
+        out.fault = {fault_of(info.result), info.raw_count, info.bone};
+    }
+    return out;
+}
+
+bool body_pose_sites() noexcept {
+    if (!sites_tried) install_sites(context());
+    return sites_in;
+}
 
 void prepare_body(const game::GameImage& g) noexcept {
     image.emplace(g);
@@ -196,7 +205,10 @@ void body_on_stereo_update(game::StereoInterface& device) noexcept {
 }
 
 void __fastcall skin_set_pose(void* object, void* edx, const void* pose, int count) noexcept {
-    auto& ctx                       = context();
+    auto& ctx = context();
+    // 21 §4.2: the arms are edited in the game's pose first, so the body
+    // hidden below and every render object see the edited pose.
+    guarded("arm pose edit", [&] { hands_on_skin_pose(pose); });
     const hands::HiddenPose* hidden = ctx.body_hider.current();
     game::StereoInterface* device   = game::stereo::load_device(ctx.manager);
     if (hidden && device && game::stereo::load_state(*device) == game::DeviceState::Running) {

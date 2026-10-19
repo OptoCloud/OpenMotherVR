@@ -7,8 +7,9 @@
 #include "util/math/matrix.h"
 
 // The tracked hands' hooks (spec 21 §3 to §6): the hand poses taken with
-// each head pose, the aim ray after the game's AimRayUpdate, and the motion
-// tracker's facing around the game's TrackerScan.
+// each head pose, the arm pose edit around the final-pose pass (21 §4.2),
+// the aim ray after the game's AimRayUpdate, and the motion tracker's
+// facing around the game's TrackerScan.
 namespace omvr::loader::hooks {
 
 // At attach (full patch set): remembers the game image for a later install
@@ -34,5 +35,12 @@ bool __fastcall tracker_scan(void* tracker, void* edx) noexcept;
 // tracker_scan's address, for the haptics' install of the same call
 // (21 §14).
 const void* tracker_scan_hook() noexcept;
+
+// From the SkinSetPose calls in FinalPoseStep, before the pose `model` (a
+// model-space bone array) is handed to a render object: when it is the
+// player's pose and this frame's arm edit is not yet applied, edits the
+// player's arms in it (21 §4.2). The player's final-pose job thread; for
+// any other pose one comparison.
+void hands_on_skin_pose(const void* model) noexcept;
 
 } // namespace omvr::loader::hooks
