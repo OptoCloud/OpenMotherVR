@@ -63,6 +63,8 @@ enum class SkeletonFault : std::uint8_t {
     // table's bone meanings.
     TableMismatch,
 };
+// The fault as the hands' and body's log lines say it.
+std::string_view to_string(SkeletonFault f) noexcept;
 struct SkeletonReadFault {
     SkeletonFault fault = SkeletonFault::Unknown;
     std::int32_t count  = 0; // the skeleton's bone count as read

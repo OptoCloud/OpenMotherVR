@@ -42,19 +42,6 @@ constexpr std::string_view kLogOtherPose =
     "[body] WARNING a part of the player's model is posed from another skeleton's pose and stays drawn "
     "(21 §22 item 27)";
 
-// The fault as the log says it.
-std::string_view fault_text(SkeletonFault f) noexcept {
-    switch (f) {
-        case SkeletonFault::Unknown: return "no reason given";
-        case SkeletonFault::NoBones: return "no bones";
-        case SkeletonFault::NoArrays: return "no bone or parent array";
-        case SkeletonFault::TooManyBones: return "too many bones";
-        case SkeletonFault::UnnamedBone: return "a bone without a name";
-        case SkeletonFault::TableMismatch: return "not the first-person bone table's skeleton";
-    }
-    return "?";
-}
-
 // The index of a bone by its name without prefix, -1 when absent.
 int index_of(const SkeletonBones& b, std::string_view name) noexcept {
     return find_bone(b, name).value_or(-1);
@@ -110,7 +97,7 @@ void BodyHider::log_unreadable(const PlayerSkeleton& s, const SkeletonReadFault&
     }
     // A fixed buffer: the game thread logs without allocating here.
     std::array<char, 96> why{};
-    const auto text = fault_text(fault.fault);
+    const auto text = to_string(fault.fault);
     const auto r =
         fault.fault == SkeletonFault::UnnamedBone
             ? std::format_to_n(why.data(), why.size(), "{}: bone {} of {}", text, fault.bone, fault.count)

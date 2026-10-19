@@ -24,4 +24,16 @@ std::optional<std::int16_t> find_bone(const SkeletonBones& s, std::string_view p
     return std::nullopt;
 }
 
+std::string_view to_string(SkeletonFault f) noexcept {
+    switch (f) {
+        case SkeletonFault::Unknown: return "no reason given";
+        case SkeletonFault::NoBones: return "no bones";
+        case SkeletonFault::NoArrays: return "no bone or parent array";
+        case SkeletonFault::TooManyBones: return "too many bones";
+        case SkeletonFault::UnnamedBone: return "a bone without a name";
+        case SkeletonFault::TableMismatch: return "not the first-person bone table's skeleton";
+    }
+    return "?";
+}
+
 } // namespace omvr::core::hands

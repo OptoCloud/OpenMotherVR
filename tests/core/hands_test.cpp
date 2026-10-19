@@ -1257,7 +1257,7 @@ TEST_CASE("ArmPoser: a skeleton without the arms' bones is logged once and not e
     arms.set_rig(other, nullptr, {SkeletonFault::NoBones, 0, 0}, now);
     CHECK(
         log.contains("hands: WARNING the arms of skeleton FEMALEFP keep the game's animation until it can be "
-                     "read: the skeleton has no bones; it is read again every 1 s"));
+                     "read: no bones; it is read again every 1 s"));
     CHECK_FALSE(arms.wants_rig(other, now));
     CHECK(arms.wants_rig(other, now + std::chrono::seconds(1)));
 }

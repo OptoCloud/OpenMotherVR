@@ -54,18 +54,6 @@ const char* rig_fault_text(RigFault f) noexcept {
     return "unknown";
 }
 
-const char* skeleton_fault_text(SkeletonFault f) noexcept {
-    switch (f) {
-        case SkeletonFault::Unknown: return "the skeleton could not be read";
-        case SkeletonFault::NoBones: return "the skeleton has no bones";
-        case SkeletonFault::NoArrays: return "the skeleton has no bone or parent array";
-        case SkeletonFault::TooManyBones: return "it has too many bones";
-        case SkeletonFault::UnnamedBone: return "a bone has no name";
-        case SkeletonFault::TableMismatch: return "it is not the first-person bone table's skeleton";
-    }
-    return "unknown";
-}
-
 const char* pose_fault_text(PoseFault f) noexcept {
     switch (f) {
         case PoseFault::None: return "no fault";
@@ -109,7 +97,7 @@ void ArmPoser::set_rig(const PlayerSkeleton& s, const SkeletonBones* bones, cons
         rig_.reset();
         rig_retry_at_ = util::after(now, kSkeletonRetry);
         if (logged_state_ != kStateUnreadable)
-            logf(log_, kLogRigUnreadable, s.name, skeleton_fault_text(fault.fault), kSkeletonRetry.count());
+            logf(log_, kLogRigUnreadable, s.name, to_string(fault.fault), kSkeletonRetry.count());
         logged_state_ = kStateUnreadable;
         return;
     }
