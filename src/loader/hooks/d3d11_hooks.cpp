@@ -56,8 +56,8 @@ using CreatePixelShaderFn = HRESULT(__stdcall*)(void* self, const void* code, SI
 // The system's method saved from a slot, as its type. The one cast from
 // the untyped slot values.
 template <class Fn>
-Fn system_method(void* saved) noexcept {
-    return reinterpret_cast<Fn>(saved);
+Fn system_method(const std::atomic<void*>& saved) noexcept {
+    return reinterpret_cast<Fn>(saved.load(std::memory_order_acquire));
 }
 
 // A replacement as the untyped value a vtable slot holds.
@@ -179,11 +179,16 @@ static_assert(std::is_convertible_v<decltype(&hook_resize_buffers), ResizeBuffer
 static_assert(std::is_convertible_v<decltype(&hook_set_fullscreen_state), SetFullscreenStateFn>);
 static_assert(std::is_convertible_v<decltype(&hook_create_pixel_shader), CreatePixelShaderFn>);
 
-// Replaces vtable slot `index` of `vtable` with `replacement`; the system's
-// method, or null when the slot could not be written.
-void* replace_slot(void** vtable, std::size_t index, void* replacement, const char* method,
-                   ports::Log& log) noexcept {
-    return platform::win32::replace_pointer(&vtable[index], replacement, method, log);
+// Replaces vtable slot `index` of `vtable` with `replacement`, the system's
+// method stored in `original` first. False when the slot could not be
+// written.
+bool replace_slot(void** vtable, std::size_t index, void* replacement, std::atomic<void*>& original,
+                  const char* method, ports::Log& log) noexcept {
+    return platform::win32::replace_pointer(&vtable[index], replacement, original, method, log);
+}
+
+std::uintptr_t address_of(const std::atomic<void*>& saved) noexcept {
+    return reinterpret_cast<std::uintptr_t>(saved.load(std::memory_order_relaxed));
 }
 
 } // namespace
@@ -195,9 +200,8 @@ void install_device_hooks(void* device) noexcept {
     // 24 §15.3: the keys as they are now apply to the whole session.
     const core::config::GraphicsSettings graphics = ctx.settings.current().graphics;
     ctx.constant_smoke.start(graphics.constant_smoke_lighting, graphics.constant_smoke_brightness);
-    if (auto* prev = replace_slot(vtable_of(device), kCreatePixelShaderVtblIndex,
-                                  slot_value(&hook_create_pixel_shader), "CreatePixelShader", ctx.log)) {
-        ctx.targets.create_pixel_shader = prev;
+    if (replace_slot(vtable_of(device), kCreatePixelShaderVtblIndex, slot_value(&hook_create_pixel_shader),
+                     ctx.targets.create_pixel_shader, "CreatePixelShader", ctx.log)) {
         ctx.log.line(kPixelShaderLog);
     }
     install_vertex_shader_hook(vtable_of(device)); // 24 §14
@@ -227,18 +231,15 @@ void install_swapchain_hooks(void* swapchain) noexcept {
     // resize, without SetFullscreenState the fullscreen option may break the
     // mirror.
     void** vtbl = vtable_of(sc);
-    if (auto* prev = replace_slot(vtbl, kPresentVtblIndex, slot_value(&hook_present), "Present", ctx.log)) {
-        ctx.targets.present = prev;
-        ports::logf(ctx.log, kPresentHookedLog, reinterpret_cast<std::uintptr_t>(prev));
+    if (replace_slot(vtbl, kPresentVtblIndex, slot_value(&hook_present), ctx.targets.present, "Present",
+                     ctx.log)) {
+        ports::logf(ctx.log, kPresentHookedLog, address_of(ctx.targets.present));
     }
-    if (auto* prev = replace_slot(vtbl, kSetFullscreenStateVtblIndex, slot_value(&hook_set_fullscreen_state),
-                                  "SetFullscreenState", ctx.log)) {
-        ctx.targets.set_fullscreen = prev;
-    }
-    if (auto* prev = replace_slot(vtbl, kResizeBuffersVtblIndex, slot_value(&hook_resize_buffers),
-                                  "ResizeBuffers", ctx.log)) {
-        ctx.targets.resize_buffers = prev;
-        ports::logf(ctx.log, kResizeHookedLog, reinterpret_cast<std::uintptr_t>(prev));
+    replace_slot(vtbl, kSetFullscreenStateVtblIndex, slot_value(&hook_set_fullscreen_state),
+                 ctx.targets.set_fullscreen, "SetFullscreenState", ctx.log);
+    if (replace_slot(vtbl, kResizeBuffersVtblIndex, slot_value(&hook_resize_buffers),
+                     ctx.targets.resize_buffers, "ResizeBuffers", ctx.log)) {
+        ports::logf(ctx.log, kResizeHookedLog, address_of(ctx.targets.resize_buffers));
     }
 }
 

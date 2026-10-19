@@ -21,7 +21,8 @@ LRESULT CALLBACK game_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) noexcep
         platform::win32::log_focus_loss(ctx.log);
         return 0;
     }
-    return platform::win32::call_window_proc(ctx.targets.game_wndproc, hwnd, msg, wp, lp);
+    return platform::win32::call_window_proc(ctx.targets.game_wndproc.load(std::memory_order_acquire), hwnd,
+                                             msg, wp, lp);
 }
 
 static_assert(std::is_convertible_v<decltype(&game_wndproc), WNDPROC>);
@@ -31,7 +32,8 @@ static_assert(std::is_convertible_v<decltype(&game_wndproc), platform::win32::Wi
 
 void keep_focus_while_vr(void* hwnd) noexcept {
     auto& ctx = context();
-    if (!hwnd || ctx.targets.game_wndproc || !ctx.window.headset_attached()) return;
+    if (!hwnd || ctx.targets.game_wndproc.load(std::memory_order_acquire) || !ctx.window.headset_attached())
+        return;
     platform::win32::subclass_game_window(hwnd, &game_wndproc, ctx.targets.game_wndproc, ctx.log);
 }
 

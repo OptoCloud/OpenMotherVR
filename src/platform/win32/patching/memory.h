@@ -4,6 +4,7 @@
 #include "core/diag/ports/log.h"
 #include "util/base/error.h"
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -27,11 +28,16 @@ util::Result<void> write_memory(void* dst, std::span<const std::uint8_t> bytes,
 // loader's lock is re-entrant for the thread that holds it).
 void pin_this_module(core::diag::ports::Log& log) noexcept;
 
-// VirtualProtect-swap a single pointer slot (a COM vtable entry). Returns
-// the previous slot value (so the caller can call through it), or null
-// after logging `method` when the slot cannot be written.
-void* replace_pointer(void** slot, void* replacement, const char* method,
-                      core::diag::ports::Log& log) noexcept;
+// VirtualProtect-swap a single pointer slot (a COM vtable entry, an import
+// slot). The slot's previous value, which the replacement calls through, is
+// stored in `original` (release) before the slot points at `replacement`:
+// the slot may be shared by other objects and threads (every swapchain of a
+// class shares its vtable), and a call through it must never find
+// `original` unset. The page keeps execute rights while it is writable, in
+// case code shares it. Returns false, with `original` and the slot
+// unchanged, after logging `method` when the slot cannot be written.
+bool replace_pointer(void** slot, void* replacement, std::atomic<void*>& original, const char* method,
+                     core::diag::ports::Log& log) noexcept;
 
 // Executable memory for code the mod generates: allocate_code returns
 // `size` writable bytes (null on failure); seal_code makes them read-only

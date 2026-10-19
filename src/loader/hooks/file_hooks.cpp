@@ -37,8 +37,14 @@ constexpr std::string_view kCopyOpenFailedLog =
     "[hook] engine settings: cannot open the copy (err=0x{:08X}); the game reads its own file";
 
 // The functions the slots held before; set once, before the swap.
-std::atomic<CreateFileAFn> g_create_file_a{nullptr};
-std::atomic<CreateFileWFn> g_create_file_w{nullptr};
+std::atomic<void*> g_create_file_a{nullptr};
+std::atomic<void*> g_create_file_w{nullptr};
+
+// A saved import as its type. The one cast from the untyped slot values.
+template <class Fn>
+Fn system_function(const std::atomic<void*>& saved) noexcept {
+    return reinterpret_cast<Fn>(saved.load(std::memory_order_acquire));
+}
 std::atomic<bool> g_watch_levels{false};
 
 // Level paths are ASCII; a longer path is not one of them.
@@ -107,7 +113,7 @@ HANDLE WINAPI create_file_a(LPCSTR name, DWORD access, DWORD share, LPSECURITY_A
         HANDLE h = try_game_open(name, access, share, security, disposition, flags, templ);
         if (h != INVALID_HANDLE_VALUE) return h;
     }
-    return g_create_file_a.load(std::memory_order_relaxed)(name, access, share, security, disposition, flags,
+    return system_function<CreateFileAFn>(g_create_file_a)(name, access, share, security, disposition, flags,
                                                            templ);
 }
 
@@ -123,7 +129,7 @@ HANDLE WINAPI create_file_w(LPCWSTR name, DWORD access, DWORD share, LPSECURITY_
             if (h != INVALID_HANDLE_VALUE) return h;
         }
     }
-    return g_create_file_w.load(std::memory_order_relaxed)(name, access, share, security, disposition, flags,
+    return system_function<CreateFileWFn>(g_create_file_w)(name, access, share, security, disposition, flags,
                                                            templ);
 }
 
@@ -131,16 +137,16 @@ static_assert(std::is_convertible_v<decltype(&create_file_a), CreateFileAFn>);
 static_assert(std::is_convertible_v<decltype(&create_file_w), CreateFileWFn>);
 
 template <class Fn>
-void take(void* game_module, const char* function, std::atomic<Fn>& original, Fn replacement) noexcept {
+void take(void* game_module, const char* function, std::atomic<void*>& original, Fn replacement) noexcept {
     auto& log   = context().log;
     void** slot = platform::win32::import_slot(game_module, "kernel32.dll", function);
     if (!slot) {
         core::diag::ports::logf(log, "files: AI.exe does not import {}, not watched", function);
         return;
     }
-    original.store(reinterpret_cast<Fn>(*slot), std::memory_order_relaxed);
-    if (!platform::win32::replace_pointer(slot, reinterpret_cast<void*>(replacement), function, log))
-        original.store(nullptr, std::memory_order_relaxed);
+    // Stores the original before the swap; leaves it null when the slot
+    // cannot be written.
+    platform::win32::replace_pointer(slot, reinterpret_cast<void*>(replacement), original, function, log);
 }
 
 } // namespace

@@ -93,15 +93,22 @@ void log_focus_loss(ports::Log& log) noexcept {
     ports::logf(log, kFocusTakenLog, pid, utf8(std::filesystem::path{name}.filename()));
 }
 
-void subclass_game_window(void* window, WindowProc replacement, WindowProc& game_proc,
+void subclass_game_window(void* window, WindowProc replacement, std::atomic<WindowProc>& game_proc,
                           ports::Log& log) noexcept {
     const auto hwnd = static_cast<HWND>(window);
-    if (!hwnd || game_proc) return;
+    if (!hwnd || game_proc.load(std::memory_order_acquire)) return;
+    // The game thread may dispatch a message the moment the procedure is
+    // replaced: the one it calls on is stored first.
+    const auto own = reinterpret_cast<WNDPROC>(::GetWindowLongPtrA(hwnd, GWLP_WNDPROC));
+    if (!own) return;
+    game_proc.store(own, std::memory_order_release);
     // The window procedure points into this DLL for the rest of the process.
     pin_this_module(log);
-    game_proc = reinterpret_cast<WNDPROC>(
-        ::SetWindowLongPtrA(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(replacement)));
-    if (game_proc) log.line(kSubclassedLog);
+    if (::SetWindowLongPtrA(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(replacement)) == 0) {
+        game_proc.store(nullptr, std::memory_order_release);
+        return;
+    }
+    log.line(kSubclassedLog);
 }
 
 long call_window_proc(WindowProc game_proc, HWND__* hwnd, unsigned int msg, unsigned int wp,

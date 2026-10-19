@@ -42,13 +42,15 @@ struct HookTargets {
     // The script event tap's trampoline.
     game::TapFn event_tap = nullptr;
 
-    // The swapchain and device methods the proxy replaces.
-    void* present             = nullptr;
-    void* resize_buffers      = nullptr;
-    void* set_fullscreen      = nullptr;
-    void* create_pixel_shader = nullptr;
+    // The swapchain and device methods the proxy replaces. Atomic: stored
+    // before the shared vtable slot is swapped (replace_pointer), and read on
+    // any thread that calls through it.
+    std::atomic<void*> present{nullptr};
+    std::atomic<void*> resize_buffers{nullptr};
+    std::atomic<void*> set_fullscreen{nullptr};
+    std::atomic<void*> create_pixel_shader{nullptr};
     // ID3D11Device::CreateVertexShader, for the upright sprites (24 §14).
-    void* create_vertex_shader = nullptr;
+    std::atomic<void*> create_vertex_shader{nullptr};
 
     // The vtable slots are shared by every swapchain of the class in the
     // process, including one an OpenXR runtime or an overlay creates
@@ -61,8 +63,9 @@ struct HookTargets {
     // counter for the first-frame line, on the render thread.
     std::atomic<unsigned long> present_count{0};
 
-    // The game's window procedure, once the window is subclassed.
-    platform::win32::WindowProc game_wndproc = nullptr;
+    // The game's window procedure, once the window is subclassed: stored
+    // before the subclass, read on the game thread.
+    std::atomic<platform::win32::WindowProc> game_wndproc{nullptr};
 };
 
 } // namespace omvr::loader

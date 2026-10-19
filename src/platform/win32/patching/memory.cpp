@@ -58,19 +58,23 @@ util::Result<void> write_memory(void* dst, std::span<const std::uint8_t> bytes, 
     return result;
 }
 
-void* replace_pointer(void** slot, void* replacement, const char* method, ports::Log& log) noexcept {
+bool replace_pointer(void** slot, void* replacement, std::atomic<void*>& original, const char* method,
+                     ports::Log& log) noexcept {
     DWORD old_protect = 0;
-    if (!::VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &old_protect)) {
+    // Execute too: a thread running code on the same page (an import table
+    // inside .text) would take a DEP fault on a page that is only RW.
+    if (!::VirtualProtect(slot, sizeof(void*), PAGE_EXECUTE_READWRITE, &old_protect)) {
         ports::logf(log, kReplaceFailedLog, method, ::GetLastError());
-        return nullptr;
+        return false;
     }
     // From here the slot points into this DLL for the rest of the process.
     pin_this_module(log);
-    void* prev   = *slot;
-    *slot        = replacement;
+    std::atomic_ref<void*> live{*slot};
+    original.store(live.load(std::memory_order_relaxed), std::memory_order_release);
+    live.store(replacement, std::memory_order_release);
     DWORD ignore = 0;
     ::VirtualProtect(slot, sizeof(void*), old_protect, &ignore);
-    return prev;
+    return true;
 }
 
 std::uint8_t* allocate_code(std::size_t size) noexcept {

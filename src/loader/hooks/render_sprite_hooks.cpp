@@ -27,8 +27,9 @@ using CreateVertexShaderFn = HRESULT(__stdcall*)(void* self, const void* code, S
 
 HRESULT __stdcall hook_create_vertex_shader(void* self, const void* code, SIZE_T size, void* linkage,
                                             void** out) noexcept {
-    auto& ctx          = context();
-    const auto create  = reinterpret_cast<CreateVertexShaderFn>(ctx.targets.create_vertex_shader);
+    auto& ctx         = context();
+    const auto create = reinterpret_cast<CreateVertexShaderFn>(
+        ctx.targets.create_vertex_shader.load(std::memory_order_acquire));
     auto& stats        = ctx.sprite_fixes;
     const int total    = stats.count_created();
     int sites          = 0;
@@ -50,10 +51,9 @@ static_assert(std::is_convertible_v<decltype(&hook_create_vertex_shader), Create
 
 void install_vertex_shader_hook(void** vtable) noexcept {
     auto& ctx = context();
-    if (auto* prev = platform::win32::replace_pointer(&vtable[platform::d3d11::kCreateVertexShaderVtblIndex],
-                                                      reinterpret_cast<void*>(&hook_create_vertex_shader),
-                                                      "CreateVertexShader", ctx.log)) {
-        ctx.targets.create_vertex_shader = prev;
+    if (platform::win32::replace_pointer(&vtable[platform::d3d11::kCreateVertexShaderVtblIndex],
+                                         reinterpret_cast<void*>(&hook_create_vertex_shader),
+                                         ctx.targets.create_vertex_shader, "CreateVertexShader", ctx.log)) {
         ctx.log.line(kVertexShaderLog);
     }
 }

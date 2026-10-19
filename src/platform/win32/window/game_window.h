@@ -3,6 +3,7 @@
 
 #include "core/diag/ports/log.h"
 
+#include <atomic>
 #include <cstdint>
 
 struct HWND__;
@@ -40,8 +41,9 @@ bool handle_fit_message(HWND__* hwnd, unsigned int msg, core::diag::ports::Log& 
 void log_focus_loss(core::diag::ports::Log& log) noexcept;
 
 // Subclasses the game's window with `replacement` (once; `game_proc`
-// receives the game's own procedure). Pins the module.
-void subclass_game_window(void* hwnd, WindowProc replacement, WindowProc& game_proc,
+// receives the game's own procedure, before the window can call
+// `replacement` with it). Pins the module.
+void subclass_game_window(void* hwnd, WindowProc replacement, std::atomic<WindowProc>& game_proc,
                           core::diag::ports::Log& log) noexcept;
 
 // Calls the game's own window procedure `game_proc`.
