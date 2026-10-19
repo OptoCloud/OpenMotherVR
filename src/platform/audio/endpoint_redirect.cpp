@@ -73,14 +73,19 @@ long EndpointRedirect::install(std::wstring endpoint_id, ActivateFn replacement,
     ComPtr<IMMDevice> device;
     if (const HRESULT hr = default_device(device); FAILED(hr)) return hr;
 
-    void** vtable        = vtable_of(device.get());
-    original_activate_   = reinterpret_cast<ActivateFn>(vtable[kActivateSlot]);
-    const auto value     = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(replacement));
-    const auto bytes     = std::bit_cast<std::array<std::uint8_t, sizeof(value)>>(value);
-    const bool patched   = win32::write_memory(&vtable[kActivateSlot], bytes, log).has_value();
-    const HRESULT result = patched ? S_OK : HRESULT_FROM_WIN32(::GetLastError());
-    if (FAILED(result)) original_activate_ = nullptr;
-    return result;
+    void** vtable      = vtable_of(device.get());
+    original_activate_ = reinterpret_cast<ActivateFn>(vtable[kActivateSlot]);
+    const auto value   = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(replacement));
+    const auto bytes   = std::bit_cast<std::array<std::uint8_t, sizeof(value)>>(value);
+    // The code captured at the failing call: GetLastError here would be
+    // stale after write_memory's logging and protection restore, and a 0
+    // would turn the failure into S_OK.
+    if (const auto written = win32::write_memory(&vtable[kActivateSlot], bytes, log); !written) {
+        original_activate_ = nullptr;
+        const auto code    = static_cast<DWORD>(written.error().code);
+        return code != 0 ? HRESULT_FROM_WIN32(code) : E_FAIL;
+    }
+    return S_OK;
 }
 
 } // namespace omvr::platform::audio
