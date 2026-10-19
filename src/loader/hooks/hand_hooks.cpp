@@ -4,6 +4,7 @@
 
 #include "loader/hooks/hand_hooks.h"
 
+#include "core/input/action_tiers.h"
 #include "core/hands/action_episode.h"
 #include "core/hands/hand_aim.h"
 #include "core/hands/motion_actions.h"
@@ -310,8 +311,8 @@ void install_sites(Context& ctx) noexcept {
 // throwing by motion; the item only when either is on.
 hands::PlayInput read_play(Context& ctx, void* player) noexcept {
     hands::PlayInput p;
-    p.aim_held =
-        ctx.pad.tiers()[kPlayerTier].digital[static_cast<std::size_t>(game::player_action::kAim)] != 0;
+    p.aim_held     = core::input::vr_digital(ctx.pad.tiers()[kPlayerTier],
+                                             static_cast<std::size_t>(game::player_action::kAim));
     const auto& hs = ctx.settings.current().hands;
     if (!player || !ctx.targets.hands.current_item || !(hs.melee_by_motion || hs.throw_by_motion)) return p;
     void* component = game::hands::weapon_component(player);

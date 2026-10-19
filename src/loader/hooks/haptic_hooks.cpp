@@ -4,6 +4,7 @@
 
 #include "loader/hooks/haptic_hooks.h"
 
+#include "core/input/action_tiers.h"
 #include "core/diag/thread_roles.h"
 #include "core/diag/tuning.h"
 #include "core/input/interaction_state.h"
@@ -72,7 +73,7 @@ int __fastcall rumble_set_motors(void* self, void* edx, float low, float high) n
 static_assert(std::is_convertible_v<decltype(&rumble_set_motors), game::hands::RumbleSetMotorsFn>);
 
 bool vr_down(Context& ctx, int action) noexcept {
-    return ctx.pad.tiers()[kPlayerTier].digital[static_cast<std::size_t>(action)] != 0;
+    return core::input::vr_digital(ctx.pad.tiers()[kPlayerTier], static_cast<std::size_t>(action));
 }
 
 hands::FireSample read_fire(Context& ctx, void* player) noexcept {
