@@ -35,10 +35,11 @@ IMPORTS = [
     "flash.utils.Timer",
     "frontend.menu.MenuPage",
 ]
-# (method, statement appended at the end of its body)
+# (method, statement appended at the end of its body; {0} is the method's
+# first parameter, whose decompiled name may or may not be param1)
 CALLS = [
     ("setVisibility", "this.motherV2Build();"),
-    ("setMotherVROptionsEnabled", "this.motherV2SetRunning(param1);"),
+    ("setMotherVROptionsEnabled", "this.motherV2SetRunning({0});"),
 ]
 # Names the recompiled class must define.
 REQUIRED = ["motherV2Build", "motherV2SetRunning", "setMotherSmoothTurnSpeed", "setMotherRealCrouch",
@@ -54,11 +55,13 @@ def add_imports(src: str) -> str:
 
 
 def append_to_method(src: str, method: str, statement: str) -> str:
-    m = re.search(rf"function {method}\([^)]*\) : void\s*\n(\s*)\{{\n", src)
+    m = re.search(rf"function {method}\((?:(\w+):)?[^)]*\) : void\s*\n(\s*)\{{\n", src)
     if not m or len(re.findall(rf"function {method}\(", src)) != 1:
         raise SystemExit(f"GameMenu: {method} not found once")
+    if "{0}" in statement and not m.group(1):
+        raise SystemExit(f"GameMenu: {method} has no parameter to pass")
     close = ffdec_movie.line_start(src, ffdec_movie.block_end(src, m.end()) - 1)  # the closing brace's line
-    return src[:close] + m.group(1) + "   " + statement + "\n" + src[close:]
+    return src[:close] + m.group(2) + "   " + statement.format(m.group(1)) + "\n" + src[close:]
 
 
 def splice(src: str, members: str) -> str:

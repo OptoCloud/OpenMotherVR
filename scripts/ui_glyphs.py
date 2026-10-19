@@ -90,13 +90,15 @@ def splice(src: str, ids: list[str]) -> str:
         raise SystemExit(f"{CLASS}: load_image_files returns early; the glyph call would be skipped")
     indent = src[indent_at:src.index("{", indent_at)]
     close = ffdec_movie.line_start(src, end - 1)  # the closing brace's line
-    src = src[:close] + indent + f"   this.{METHOD}(param1);\n" + src[close:]
+    src = src[:close] + indent + f"   this.{METHOD}({platform.group(1)});\n" + src[close:]
     return ffdec_movie.add_before_class_end(src, members(ids), CLASS)
 
 
 def lacks(check: str, ids: list[str]) -> str | None:
     _, _, body = method_body(check, "load_image_files")
-    if not re.search(rf"this\.{METHOD}\(\w+\);", body) or len(re.findall(r'load_image_file\("glyph_omvr_', check)) != len(ids):
+    # The call must pass the method's own parameter, whatever its name.
+    platform = re.search(r"function load_image_files\((\w+):String\) : void", check)
+    if not platform or not re.search(rf"this\.{METHOD}\({platform.group(1)}\);", body) or len(re.findall(r'load_image_file\("glyph_omvr_', check)) != len(ids):
         return "the glyph registration"
     return None
 
