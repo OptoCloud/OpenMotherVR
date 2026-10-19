@@ -65,7 +65,16 @@ public:
     // Game thread. Whether update() needs the bones of `skeleton` this frame:
     // a new skeleton, pose or value while one is to be hidden, or, after a
     // skeleton could not be read, every kSkeletonRetry until it is (21 §10.2).
-    bool wants_bones(config::BodyVisible v, const PlayerSkeleton& s, TimePoint now) const noexcept;
+    // Never while the stereo device is not `running`: update() hides
+    // nothing then and records no build, so the bones would be read every
+    // frame for nothing.
+    bool wants_bones(config::BodyVisible v, bool running, const PlayerSkeleton& s,
+                     TimePoint now) const noexcept;
+    // The same with the device taken as running. For a caller that does not
+    // pass `running` yet; the BodyHider hook moves to the overload above.
+    bool wants_bones(config::BodyVisible v, const PlayerSkeleton& s, TimePoint now) const noexcept {
+        return wants_bones(v, true, s, now);
+    }
 
     // Game thread, each frame. `running`: the stereo device runs (20 §1.2:
     // nothing hidden otherwise). `bones` as read for `s.skeleton` when

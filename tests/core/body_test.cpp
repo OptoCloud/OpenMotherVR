@@ -264,9 +264,15 @@ TEST_CASE("body hider: publishes a plan only while something is hidden and the d
     hider.update(BodyVisible::HandsOnly, true, player, nullptr, t + 10s);
     CHECK(hider.current() == p);
 
-    // Without a running device nothing is hidden (20 §1.2).
+    // Without a running device nothing is hidden (20 §1.2), and no bones are
+    // asked for, even for a change, until it runs.
     hider.update(BodyVisible::HandsOnly, false, player, nullptr, t + 10s);
     CHECK(hider.current() == nullptr);
+    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, false, player, t + 10s));
+    hider.update(BodyVisible::ArmsAndHands, false, player, nullptr, t + 10s);
+    CHECK_FALSE(hider.wants_bones(BodyVisible::ArmsAndHands, false, player, t + 11s));
+    CHECK(hider.wants_bones(BodyVisible::ArmsAndHands, true, player, t + 11s));
+    CHECK_FALSE(log.contains("could not be read"));
 
     // Back to Full: nothing hidden, and that is said once.
     hider.update(BodyVisible::Full, true, player, nullptr, t + 10s);

@@ -64,8 +64,9 @@ int index_of(const SkeletonBones& b, std::string_view name) noexcept {
 
 } // namespace
 
-bool BodyHider::wants_bones(BodyVisible v, const PlayerSkeleton& s, TimePoint now) const noexcept {
-    if (v == BodyVisible::Full || s.pose == 0) return false;
+bool BodyHider::wants_bones(BodyVisible v, bool running, const PlayerSkeleton& s,
+                            TimePoint now) const noexcept {
+    if (!running || v == BodyVisible::Full || s.pose == 0) return false;
     if (changed(v, s)) return true;
     return retry_at_ && now >= *retry_at_;
 }
@@ -83,7 +84,7 @@ void BodyHider::update(BodyVisible v, bool running, const PlayerSkeleton& s, con
         current_.store(nullptr, std::memory_order_release);
         return;
     }
-    if (wants_bones(v, s, now)) {
+    if (wants_bones(v, running, s, now)) {
         if (changed(v, s)) unreadable_logged_.reset();
         built_    = BuildKey{v, s.skeleton, s.pose};
         built_ok_ = false;
