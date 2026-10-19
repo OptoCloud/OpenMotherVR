@@ -165,6 +165,23 @@ TEST_CASE("haptics: firing pulses the right hand on the press, with a ranged wea
     check_silent(r.frame()[1]);
 }
 
+TEST_CASE("haptics: each press of a ranged weapon is a shot: press, release, press pulses twice") {
+    Rig r;
+    r.haptics.on_fire(fire(true, WeaponType::Pistol), r.now());
+    check_pulse(r.frame()[1], 0.6f, 0.06f);
+    r.clock.advance(100ms);
+    r.haptics.on_fire(fire(false, WeaponType::Pistol), r.now());
+    check_silent(r.frame()[1]);
+    r.clock.advance(100ms);
+    r.haptics.on_fire(fire(true, WeaponType::Pistol), r.now());
+    check_pulse(r.frame()[1], 0.6f, 0.06f);
+    r.clock.advance(100ms);
+    // A release seen while the gate is closed still ends the press.
+    r.haptics.on_fire(fire(false, WeaponType::Pistol, false), r.now());
+    r.haptics.on_fire(fire(true, WeaponType::Pistol), r.now());
+    check_pulse(r.frame()[1], 0.6f, 0.06f);
+}
+
 TEST_CASE("haptics: the flamethrower pulses 0.3 again as each pulse ends while held") {
     Rig r;
     r.haptics.on_fire(fire(true, WeaponType::Flamethrower), r.now());

@@ -107,7 +107,10 @@ void Haptics::on_health(const std::optional<Health>& health) noexcept {
 }
 
 void Haptics::on_fire(const FireSample& fire, TimePoint now) noexcept {
-    const bool pressed_now = fire.pressed && !std::exchange(fire_pressed_, fire.pressed);
+    // The exchange runs on every sample so a release clears the edge: the
+    // next press is a new shot.
+    const bool was_pressed = std::exchange(fire_pressed_, fire.pressed);
+    const bool pressed_now = fire.pressed && !was_pressed;
     const bool fires = fire.pressed && fire.weapon && is_ranged(weapon_class(fire.weapon)) && fire.gate_open;
     if (!fires || !settings_.firing) {
         flame_until_.reset();
