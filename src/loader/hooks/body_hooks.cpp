@@ -108,7 +108,8 @@ void update_visibility(Context& ctx, BodyVisible v, bool running, void* player,
     // skeleton cannot be read (no walk of the bones every frame).
     game::hands::SkeletonRead read;
     SkeletonBonesRead bones;
-    if (ctx.body_hider.wants_bones(v, skeleton, now)) bones = read_skeleton_bones(skeleton.skeleton, read);
+    if (ctx.body_hider.wants_bones(v, running, skeleton, now))
+        bones = read_skeleton_bones(skeleton.skeleton, read);
     ctx.body_hider.update(v, running, skeleton, bones.bones ? &*bones.bones : nullptr, now, bones.fault);
 }
 
