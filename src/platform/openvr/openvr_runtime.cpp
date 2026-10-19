@@ -16,6 +16,7 @@
 #include "core/diag/tuning.h"
 #include "core/hands/tuning.h"
 #include "core/input/controller_mapping.h"
+#include "core/input/controller_rules.h"
 #include "core/ui/notices.h"
 #include "core/vr/fov.h"
 #include "core/vr/hand_offsets.h"
@@ -105,11 +106,6 @@ constexpr std::string_view kFailMissingInterface = "SteamVR does not provide {}"
 // The log label of the headset-not-showing-the-game warning (03 §6.7).
 constexpr std::string_view kNotShowingLabel = "headset not showing the game";
 
-// SteamVR's controller type names that pick a control scheme.
-constexpr std::string_view kViveController  = "vive_controller";
-constexpr std::string_view kIndexController = "knuckles";
-constexpr std::string_view kFrameController = "frame_controller";
-
 // The neutral pose: the reference before any recenter (03 §7) and the head
 // before any valid pose (03 §1).
 constexpr vr::HmdMatrix34_t kIdentity34{
@@ -146,13 +142,6 @@ const char* tracking_text(HeadTracking t) noexcept {
         case HeadTracking::Tracked: return "tracked";
     }
     return "tracked";
-}
-
-input::ControlScheme scheme_for(std::string_view controller_type) noexcept {
-    if (controller_type == kViveController) return input::ControlScheme::Touchpad;
-    if (controller_type == kIndexController) return input::ControlScheme::Index;
-    if (controller_type == kFrameController) return input::ControlScheme::Frame;
-    return input::ControlScheme::Thumbstick;
 }
 
 void sleep_for(std::chrono::milliseconds d) noexcept { ::Sleep(static_cast<DWORD>(d.count())); }
@@ -791,7 +780,7 @@ void OpenVrRuntime::note_controller(std::size_t hand, vr::TrackedDeviceIndex_t i
         type);
     if (hand == 1 && actions_.ready() && !glyphs_chosen_) {
         glyphs_chosen_ = true;
-        controls_.set_scheme(scheme_for(type));
+        controls_.set_scheme(input::scheme_for(input::ControllerSource::SteamVrInput, type));
     }
 }
 
@@ -809,21 +798,13 @@ void OpenVrRuntime::write_controls() {
         note_controller(i, index[i]);
     }
 
-    // The right hand near the head turns Interact into the flashlight. Both
-    // poses valid: a headset that lost tracking can report a stale or zeroed
-    // matrix, which a hand near the origin would then read as "near".
-    bool near_head = false;
-    if (index[1] != vr::k_unTrackedDeviceIndexInvalid && index[1] < vr::k_unMaxTrackedDeviceCount) {
-        const auto& hmd  = poses[vr::k_unTrackedDeviceIndex_Hmd];
-        const auto& head = hmd.mDeviceToAbsoluteTracking.m;
-        const auto& hand = poses[index[1]].mDeviceToAbsoluteTracking.m;
-        near_head        = hmd.bPoseIsValid && poses[index[1]].bPoseIsValid &&
-                           input::near_head(translation(hand), translation(head));
-    }
-
     Controls c = actions_.ready() ? actions_.poll() : legacy_controls(index);
     c.poses    = body_poses(poses, index, system_->IsInputAvailable());
-    controls_.write(c, near_head);
+    // The right hand near the head turns Interact into the flashlight. The
+    // head counts only with this frame's valid pose: a headset that lost
+    // tracking can report a stale or zeroed matrix, which a hand near the
+    // origin would then read as "near".
+    controls_.write(c, input::right_hand_near_head(c.poses, input::HeadPosition::ThisFrame));
     play_haptics(poses, index);
 }
 

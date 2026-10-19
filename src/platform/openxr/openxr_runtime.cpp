@@ -10,6 +10,7 @@
 
 #include "core/diag/tuning.h"
 #include "core/input/controller_mapping.h"
+#include "core/input/controller_rules.h"
 #include "core/vr/fov.h"
 #include "core/vr/hand_offsets.h"
 #include "core/vr/heading.h"
@@ -88,8 +89,8 @@ input::HandInput hand_input(const HandState& h) noexcept {
 input::Controls map_controls(const ControllerState& s) noexcept {
     const input::HandInput left  = hand_input(s[Hand::Left]);
     const input::HandInput right = hand_input(s[Hand::Right]);
-    return s.family == input::ControlScheme::Touchpad ? input::touchpad_controls(left, right)
-                                                      : input::thumbstick_controls(left, right);
+    // No right-hand profile yet reads as thumbsticks (04 §5.5).
+    return input::scheme_controls(s.family.value_or(input::ControlScheme::Thumbstick), left, right);
 }
 
 // ---- The runtime -------------------------------------------------------------------
@@ -433,14 +434,12 @@ private:
             controls_.set_scheme(*s.family);
         }
         input::Controls c = map_controls(s);
+        const auto views  = xr_.views();
+        c.poses           = body_poses(s, views.head, views.head_valid);
         // The right hand near the head turns Interact into the flashlight
-        // (04 §5.10).
-        const auto& R        = s[Hand::Right];
-        const auto views     = xr_.views();
-        const Pose head      = views.head;
-        const bool near_head = R.grip_valid && input::near_head(R.grip.position, head.position);
-        c.poses              = body_poses(s, head, views.head_valid);
-        controls_.write(c, near_head);
+        // (04 §5.10). The views hold the last valid head, so it counts
+        // whatever head_valid says.
+        controls_.write(c, input::right_hand_near_head(c.poses, input::HeadPosition::Held));
     }
 
     // 22 §8.1: the head of the located views and the hands synced with

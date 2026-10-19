@@ -1,10 +1,10 @@
 // OpenMotherVR-Provenance: clean
 #include "platform/openxr/input.h"
 
+#include "core/input/controller_rules.h"
 #include "platform/openxr/constants.h"
 
 #include <array>
-#include <cstring>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -36,9 +36,6 @@ constexpr std::string_view kLogAimUnbound =
 constexpr std::string_view kLogFrameProfile = "openxr input: Steam Frame controller bindings suggested";
 
 constexpr float kNanosecondsPerSecond = 1e9f;
-
-// The interaction profile of the Vive wands, the one touchpad family.
-constexpr const char* kViveProfile = "htc/vive_controller";
 
 const char* hand_name(int hand) noexcept { return hand == 0 ? "left" : "right"; }
 
@@ -416,10 +413,7 @@ void Input::on_interaction_profile_changed() noexcept {
         return;
     }
     const char* name = state_.profiles[1].data();
-    using core::input::ControlScheme;
-    state_.family = std::strstr(name, kViveProfile)                   ? ControlScheme::Touchpad
-                    : std::strcmp(name, kFrameControllerProfile) == 0 ? ControlScheme::Frame
-                                                                      : ControlScheme::Thumbstick;
+    state_.family    = core::input::scheme_for(core::input::ControllerSource::OpenXr, name);
     logf(log_, kLogProfile, name);
     log_haptic_binding();
 }

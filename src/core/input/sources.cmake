@@ -9,6 +9,8 @@ target_sources(omvr_core PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/control_scheme.h
     ${CMAKE_CURRENT_LIST_DIR}/controller_mapping.cpp
     ${CMAKE_CURRENT_LIST_DIR}/controller_mapping.h
+    ${CMAKE_CURRENT_LIST_DIR}/controller_rules.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/controller_rules.h
     ${CMAKE_CURRENT_LIST_DIR}/dpad_emulation.cpp
     ${CMAKE_CURRENT_LIST_DIR}/dpad_emulation.h
     ${CMAKE_CURRENT_LIST_DIR}/gesture_geometry.cpp
