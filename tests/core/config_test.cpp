@@ -283,6 +283,27 @@ TEST_CASE("read_config: wrong types and missing parts give defaults") {
     CHECK(read_config(json::parse(R"({"Settings": {"Rendering": 3}})")).rendering.pixel_scale == 1.0f);
 }
 
+TEST_CASE("read_config: numbers outside int or float end at the setting's range") {
+    Settings s = read_config(json::parse(R"({"Settings": {
+        "Rendering": {"PixelScale": 1e39},
+        "Input": {"SnapRotationSegments": 1e10},
+        "Graphics": {"StreamingTextureHeapMB": 3e9, "StreamingModelHeapMB": -3e9}}})"));
+    sanitize(s);
+    CHECK(s.graphics.streaming_texture_heap_mb == kTextureHeapMbMax); // clamped, not 0
+    CHECK(s.graphics.streaming_model_heap_mb == 0);                   // the game's own size
+    CHECK(s.input.snap_rotation_segments == 24);                      // as any large count
+    CHECK(s.rendering.pixel_scale == 1.0f);                           // out of range: default
+
+    // A 64-bit integer and a fraction: held to int, and truncated as before.
+    s = read_config(json::parse(R"({"Settings": {"Graphics": {"StreamingTextureHeapMB": 9223372036854775807,
+        "StreamingModelHeapMB": 512.9}}})"));
+    CHECK(s.graphics.streaming_texture_heap_mb == std::numeric_limits<int>::max());
+    CHECK(s.graphics.streaming_model_heap_mb == 512);
+    // A boolean still reads as 0 or 1, as nlohmann reads it.
+    s = read_config(json::parse(R"({"Settings": {"Input": {"SnapRotationSegments": true}}})"));
+    CHECK(s.input.snap_rotation_segments == 1);
+}
+
 TEST_CASE("sanitize: Oculus is OpenXR, pixel scale range, snap segment steps") {
     Settings s;
     s.vr_runtime                   = VRRuntime::Oculus;

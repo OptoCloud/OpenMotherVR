@@ -12,6 +12,7 @@
 #include "core/config/settings_table.h"
 
 #include <array>
+#include <limits>
 #include <type_traits>
 #include <utility>
 
@@ -55,6 +56,26 @@ constexpr const SectionObject& object_of(Section s) noexcept { return kSections[
 static_assert(std::string_view(object_of(Section::HandsHaptics).key) == "Haptics" &&
               std::string_view(object_of(Section::Hud).key) == "Hud");
 
+// A JSON number as T. nlohmann's get<T> is a plain cast, undefined when the
+// value lies outside T (a hand-edited 3e9 for an int, 1e39 for a float), so
+// the value is first held to T's range; sanitize then applies the setting's
+// own range, so a huge value ends at the setting's maximum.
+template <class T>
+T narrow_number(const json& v) {
+    const auto d      = v.get<double>();
+    constexpr auto lo = static_cast<double>(std::numeric_limits<T>::lowest());
+    constexpr auto hi = static_cast<double>(std::numeric_limits<T>::max());
+    if constexpr (std::is_integral_v<T>) {
+        // Every int is a double exactly, so these compare without rounding.
+        if (d <= lo) return std::numeric_limits<T>::lowest();
+        if (d >= hi) return std::numeric_limits<T>::max();
+    } else {
+        if (d < lo) return std::numeric_limits<T>::lowest();
+        if (d > hi) return std::numeric_limits<T>::max();
+    }
+    return static_cast<T>(d);
+}
+
 // Tolerant lookup: returns `fallback` if `key` is missing or has the wrong
 // type, so older or hand-edited files load with defaults for what they lack.
 template <class T>
@@ -62,6 +83,11 @@ T get_or(const json& j, std::string_view key, const T& fallback) {
     auto it = j.find(key);
     if (it == j.end()) return fallback;
     try {
+        if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) {
+            // get<T> reads a boolean as 0 or 1; anything else not a number
+            // throws, as before.
+            if (it->is_number()) return narrow_number<T>(*it);
+        }
         return it->get<T>();
     } catch (...) {
         return fallback;
