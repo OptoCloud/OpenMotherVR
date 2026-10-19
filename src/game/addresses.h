@@ -395,6 +395,55 @@ inline constexpr BodyRvas kBodyRvas2020 = {};
 inline constexpr PerBuild<BodyRvas> kBodyRvas{kBodyRvas2015, kBodyRvas2020};
 static_assert(all_rows_known(kBodyRvas2015), "every body row has its 2015 RVA");
 
+// The arm pose edit of the tracked hands (spec 21 §2.1, §2.3, §4.2, §20);
+// it also uses body visibility's SkinSetPose calls and the player of
+// HandRvas. 2015 RVAs, checked in the 2015 AI.exe by the spec side; the
+// 2020 ones are unknown, so the edit stays off on that build.
+struct ArmRvas {
+    // 21 §2.1: the final-pose pass (cdecl: the stage's character list and
+    // its count) and its call in CHARACTER_IK_AND_RAGDOLL.
+    std::uint32_t final_pose_pass;
+    std::uint32_t final_pose_pass_call;
+    // 21 §2.1, §4.2 item 6: the equipment update (thiscall on the
+    // equipment component, no args) and its call in the same stage, before
+    // the pass.
+    std::uint32_t equipment_update;
+    std::uint32_t equipment_update_call;
+    // 21 §2.3: BoneWorldTransform (thiscall on the animation component:
+    // bone, pose selector, out transform; ret 0xC); the held item's
+    // attachment query that calls it, and the push of its selector 6.
+    std::uint32_t bone_world_transform;
+    std::uint32_t attach_query_call;
+    std::uint32_t attach_selector_push;
+    // 21 §2.3, §4.2 item 7: the game's limb IK (stdcall, four args, ret
+    // 0x10) and its four calls.
+    std::uint32_t limb_ik;
+    std::uint32_t limb_ik_call_a;
+    std::uint32_t limb_ik_call_b;
+    std::uint32_t limb_ik_call_c;
+    std::uint32_t limb_ik_call_d;
+};
+
+inline constexpr ArmRvas kArmRvas2015 = {
+    .final_pose_pass       = 0x002A55F0,
+    .final_pose_pass_call  = 0x003CA04B,
+    .equipment_update      = 0x00382710,
+    .equipment_update_call = 0x003CA02E,
+    .bone_world_transform  = 0x002A2FB0,
+    .attach_query_call     = 0x003B4E06,
+    .attach_selector_push  = 0x003B4DFD,
+    .limb_ik               = 0x0029ED80,
+    .limb_ik_call_a        = 0x002A7986,
+    .limb_ik_call_b        = 0x002A79A1,
+    .limb_ik_call_c        = 0x002A79BC,
+    .limb_ik_call_d        = 0x002A7F30,
+};
+
+inline constexpr ArmRvas kArmRvas2020 = {};
+
+inline constexpr PerBuild<ArmRvas> kArmRvas{kArmRvas2015, kArmRvas2020};
+static_assert(all_rows_known(kArmRvas2015), "every arm row has its 2015 RVA");
+
 // The engine settings load (spec 24 §1.9, §6.1). Nothing is written there:
 // the game opens the file through the C runtime's fopen, which reaches
 // AI.exe's CreateFileA import, and the file hooks redirect that open. The

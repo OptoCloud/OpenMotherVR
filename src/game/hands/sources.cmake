@@ -3,6 +3,10 @@
 target_sources(mothervr PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/action_sites.cpp
     ${CMAKE_CURRENT_LIST_DIR}/action_sites.h
+    ${CMAKE_CURRENT_LIST_DIR}/arm_objects.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/arm_objects.h
+    ${CMAKE_CURRENT_LIST_DIR}/arm_sites.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/arm_sites.h
     ${CMAKE_CURRENT_LIST_DIR}/body_objects.cpp
     ${CMAKE_CURRENT_LIST_DIR}/body_objects.h
     ${CMAKE_CURRENT_LIST_DIR}/body_sites.cpp
