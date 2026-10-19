@@ -99,6 +99,20 @@ bool kept(const CollapsePlan& plan, std::size_t i) { return plan.bones[i].anchor
 
 } // namespace
 
+TEST_CASE("skeleton: a bone is found by its name without the tools' prefix, the first one") {
+    const std::array<std::string_view, 5> names{"FemaleFP:Hips", "FemaleFP:LeftHand", "LeftHandIndex1",
+                                                "Other:LeftHand", "Head"};
+    const std::array<std::int16_t, 5> parents{-1, 0, 1, 0, 0};
+    const SkeletonBones s{names, parents};
+    CHECK(find_bone(s, "LeftHand") == std::int16_t{1});
+    CHECK(find_bone(s, "Left", "Hand") == std::int16_t{1});
+    CHECK(find_bone(s, "Left", "HandIndex1") == std::int16_t{2});
+    CHECK(find_bone(s, "Head") == std::int16_t{4});
+    CHECK_FALSE(find_bone(s, "Right", "Hand"));
+    CHECK_FALSE(find_bone(s, "Hand"));
+    CHECK_FALSE(find_bone(s, "Left"));
+}
+
 TEST_CASE("body groups: the game's bone names, with or without the tools' prefix") {
     CHECK(bare_bone_name("FemaleFP:LeftHand") == "LeftHand");
     CHECK(bare_bone_name("SpaceSuitFP:Spine2") == "Spine2");

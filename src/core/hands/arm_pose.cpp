@@ -82,15 +82,12 @@ std::size_t at(std::int16_t bone) noexcept { return static_cast<std::size_t>(bon
 
 constexpr std::array<std::string_view, kHandCount> kSidePrefix = {"Left", "Right"};
 
+constexpr std::int16_t kNoBone = -1;
+
 // The bone named <prefix><suffix> (the namespace prefix of 21 §2.3 ignored),
-// or -1.
-std::int16_t find_bone(const SkeletonBones& s, std::string_view prefix, std::string_view suffix) noexcept {
-    for (std::size_t i = 0; i < s.names.size(); ++i) {
-        const std::string_view n = bare_bone_name(s.names[i]);
-        if (n.size() == prefix.size() + suffix.size() && n.starts_with(prefix) && n.ends_with(suffix))
-            return static_cast<std::int16_t>(i);
-    }
-    return -1;
+// or kNoBone.
+std::int16_t side_bone(const SkeletonBones& s, std::string_view prefix, std::string_view suffix) noexcept {
+    return find_bone(s, prefix, suffix).value_or(kNoBone);
 }
 
 // Every parent comes before its bone (the order the edit refreshes in).
@@ -117,15 +114,15 @@ SideLookup find_side(const SkeletonBones& s, std::string_view prefix) noexcept {
         std::string_view suffix;
         const std::int16_t* parent; // the bone it must hang from; null: any
     };
-    b.shoulder = find_bone(s, prefix, "Shoulder");
-    b.arm      = find_bone(s, prefix, "Arm");
-    b.forearm  = find_bone(s, prefix, "ForeArm");
-    b.hand     = find_bone(s, prefix, "Hand");
-    b.index    = find_bone(s, prefix, "HandIndex1");
-    b.middle   = find_bone(s, prefix, "HandMiddle1");
-    b.ring     = find_bone(s, prefix, "HandRing1");
-    b.pinky    = find_bone(s, prefix, "HandPinky1");
-    b.thumb    = find_bone(s, prefix, "HandThumb1");
+    b.shoulder = side_bone(s, prefix, "Shoulder");
+    b.arm      = side_bone(s, prefix, "Arm");
+    b.forearm  = side_bone(s, prefix, "ForeArm");
+    b.hand     = side_bone(s, prefix, "Hand");
+    b.index    = side_bone(s, prefix, "HandIndex1");
+    b.middle   = side_bone(s, prefix, "HandMiddle1");
+    b.ring     = side_bone(s, prefix, "HandRing1");
+    b.pinky    = side_bone(s, prefix, "HandPinky1");
+    b.thumb    = side_bone(s, prefix, "HandThumb1");
     const std::array<Need, 9> needs{{
         {&b.shoulder, "Shoulder", nullptr},
         {&b.arm, "Arm", &b.shoulder},
@@ -143,8 +140,8 @@ SideLookup find_side(const SkeletonBones& s, std::string_view prefix) noexcept {
     }
     // 21 §4.2 item 3: the roll bones are turned only as siblings of the hand.
     const auto roll_of = [&](std::string_view suffix) {
-        const std::int16_t i = find_bone(s, prefix, suffix);
-        return i >= 0 && s.parents[at(i)] == b.forearm ? i : std::int16_t{-1};
+        const std::int16_t i = side_bone(s, prefix, suffix);
+        return i >= 0 && s.parents[at(i)] == b.forearm ? i : kNoBone;
     };
     b.roll  = roll_of("ForeArmRoll");
     b.roll1 = roll_of("ForeArmRoll1");
@@ -369,8 +366,7 @@ RigResult find_arm_rig(const SkeletonBones& s) noexcept {
         if (side.fault != RigFault::None) return {std::nullopt, side.fault, side.bone};
         rig.sides[h] = side.bones;
     }
-    for (std::size_t i = 0; i < s.names.size(); ++i)
-        if (bare_bone_name(s.names[i]) == "Head") rig.head = static_cast<std::int16_t>(i);
+    rig.head = find_bone(s, "Head").value_or(kNoBone);
     return {rig, RigFault::None, {}};
 }
 

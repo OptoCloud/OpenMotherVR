@@ -57,9 +57,7 @@ std::string_view fault_text(SkeletonFault f) noexcept {
 
 // The index of a bone by its name without prefix, -1 when absent.
 int index_of(const SkeletonBones& b, std::string_view name) noexcept {
-    for (std::size_t i = 0; i < b.names.size(); ++i)
-        if (bare_bone_name(b.names[i]) == name) return static_cast<int>(i);
-    return -1;
+    return find_bone(b, name).value_or(-1);
 }
 
 } // namespace

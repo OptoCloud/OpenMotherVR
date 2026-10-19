@@ -61,10 +61,6 @@ constexpr std::array<std::string_view, 7> kRequiredBones = {
     "Spine", "LeftShoulder", "RightShoulder", "LeftArm", "RightArm", "LeftHand", "RightHand",
 };
 
-bool has_bone(const SkeletonBones& s, std::string_view name) noexcept {
-    return std::ranges::any_of(s.names, [&](std::string_view n) { return bare_bone_name(n) == name; });
-}
-
 // Every parent index is a bone or -1 and no bone is its own ancestor.
 bool parents_valid(std::span<const std::int16_t> parents) noexcept {
     const auto n = static_cast<std::int32_t>(parents.size());
@@ -170,7 +166,7 @@ bool group_visible(BoneGroup g, BodyVisible v) noexcept {
 
 std::string_view first_missing_bone(const SkeletonBones& s) noexcept {
     for (const auto name : kRequiredBones)
-        if (!has_bone(s, name)) return name;
+        if (!find_bone(s, name)) return name;
     return {};
 }
 

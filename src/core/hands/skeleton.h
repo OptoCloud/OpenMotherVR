@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -32,6 +33,14 @@ struct SkeletonBones {
 // `FemaleFP:LeftHand` (the skeletons' mirror files, 21 §2.3), the bone
 // group files as `LeftHand`.
 std::string_view bare_bone_name(std::string_view name) noexcept;
+
+// The first bone whose bare name is <prefix><suffix>, or none.
+std::optional<std::int16_t> find_bone(const SkeletonBones& s, std::string_view prefix,
+                                      std::string_view suffix) noexcept;
+// The first bone whose bare name is `bare_name`, or none.
+inline std::optional<std::int16_t> find_bone(const SkeletonBones& s, std::string_view bare_name) noexcept {
+    return find_bone(s, bare_name, {});
+}
 
 // The player's skeleton as the game thread found it this frame.
 struct PlayerSkeleton {
