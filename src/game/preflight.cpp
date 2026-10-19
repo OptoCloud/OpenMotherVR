@@ -322,8 +322,11 @@ bool preflight(const GameImage& g, bool full_set, ports::Log& log) noexcept {
 
     Preflight pf{g, log};
     check_ui_set(pf);
+    // The core checks read through the inline sites, so they run only when
+    // those lie in the image; a UI-set mismatch does not hide them.
+    const int before_inline = pf.failures();
     if (full_set) check_inline_sites_in_image(pf);
-    if (full_set && pf.failures() == 0) {
+    if (full_set && pf.failures() == before_inline) {
         check_stereo_mode_tests(pf);
         check_stereo_hand_off(pf);
         check_game_side_calls(pf);
