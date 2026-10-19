@@ -24,8 +24,17 @@ class FollowCamera final {
 public:
     // FollowBehavior::OnActivate on `behaviour`, before the game's own.
     void on_activate(void* behaviour) noexcept;
-    // FollowBehavior::OnDeactivate: inactive before the game's own runs, and
-    // forgotten after it if it is the tracked one.
+    // FollowBehavior::OnDeactivate on `behaviour`: inactive before the
+    // game's own runs, and forgotten after it, if it is the tracked one. The
+    // last one activated stays active until its own deactivation (05 §6.1),
+    // so an older one deactivated after a newer one activated changes
+    // nothing.
+    void on_deactivate_begin(const void* behaviour) noexcept {
+        if (object_ == nullptr || object_ == behaviour) active_ = false;
+    }
+    // Without the object, as the original does (FUN_10001740): inactive
+    // whichever FollowBehavior deactivates. Kept until the hook passes the
+    // object; prefer the overload above.
     void on_deactivate_begin() noexcept { active_ = false; }
     void on_deactivate_end(void* behaviour) noexcept;
 
