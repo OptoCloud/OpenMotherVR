@@ -41,7 +41,8 @@ public:
     // The tracked (or held) poses' weight against the game's own: 0..1.
     float weight() const noexcept { return weight_.value(); }
     // The grip and aim poses relative to the head: the latest tracked ones,
-    // held while lost. Meaningful while has_grip() / has_aim().
+    // held while lost. Meaningful while has_grip() / has_aim(); has_aim()
+    // goes false when the grip is tracked without an aim.
     const HeadLocalPose& grip() const noexcept { return grip_; }
     const HeadLocalPose& aim() const noexcept { return aim_; }
     bool has_grip() const noexcept { return has_grip_; }

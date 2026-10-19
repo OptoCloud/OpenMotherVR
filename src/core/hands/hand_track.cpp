@@ -21,10 +21,11 @@ HandTrack::Change HandTrack::update(Seconds dt, const std::optional<HeadLocalPos
     if (tracked_) {
         grip_     = *grip;
         has_grip_ = true;
-        if (aim) {
-            aim_     = *aim;
-            has_aim_ = true;
-        }
+        // The aim is held only while the whole hand is lost. A tracked grip
+        // without an aim (the aim pose action reads inactive) means no aim,
+        // so aiming falls back to the game's head ray (21 §16).
+        if (aim) aim_ = *aim;
+        has_aim_  = aim.has_value();
         lost_for_ = Seconds{0.0f};
         weight_.step(dt, true);
     } else {

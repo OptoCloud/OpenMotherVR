@@ -210,6 +210,28 @@ TEST_CASE("a lost hand is held 0.3 s, blends out over 0.3 s and back in over 0.1
     CHECK(t.grip().offset.x == doctest::Approx(0.2f));
 }
 
+// 21 §16: a grip tracked while its aim pose reads inactive aims from the
+// game's head ray; the aim is held only while the whole hand is lost.
+TEST_CASE("a tracked grip without an aim has no aim; a lost hand keeps its last aim") {
+    const HeadLocalPose p1{{0.1f, 0, 0.4f}, {}};
+    const HeadLocalPose a1{{0.1f, 0.05f, 0.5f}, {}};
+    HandTrack t;
+    t.update(Seconds{0}, p1, a1);
+    REQUIRE(t.has_aim());
+    CHECK(t.aim().offset.y == doctest::Approx(0.05f));
+
+    t.update(Seconds{0.1f}, std::nullopt, std::nullopt); // lost: held
+    CHECK(t.has_aim());
+    CHECK(t.aim().offset.y == doctest::Approx(0.05f));
+
+    t.update(Seconds{0.1f}, p1, std::nullopt); // the grip back, the aim not
+    CHECK(t.has_grip());
+    CHECK_FALSE(t.has_aim());
+
+    t.update(Seconds{0.1f}, p1, a1); // the aim back
+    CHECK(t.has_aim());
+}
+
 TEST_CASE("hands are active only in first-person play the player controls (21 §4.4)") {
     ActivityInput in{.enabled          = true,
                      .stereo_running   = true,
