@@ -56,13 +56,19 @@ void SettingsPush::push(ports::UiHandle ui) noexcept {
             deps_.log.line("[script_bridge] push_settings_to_game: callbacks not installed yet");
         return;
     }
-    push_runtime_and_debug(ui);
-    push_rendering(ui);
-    // Seeds the record of what the render targets were built with.
-    deps_.display_reset.reset_if_changed(deps_.settings);
-    push_input(ui);
-    push_pages(ui);
-    push_controls_help(ui);
+    try {
+        push_runtime_and_debug(ui);
+        push_rendering(ui);
+        // Seeds the record of what the render targets were built with.
+        deps_.display_reset.reset_if_changed(deps_.settings);
+        push_input(ui);
+        push_pages(ui);
+        push_controls_help(ui);
+    } catch (...) {
+        // The help rows build strings; nothing may escape into the game's
+        // menu hook (as Commands::run).
+        deps_.log.line("[script_bridge] push_settings_to_game failed: out of memory");
+    }
 }
 
 void SettingsPush::push_runtime_and_debug(ports::UiHandle ui) noexcept {

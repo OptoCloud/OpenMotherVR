@@ -9,6 +9,7 @@
 #include "core/vr/pose_convert.h"
 #include "core/vr/pose_hold.h"
 #include "core/vr/runtime_choice.h"
+#include "core/vr/runtime_detector.h"
 #include "core/vr/space_change.h"
 #include "core/vr/tuning.h"
 #include "fakes/fakes.h"
@@ -18,6 +19,7 @@
 #include <cmath>
 #include <numbers>
 #include <optional>
+#include <stdexcept>
 
 namespace {
 
@@ -214,6 +216,44 @@ TEST_CASE("runtime choice precedence") {
     CHECK(std::string_view{to_string(Chosen::OpenXR)} == "OpenXR");
     CHECK(std::string_view{to_string(Chosen::Oculus)} == "Oculus");
     CHECK(std::string_view{to_string(Chosen::None)} == "None");
+}
+
+struct NoSwitches final : omvr::core::config::ports::LaunchSwitches {
+    std::optional<VRRuntime> forced_runtime() const noexcept override { return std::nullopt; }
+    std::optional<float> world_scale_switch() const noexcept override { return std::nullopt; }
+};
+
+struct Probe final : ports::RuntimeProbe {
+    ports::ProbeResult result;
+    bool throws = false;
+    ports::ProbeResult probe() override {
+        if (throws) throw std::runtime_error("probe");
+        return result;
+    }
+};
+
+TEST_CASE("runtime detector: a probe that throws chooses no runtime, logged") {
+    omvr::tests::RecordingLog log;
+    const omvr::core::config::Settings settings{};
+    const NoSwitches switches;
+    Probe openvr, openxr;
+    openvr.result = {true, "C:/SteamVR", {}};
+    openxr.throws = true;
+    RuntimeDetector detector(log, settings, switches, openvr, openxr);
+    CHECK(detector.last_result().chosen == Chosen::None);
+    CHECK_FALSE(detector.last_result().openvr_available);
+    CHECK(log.contains("vr probe: failed; chosen=None"));
+}
+
+TEST_CASE("runtime detector: SteamVR found and preferred is chosen") {
+    omvr::tests::RecordingLog log;
+    const omvr::core::config::Settings settings{}; // VRRuntime OpenVR
+    const NoSwitches switches;
+    Probe openvr, openxr;
+    openvr.result = {true, "C:/SteamVR", {}};
+    RuntimeDetector detector(log, settings, switches, openvr, openxr);
+    CHECK(detector.last_result().chosen == Chosen::OpenVR);
+    CHECK(log.contains("vr probe: chosen=OpenVR"));
 }
 
 } // namespace
