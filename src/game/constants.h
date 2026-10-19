@@ -271,4 +271,34 @@ enum class WeaponType : std::int32_t {
     Cattleprod   = 6,
 };
 
+// The per-bone flags of the game's pose (21 §2.3): the local transform is
+// out of date (the model one is current), the model transform is out of
+// date.
+namespace pose_flag {
+inline constexpr std::uint32_t kLocalStale = 1U << 0;
+inline constexpr std::uint32_t kModelStale = 1U << 1;
+} // namespace pose_flag
+
+// The game's pad curve in RumbleSetMotors (21 §2.9), a level L (0 to 1) to
+// a motor speed out of kMotorFullSpeed. At or below kDeadZone both motors
+// stop. The low-frequency motor rises along one line up to kLowKnee and a
+// steeper one above it; the high-frequency motor along one line.
+namespace pad_rumble {
+inline constexpr float kMotorFullSpeed = 65535.0f;
+inline constexpr float kDeadZone       = 0.05f;
+inline constexpr float kLowKnee        = 0.4f;
+inline constexpr float kLowSlopeBelow  = 11468.626f;
+inline constexpr float kLowOffsetBelow = 5242.8f;
+inline constexpr float kLowSlopeAbove  = 75365.25f;
+inline constexpr float kLowOffsetAbove = -9830.25f;
+inline constexpr float kHighSlope      = 57343.0f;
+inline constexpr float kHighOffset     = 8192.0f;
+} // namespace pad_rumble
+
+// 21 §2.2, §11.5 [likely]: how far the game lowers the first-person camera
+// when the player crouches, game metres: the difference of the game's
+// `first_person_camera_offset_y` (0.01) and
+// `first_person_camera_crouch_offset_y` (-0.62) in DATA\GLOBALCONSTANTS.TXT.
+inline constexpr float kCrouchCameraDropM = 0.63f;
+
 } // namespace omvr::game

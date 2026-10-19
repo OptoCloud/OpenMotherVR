@@ -177,11 +177,6 @@ RigResult find_arm_rig(const SkeletonBones& s) noexcept;
 
 // ---- The pose edit (21 §4.2) -----------------------------------------------------
 
-// 21 §2.3: the pose's per-bone flags: the local transform out of date (the
-// model one is current), the model transform out of date.
-inline constexpr std::uint32_t kBoneLocalStale = 1U << 0;
-inline constexpr std::uint32_t kBoneModelStale = 1U << 1;
-
 // The game's pose as arrays of the skeleton's size: PoseArrays (types.h).
 
 enum class PoseFault : std::uint8_t {

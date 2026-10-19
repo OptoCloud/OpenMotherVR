@@ -34,6 +34,7 @@ namespace {
 
 using namespace omvr::core::hands;
 using omvr::core::config::BodyVisible;
+using omvr::game::kCrouchCameraDropM;
 using omvr::tests::FakeClock;
 using omvr::tests::RecordingLog;
 using namespace std::chrono_literals;
@@ -611,7 +612,7 @@ TEST_CASE("real crouch: a real crouch presses the game's crouch once, and the vi
     out = rc.update(standing_at(1.20f, true), t += 100ms);
     out = rc.update(standing_at(1.20f, true), t += 100ms);
     out = rc.update(standing_at(1.20f, true), t += 100ms);
-    CHECK(out.eye_raise_m == doctest::Approx(kGameCrouchEyeDropM));
+    CHECK(out.eye_raise_m == doctest::Approx(kCrouchCameraDropM));
 
     // Standing up: one stand press; the game stands and the raise goes.
     out = rc.update(standing_at(1.50f, true), t += 100ms);
@@ -767,9 +768,9 @@ TEST_CASE("play space: real crouch's raise is game metres at any world scale") {
         const auto head    = omvr::core::vr::to_game_pose(raw, 1.0f);
         const auto ref     = ps.on_reference(head, 0.0f, "OpenVR");
         const float before = ps.on_head_pose(head, 0.0f).game.m[1][3] - ref.m[1][3];
-        ps.set_crouch_raise(kGameCrouchEyeDropM);
+        ps.set_crouch_raise(kCrouchCameraDropM);
         const auto poses = ps.on_head_pose(head, 0.0f);
-        CHECK(poses.game.m[1][3] - ref.m[1][3] - before == doctest::Approx(-kGameCrouchEyeDropM)); // up is -y
+        CHECK(poses.game.m[1][3] - ref.m[1][3] - before == doctest::Approx(-kCrouchCameraDropM)); // up is -y
         CHECK(poses.player.m[1][3] - ref.m[1][3] == doctest::Approx(before)); // not the player's movement
     }
 }

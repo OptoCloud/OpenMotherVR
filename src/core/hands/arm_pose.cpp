@@ -2,6 +2,7 @@
 #include "core/hands/arm_pose.h"
 
 #include "core/hands/tuning.h"
+#include "game/constants.h"
 #include "util/math/matrix.h"
 #include "util/math/quat.h"
 
@@ -15,6 +16,9 @@ namespace {
 
 using util::Quat;
 using util::Vec3;
+
+using game::pose_flag::kLocalStale;
+using game::pose_flag::kModelStale;
 
 constexpr std::size_t kX = 0;
 constexpr std::size_t kY = 1;
@@ -385,14 +389,13 @@ PoseFault prepare_arms(PoseArrays& p, const ArmRig& rig) noexcept {
     for (std::size_t i = 0; i < n; ++i) {
         if (!marks[i]) continue;
         const std::int16_t parent = p.parents[i];
-        if ((p.flags[i] & kBoneModelStale) != 0 ||
-            (parent >= 0 && (p.flags[at(parent)] & kBoneModelStale) != 0))
+        if ((p.flags[i] & kModelStale) != 0 || (parent >= 0 && (p.flags[at(parent)] & kModelStale) != 0))
             return PoseFault::Stale;
     }
     for (std::size_t i = 0; i < n; ++i) {
-        if (!marks[i] || (p.flags[i] & kBoneLocalStale) == 0) continue;
+        if (!marks[i] || (p.flags[i] & kLocalStale) == 0) continue;
         p.local[i] = relative(parent_model(p, i), p.model[i]);
-        p.flags[i] &= ~kBoneLocalStale;
+        p.flags[i] &= ~kLocalStale;
     }
     return PoseFault::None;
 }
@@ -470,7 +473,7 @@ void refresh_arms(PoseArrays& p, const ArmRig& rig) noexcept {
     for (std::size_t i = 0; i < n; ++i) {
         if (!marks[i]) continue;
         p.model[i] = compose(parent_model(p, i), p.local[i]);
-        p.flags[i] &= ~(kBoneLocalStale | kBoneModelStale);
+        p.flags[i] &= ~(kLocalStale | kModelStale);
     }
 }
 

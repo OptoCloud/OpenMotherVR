@@ -195,19 +195,6 @@ inline constexpr Seconds kRumbleRenewal{0.05f};
 // stops, for example at a pause.
 inline constexpr Seconds kRumbleStale{0.5f};
 
-// 21 §2.9: the game's pad curve in RumbleSetMotors, a level L (0 to 1) to a
-// motor speed out of kMotorFullSpeed. At or below kPadDeadZone both motors
-// stop. The low-frequency motor rises along one line up to kPadLowKnee and
-// a steeper one above it; the high-frequency motor along one line.
-inline constexpr float kMotorFullSpeed    = 65535.0f;
-inline constexpr float kPadDeadZone       = 0.05f;
-inline constexpr float kPadLowKnee        = 0.4f;
-inline constexpr float kPadLowSlopeBelow  = 11468.626f;
-inline constexpr float kPadLowOffsetBelow = 5242.8f;
-inline constexpr float kPadLowSlopeAbove  = 75365.25f;
-inline constexpr float kPadLowOffsetAbove = -9830.25f;
-inline constexpr float kPadHighSlope      = 57343.0f;
-inline constexpr float kPadHighOffset     = 8192.0f;
 // 21 §14.4 item 3 [proposal]: an amplitude (the motor speed fraction
 // squared, item 2) below this is not played: below 5 % of full output a VR
 // actuator gives a buzz with no information.
@@ -252,14 +239,10 @@ inline constexpr Seconds kCrouchConfirm{1.0f};
 // episode ends.
 inline constexpr Seconds kHandBackSettle{0.5f};
 
-// 21 §2.2, §11.5 [likely]: how far the game lowers the first-person camera
-// when the player crouches, game metres: the difference of the game's
-// `first_person_camera_offset_y` (0.01) and
-// `first_person_camera_crouch_offset_y` (-0.62) in DATA\GLOBALCONSTANTS.TXT.
-inline constexpr float kGameCrouchEyeDropM = 0.63f;
-// 21 §11.5 [proposal]: the eye compensation follows the game's crouch over
-// this time, so the view does not jump when the game's camera moves (the
-// game's own transition time is not known, 21 §22 item 14).
+// 21 §11.5 [proposal]: the eye compensation follows the game's crouch
+// (game::kCrouchCameraDropM) over this time, so the view does not jump
+// when the game's camera moves (the game's own transition time is not
+// known, 21 §22 item 14).
 inline constexpr Seconds kCrouchEyeBlend{0.3f};
 
 } // namespace omvr::core::hands

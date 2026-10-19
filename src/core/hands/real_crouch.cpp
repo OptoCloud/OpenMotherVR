@@ -2,6 +2,7 @@
 #include "core/hands/real_crouch.h"
 
 #include "core/hands/tuning.h"
+#include "game/constants.h"
 
 #include <algorithm>
 
@@ -50,11 +51,11 @@ void RealCrouch::follow_press(bool game_crouched, TimePoint now, RealCrouchOutpu
 }
 
 void RealCrouch::ease_raise(bool raised, TimePoint now) noexcept {
-    const float target = raised ? kGameCrouchEyeDropM : 0.0f;
+    const float target = raised ? game::kCrouchCameraDropM : 0.0f;
     Seconds dt         = last_update_ ? seconds_between(*last_update_, now) : Seconds{0.0f};
     if (dt > kMaxBlendStep || dt < Seconds{0.0f}) dt = Seconds{0.0f};
     last_update_     = now;
-    const float step = kGameCrouchEyeDropM * (dt / kCrouchEyeBlend);
+    const float step = game::kCrouchCameraDropM * (dt / kCrouchEyeBlend);
     raise_m_ = raise_m_ < target ? std::min(target, raise_m_ + step) : std::max(target, raise_m_ - step);
 }
 

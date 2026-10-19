@@ -35,6 +35,7 @@ namespace {
 
 using namespace omvr::core::hands;
 using omvr::game::WeaponType;
+namespace pose_flag = omvr::game::pose_flag;
 using omvr::util::Matrix34;
 using omvr::util::Quat;
 using omvr::util::Vec3;
@@ -1000,7 +1001,7 @@ struct TestSkeleton {
             const BoneTransform m = compose(model[static_cast<std::size_t>(parents[i])], local[i]);
             check_close(rigid_of(m).translation, rigid_of(model[i]).translation);
             CHECK(rotation_gap(rigid_of(m).rotation, rigid_of(model[i]).rotation) < 1e-3f);
-            CHECK((flags[i] & (kBoneLocalStale | kBoneModelStale)) == 0);
+            CHECK((flags[i] & (pose_flag::kLocalStale | pose_flag::kModelStale)) == 0);
         }
     }
 };
@@ -1117,13 +1118,13 @@ TEST_CASE("pose edit: an out-of-date local transform is made current; an out-of-
     // The game left the hand's local transform out of date (its model one
     // is the truth).
     s.local[hand].translation = {9, 9, 9, 0};
-    s.flags[hand]             = kBoneLocalStale;
+    s.flags[hand]             = pose_flag::kLocalStale;
     PoseArrays p              = s.arrays();
     REQUIRE(prepare_arms(p, *r.rig) == PoseFault::None);
     CHECK(s.local[hand].translation[0] == doctest::Approx(0.25f));
     CHECK(s.flags[hand] == 0);
 
-    s.flags[hand] = kBoneModelStale;
+    s.flags[hand] = pose_flag::kModelStale;
     CHECK(prepare_arms(p, *r.rig) == PoseFault::Stale);
     PoseArrays short_pose{std::span{s.local}.first(5), s.model, s.flags, s.parents};
     CHECK(prepare_arms(short_pose, *r.rig) == PoseFault::Size);

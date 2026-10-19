@@ -2,6 +2,7 @@
 #include "core/hands/haptics.h"
 
 #include "core/hands/hand_aim.h"
+#include "game/constants.h"
 
 #include <algorithm>
 #include <atomic>
@@ -16,6 +17,7 @@ namespace {
 using diag::ports::logf;
 using util::after;
 using vr::ports::HapticHand;
+namespace pad = game::pad_rumble;
 
 constexpr std::string_view kLogPulse = "[diag] haptics: {} pulse, amplitude {:.2f}, {:.0f} ms";
 constexpr std::string_view kLogRumbleWindow =
@@ -54,9 +56,9 @@ void store_max(std::atomic<float>& slot, float value) noexcept {
 }
 
 float pad_motor_units(float level, PadMotor motor) noexcept {
-    if (motor == PadMotor::High) return kPadHighSlope * level + kPadHighOffset;
-    return level <= kPadLowKnee ? kPadLowSlopeBelow * level + kPadLowOffsetBelow
-                                : kPadLowSlopeAbove * level + kPadLowOffsetAbove;
+    if (motor == PadMotor::High) return pad::kHighSlope * level + pad::kHighOffset;
+    return level <= pad::kLowKnee ? pad::kLowSlopeBelow * level + pad::kLowOffsetBelow
+                                  : pad::kLowSlopeAbove * level + pad::kLowOffsetAbove;
 }
 
 } // namespace
@@ -70,8 +72,8 @@ float damage_amplitude(std::uint16_t before, std::uint16_t after, std::uint16_t 
 
 float pad_motor_speed(float level, PadMotor motor) noexcept {
     // NaN fails the comparison and stops the motor, as at the dead zone.
-    if (!(level > kPadDeadZone)) return 0.0f;
-    return std::min(pad_motor_units(std::min(level, 1.0f), motor) / kMotorFullSpeed, 1.0f);
+    if (!(level > pad::kDeadZone)) return 0.0f;
+    return std::min(pad_motor_units(std::min(level, 1.0f), motor) / pad::kMotorFullSpeed, 1.0f);
 }
 
 float rumble_amplitude(float level, PadMotor motor) noexcept {

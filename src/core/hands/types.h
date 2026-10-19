@@ -123,9 +123,9 @@ struct BoneTransform {
 inline constexpr std::size_t kBoneTransformSize = 0x30;
 static_assert(sizeof(BoneTransform) == kBoneTransformSize);
 
-// The arm pose edit (21 §2.3, r9): the character's model-to-world transform (animation
-// component +0x270, +0x280, +0x290): world = T + rotate(Q, S * model),
-// world rotation = Q * model rotation.
+// The arm pose edit (21 §2.3, r9): the character's model-to-world transform
+// (read from the animation component, game/hands/arm_objects.h):
+// world = T + rotate(Q, S * model), world rotation = Q * model rotation.
 struct ModelToWorld {
     util::Vec3 translation{};
     util::Quat rotation{};
