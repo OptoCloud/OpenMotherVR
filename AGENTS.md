@@ -147,7 +147,8 @@ links both.
   period. Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `build`, `ci`,
   `test`, `chore`, `revert`. Scope is the module or area: `hook`, `stereo`,
   `runtime`, `input`, `proxy`, `config`, `render`, `integration`, `game`,
-  `audio`, `ui`, `scripts`, `util`, `core`, `platform`, `loader`, `tests`. The body says what changed and why;
+  `audio`, `ui`, `scripts`, `util`, `core`, `platform`, `loader`, `tests`, `diag`, `cleanroom`
+  (CI checks this list: `scripts/check_repo.sh`). The body says what changed and why;
   a breaking change (for example to `mothervr.json` or the install layout)
   gets `!` after the scope and a `BREAKING CHANGE:` footer. One logical
   change per commit. No AI-attribution trailers or footers.
