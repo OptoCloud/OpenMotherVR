@@ -1,10 +1,14 @@
 # OpenMotherVR
 
-# This repository is only temporary while the GRAND-MotherVR dev is working on making their polished mod OpenSource, see links below
+# THIS REPOSITORY IS TEMPORARY
+
+## Waiting on the GRAND-MotherVR dev to make their polished mod OpenSource, see links below
 
 - [Discord thread](https://discord.com/channels/747967102895390741/1363947657248378880) (Flat2VR Modding Discord)
 - [Closed Source Distribution Website](https://www.alienisolationvr.com/)
 - [Developers Github Account](https://github.com/JayP236)
+
+## All credits go to JayP and NibreVR this repo is fully derived from their decompiled code, rest is slop lol
 
 ---
 
