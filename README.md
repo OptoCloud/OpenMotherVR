@@ -1,5 +1,13 @@
 # OpenMotherVR
 
+# This repository is only temporary while the GRAND-MotherVR dev is working on making their polished mod OpenSource, see links below
+
+- [Discord thread](https://discord.com/channels/747967102895390741/1363947657248378880)
+- [Closed Source Distribution Website](https://www.alienisolationvr.com/)
+- [Developers Github Account](https://github.com/JayP236)
+
+---
+
 A rebuild of MotherVR 0.8.1, the unofficial VR mod for Alien: Isolation,
 that runs on Windows 10 and 11 with SteamVR (OpenVR) or any OpenXR runtime.
 The project has two parts:
