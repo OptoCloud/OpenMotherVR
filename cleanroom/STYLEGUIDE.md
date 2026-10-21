@@ -1,4 +1,4 @@
-<!-- Provenance: project decision (user request for a modern C++ style guide); public C++ and Windows practice. r2: decoupling, layers, constants, utilities and helpers (user request). Revision: r2 -->
+<!-- Provenance: project decision (user request for a modern C++ style guide); public C++ and Windows practice. r2: decoupling, layers, constants, utilities and helpers (user request). r3: profiling zones and the traced build flavour (user request). Revision: r3 -->
 
 # C++ style guide
 
@@ -303,7 +303,15 @@ The spec (12) names the threads and what crosses between them. In code:
   direct call works; measure before adding indirection there.
 - Containers on hot paths are `std::array` or pre-reserved `std::vector`.
 - A change that touches a per-frame path states its cost (measured with
-  the in-game timers or a frame capture) in the commit body.
+  the traced build flavour or a frame capture) in the commit body.
+- Profiling zones are the one place macros are the rule:
+  `OMVR_ZONE(tracer, "name")`, `OMVR_GPU_ZONE` and `OMVR_GPU_SPAN_BEGIN`
+  from `core/diag/trace.h`, given a `core::diag::TracerRef` handed in like
+  any port. They expand to nothing unless the build is the opt-in traced
+  flavour (`OMVR_TRACE`), so a release build carries no code, data or
+  import of the profiler. `#if OMVR_TRACE` itself appears only in
+  `trace.h`, `platform/tracy` and the composition root; zone names are
+  string literals (the profiler keeps the pointer).
 
 ## 10. Logging
 
