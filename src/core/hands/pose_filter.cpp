@@ -9,16 +9,6 @@
 
 namespace omvr::core::hands {
 
-namespace {
-
-util::Matrix34 to_matrix(const util::Quat& q, const util::Vec3& p) noexcept {
-    util::Matrix34 m{};
-    util::pose_matrix({q, p}, m.m);
-    return m;
-}
-
-} // namespace
-
 float smoothing_cutoff_hz(float smoothing) noexcept {
     return kSmoothingCutoffAtZeroHz + (kSmoothingCutoffAtOneHz - kSmoothingCutoffAtZeroHz) * smoothing;
 }
@@ -53,7 +43,7 @@ util::Matrix34 PoseFilter::apply(const util::Matrix34& pose, float dt_s, float s
     const float a_rot = smoothing_alpha(min_cutoff + kSmoothingBetaPerRadianPerSecond * angular_speed_, dt_s);
     position_         = util::lerp(position_, p, a_pos);
     rotation_         = util::nlerp(rotation_, q, a_rot);
-    return to_matrix(rotation_, position_);
+    return util::pose_matrix({rotation_, position_});
 }
 
 } // namespace omvr::core::hands

@@ -2,12 +2,10 @@
 #include "core/hands/hand_aim.h"
 
 #include "core/hands/tuning.h"
-#include "util/math/finite.h"
+#include "util/math/matrix.h"
 #include "util/math/quat.h"
 
 #include <cmath>
-#include <cstddef>
-#include <span>
 
 namespace omvr::core::hands {
 
@@ -73,8 +71,6 @@ float transform_muzzle_offset(WeaponClass c) noexcept {
 
 namespace {
 
-constexpr std::size_t kMatrix34Floats = 12;
-
 bool is_identity(const util::Matrix34& t) noexcept {
     for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 4; ++c) {
@@ -87,8 +83,7 @@ bool is_identity(const util::Matrix34& t) noexcept {
 } // namespace
 
 std::optional<AimLine> weapon_barrel(const util::Matrix34& transform, float offset) noexcept {
-    if (!util::all_finite(std::span<const float>{&transform.m[0][0], kMatrix34Floats}) ||
-        is_identity(transform)) {
+    if (!util::all_finite(transform) || is_identity(transform)) {
         return std::nullopt;
     }
     const util::Vec3 column{transform.m[0][kWeaponBarrelColumn], transform.m[1][kWeaponBarrelColumn],
