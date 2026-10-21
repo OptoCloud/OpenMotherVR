@@ -5,16 +5,16 @@
 #include "util/hash/md5_block.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
+#include <type_traits>
 
 namespace omvr::core::render {
 
 namespace {
 
-// RFC 1321 §3.3: MD5's initial state.
-constexpr DxbcChecksum kMd5InitialState = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476};
-constexpr std::size_t kMd5BlockBytes    = 64;
-constexpr std::uint8_t kMd5Pad          = 0x80;
+using util::kMd5BlockBytes;
+using util::kMd5Pad;
 // DXBC's final block: the length in bits first, the rest of the data and
 // the pad after it; a remainder that leaves no room for that (56 bytes or
 // more) gets a block of its own and the length goes in a block of zeros.
@@ -76,29 +76,31 @@ bool is_immediate4(const std::uint32_t* t, const Operand& o, std::uint32_t x, st
 }
 
 DxbcChecksum dxbc_checksum(std::span<const std::uint8_t> blob) noexcept {
-    const std::uint8_t* data = blob.data() + kChecksummedFrom;
-    const std::size_t size   = blob.size() - kChecksummedFrom;
-    DxbcChecksum state       = kMd5InitialState;
-    const std::size_t full   = size - size % kMd5BlockBytes;
-    for (std::size_t off = 0; off < full; off += kMd5BlockBytes) util::md5_block(state.data(), data + off);
+    static_assert(std::is_same_v<DxbcChecksum, util::Md5State>);
+    const std::span<const std::uint8_t> data = blob.subspan(kChecksummedFrom);
+    const std::size_t size                   = data.size();
+    DxbcChecksum state                       = util::kMd5InitialState;
+    const std::size_t full                   = size - size % kMd5BlockBytes;
+    for (std::size_t off = 0; off < full; off += kMd5BlockBytes)
+        util::md5_block(state, data.subspan(off).first<kMd5BlockBytes>());
     const std::size_t left        = size - full;
     const std::uint32_t bits      = static_cast<std::uint32_t>(size * kBitsPerByte);
     const std::uint32_t last_word = (bits >> 2) | 1;
-    std::uint8_t block[kMd5BlockBytes]{};
+    std::array<std::uint8_t, kMd5BlockBytes> block{};
     if (left >= kRoomForLength) {
-        std::memcpy(block, data + full, left);
+        std::memcpy(block.data(), data.data() + full, left);
         block[left] = kMd5Pad;
-        util::md5_block(state.data(), block);
-        std::memset(block, 0, sizeof(block));
-        std::memcpy(block, &bits, sizeof(bits));
-        std::memcpy(block + kLastWordOffset, &last_word, sizeof(last_word));
+        util::md5_block(state, block);
+        block.fill(0);
+        std::memcpy(block.data(), &bits, sizeof(bits));
+        std::memcpy(block.data() + kLastWordOffset, &last_word, sizeof(last_word));
     } else {
-        std::memcpy(block, &bits, sizeof(bits));
-        std::memcpy(block + sizeof(bits), data + full, left);
+        std::memcpy(block.data(), &bits, sizeof(bits));
+        std::memcpy(block.data() + sizeof(bits), data.data() + full, left);
         block[sizeof(bits) + left] = kMd5Pad;
-        std::memcpy(block + kLastWordOffset, &last_word, sizeof(last_word));
+        std::memcpy(block.data() + kLastWordOffset, &last_word, sizeof(last_word));
     }
-    util::md5_block(state.data(), block);
+    util::md5_block(state, block);
     return state;
 }
 

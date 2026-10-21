@@ -67,11 +67,6 @@ TEST_CASE("md5_block of the padded empty message is MD5(\"\")") {
     CHECK(state[1] == 0x04B2008Fu);
     CHECK(state[2] == 0x980980E9u);
     CHECK(state[3] == 0x7E42F8ECu);
-
-    // The unsized form folds the same block the same way.
-    std::uint32_t words[4] = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476};
-    util::md5_block(words, block.data());
-    CHECK(std::ranges::equal(words, state));
 }
 
 TEST_CASE("parse_int takes a whole decimal integer") {

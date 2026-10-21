@@ -21,12 +21,4 @@ inline constexpr std::uint8_t kMd5Pad       = 0x80;
 // thread.
 void md5_block(Md5State& state, std::span<const std::uint8_t, kMd5BlockBytes> block) noexcept;
 
-// The unsized form, kept while core/render's DXBC checksum still calls it:
-// `state` is four words, `block` 64 bytes.
-inline void md5_block(std::uint32_t state[4], const std::uint8_t* block) noexcept {
-    Md5State s = {state[0], state[1], state[2], state[3]};
-    md5_block(s, std::span<const std::uint8_t, kMd5BlockBytes>{block, kMd5BlockBytes});
-    for (std::size_t i = 0; i < s.size(); ++i) state[i] = s[i];
-}
-
 } // namespace omvr::util
