@@ -88,8 +88,6 @@ TEST_CASE("the thumbstick scheme: face buttons") {
 
     CHECK(squeeze_pressed(0.51f));
     CHECK_FALSE(squeeze_pressed(0.5f));
-    CHECK(near_head({0.0f, 0.0f, 0.1f}, {0.0f, 0.0f, 0.0f}));
-    CHECK_FALSE(near_head({0.0f, 0.0f, 0.3f}, {0.0f, 0.0f, 0.0f}));
 }
 
 TEST_CASE("action tiers: bases, lookups and the left-stick prompt") {

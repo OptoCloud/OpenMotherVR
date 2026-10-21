@@ -26,8 +26,4 @@ namespace omvr::core::input {
 // 04 §5.1: an analog grip (squeeze) counts as the grip button.
 [[nodiscard]] bool squeeze_pressed(float squeeze) noexcept;
 
-// 04 §5.10: the right hand is near enough to the head to turn Interact into
-// the flashlight. Both positions in runtime metres, in one space.
-[[nodiscard]] bool near_head(const util::Vec3& hand, const util::Vec3& head) noexcept;
-
 } // namespace omvr::core::input

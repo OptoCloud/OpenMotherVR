@@ -65,8 +65,4 @@ Controls thumbstick_controls(const HandInput& left, const HandInput& right) noex
 
 bool squeeze_pressed(float squeeze) noexcept { return squeeze > kSqueezePressed; }
 
-bool near_head(const util::Vec3& hand, const util::Vec3& head) noexcept {
-    return util::length(util::sub(hand, head)) < kNearHead;
-}
-
 } // namespace omvr::core::input
