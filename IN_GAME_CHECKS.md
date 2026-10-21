@@ -798,6 +798,107 @@ also watch for any menu that stops working.
       and, with Dev. Debug Options, Select Level and Trigger Debug
       Checkpoint behave as before; `Use OpenXR` still reads so.
 
+## Review fixes (2026-10-19)
+
+From the fixes and clean-ups after the October review
+(`reviews/2026-10-19/`). Most of them guard rare paths; the first ones
+need only a normal session.
+
+- [ ] **Shader fixes after the walker refactor.** Load a level with
+      Constant smoke lighting on, then again with it off: the log has
+      `proxy: CreatePixelShader hooked (shader fixes)`, `proxy: Dither
+      fix: N of M pixel shaders changed so far; ...` with N > 0 and about
+      the counts of earlier logs (1000 of 2971 at a first level load),
+      with smoke on also `proxy: Constant smoke lighting: N of M ...`
+      with N > 0; no `rejected` or `refused` lines and no bright surfaces
+      in the right eye. (Seen once on 2026-10-20 for the dither counts,
+      OpenXR; smoke not checked.)
+- [ ] **Vtable hooks.** Start with an overlay running (Steam, RTSS):
+      `proxy: Present hooked, original=0x...` and the ResizeBuffers line
+      with nonzero addresses, and no crash.
+- [ ] **Foreign D3D11 callers.** Start with OBS or RTSS hooking the
+      game: its swapchain still logs `proxy: VR active, swapchain forced
+      windowed`. A plain run has no `... from outside AI.exe (return
+      address ...) passed through` line.
+- [ ] **Head pose fallback.** Play a heavy level for several minutes
+      with Dev. Debug Options on: no flashes of the screen view, no
+      `[stereo] exception in GetHeadPose caught`, no flip-flops between tracked and
+      screen in the frame-kind lines.
+- [ ] **OpenVR controls from the first second.** Press controller
+      buttons repeatedly right after start: every press registers.
+- [ ] **Window fit from the render thread.** Change the display mode in
+      VR: no hang. The log has `ResizeBuffers count=...` and, when the
+      window was too large, `proxy: mirror window WxH did not fit the
+      monitor, now borderless WxH`; never `cannot post the mirror window
+      fit to the game thread`.
+- [ ] **Mirror fallback.** Resize the window and toggle the mirror view:
+      the desktop window keeps drawing and ResizeBuffers does not fail. At
+      most once: `[stereo] desktop mirror: the game has no output bound at
+      end of frame; binding the back buffer`.
+- [ ] **Pixel scale typed first.** Before opening any menu, enter
+      `mvr_pixelscale 1.5` in the console: a short freeze while the
+      targets are rebuilt, and `[script_bridge] display reset raised;
+      changed: Rendering.PixelScale`. Changing Pixel Scale once in the
+      options page rebuilds them too.
+- [ ] **HUD Follow after a turn looking down.** Hud.Placement Follow;
+      look straight down, snap turn, look up: the HUD is at the new
+      heading at once, with no 300 ms glide.
+- [ ] **Follow camera handed back.** Load a level and play through a
+      cutscene that hands the camera back: snap turn and stick look keep
+      working at once afterwards.
+- [ ] **Action sites on a rebased image (2015 build).** The existing
+      action-site lines (see Hands) still appear; never `[hook] hands,
+      player action episodes: off; unexpected code ...`. A scripted kill
+      or grab hands off as before.
+- [ ] **Haptics on every shot.** Hands haptics with Firing on, Dev.
+      Debug Options on; fire the revolver several times, releasing the
+      trigger between shots: the right controller pulses each time, and
+      each shot logs `[diag] haptics: Firing pulse, ...`.
+- [ ] **Hand filter after a pause.** `"Smoothing": 1` with tracked hands;
+      pause a few seconds, move a hand, unpause: the hand is at the
+      controller at once, no 0.1 s slide.
+- [ ] **Aim without an aim pose.** With a binding that has the grip but
+      no aim pose and a weapon drawn, aiming falls back to the head, and
+      `hands: the runtime gives no aim pose for the right hand; aiming
+      stays on the head` is logged once.
+- [ ] **Weapon follow ends with the arm edit.** Start a melee swing:
+      the aim leaves the weapon transform as soon as the arm is no longer
+      edited (the `[diag] hands: aim ray` source changes within a frame).
+- [ ] **No skeleton reads before VR runs.** Body visibility other than
+      Full, VR not yet running: no `[body] WARNING ... could not be read`
+      lines; once VR runs, `[body] visibility <value>: ... collapsed`
+      appears once.
+- [ ] **Both holsters at once.** Controls.HolsterGestures on; squeeze
+      both grips with the right hand at the right shoulder and the left
+      at the left hip: both `[input] gesture: holster right shoulder
+      (right hand): ...` and `[input] gesture: holster left hip (left
+      hand): ...` are logged.
+- [ ] **Late runtime failure.** With OpenXR chosen and its render
+      resources failing (no OpenXR session available), the "runtime
+      failed" box appears while the game keeps rendering and responding;
+      the log has `[stereo] HMD backend cannot render, running without VR`.
+- [ ] **OpenXR start-up.** `openxr: swapchain WxH fmt=N images=K` with
+      K > 0; no enumerate failures and no `ENVIRONMENT_BLEND_MODE_UNSUPPORTED`.
+- [ ] **OpenXR virtual screen with no valid views.** In a menu or video,
+      cover the headset sensor: the virtual screen stays visible.
+- [ ] **OpenXR VR-off hotkey.** `openxr: ending the session at the
+      player's request`, then the session states STOPPING and stopped
+      within a frame or two, and `session and instance destroyed; VR off
+      until restart`; never `the runtime did not stop the session within
+      1000 ms`.
+- [ ] **OpenXR frames without an eye texture.** No `xrWaitFrame` or
+      `xrEndFrame` failure lines, and the controllers keep working.
+- [ ] **Discord reconnect.** Close and reopen the Discord client mid-game:
+      at most one `discord: connection lost` line per retry period.
+- [ ] **Install failure leaves D3D11 alone.** With a build whose preflight
+      fails (or Runtime None): the game runs stock; the log has the
+      `[hook]` mismatch lines and no `proxy: ... hooked` or `present #1`
+      lines.
+- [ ] **Crash filter chain.** With an overlay that installs its own
+      filter, force a crash: one `crash: the unhandled-exception filter
+      was replaced ...` line per foreign filter, a `crash:` record, and the
+      crash still reaches Windows Error Reporting.
+
 ## Builds and runtimes
 
 - [ ] Every item above on both OpenVR and OpenXR where it applies.
