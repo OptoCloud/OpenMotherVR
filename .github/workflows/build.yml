@@ -1,6 +1,8 @@
 # OpenMotherVR-Provenance: clean
 # Reusable build: d3d11.dll as a 32-bit release build with warnings as
-# errors, checked and packaged. Called by ci.yml and release.yml.
+# errors, checked and packaged. Called by ci.yml and release.yml. With
+# `traced` it builds the profiling flavour instead (MOTHERVR_TRACY=ON,
+# BUILDING.md "Profiling") so it keeps compiling: tested, never packaged.
 name: build
 
 on:
@@ -10,6 +12,10 @@ on:
         description: Version stamped into the DLL and the package name (1.0.0, 1.0.0-rc.2)
         type: string
         required: true
+      traced:
+        description: Build the traced (Tracy) flavour; nothing is packaged
+        type: boolean
+        default: false
     outputs:
       package:
         description: Name of the uploaded package artifact
@@ -55,7 +61,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: vcpkg-cache
-          key: vcpkg-${{ steps.baseline.outputs.commit }}-${{ hashFiles('vcpkg.json', 'triplets/**') }}
+          key: vcpkg-${{ steps.baseline.outputs.commit }}-${{ inputs.traced && 'tracy' || 'release' }}-${{ hashFiles('vcpkg.json', 'triplets/**', 'ports/**') }}
           restore-keys: vcpkg-${{ steps.baseline.outputs.commit }}-
 
       - name: Set up vcpkg
@@ -77,14 +83,17 @@ jobs:
             if ($_ -match '^([^=]+)=(.*)$') { "$($Matches[1])=$($Matches[2])" >> $env:GITHUB_ENV }
           }
 
+      # A traced build never carries a version (configure refuses one).
       - name: Configure
         shell: pwsh
         env:
           VERSION: ${{ inputs.version }}
-        run: >
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DMOTHERVR_WERROR=ON "-DMOTHERVR_VERSION=$env:VERSION"
+          TRACED: ${{ inputs.traced }}
+        run: |
+          $flavour = if ($env:TRACED -eq 'true') { '-DMOTHERVR_TRACY=ON' } else { "-DMOTHERVR_VERSION=$env:VERSION" }
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DMOTHERVR_WERROR=ON $flavour
 
       - name: Build
         run: cmake --build build
@@ -97,12 +106,23 @@ jobs:
       # Exports, imports, architecture and the version resource; a failure
       # stops the job before anything is packaged.
       - name: Check the DLL
+        if: ${{ !inputs.traced }}
         shell: pwsh
         env:
           VERSION: ${{ inputs.version }}
         run: ./scripts/check_dll.ps1 build/d3d11.dll -Version $env:VERSION
 
+      # The marker check_dll.ps1 keeps out of release builds is what tells
+      # run_game.ps1 a traced DLL; make sure the flag still puts it in.
+      - name: Check the traced DLL
+        if: ${{ inputs.traced }}
+        shell: pwsh
+        run: |
+          $text = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes('build/d3d11.dll'))
+          if (-not $text.Contains('Tracy')) { Write-Output '::error::the traced build has no Tracy client'; exit 1 }
+
       - name: Package
+        if: ${{ !inputs.traced }}
         id: package
         shell: pwsh
         env:
@@ -111,6 +131,7 @@ jobs:
 
       # The folder, not the zip: the artifact download is zipped already.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !inputs.traced }}
         with:
           name: ${{ steps.package.outputs.name }}
           path: out/${{ steps.package.outputs.name }}/
@@ -119,6 +140,7 @@ jobs:
       # d3d11.pdb of this exact DLL, kept apart from the player package; the
       # release attaches it so crash offsets from any release can be mapped.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !inputs.traced }}
         with:
           name: ${{ steps.package.outputs.symbols }}
           path: out/${{ steps.package.outputs.symbols }}/

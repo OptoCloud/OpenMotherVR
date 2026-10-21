@@ -63,3 +63,11 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.version }}
+
+  # The opt-in profiling flavour (BUILDING.md "Profiling"): built and
+  # tested so it keeps compiling, never packaged.
+  build-traced:
+    uses: ./.github/workflows/build.yml
+    with:
+      version: 0.0.0-dev
+      traced: true
