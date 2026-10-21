@@ -187,8 +187,9 @@ records which `UI.PAK` it came from) from the player's own `DATA\UI.PAK` and the
 is the player-facing guide.
 
 `scripts/run_game.ps1` (`-Seconds N`, `-Keep`, `-NoDeploy`, `-Dll <path>`)
-copies the build (and its `.pdb`) into the game folder, starts the game through Steam and reports the new log
-lines and any crash, with the faulting AI.exe code disassembled.
+copies the build (and its `.pdb`) into the game folder, starts the game
+through Steam and reports the new log lines and any crash, with the
+faulting AI.exe code disassembled.
 
 ### Profiling (Tracy)
 
@@ -235,8 +236,11 @@ What is traced: the render thread's frame (`begin_frame`, `end_frame` with
 `comfort`, `submit`, `mirror`, `present`), inside `submit` each backend's
 work (OpenXR `eye_copy`, `flush`, `xr_end_frame`, `xr_wait_frame`,
 `xr_begin_frame`, `input_sync`, `locate`; OpenVR `openvr_submit`,
-`wait_get_poses`, `input_sync`), the game thread's `head_pose`, and GPU
-spans for the game's frame, the comfort pass and the mirror. Frame marks
+`wait_get_poses`, `input_sync`), the game thread's `head_pose`, GPU spans
+for the game's frame, the comfort pass and the mirror, and CPU and GPU
+zones around the game passes the mod hooks: `reflection`, `final_draw`
+(the stereo final pass with its AA), `smaa` and `lens_flares`. The rest of
+`game_frame` (scene, shadows, lighting) is not broken down. Frame marks
 are the render thread's frames and the game thread's head-pose reads
 (`game`). Add a zone with `OMVR_ZONE(tracer, "name")` (or
 `OMVR_GPU_ZONE`) where a `core::diag::TracerRef` is at hand; a zone
