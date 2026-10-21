@@ -9,6 +9,7 @@
 #include "core/render/dxbc.h"
 #include "core/render/upright_sprites.h"
 #include "core/sm5_machine.h"
+#include "support/approx.h"
 
 #include <doctest/doctest.h>
 
@@ -24,6 +25,7 @@
 namespace {
 
 using namespace omvr::core::render;
+using omvr::tests::check_near;
 using omvr::tests::container;
 using omvr::tests::program_of;
 using omvr::tests::Sm5Machine;
@@ -51,18 +53,12 @@ Camera camera(float pitch, float roll) {
             f};
 }
 
-void check_vec(const Vec3& a, const Vec3& b) {
-    CHECK(a.x == doctest::Approx(b.x).epsilon(kEps));
-    CHECK(a.y == doctest::Approx(b.y).epsilon(kEps));
-    CHECK(a.z == doctest::Approx(b.z).epsilon(kEps));
-}
-
 TEST_CASE("an upright camera's sprites are the game's own") {
     const Camera c     = camera(0.3f, 0.0f);
     const SpriteAxes s = upright_sprite_axes(c.right, c.up, c.forward);
-    check_vec(s.right, c.right);
-    check_vec(s.up, c.up);
-    check_vec(s.forward, c.forward);
+    check_near(s.right, c.right, kEps);
+    check_near(s.up, c.up, kEps);
+    check_near(s.forward, c.forward, kEps);
     const Vec2 n = sprite_up_in_view(0.0f, 0.8f);
     CHECK(n.x == 0.0f);
     CHECK(n.y == 1.0f);
@@ -76,7 +72,7 @@ TEST_CASE("a rolled camera's sprites keep the view's forward and the world's up"
         for (const float roll : {0.2f, -0.6f, 1.2f, 3.0f}) {
             const Camera c     = camera(pitch, roll);
             const SpriteAxes s = upright_sprite_axes(c.right, c.up, c.forward);
-            check_vec(s.forward, c.forward);
+            check_near(s.forward, c.forward, kEps);
             // Still in the view plane, still an orthonormal pair.
             CHECK(dot3(s.right, c.forward) == doctest::Approx(0.0f).epsilon(kEps));
             CHECK(dot3(s.up, c.forward) == doctest::Approx(0.0f).epsilon(kEps));
@@ -87,8 +83,8 @@ TEST_CASE("a rolled camera's sprites keep the view's forward and the world's up"
             CHECK(s.right.y == doctest::Approx(0.0f).epsilon(kEps));
             CHECK(s.up.y > 0.0f);
             const Camera level = camera(pitch, 0.0f);
-            check_vec(s.up, level.up);
-            check_vec(s.right, level.right);
+            check_near(s.up, level.up, kEps);
+            check_near(s.right, level.right, kEps);
         }
     }
 }
@@ -114,8 +110,8 @@ TEST_CASE("looking straight up or down keeps the game's own orientation") {
         for (const float roll : {0.0f, 0.7f, -2.0f}) {
             const Camera c     = camera(pitch, roll);
             const SpriteAxes s = upright_sprite_axes(c.right, c.up, c.forward);
-            check_vec(s.right, c.right);
-            check_vec(s.up, c.up);
+            check_near(s.right, c.right, kEps);
+            check_near(s.up, c.up, kEps);
             CHECK(std::isfinite(s.up.x));
         }
     }
