@@ -29,7 +29,4 @@ inline constexpr int kOpenXrRuntimeUnavailable  = -51;
 inline constexpr float kHudFollowThreshold = 20.0f * std::numbers::pi_v<float> / 180.0f;
 inline constexpr std::chrono::milliseconds kHudFollowMove{300};
 
-// Degrees to radians, for Hud.Pitch.
-inline constexpr float kRadiansPerDegree = std::numbers::pi_v<float> / 180.0f;
-
 } // namespace omvr::core::ui

@@ -18,6 +18,7 @@
 #include "core/ui/ui_patch.h"
 #include "fakes/fakes.h"
 #include "util/hash/crc32.h"
+#include "util/math/angle.h"
 #include "util/math/matrix.h"
 
 #include <doctest/doctest.h>
@@ -54,7 +55,9 @@ using omvr::core::ui::HudVisibility;
 using Clock = std::chrono::steady_clock;
 
 constexpr float kNaN = std::numeric_limits<float>::quiet_NaN();
-constexpr float kDeg = std::numbers::pi_v<float> / 180.0f;
+constexpr float kDeg = omvr::util::kDegToRad;
+// The pi/180 this test and core/ui's Hud.Pitch conversion used, to the bit.
+static_assert(kDeg == std::numbers::pi_v<float> / 180.0f);
 
 Settings sanitized(Settings s) {
     sanitize(s);

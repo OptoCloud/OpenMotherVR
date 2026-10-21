@@ -4,6 +4,7 @@
 #include "core/stereo/tuning.h"
 #include "core/stereo/ui_placement.h"
 #include "core/ui/tuning.h"
+#include "util/math/angle.h"
 #include "util/math/finite.h"
 #include "util/math/matrix.h"
 #include "util/math/vec.h"
@@ -65,7 +66,7 @@ bool HudPanel::is_v1() const noexcept {
 }
 
 HudPanel hud_panel(const config::HudSettings& hud) noexcept {
-    return {hud.placement, hud.distance, hud.width, hud.pitch * kRadiansPerDegree};
+    return {hud.placement, hud.distance, hud.width, hud.pitch * util::kDegToRad};
 }
 
 Matrix44 head_locked_quad(const std::optional<Matrix44>& view, float inv_aspect, const HudPanel& p) noexcept {
