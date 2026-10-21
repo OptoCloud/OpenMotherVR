@@ -433,8 +433,6 @@ TEST_CASE("the runtime menu entries") {
     CHECK(running_runtime(s, state) == VRRuntime::OpenVR);
     state.chosen_runtime = Chosen::OpenXR;
     CHECK(running_runtime(s, state) == VRRuntime::OpenXR);
-    state.chosen_runtime = Chosen::Oculus;
-    CHECK(running_runtime(s, state) == VRRuntime::None);
     state.chosen_runtime = Chosen::OpenVR;
     state.has_failed     = true;
     CHECK(running_runtime(s, state) == VRRuntime::None);

@@ -12,8 +12,8 @@ using config::VRRuntime;
 bool preferred_available(const DetectResult& r) noexcept {
     switch (r.preferred) {
         case VRRuntime::OpenVR: return r.openvr_available;
-        case VRRuntime::Oculus: return r.oculus_available;
         case VRRuntime::OpenXR: return r.openxr_available;
+        case VRRuntime::Oculus: // no runtime of its own (06 §1.1)
         case VRRuntime::None: return false;
     }
     return false;
@@ -22,8 +22,8 @@ bool preferred_available(const DetectResult& r) noexcept {
 Chosen chosen_for(VRRuntime runtime) noexcept {
     switch (runtime) {
         case VRRuntime::OpenVR: return Chosen::OpenVR;
-        case VRRuntime::Oculus: return Chosen::Oculus;
         case VRRuntime::OpenXR: return Chosen::OpenXR;
+        case VRRuntime::Oculus: // never available, so never chosen
         case VRRuntime::None: return Chosen::None;
     }
     return Chosen::None;
@@ -32,7 +32,6 @@ Chosen chosen_for(VRRuntime runtime) noexcept {
 // Rule 3: whichever runtime is present, in this order.
 Chosen first_available(const DetectResult& r) noexcept {
     if (r.openvr_available) return Chosen::OpenVR;
-    if (r.oculus_available) return Chosen::Oculus;
     if (r.openxr_available) return Chosen::OpenXR;
     return Chosen::None;
 }
@@ -49,11 +48,19 @@ DetectResult::Chosen choose_runtime(const DetectResult& r) noexcept {
 const char* to_string(DetectResult::Chosen c) noexcept {
     switch (c) {
         case Chosen::OpenVR: return "OpenVR";
-        case Chosen::Oculus: return "Oculus";
         case Chosen::OpenXR: return "OpenXR";
         case Chosen::None: return "None";
     }
     return "None";
+}
+
+std::optional<VRRuntime> runtime_of(DetectResult::Chosen c) noexcept {
+    switch (c) {
+        case Chosen::OpenVR: return VRRuntime::OpenVR;
+        case Chosen::OpenXR: return VRRuntime::OpenXR;
+        case Chosen::None: return std::nullopt;
+    }
+    return std::nullopt;
 }
 
 } // namespace omvr::core::vr

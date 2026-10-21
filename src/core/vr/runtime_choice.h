@@ -4,6 +4,7 @@
 #include "core/config/settings.h"
 
 #include <filesystem>
+#include <optional>
 
 namespace omvr::core::vr {
 
@@ -15,12 +16,12 @@ namespace omvr::core::vr {
 // fail to start then (no headset connected, runtime in an error state).
 struct DetectResult {
     bool openvr_available       = false;
-    bool oculus_available       = false;
     bool openxr_available       = false;
     bool forced                 = false; // -vrforce<runtime>: no fallback
     config::VRRuntime preferred = config::VRRuntime::OpenVR;
-    // Enumerators spelled as config::VRRuntime spells them.
-    enum class Chosen { None, OpenVR, Oculus, OpenXR };
+    // Enumerators spelled as config::VRRuntime spells them. There is no
+    // Oculus: Meta's PC runtime is driven through OpenXR (06 §1.1).
+    enum class Chosen { None, OpenVR, OpenXR };
     Chosen chosen = Chosen::None;
 
     // The OpenVR runtime root: the directory containing
@@ -40,11 +41,15 @@ struct DetectResult {
 //      is missing means no VR, with no fallback. -vrforceoculus selects
 //      OpenXR.
 //   2. Otherwise the player's Settings.VRRuntime preference, if that
-//      runtime is available ("None" means no VR).
+//      runtime is available ("None" means no VR; "Oculus", which the
+//      settings turn into OpenXR on load, is never available).
 //   3. Otherwise whichever runtime is present.
 //   4. If none is present, None: the mod stays loaded but inert.
 DetectResult::Chosen choose_runtime(const DetectResult& r) noexcept;
 
 const char* to_string(DetectResult::Chosen c) noexcept;
+
+// The settings' runtime id of `c`; none for Chosen::None.
+std::optional<config::VRRuntime> runtime_of(DetectResult::Chosen c) noexcept;
 
 } // namespace omvr::core::vr

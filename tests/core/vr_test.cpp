@@ -221,9 +221,24 @@ TEST_CASE("runtime choice precedence") {
     DetectResult none;
     CHECK(choose_runtime(none) == Chosen::None);
 
+    // A preferred Oculus (the settings turn it into OpenXR on load) has no
+    // runtime of its own: the first one present, or none when forced.
+    DetectResult oculus;
+    oculus.openvr_available = true;
+    oculus.openxr_available = true;
+    oculus.preferred        = VRRuntime::Oculus;
+    CHECK(choose_runtime(oculus) == Chosen::OpenVR);
+    oculus.openvr_available = false;
+    CHECK(choose_runtime(oculus) == Chosen::OpenXR);
+    oculus.forced = true;
+    CHECK(choose_runtime(oculus) == Chosen::None);
+
+    CHECK(runtime_of(Chosen::OpenVR) == VRRuntime::OpenVR);
+    CHECK(runtime_of(Chosen::OpenXR) == VRRuntime::OpenXR);
+    CHECK_FALSE(runtime_of(Chosen::None).has_value());
+
     CHECK(std::string_view{to_string(Chosen::OpenVR)} == "OpenVR");
     CHECK(std::string_view{to_string(Chosen::OpenXR)} == "OpenXR");
-    CHECK(std::string_view{to_string(Chosen::Oculus)} == "Oculus");
     CHECK(std::string_view{to_string(Chosen::None)} == "None");
 }
 

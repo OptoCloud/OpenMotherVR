@@ -12,6 +12,7 @@
 #include "core/stereo/play_space.h"
 #include "core/stereo/render_target.h"
 #include "core/ui/compat_messages.h"
+#include "core/vr/runtime_choice.h"
 #include "game/constants.h"
 #include "game/stereo/stereo_objects.h" // layer exception: see stereo_device.h
 
@@ -132,14 +133,6 @@ void apply_eye_offsets(StereoInterface& si, const EyeOffsets& eye) noexcept {
     }
 }
 
-// The settings' runtime id the device records for `chosen`, none for a
-// runtime the device cannot drive.
-std::optional<config::VRRuntime> runtime_id_of(Chosen chosen) noexcept {
-    if (chosen == Chosen::OpenVR) return config::VRRuntime::OpenVR;
-    if (chosen == Chosen::OpenXR) return config::VRRuntime::OpenXR;
-    return std::nullopt;
-}
-
 } // namespace
 
 bool StereoDevice::running() const noexcept {
@@ -213,7 +206,7 @@ void StereoDevice::init_device(StereoInterface& si) noexcept {
     si.rt_width = si.rt_height = 0;
 
     const Chosen chosen   = runtimes_.last_result().chosen;
-    const auto runtime_id = runtime_id_of(chosen);
+    const auto runtime_id = vr::runtime_of(chosen);
     if (!runtime_id) {
         diag::ports::logf(log_, kNoDeviceLog, vr::to_string(chosen));
         return;

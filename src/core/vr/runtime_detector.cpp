@@ -13,7 +13,7 @@ namespace omvr::core::vr {
 namespace {
 
 // 11 §2.3: what was found, and what was chosen.
-constexpr std::string_view kLogProbe  = "vr probe: openvr={} oculus={} openxr={} preferred={}{}";
+constexpr std::string_view kLogProbe  = "vr probe: openvr={} openxr={} preferred={}{}";
 constexpr std::string_view kLogChosen = "vr probe: chosen={}";
 constexpr std::string_view kLogFailed = "vr probe: failed; chosen=None";
 
@@ -28,9 +28,6 @@ void RuntimeDetector::detect() noexcept {
         r.openvr_available              = openvr.available;
         r.openvr_runtime_path           = openvr.location;
 
-        // Oculus: served by OpenXR, see runtime_detector.h.
-        r.oculus_available = false;
-
         const ports::ProbeResult openxr = openxr_.probe();
         r.openxr_manifest               = openxr.location;
         r.openxr_available              = !r.openxr_manifest.empty();
@@ -39,7 +36,7 @@ void RuntimeDetector::detect() noexcept {
         r.forced          = forced.has_value();
         r.preferred       = forced.value_or(settings_.vr_runtime);
 
-        diag::ports::logf(log_, kLogProbe, r.openvr_available, r.oculus_available, r.openxr_available,
+        diag::ports::logf(log_, kLogProbe, r.openvr_available, r.openxr_available,
                           config::to_string(r.preferred), r.forced ? " (forced)" : "");
 
         r.chosen = choose_runtime(r);
