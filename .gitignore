@@ -33,3 +33,4 @@ build-ninja/
 # Material the project no longer needs (original binary, raw decompiles,
 # Ghidra projects); kept locally, not tracked
 archive/
+*.tracy
