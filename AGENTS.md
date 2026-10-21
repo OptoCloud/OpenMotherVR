@@ -19,7 +19,10 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
 
 - CI builds with Ninja in a `vcvars32.bat` environment and `MOTHERVR_WERROR=ON`;
   a warning fails it.
-- CI also fails on a commit subject that is not Conventional Commits, on a
+- CI also fails on a commit subject that is not Conventional Commits (on a
+  pull request; a push only warns, since master's history is never
+  rewritten: install `scripts/hooks/commit-msg` into `.git/hooks/` so a bad
+  subject is refused at commit time), on a
   tracked game file (`scripts/check_repo.sh`), and on a built DLL with the
   wrong exports, imports or version (`scripts/check_dll.ps1`). Each build
   keeps its `d3d11.pdb` as a separate artifact.
