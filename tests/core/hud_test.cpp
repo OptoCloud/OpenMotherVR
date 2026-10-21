@@ -65,7 +65,7 @@ Settings sanitized(Settings s) {
 // origin: its columns are the camera's right, up and forward axes.
 Matrix44 view_towards(float h) {
     Matrix44 m{};
-    omvr::util::identity(m.data());
+    omvr::util::identity(m);
     m[0]  = std::cos(h);
     m[8]  = -std::sin(h);
     m[2]  = std::sin(h);
@@ -408,7 +408,7 @@ TEST_SUITE("HUD placement") {
 
     TEST_CASE("head-locked: distance, width and pitch") {
         Matrix44 view{};
-        omvr::util::identity(view.data());
+        omvr::util::identity(view);
         HudPanel p;
         p.distance       = 2.0f;
         p.width          = 0.8f;
@@ -450,7 +450,7 @@ TEST_SUITE("HUD placement") {
         Matrix44 q = placer.place(view_towards(90.0f * kDeg), 0.5f, p, t0 + 10ms);
         CHECK(panel_heading(q) == doctest::Approx(90.0f * kDeg));
         Matrix44 down{};
-        omvr::util::identity(down.data());
+        omvr::util::identity(down);
         down[10] = 0.0f;
         down[6]  = -1.0f;
         q        = placer.place(down, 0.5f, p, t0 + 20ms);
@@ -465,7 +465,7 @@ TEST_SUITE("HUD placement") {
         const Clock::time_point t0{10s};
         placer.place(view_towards(0.0f), 0.5f, p, t0);
         Matrix44 down{};
-        omvr::util::identity(down.data());
+        omvr::util::identity(down);
         down[10] = 0.0f;
         down[6]  = -1.0f;
         placer.request_replace();

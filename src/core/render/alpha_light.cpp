@@ -48,7 +48,7 @@ CameraGap atlas_camera_gap(const util::Vec3& atlas_forward, const util::Vec3& at
     const float cosine           = lengths > 0.0f ? util::dot(atlas_forward, eye_forward) / lengths
                                                   : std::numeric_limits<float>::quiet_NaN();
     return {.angle_deg  = std::acos(std::clamp(cosine, -1.0f, 1.0f)) * util::kRadToDeg,
-            .distance_m = util::distance(atlas_position, util::camera_position(eye_view.data()))};
+            .distance_m = util::distance(atlas_position, util::camera_position(eye_view))};
 }
 
 bool AlphaLightTrace::camera_sample_due(int eye) noexcept {

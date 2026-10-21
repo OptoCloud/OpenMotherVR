@@ -72,7 +72,7 @@ Matrix44 head_locked_quad(const std::optional<Matrix44>& view, float inv_aspect,
     if (!view) return identity44();
     // Defaults: v1's own builder, so v1 is reproduced to the bit.
     if (p.is_v1()) return stereo::hud_panel_quad(view, inv_aspect);
-    const Matrix44 out = panel(util::camera_position(view->data()), column3(*view, kForwardAxis),
+    const Matrix44 out = panel(util::camera_position(*view), column3(*view, kForwardAxis),
                                column3(*view, kUpAxis), inv_aspect, p);
     return util::all_finite(out) ? out : identity44();
 }
@@ -81,7 +81,7 @@ Matrix44 level_quad(const std::optional<Matrix44>& view, float heading, float in
                     const HudPanel& p) noexcept {
     if (!view) return identity44();
     const Vec3 forward{std::sin(heading), 0.0f, std::cos(heading)};
-    const Matrix44 out = panel(util::camera_position(view->data()), forward, kWorldUp, inv_aspect, p);
+    const Matrix44 out = panel(util::camera_position(*view), forward, kWorldUp, inv_aspect, p);
     return util::all_finite(out) ? out : identity44();
 }
 

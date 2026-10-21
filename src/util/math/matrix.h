@@ -93,13 +93,6 @@ inline void identity(Matrix44MutView m) noexcept {
     }
 }
 
-// The unsized forms, kept while callers in core/render, core/ui and their
-// tests still pass `.data()`; they read and write the same 16 floats.
-inline Vec3 camera_position(const float* v) noexcept {
-    return camera_position(Matrix44View{v, kMatrix44Floats});
-}
-inline void identity(float* m) noexcept { identity(Matrix44MutView{m, kMatrix44Floats}); }
-
 // The 4x4 identity.
 inline Matrix44 identity44() noexcept {
     Matrix44 m{};
