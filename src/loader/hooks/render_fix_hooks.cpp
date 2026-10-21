@@ -1,6 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #include "loader/hooks/render_fix_hooks.h"
 
+#include "core/diag/trace.h"
 #include "core/stereo/reflection_pass.h"
 #include "core/stereo/stereo_aa.h"
 #include "game/stereo/cull.h"
@@ -111,7 +112,9 @@ game::stereo::ReflectionInstall install_reflections(game::stereo::ReflectionTarg
 }
 
 void __fastcall render_reflection(void* pov, void*) noexcept {
-    auto& ctx               = context();
+    auto& ctx = context();
+    OMVR_ZONE(ctx.tracer, "reflection");
+    OMVR_GPU_ZONE(ctx.tracer, "reflection");
     StereoInterface* dev    = game::stereo::load_device(ctx.manager);
     const DeviceState state = dev ? game::stereo::load_state(*dev) : DeviceState::None;
     ctx.reflections.note_pov(
@@ -134,7 +137,9 @@ void __fastcall render_reflection(void* pov, void*) noexcept {
 }
 
 void __cdecl stereo_final_draw() noexcept {
-    auto& ctx           = context();
+    auto& ctx = context();
+    OMVR_ZONE(ctx.tracer, "final_draw");
+    OMVR_GPU_ZONE(ctx.tracer, "final_draw");
     const auto& targets = ctx.targets.render_fixes.aa;
     void* postfx        = ctx.stereo.running() ? game::stereo::postfx_instance(targets) : nullptr;
     const AaMode mode   = postfx ? game::stereo::aa_mode(postfx) : AaMode::Off;
@@ -153,6 +158,8 @@ void __cdecl run_smaa(void* color, void* second, const std::uint8_t* temporal) n
     // The runner's temporal flag, off: spatial SMAA (08 §3.2).
     const std::uint8_t spatial = 0;
     auto& ctx                  = context();
+    OMVR_ZONE(ctx.tracer, "smaa");
+    OMVR_GPU_ZONE(ctx.tracer, "smaa");
     if (StereoAa::spatial_smaa(*temporal != 0, ctx.stereo.running())) temporal = &spatial;
     game::stereo::call_smaa(ctx.targets.render_fixes.aa, color, second, temporal);
 }

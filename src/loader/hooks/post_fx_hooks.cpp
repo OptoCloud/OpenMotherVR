@@ -1,6 +1,7 @@
 // OpenMotherVR-Provenance: clean
 #include "loader/hooks/post_fx_hooks.h"
 
+#include "core/diag/trace.h"
 #include "core/render/post_fx.h"
 #include "game/code_address.h"
 #include "game/sites/post_fx_effects.h"
@@ -42,6 +43,8 @@ core::render::PostFxOff this_frame(Context& ctx) noexcept {
 // While stereo runs with Graphics.LensFlares false, no flare is drawn.
 void __fastcall post_fx_lens_flare_draw(void* flares, void*, std::int32_t pass) noexcept {
     auto& ctx = context();
+    OMVR_ZONE(ctx.tracer, "lens_flares");
+    OMVR_GPU_ZONE(ctx.tracer, "lens_flares");
     if (this_frame(ctx).lens_flares) return;
     game::stereo::call_lens_flare_draw(ctx.post_fx_targets, flares, pass);
 }
