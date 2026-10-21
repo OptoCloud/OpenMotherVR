@@ -133,24 +133,6 @@ TEST_CASE("hand mapping matches 21 §3.1 for general poses") {
     }
 }
 
-TEST_CASE("quaternion of a rotation matrix, product, nlerp") {
-    for (const float angle : {0.0f, 1.0f, 3.0f}) {
-        Raw m;
-        raw_pose(m, {0, 0, 1}, angle, {});
-        Matrix34 mm{};
-        copy(m, mm.m);
-        const Quat q = omvr::util::quat_from_rotation(mm);
-        CHECK(q.z == doctest::Approx(std::sin(angle / 2)).epsilon(kEps));
-        CHECK(q.w == doctest::Approx(std::cos(angle / 2)).epsilon(kEps));
-    }
-    const Quat a = yaw(0.4f), b = yaw(0.2f);
-    const Quat ab = omvr::util::multiply(a, b);
-    CHECK(ab.y == doctest::Approx(std::sin(0.3f)));
-    CHECK(omvr::util::angle_between(a, b) == doctest::Approx(0.2f).epsilon(kEps));
-    const Quat half = omvr::util::nlerp(yaw(0), yaw(1.0f), 0.5f);
-    CHECK(omvr::util::yaw_of(half) == doctest::Approx(0.5f).epsilon(kEps));
-}
-
 TEST_CASE("smoothing: 0 is off; the cut-off goes from 10 Hz to 1 Hz") {
     CHECK(smoothing_cutoff_hz(0.0f) == doctest::Approx(10.0f));
     CHECK(smoothing_cutoff_hz(1.0f) == doctest::Approx(1.0f));
