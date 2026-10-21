@@ -17,7 +17,7 @@
 #include "core/ui/pak2.h"
 #include "core/ui/ui_patch.h"
 #include "fakes/fakes.h"
-#include "util/hash/crc32.h"
+#include "support/ui_patch_writer.h"
 #include "util/math/angle.h"
 #include "util/math/matrix.h"
 
@@ -479,43 +479,9 @@ TEST_SUITE("HUD placement") {
 }
 
 TEST_SUITE("UI patch variants") {
-    using omvr::core::ui::PatchEntry;
     using omvr::tests::bytes_of;
+    using omvr::tests::PatchWriter;
     using omvr::tests::string_of;
-
-    class Writer {
-    public:
-        explicit Writer(std::uint32_t count) {
-            text("MVRUIP01");
-            u32(4);
-            u32(count);
-        }
-        void stock(std::string_view name, std::string_view data) {
-            entry(name, PatchEntry::Stock);
-            u32(static_cast<std::uint32_t>(data.size()));
-            u32(omvr::util::crc32(bytes_of(data)));
-        }
-        void added(std::string_view name, std::string_view data) {
-            entry(name, PatchEntry::New);
-            u32(static_cast<std::uint32_t>(data.size()));
-            text(data);
-        }
-        std::vector<std::byte> out;
-
-    private:
-        void entry(std::string_view name, PatchEntry kind) {
-            const auto n = static_cast<std::uint16_t>(name.size());
-            raw(&n, sizeof(n));
-            text(name);
-            out.push_back(static_cast<std::byte>(kind));
-        }
-        void u32(std::uint32_t v) { raw(&v, sizeof(v)); }
-        void text(std::string_view s) { raw(s.data(), s.size()); }
-        void raw(const void* p, std::size_t n) {
-            const auto* b = static_cast<const std::byte*>(p);
-            out.insert(out.end(), b, b + n);
-        }
-    };
 
     TEST_CASE("the terminal text steps' tags and keys") {
         using omvr::core::ui::terminal_text_variant;
@@ -531,7 +497,7 @@ TEST_SUITE("UI patch variants") {
         omvr::tests::FakeArchiveFiles files;
         omvr::tests::RecordingLog log;
         files.files[L"UI.PAK"] = omvr::core::ui::build_pak(4, {{"T.GFX", bytes_of("stock")}});
-        Writer w(3);
+        PatchWriter w(4, 3);
         w.stock("T.GFX", "stock");
         w.added("T.GFX|text150", "large");
         w.added("T.GFX|text175", "huge!");

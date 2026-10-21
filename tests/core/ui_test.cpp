@@ -17,6 +17,7 @@
 #include "core/ui/ui_patch.h"
 #include "core/vr/runtime_failure.h"
 #include "fakes/fakes.h"
+#include "support/ui_patch_writer.h"
 #include "util/hash/crc32.h"
 
 #include <doctest/doctest.h>
@@ -43,6 +44,7 @@ using omvr::tests::FakeGameSignals;
 using omvr::tests::FakePlaySpaceControl;
 using omvr::tests::FakeRuntimeState;
 using omvr::tests::MemoryFileStore;
+using omvr::tests::PatchWriter;
 using omvr::tests::RecordingLog;
 using omvr::tests::RecordingScriptVariables;
 using omvr::tests::string_of;
@@ -616,33 +618,6 @@ TEST_CASE("PAK2 round trip") {
     CHECK_FALSE(read_pak(zero_align).has_value());
 }
 
-// A UI patch (MVRUIP01) built byte by byte, as scripts/ui_patch.py writes it.
-class PatchWriter {
-public:
-    PatchWriter(std::uint32_t align, std::uint32_t count) {
-        text("MVRUIP01");
-        u32(align);
-        u32(count);
-    }
-    void entry(std::string_view name, PatchEntry kind) {
-        u16(static_cast<std::uint16_t>(name.size()));
-        text(name);
-        u8(static_cast<std::uint8_t>(kind));
-    }
-    void u8(std::uint8_t v) { out.push_back(std::byte{v}); }
-    void u16(std::uint16_t v) { raw(&v, sizeof(v)); }
-    void u32(std::uint32_t v) { raw(&v, sizeof(v)); }
-    void text(std::string_view s) { raw(s.data(), s.size()); }
-
-    std::vector<std::byte> out;
-
-private:
-    void raw(const void* p, std::size_t n) {
-        const auto* b = static_cast<const std::byte*>(p);
-        out.insert(out.end(), b, b + n);
-    }
-};
-
 std::uint32_t crc_of(std::string_view s) { return omvr::util::crc32(bytes_of(s)); }
 
 TEST_CASE("the UI patch copies, rewrites and adds entries") {
@@ -653,9 +628,7 @@ TEST_CASE("the UI patch copies, rewrites and adds entries") {
     files.files[stock] = build_pak(4, {{"keep", bytes_of("hello")}, {"edit", bytes_of("abcdef")}});
 
     PatchWriter p(4, 3);
-    p.entry("keep", PatchEntry::Stock);
-    p.u32(5);
-    p.u32(crc_of("hello"));
+    p.stock("keep", "hello");
     p.entry("edit", PatchEntry::Delta);
     p.u32(6);
     p.u32(crc_of("abcdef"));
@@ -667,9 +640,7 @@ TEST_CASE("the UI patch copies, rewrites and adds entries") {
     p.u8(static_cast<std::uint8_t>(DeltaOp::Insert));
     p.u32(2);
     p.text("XY");
-    p.entry("new", PatchEntry::New);
-    p.u32(3);
-    p.text("new");
+    p.added("new", "new");
 
     REQUIRE(build_ui_archive(files, log, stock, p.out, target));
     const auto built = read_pak(files.files.at(target));
@@ -688,9 +659,7 @@ TEST_CASE("the UI patch refuses another stock version and a malformed patch") {
     files.files[stock]                 = build_pak(4, {{"keep", bytes_of("HELLO")}});
 
     PatchWriter p(4, 1);
-    p.entry("keep", PatchEntry::Stock);
-    p.u32(5);
-    p.u32(crc_of("hello"));
+    p.stock("keep", "hello");
     CHECK_FALSE(build_ui_archive(files, log, stock, p.out, target));
     CHECK(log.contains("ui patch: keep in UI.PAK is not the version the patch was made for"));
     CHECK_FALSE(files.files.contains(target));
@@ -723,9 +692,7 @@ TEST_CASE("the UI patch reports a temporary file it cannot create") {
     files.files[L"UI.PAK"] = build_pak(4, {{"n", bytes_of("x")}});
     files.fail_create      = true;
     PatchWriter p(4, 1);
-    p.entry("n", PatchEntry::New);
-    p.u32(1);
-    p.text("y");
+    p.added("n", "y");
     CHECK_FALSE(build_ui_archive(files, log, L"UI.PAK", p.out, L"MOTHER.PAK"));
     CHECK(log.contains("ui patch: cannot create MOTHER.PAK.tmp err=0x00000005"));
 }
