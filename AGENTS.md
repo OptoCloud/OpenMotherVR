@@ -35,7 +35,9 @@ cmake --build build --config Release        # -> build/Release/d3d11.dll
   `pwsh scripts/run_game.ps1 -Seconds 60` deploys the build, starts the game,
   prints the new `mothervr.log` lines and disassembles any crash (the log
   also has a `crash:` record with module, offset and callers). `-Keep`
-  leaves the game running.
+  leaves the game running. `-Tracy` runs the opt-in traced flavour
+  (`build-tracy`, `-DMOTHERVR_TRACY=ON`), records a trace and prints its
+  per-zone tables; see "Profiling" in `BUILDING.md`. Never ship it.
 - Unit tests of `src/util` and `src/core` are in `tests/` (doctest; target
   `omvr_tests`, built by default, never linked into the DLL):
   `ctest --test-dir build -C Release --output-on-failure` after a build. CI

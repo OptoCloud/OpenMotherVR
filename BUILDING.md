@@ -186,9 +186,63 @@ records which `UI.PAK` it came from) from the player's own `DATA\UI.PAK` and the
 `mothervr_input` bindings, and logs to `mothervr.log`. `packaging/README.txt`
 is the player-facing guide.
 
-`scripts/run_game.ps1` (`-Seconds N`, `-Keep`, `-NoDeploy`) copies the build
-into the game folder, starts the game through Steam and reports the new log
+`scripts/run_game.ps1` (`-Seconds N`, `-Keep`, `-NoDeploy`, `-Dll <path>`)
+copies the build (and its `.pdb`) into the game folder, starts the game through Steam and reports the new log
 lines and any crash, with the faulting AI.exe code disassembled.
+
+### Profiling (Tracy)
+
+The traced flavour is `d3d11.dll` with the [Tracy](https://github.com/wolfpld/tracy)
+0.14.1 profiler client, for local profiling only. It is off unless asked
+for, and nothing of it reaches any other build:
+
+- `-DMOTHERVR_TRACY=ON` turns on the vcpkg feature `tracy` (the overlay port
+  in `ports/tracy`, pinned to the profiler's version) and defines
+  `OMVR_TRACE`. Without it `core/diag/trace.h`'s macros expand to nothing,
+  `TracerRef` and `GpuSpan` are empty types, `src/platform/tracy` is not
+  compiled and Tracy is not fetched.
+- Configure stops if a traced build carries a release version
+  (`MOTHERVR_VERSION` other than `0.0.0-dev`), and `scripts/check_dll.ps1`
+  fails a DLL that imports `ws2_32.dll` or contains the string `Tracy`, so a
+  traced DLL cannot be packaged.
+
+```powershell
+cmake -S . -B build-tracy -G "Visual Studio 18 2026" -A Win32 `
+      -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+      -DMOTHERVR_WERROR=ON -DMOTHERVR_TRACY=ON
+cmake --build build-tracy --config Release   # -> build-tracy/Release/d3d11.dll
+```
+
+The client starts with the game's first D3D11 device (`trace: Tracy client
+started ...` in the log), listens on localhost only and sends data only
+while a profiler is connected; it installs no crash handler. Connect with
+the `tracy-profiler` GUI of the same version (0.14.1) from the Tracy
+release, or record without it:
+
+```powershell
+$env:TRACY_DIR = 'C:\Tools\tracy-0.14.1'      # tracy-capture and tracy-csvexport
+pwsh scripts/run_game.ps1 -Tracy -Seconds 120 [-Baseline traces\before.tracy]
+python -I scripts/tracy_summary.py traces\<time>.tracy [--baseline old.tracy]
+```
+
+`run_game.ps1 -Tracy` deploys `build-tracy`'s DLL and PDB (and refuses an
+untraced one; a plain run refuses a traced one), records the session with
+`tracy-capture` into `traces\` (ignored by git) and prints the per-zone
+tables (count, mean, p50, p95, p99, max; CPU zones per thread, GPU zones
+separately).
+
+What is traced: the render thread's frame (`begin_frame`, `end_frame` with
+`comfort`, `submit`, `mirror`, `present`), inside `submit` each backend's
+work (OpenXR `eye_copy`, `flush`, `xr_end_frame`, `xr_wait_frame`,
+`xr_begin_frame`, `input_sync`, `locate`; OpenVR `openvr_submit`,
+`wait_get_poses`, `input_sync`), the game thread's `head_pose`, and GPU
+spans for the game's frame, the comfort pass and the mirror. Frame marks
+are the render thread's frames and the game thread's head-pose reads
+(`game`). Add a zone with `OMVR_ZONE(tracer, "name")` (or
+`OMVR_GPU_ZONE`) where a `core::diag::TracerRef` is at hand; a zone
+costs nothing in a release build. `xr_wait_frame` and `wait_get_poses`
+are the runtime pacing the frame, not work: a frame over budget shows up
+there as the GPU's `game_frame` running long.
 
 ### Regenerating the UI patch
 
