@@ -894,6 +894,11 @@ need only a normal session.
       fails (or Runtime None): the game runs stock; the log has the
       `[hook]` mismatch lines and no `proxy: ... hooked` or `present #1`
       lines.
+- [ ] **Runtime detection without Oculus.** Start with SteamVR, then with
+      `-vrforceoculus` and an OpenXR runtime: the log has `vr probe:
+      openvr=<bool> openxr=<bool> preferred=<runtime>` (no `oculus=`
+      field), then `chosen=OpenVR` (with the switch, `chosen=OpenXR`); VR
+      starts on that runtime and the options page names it.
 - [ ] **Crash filter chain.** With an overlay that installs its own
       filter, force a crash: one `crash: the unhandled-exception filter
       was replaced ...` line per foreign filter, a `crash:` record, and the
