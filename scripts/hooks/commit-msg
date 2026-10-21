@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# OpenMotherVR-Provenance: clean
+# Stops a commit whose subject CI would flag (AGENTS.md, "Content rules"):
+# commits on master are never rewritten, so the subject has to be right
+# before the commit exists. Install: cp scripts/hooks/commit-msg .git/hooks/
+exec bash "$(git rev-parse --show-toplevel)/scripts/check_repo.sh" subject "$1"

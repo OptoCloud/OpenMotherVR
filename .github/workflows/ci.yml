@@ -41,7 +41,8 @@ jobs:
           if [[ "$EVENT" == pull_request ]]; then
             bash scripts/check_repo.sh commits "$PR_BASE" "$PR_HEAD"
           elif [[ "$EVENT" == push && -n "$BEFORE" && ! "$BEFORE" =~ ^0+$ ]]; then
-            bash scripts/check_repo.sh commits "$BEFORE" "$AFTER"
+            # Pushed commits are already history (never rewritten): warn.
+            bash scripts/check_repo.sh commits --warn "$BEFORE" "$AFTER"
           else
             echo "no commit range to check"
           fi
